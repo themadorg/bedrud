@@ -76,7 +76,7 @@ kotlin {
 
 dependencies {
     // Compose BOM
-    val composeBom = platform("androidx.compose:compose-bom:2026.04.01")
+    val composeBom = platform("androidx.compose:compose-bom:2026.05.00")
     implementation(composeBom)
 
     // Compose
@@ -95,7 +95,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     // LiveKit
-    implementation("io.livekit:livekit-android:2.25.0")
+    implementation("io.livekit:livekit-android:2.25.2")
     implementation("io.livekit:livekit-android-compose-components:2.3.0")
 
     // Retrofit + OkHttp
