@@ -1,0 +1,338 @@
+package com.bedrud.app.core.livekit
+
+import android.app.Application
+import android.util.Log
+import io.livekit.android.LiveKit
+import io.livekit.android.events.RoomEvent
+import io.livekit.android.events.collect
+import io.livekit.android.room.Room
+import io.livekit.android.room.RoomException
+import io.livekit.android.room.track.DataPublishReliability
+import io.livekit.android.room.participant.LocalParticipant
+import io.livekit.android.room.track.CameraPosition
+import io.livekit.android.room.track.LocalVideoTrack
+import io.livekit.android.room.track.Track
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import org.json.JSONObject
+
+enum class ConnectionState {
+    DISCONNECTED,
+    CONNECTING,
+    CONNECTED,
+    RECONNECTING,
+    FAILED
+}
+
+data class ChatAttachment(
+    val kind: String,   // "image"
+    val url: String,
+    val mime: String,
+    val w: Int = 0,
+    val h: Int = 0,
+    val size: Int = 0,
+)
+
+data class ChatMessage(
+    val senderName: String,
+    val text: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val isLocal: Boolean = false,
+    val attachments: List<ChatAttachment> = emptyList(),
+)
+
+class RoomManager(private val application: Application) {
+
+    private var _room: Room? = null
+    val room: Room? get() = _room
+
+    private var eventScope: CoroutineScope? = null
+
+    private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
+    val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
+
+    private val _isMicEnabled = MutableStateFlow(true)
+    val isMicEnabled: StateFlow<Boolean> = _isMicEnabled.asStateFlow()
+
+    private val _isCameraEnabled = MutableStateFlow(false)
+    val isCameraEnabled: StateFlow<Boolean> = _isCameraEnabled.asStateFlow()
+
+    private val _isScreenShareEnabled = MutableStateFlow(false)
+    val isScreenShareEnabled: StateFlow<Boolean> = _isScreenShareEnabled.asStateFlow()
+
+    // Incremented on every participant change to trigger recomposition
+    private val _participantVersion = MutableStateFlow(0)
+    val participantVersion: StateFlow<Int> = _participantVersion.asStateFlow()
+
+    private val _chatMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val chatMessages: StateFlow<List<ChatMessage>> = _chatMessages.asStateFlow()
+
+    private val _roomName = MutableStateFlow<String?>(null)
+    val roomName: StateFlow<String?> = _roomName.asStateFlow()
+
+    var onDisconnected: (() -> Unit)? = null
+
+    private val _wasKicked = MutableStateFlow(false)
+    val wasKicked: StateFlow<Boolean> = _wasKicked.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    suspend fun connect(url: String, token: String, roomName: String? = null, avatarUrl: String? = null) {
+        try {
+            _connectionState.value = ConnectionState.CONNECTING
+            _error.value = null
+            _roomName.value = roomName
+
+            val room = LiveKit.create(application)
+            _room = room
+
+            room.connect(url, token)
+
+            _connectionState.value = ConnectionState.CONNECTED
+
+            // Set avatar metadata on local participant
+            if (!avatarUrl.isNullOrBlank()) {
+                try {
+                    val metadata = JSONObject().apply {
+                        put("avatarUrl", avatarUrl)
+                    }.toString()
+                    room.localParticipant.updateMetadata(metadata)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to set avatar metadata", e)
+                }
+            }
+
+            // Enable mic and camera after connecting
+            try {
+                room.localParticipant.setMicrophoneEnabled(true)
+                _isMicEnabled.value = true
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to enable microphone", e)
+                _isMicEnabled.value = false
+            }
+
+            try {
+                room.localParticipant.setCameraEnabled(false)
+                _isCameraEnabled.value = false
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to enable camera", e)
+                _isCameraEnabled.value = false
+            }
+
+            // Notify initial participant state
+            _participantVersion.value++
+
+            // Listen for room events
+            eventScope?.cancel()
+            eventScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+            eventScope?.launch {
+                room.events.collect { event ->
+                    when (event) {
+                        is RoomEvent.DataReceived -> handleDataReceived(event)
+                        is RoomEvent.ParticipantConnected -> _participantVersion.value++
+                        is RoomEvent.ParticipantDisconnected -> _participantVersion.value++
+                        is RoomEvent.TrackSubscribed -> _participantVersion.value++
+                        is RoomEvent.TrackUnsubscribed -> _participantVersion.value++
+                        is RoomEvent.TrackPublished -> _participantVersion.value++
+                        is RoomEvent.TrackUnpublished -> _participantVersion.value++
+                        // When a track is muted/unmuted (e.g. camera turned off/on),
+                        // increment participantVersion so UI recomposes and can switch
+                        // between video and avatar.
+                        is RoomEvent.TrackMuted -> _participantVersion.value++
+                        is RoomEvent.TrackUnmuted -> _participantVersion.value++
+                        is RoomEvent.Reconnecting -> {
+                            _connectionState.value = ConnectionState.RECONNECTING
+                        }
+                        is RoomEvent.Reconnected -> {
+                            _connectionState.value = ConnectionState.CONNECTED
+                            _participantVersion.value++
+                        }
+                        is RoomEvent.Disconnected -> {
+                            // "PARTICIPANT_REMOVED" is the LiveKit disconnect reason for kick
+                            val kicked = event.reason?.name == "PARTICIPANT_REMOVED"
+                            if (kicked) _wasKicked.value = true
+                            _connectionState.value = ConnectionState.DISCONNECTED
+                            onDisconnected?.invoke()
+                        }
+                        else -> {}
+                    }
+                }
+            }
+
+            Log.d(TAG, "Connected to room: ${room.name}")
+        } catch (e: RoomException) {
+            Log.e(TAG, "Failed to connect to room", e)
+            _connectionState.value = ConnectionState.FAILED
+            _error.value = e.message ?: "Connection failed"
+        } catch (e: Exception) {
+            Log.e(TAG, "Unexpected error connecting to room", e)
+            _connectionState.value = ConnectionState.FAILED
+            _error.value = e.message ?: "Unexpected error"
+        }
+    }
+
+    private fun handleDataReceived(event: RoomEvent.DataReceived) {
+        try {
+            val json = JSONObject(String(event.data, Charsets.UTF_8))
+            val isChat = event.topic == "chat" || json.optString("type") == "chat"
+            if (isChat) {
+                val senderName = json.optString("senderName", "").ifBlank {
+                    event.participant?.name
+                        ?: event.participant?.identity?.value
+                        ?: "Unknown"
+                }
+                // Parse optional attachments (forward-compatible: old clients send none)
+                val attachments = mutableListOf<ChatAttachment>()
+                val attArray = json.optJSONArray("attachments")
+                if (attArray != null) {
+                    for (i in 0 until attArray.length()) {
+                        val att = attArray.optJSONObject(i) ?: continue
+                        attachments.add(ChatAttachment(
+                            kind = att.optString("kind", "image"),
+                            url = att.optString("url", ""),
+                            mime = att.optString("mime", ""),
+                            w = att.optInt("w", 0),
+                            h = att.optInt("h", 0),
+                            size = att.optInt("size", 0),
+                        ))
+                    }
+                }
+                val msg = ChatMessage(
+                    senderName = senderName,
+                    text = json.optString("message", ""),
+                    isLocal = false,
+                    attachments = attachments,
+                )
+                _chatMessages.value += msg
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse data message", e)
+        }
+    }
+
+    fun disconnect() {
+        eventScope?.cancel()
+        eventScope = null
+        _room?.disconnect()
+        _room?.release()
+        _room = null
+        _connectionState.value = ConnectionState.DISCONNECTED
+        _roomName.value = null
+        _isMicEnabled.value = true
+        _isCameraEnabled.value = false
+        _isScreenShareEnabled.value = false
+        _participantVersion.value = 0
+        _chatMessages.value = emptyList()
+        _wasKicked.value = false
+        _error.value = null
+        Log.d(TAG, "Disconnected from room")
+    }
+
+    suspend fun toggleMicrophone() {
+        val localParticipant = _room?.localParticipant ?: return
+        val enabled = !_isMicEnabled.value
+        try {
+            localParticipant.setMicrophoneEnabled(enabled)
+            _isMicEnabled.value = enabled
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to toggle microphone", e)
+            _error.value = "Failed to toggle microphone"
+        }
+    }
+
+    suspend fun toggleCamera() {
+        val localParticipant = _room?.localParticipant ?: return
+        val enabled = !_isCameraEnabled.value
+        try {
+            localParticipant.setCameraEnabled(enabled)
+            _isCameraEnabled.value = enabled
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to toggle camera", e)
+            _error.value = "Failed to toggle camera"
+        }
+    }
+
+    fun switchCamera() {
+        val localParticipant = _room?.localParticipant ?: return
+        val videoTrack = localParticipant.getTrackPublication(Track.Source.CAMERA)
+            ?.track as? LocalVideoTrack ?: return
+
+        val options = videoTrack.options.copy(
+            position = if (videoTrack.options.position == CameraPosition.FRONT) {
+                CameraPosition.BACK
+            } else {
+                CameraPosition.FRONT
+            }
+        )
+        videoTrack.restartTrack(options)
+    }
+
+    suspend fun toggleScreenShare() {
+        val localParticipant = _room?.localParticipant ?: return
+        val enabled = !_isScreenShareEnabled.value
+        try {
+            localParticipant.setScreenShareEnabled(enabled)
+            _isScreenShareEnabled.value = enabled
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to toggle screen share", e)
+            _error.value = "Screen share is not available: ${e.message}"
+        }
+    }
+
+    suspend fun sendChatMessage(text: String, attachments: List<ChatAttachment> = emptyList()) {
+        val room = _room ?: return
+        val localParticipant = room.localParticipant
+        val name = localParticipant.name ?: localParticipant.identity?.value ?: "Unknown"
+        val identity = localParticipant.identity?.value ?: ""
+
+        val json = JSONObject().apply {
+            put("type", "chat")
+            put("id", java.util.UUID.randomUUID().toString())
+            put("timestamp", System.currentTimeMillis())
+            put("message", text)
+            put("senderName", name)
+            put("senderIdentity", identity)
+            if (attachments.isNotEmpty()) {
+                val attArray = org.json.JSONArray()
+                attachments.forEach { att ->
+                    attArray.put(JSONObject().apply {
+                        put("kind", att.kind)
+                        put("url", att.url)
+                        put("mime", att.mime)
+                        put("w", att.w)
+                        put("h", att.h)
+                        put("size", att.size)
+                    })
+                }
+                put("attachments", attArray)
+            }
+        }
+        try {
+            localParticipant.publishData(
+                data = json.toString().toByteArray(Charsets.UTF_8),
+                reliability = DataPublishReliability.RELIABLE,
+                topic = "chat"
+            )
+            val msg = ChatMessage(senderName = name, text = text, isLocal = true, attachments = attachments)
+            _chatMessages.value += msg
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send chat message", e)
+            _error.value = "Failed to send message"
+        }
+    }
+
+    fun getLocalParticipant(): LocalParticipant? {
+        return _room?.localParticipant
+    }
+
+    companion object {
+        private const val TAG = "RoomManager"
+    }
+}

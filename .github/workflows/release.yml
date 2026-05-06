@@ -1,0 +1,1568 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  LIVEKIT_VERSION: "1.10.1"
+
+jobs:
+  # ── Server binaries (static) ──────────────────────────────────
+  server-binary:
+    name: Server – ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            suffix: linux_amd64
+            deb_arch: amd64
+            cgo: "1"
+            cc: zig cc -target x86_64-linux-musl
+            lk_arch: amd64
+          - goos: linux
+            goarch: arm64
+            suffix: linux_arm64
+            deb_arch: arm64
+            cgo: "1"
+            cc: zig cc -target aarch64-linux-musl
+            lk_arch: arm64
+          - goos: windows
+            goarch: amd64
+            suffix: windows_amd64
+            cgo: "1"
+            cc: zig cc -target x86_64-windows-gnu
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: mlugg/setup-zig@v1
+        with:
+          version: 0.14.0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25"
+          cache-dependency-path: server/go.sum
+
+      - name: Build and embed frontend
+        working-directory: apps/web
+        run: |
+          bun install --frozen-lockfile
+          bun run build:embed
+
+      - name: Cache LiveKit binary
+        id: lk-cache
+        uses: actions/cache@v5
+        with:
+          path: /tmp/livekit-cache
+          key: livekit-${{ env.LIVEKIT_VERSION }}-${{ matrix.goos }}-${{ matrix.goarch }}
+
+      - name: Download LiveKit binary
+        run: |
+          mkdir -p server/internal/livekit/bin /tmp/livekit-cache
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            LK_FILE="livekit_${LIVEKIT_VERSION}_windows_amd64.zip"
+            if [ ! -f "/tmp/livekit-cache/${LK_FILE}" ]; then
+              curl -fsSL "https://github.com/livekit/livekit/releases/download/v${LIVEKIT_VERSION}/${LK_FILE}" \
+                -o "/tmp/livekit-cache/${LK_FILE}"
+            fi
+            unzip "/tmp/livekit-cache/${LK_FILE}" livekit-server.exe -d server/internal/livekit/bin/
+          else
+            LK_FILE="livekit_${LIVEKIT_VERSION}_linux_${{ matrix.lk_arch }}.tar.gz"
+            if [ ! -f "/tmp/livekit-cache/${LK_FILE}" ]; then
+              curl -fsSL "https://github.com/livekit/livekit/releases/download/v${LIVEKIT_VERSION}/${LK_FILE}" \
+                -o "/tmp/livekit-cache/${LK_FILE}"
+            fi
+            tar -xzf "/tmp/livekit-cache/${LK_FILE}" -C server/internal/livekit/bin/ livekit-server
+            chmod +x server/internal/livekit/bin/livekit-server
+          fi
+
+      - name: Build server binary
+        working-directory: server
+        env:
+          CGO_ENABLED: ${{ matrix.cgo }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CC: ${{ matrix.cc }}
+        run: |
+          EXT=$([[ "${{ matrix.goos }}" == "windows" ]] && echo ".exe" || echo "")
+          VERSION="${{ github.ref_name }}"
+          if [ "${{ matrix.goos }}" == "windows" ]; then
+            go build -ldflags="-s -w -X main.version=${VERSION}" -o "../dist/bedrud${EXT}" ./cmd/bedrud/main.go
+          else
+            go build -ldflags="-s -w -X main.version=${VERSION} -linkmode external -extldflags -static" -o "../dist/bedrud${EXT}" ./cmd/bedrud/main.go
+          fi
+
+      - name: Package binary (Linux)
+        if: matrix.goos == 'linux'
+        run: |
+          cd dist
+          cp bedrud bedrud_${{ matrix.suffix }}
+          tar -cJf bedrud_${{ matrix.suffix }}.tar.xz bedrud
+          rm bedrud
+
+      - name: Package binary (Windows)
+        if: matrix.goos == 'windows'
+        run: |
+          cd dist
+          mv bedrud.exe bedrud_${{ matrix.suffix }}.exe
+          zip bedrud_${{ matrix.suffix }}.zip bedrud_${{ matrix.suffix }}.exe
+
+      - name: Package server (.deb)
+        if: matrix.goos == 'linux'
+        run: |
+          mkdir -p deb/DEBIAN \
+            deb/usr/bin \
+            deb/usr/lib/systemd/system \
+            deb/etc/bedrud \
+            deb/var/lib/bedrud \
+            deb/var/log/bedrud
+
+          cp dist/bedrud_${{ matrix.suffix }} deb/usr/bin/bedrud
+          cp apps/server/installer/linux/bedrud.service deb/usr/lib/systemd/system/
+
+          {
+            echo "Package: bedrud"
+            echo "Version: ${GITHUB_REF_NAME#v}"
+            echo "Architecture: ${{ matrix.deb_arch }}"
+            echo "Maintainer: Bedrud <info@bedrud.ir>"
+            echo "Homepage: https://github.com/bedrud-ir/bedrud"
+            echo "Description: Bedrud self-hosted video meeting server"
+            echo " A single binary packaging the web UI, REST API, and LiveKit WebRTC"
+            echo " media server. Supports Let's Encrypt TLS and SQLite/PostgreSQL."
+
+          } > deb/DEBIAN/control
+
+          cp apps/server/installer/linux/postinst deb/DEBIAN/postinst
+          chmod 0755 deb/DEBIAN/postinst
+
+          dpkg-deb --build deb bedrud_${{ matrix.deb_arch }}.deb
+
+      - uses: actions/upload-artifact@v7
+        if: matrix.goos == 'linux'
+        with:
+          name: server-${{ matrix.suffix }}
+          path: |
+            dist/bedrud_${{ matrix.suffix }}.tar.xz
+            dist/bedrud_${{ matrix.suffix }}
+
+      - uses: actions/upload-artifact@v7
+        if: matrix.goos == 'windows'
+        with:
+          name: server-${{ matrix.suffix }}
+          path: |
+            dist/bedrud_${{ matrix.suffix }}.zip
+            dist/bedrud_${{ matrix.suffix }}.exe
+
+      - uses: actions/upload-artifact@v7
+        if: matrix.goos == 'linux'
+        with:
+          name: server-deb-${{ matrix.deb_arch }}
+          path: bedrud_${{ matrix.deb_arch }}.deb
+
+      - name: Package server (.rpm)
+        if: matrix.goos == 'linux'
+        run: |
+          sudo apt-get install -y rpm
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          RPM_ARCH="${{ matrix.deb_arch == 'amd64' && 'x86_64' || 'aarch64' }}"
+
+          mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+
+          sed \
+            -e "s/VERSION_PLACEHOLDER/${VERSION}/" \
+            apps/server/installer/linux/bedrud.spec > rpmbuild/SPECS/bedrud.spec
+
+          install -Dm755 dist/bedrud_${{ matrix.suffix }} rpmbuild/BUILD/bedrud
+          install -Dm644 apps/server/installer/linux/bedrud.service \
+            rpmbuild/BUILD/bedrud.service
+
+          rpmbuild --define "_topdir $(pwd)/rpmbuild" \
+            --define "_builddir $(pwd)/rpmbuild/BUILD" \
+            --define "_arch ${RPM_ARCH}" \
+            -bb rpmbuild/SPECS/bedrud.spec
+
+          find rpmbuild/RPMS -name "*.rpm" -exec cp {} \
+            bedrud-${VERSION}-1.${RPM_ARCH}.rpm \;
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: server-rpm-${{ matrix.deb_arch }}
+          path: bedrud-*.rpm
+
+  # ── Docker image – Debian (assembled from pre-built binaries) ──
+  docker-debian:
+    name: Docker (Debian)
+    runs-on: ubuntu-latest
+    needs: server-binary
+    steps:
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: server-linux_*
+          path: docker-ctx
+
+      - name: Prepare Docker context
+        run: |
+          cp docker-ctx/server-linux_amd64/bedrud_linux_amd64 docker-ctx/bedrud_linux_amd64
+          cp docker-ctx/server-linux_arm64/bedrud_linux_arm64 docker-ctx/bedrud_linux_arm64
+          chmod +x docker-ctx/bedrud_linux_*
+
+          cat > docker-ctx/Dockerfile <<'DOCKERFILE'
+          FROM debian:bookworm-slim
+          RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
+          ARG TARGETARCH
+          ARG VERSION
+          LABEL org.opencontainers.image.version="${VERSION}"
+          COPY bedrud_linux_${TARGETARCH} /usr/local/bin/bedrud
+          EXPOSE 8090 7880
+          ENTRYPOINT ["bedrud"]
+          CMD ["run"]
+          DOCKERFILE
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: docker-ctx
+          file: docker-ctx/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.ref_name }}
+
+      - name: Export Docker images for offline use
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          for arch in amd64 arm64; do
+            docker buildx build \
+              --platform "linux/${arch}" \
+              --build-arg "TARGETARCH=${arch}" \
+              --tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${TAG}" \
+              --output "type=docker,dest=bedrud-docker-debian-${arch}.tar" \
+              --file docker-ctx/Dockerfile \
+              docker-ctx
+            gzip "bedrud-docker-debian-${arch}.tar"
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: docker-debian-amd64
+          path: bedrud-docker-debian-amd64.tar.gz
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: docker-debian-arm64
+          path: bedrud-docker-debian-arm64.tar.gz
+
+  # ── Docker image – Alpine (assembled from pre-built binaries) ──
+  docker-alpine:
+    name: Docker (Alpine)
+    runs-on: ubuntu-latest
+    needs: server-binary
+    steps:
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}-alpine
+            type=semver,pattern={{major}}.{{minor}}-alpine
+            type=raw,value=latest-alpine
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: server-linux_amd64
+          path: docker-ctx
+
+      - name: Prepare Docker context
+        run: |
+          cp docker-ctx/server-linux_amd64/bedrud_linux_amd64 docker-ctx/bedrud_linux_amd64
+          cp docker-ctx/server-linux_arm64/bedrud_linux_arm64 docker-ctx/bedrud_linux_arm64
+          chmod +x docker-ctx/bedrud_linux_*
+
+          cat > docker-ctx/Dockerfile <<'DOCKERFILE'
+          FROM alpine:3.21
+          RUN apk add --no-cache ca-certificates tzdata
+          ARG TARGETARCH
+          ARG VERSION
+          LABEL org.opencontainers.image.version="${VERSION}"
+          COPY bedrud_linux_${TARGETARCH} /usr/local/bin/bedrud
+          EXPOSE 8090 7880
+          ENTRYPOINT ["bedrud"]
+          CMD ["run"]
+          DOCKERFILE
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: docker-ctx
+          file: docker-ctx/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.ref_name }}
+
+      - name: Export Docker images for offline use
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          for arch in amd64 arm64; do
+            docker buildx build \
+              --platform "linux/${arch}" \
+              --build-arg "TARGETARCH=${arch}" \
+              --tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${TAG}-alpine" \
+              --output "type=docker,dest=bedrud-docker-alpine-${arch}.tar" \
+              --file docker-ctx/Dockerfile \
+              docker-ctx
+            gzip "bedrud-docker-alpine-${arch}.tar"
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: docker-alpine-amd64
+          path: bedrud-docker-alpine-amd64.tar.gz
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: docker-alpine-arm64
+          path: bedrud-docker-alpine-arm64.tar.gz
+
+  # ── Docker image – Distroless (assembled from pre-built binaries) ──
+  docker-distroless:
+    name: Docker (Distroless)
+    runs-on: ubuntu-latest
+    needs: server-binary
+    steps:
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}-distroless
+            type=semver,pattern={{major}}.{{minor}}-distroless
+            type=raw,value=latest-distroless
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: server-linux_amd64
+          path: docker-ctx
+
+      - name: Prepare Docker context
+        run: |
+          cp docker-ctx/server-linux_amd64/bedrud_linux_amd64 docker-ctx/bedrud_linux_amd64
+          cp docker-ctx/server-linux_arm64/bedrud_linux_arm64 docker-ctx/bedrud_linux_arm64
+          chmod +x docker-ctx/bedrud_linux_*
+
+          cat > docker-ctx/Dockerfile <<'DOCKERFILE'
+          FROM gcr.io/distroless/static-debian12
+          ARG TARGETARCH
+          ARG VERSION
+          LABEL org.opencontainers.image.version="${VERSION}"
+          COPY bedrud_linux_${TARGETARCH} /usr/local/bin/bedrud
+          EXPOSE 8090 7880
+          ENTRYPOINT ["bedrud"]
+          CMD ["run"]
+          DOCKERFILE
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: docker-ctx
+          file: docker-ctx/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.ref_name }}
+
+      - name: Export Docker images for offline use
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          for arch in amd64 arm64; do
+            docker buildx build \
+              --platform "linux/${arch}" \
+              --build-arg "TARGETARCH=${arch}" \
+              --tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${TAG}-distroless" \
+              --output "type=docker,dest=bedrud-docker-distroless-${arch}.tar" \
+              --file docker-ctx/Dockerfile \
+              docker-ctx
+            gzip "bedrud-docker-distroless-${arch}.tar"
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: docker-distroless-amd64
+          path: bedrud-docker-distroless-amd64.tar.gz
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: docker-distroless-arm64
+          path: bedrud-docker-distroless-arm64.tar.gz
+
+  # ── Android APK ──────────────────────────────────────────────
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/android
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PROPERTIES: ${{ secrets.ANDROID_KEYSTORE_PROPERTIES }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > keystore.jks
+            echo "$KEYSTORE_PROPERTIES" > keystore.properties
+          fi
+
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Build debug APKs
+        run: ./gradlew assembleDebug
+
+      - name: Build release APKs
+        run: |
+          if [ -f keystore.properties ]; then
+            ./gradlew assembleRelease
+          else
+            echo "⚠ Skipping release build — no signing key configured"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-debug-universal
+          path: apps/android/app/build/outputs/apk/debug/app-universal-debug.apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-debug-arm64-v8a
+          path: apps/android/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-debug-armeabi-v7a
+          path: apps/android/app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-debug-x86_64
+          path: apps/android/app/build/outputs/apk/debug/app-x86_64-debug.apk
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ hashFiles('apps/android/keystore.properties') != '' }}
+        with:
+          name: android-release-universal
+          path: apps/android/app/build/outputs/apk/release/app-universal-release.apk
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ hashFiles('apps/android/keystore.properties') != '' }}
+        with:
+          name: android-release-arm64-v8a
+          path: apps/android/app/build/outputs/apk/release/app-arm64-v8a-release.apk
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ hashFiles('apps/android/keystore.properties') != '' }}
+        with:
+          name: android-release-armeabi-v7a
+          path: apps/android/app/build/outputs/apk/release/app-armeabi-v7a-release.apk
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ hashFiles('apps/android/keystore.properties') != '' }}
+        with:
+          name: android-release-x86_64
+          path: apps/android/app/build/outputs/apk/release/app-x86_64-release.apk
+
+  # ── iOS IPA ──────────────────────────────────────────────────
+  ios:
+    name: iOS IPA
+    runs-on: macos-15
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: apps/ios
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Apple certificate and provisioning profile
+        env:
+          P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+          PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ github.run_id }}
+        run: |
+          if [ -z "$P12_BASE64" ]; then
+            echo "⚠ No iOS signing certificate configured"
+            exit 0
+          fi
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          CERT_PATH=$RUNNER_TEMP/certificate.p12
+          echo "$P12_BASE64" | base64 --decode > "$CERT_PATH"
+          security import "$CERT_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          if [ -n "$PROVISION_PROFILE_BASE64" ]; then
+            PP_PATH=$RUNNER_TEMP/profile.mobileprovision
+            echo "$PROVISION_PROFILE_BASE64" | base64 --decode > "$PP_PATH"
+            mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+            cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/
+          fi
+
+      - name: Cache Swift packages
+        uses: actions/cache@v5
+        with:
+          path: apps/ios/.spm-cache
+          key: ios-spm-${{ hashFiles('apps/ios/Bedrud.xcodeproj/project.pbxproj') }}
+          restore-keys: ios-spm-
+
+      - name: Resolve Swift packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project Bedrud.xcodeproj \
+            -scheme Bedrud \
+            -clonedSourcePackagesDirPath .spm-cache
+
+      - name: Run tests
+        run: |
+          xcodebuild test \
+            -project Bedrud.xcodeproj \
+            -scheme Bedrud \
+            -destination "platform=iOS Simulator,name=iPhone 17 Pro" \
+            -clonedSourcePackagesDirPath .spm-cache \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Build archive
+        env:
+          P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
+        run: |
+          if [ -z "$P12_BASE64" ]; then
+            echo "⚠ No iOS signing certificate — skipping archive build"
+            exit 0
+          fi
+          xcodebuild archive \
+            -project Bedrud.xcodeproj \
+            -scheme Bedrud \
+            -configuration Release \
+            -archivePath build/Bedrud.xcarchive \
+            -destination "generic/platform=iOS" \
+            -clonedSourcePackagesDirPath .spm-cache \
+            CODE_SIGN_STYLE=Automatic \
+            -allowProvisioningUpdates
+
+      - name: Export IPA
+        env:
+          HAS_CERT: ${{ secrets.IOS_P12_BASE64 != '' }}
+        run: |
+          if [ "$HAS_CERT" = "true" ]; then
+            xcodebuild -exportArchive \
+              -archivePath build/Bedrud.xcarchive \
+              -exportPath build/export \
+              -exportOptionsPlist ExportOptions.plist \
+              -allowProvisioningUpdates
+          else
+            echo "⚠ Skipping IPA export — no signing certificate configured"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ hashFiles('apps/ios/build/export/Bedrud.ipa') != '' }}
+        with:
+          name: ios-ipa
+          path: apps/ios/build/export/Bedrud.ipa
+
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          if [ -f "$KEYCHAIN_PATH" ]; then
+            security delete-keychain "$KEYCHAIN_PATH"
+          fi
+
+  # ── Desktop (multi-platform) ──────────────────────────────────
+  desktop:
+    name: Desktop – ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            name: linux-x86_64
+            deb_arch: amd64
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            name: linux-arm64
+            deb_arch: arm64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: windows-x86_64
+            nsis_arch: x64
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            name: windows-arm64
+            nsis_arch: arm64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            name: macos-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: macos-arm64
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install Slint dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libwayland-dev libgles2-mesa-dev libegl1-mesa-dev \
+            libdbus-1-dev libsecret-1-dev \
+            libasound2-dev
+
+      - name: Install NSIS (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Add macOS x86_64 cross-compile target
+        if: matrix.target == 'x86_64-apple-darwin'
+        run: rustup target add x86_64-apple-darwin
+
+      - name: Build release binary
+        run: cargo build -p bedrud-desktop --release --target ${{ matrix.target }}
+
+      # ── Linux packaging ─────────────────────────────────────
+      - name: Package Linux (portable tar.xz)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/bedrud-desktop dist/
+          tar -cJf bedrud-desktop-${{ matrix.name }}.tar.xz -C dist .
+
+      - name: Package Linux (.deb)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p deb/DEBIAN deb/usr/bin \
+            deb/usr/share/applications \
+            deb/usr/share/icons/hicolor/512x512/apps
+
+          cp target/${{ matrix.target }}/release/bedrud-desktop deb/usr/bin/
+          cp apps/web/public/logo512.png deb/usr/share/icons/hicolor/512x512/apps/bedrud.png
+          cp apps/desktop/installer/linux/bedrud.desktop deb/usr/share/applications/
+
+          {
+            echo "Package: bedrud-desktop"
+            echo "Version: ${GITHUB_REF_NAME#v}"
+            echo "Architecture: ${{ matrix.deb_arch }}"
+            echo "Maintainer: Bedrud <info@bedrud.ir>"
+            echo "Description: Bedrud Desktop — self-hosted video meeting client"
+            echo " Native desktop client for the Bedrud video meeting platform."
+            echo "Depends: libc6, libgcc1, libfontconfig1, libxkbcommon0, libsecret-1-0, libasound2"
+          } > deb/DEBIAN/control
+
+          dpkg-deb --build deb bedrud-desktop-${{ matrix.name }}.deb
+
+      - name: Package Linux (AppImage)
+        if: runner.os == 'Linux'
+        run: |
+          ARCH_TOOL=$([ "${{ matrix.name }}" = "linux-x86_64" ] && echo "x86_64" || echo "aarch64")
+
+          wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${ARCH_TOOL}.AppImage" \
+            -O appimagetool
+          chmod +x appimagetool
+
+          mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/512x512/apps
+
+          cp target/${{ matrix.target }}/release/bedrud-desktop AppDir/usr/bin/
+          cp apps/web/public/logo512.png AppDir/usr/share/icons/hicolor/512x512/apps/bedrud.png
+          cp apps/web/public/logo512.png AppDir/bedrud.png
+          cp apps/desktop/installer/linux/bedrud.desktop AppDir/bedrud.desktop
+          cp apps/desktop/installer/linux/AppRun AppDir/AppRun
+          chmod +x AppDir/AppRun
+
+          ARCH="${ARCH_TOOL}" APPIMAGE_EXTRACT_AND_RUN=1 \
+            ./appimagetool AppDir "bedrud-desktop-${{ matrix.name }}.AppImage"
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Linux'
+        with:
+          name: bedrud-desktop-${{ matrix.name }}-portable
+          path: bedrud-desktop-${{ matrix.name }}.tar.xz
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Linux'
+        with:
+          name: bedrud-desktop-${{ matrix.name }}-deb
+          path: bedrud-desktop-${{ matrix.name }}.deb
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Linux'
+        with:
+          name: bedrud-desktop-${{ matrix.name }}-appimage
+          path: bedrud-desktop-${{ matrix.name }}.AppImage
+
+      - name: Package Linux (.rpm)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y rpm
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          RPM_ARCH="${{ matrix.deb_arch == 'amd64' && 'x86_64' || 'aarch64' }}"
+
+          mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+
+          sed \
+            -e "s/VERSION_PLACEHOLDER/${VERSION}/" \
+            apps/desktop/installer/linux/bedrud-desktop.spec \
+            > rpmbuild/SPECS/bedrud-desktop.spec
+
+          install -Dm755 \
+            target/${{ matrix.target }}/release/bedrud-desktop \
+            rpmbuild/BUILD/bedrud-desktop
+          install -Dm644 \
+            apps/desktop/installer/linux/bedrud.desktop \
+            rpmbuild/BUILD/bedrud.desktop
+          install -Dm644 \
+            apps/web/public/logo512.png \
+            rpmbuild/BUILD/bedrud.png
+
+          rpmbuild --define "_topdir $(pwd)/rpmbuild" \
+            --define "_builddir $(pwd)/rpmbuild/BUILD" \
+            --define "_arch ${RPM_ARCH}" \
+            -bb rpmbuild/SPECS/bedrud-desktop.spec
+
+          find rpmbuild/RPMS -name "*.rpm" -exec cp {} \
+            bedrud-desktop-${VERSION}-1.${RPM_ARCH}.rpm \;
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Linux'
+        with:
+          name: bedrud-desktop-${{ matrix.name }}-rpm
+          path: bedrud-desktop-*.rpm
+
+      # ── Windows packaging ────────────────────────────────────
+      - name: Package Windows (portable zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item "target\${{ matrix.target }}\release\bedrud-desktop.exe" dist\
+          Compress-Archive -Path dist\* -DestinationPath "bedrud-desktop-${{ matrix.name }}.zip"
+
+      - name: Package Windows (NSIS installer)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Copy-Item "target\${{ matrix.target }}\release\bedrud-desktop.exe" apps\desktop\installer\windows\
+          cd apps\desktop\installer\windows
+          makensis /DARCH=${{ matrix.nsis_arch }} bedrud.nsi
+          Move-Item "bedrud-desktop-setup-${{ matrix.nsis_arch }}.exe" "${{ github.workspace }}\bedrud-desktop-${{ matrix.name }}-setup.exe"
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Windows'
+        with:
+          name: bedrud-desktop-${{ matrix.name }}-portable
+          path: bedrud-desktop-${{ matrix.name }}.zip
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Windows'
+        with:
+          name: bedrud-desktop-${{ matrix.name }}-setup
+          path: bedrud-desktop-${{ matrix.name }}-setup.exe
+
+      # ── macOS signing ────────────────────────────────────────────
+      - name: Sign macOS binary
+        if: runner.os == 'macOS'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          MACOS_TEAM_ID: ${{ secrets.MACOS_TEAM_ID }}
+          BIN: target/${{ matrix.target }}/release/bedrud-desktop
+        run: |
+          if [ -z "$MACOS_CERTIFICATE" ]; then
+            echo "⚠ MACOS_CERTIFICATE not set — skipping code signing"
+            echo "MACOS_SIGNED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          CERT_PATH="$RUNNER_TEMP/macos.p12"
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "ci-temp-password" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "ci-temp-password" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$MACOS_CERTIFICATE_PWD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list \
+            -S apple-tool:,apple: -k "ci-temp-password" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          codesign --deep --force --verify --verbose \
+            --sign "Developer ID Application: Bedrud ($MACOS_TEAM_ID)" \
+            --options runtime \
+            "$BIN"
+          echo "MACOS_SIGNED=true" >> "$GITHUB_ENV"
+
+      # ── macOS packaging ──────────────────────────────────────
+      - name: Package macOS (portable tar.gz + DMG)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/bedrud-desktop dist/
+
+          # Portable tarball
+          tar -czf bedrud-desktop-${{ matrix.name }}.tar.gz -C dist .
+
+          # DMG disk image
+          mkdir -p dmg-staging
+          cp target/${{ matrix.target }}/release/bedrud-desktop dmg-staging/
+          hdiutil create \
+            -volname "Bedrud Desktop" \
+            -srcfolder dmg-staging \
+            -ov -format UDZO \
+            "bedrud-desktop-${{ matrix.name }}.dmg"
+
+      - name: Notarize macOS DMG
+        if: runner.os == 'macOS' && env.MACOS_SIGNED == 'true'
+        env:
+          MACOS_APPLE_ID: ${{ secrets.MACOS_APPLE_ID }}
+          MACOS_APP_PWD: ${{ secrets.MACOS_APP_PWD }}
+          MACOS_TEAM_ID: ${{ secrets.MACOS_TEAM_ID }}
+          DMG: bedrud-desktop-${{ matrix.name }}.dmg
+        run: |
+          if [ -z "$MACOS_APPLE_ID" ] || [ -z "$MACOS_APP_PWD" ]; then
+            echo "⚠ Notarization credentials not set — skipping notarization"
+            exit 0
+          fi
+          xcrun notarytool submit "$DMG" \
+            --apple-id "$MACOS_APPLE_ID" \
+            --password "$MACOS_APP_PWD" \
+            --team-id "$MACOS_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$DMG"
+
+      - name: Cleanup macOS keychain
+        if: runner.os == 'macOS' && always()
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          [ -f "$KEYCHAIN_PATH" ] && security delete-keychain "$KEYCHAIN_PATH" || true
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'macOS'
+        with:
+          name: bedrud-desktop-${{ matrix.name }}-portable
+          path: bedrud-desktop-${{ matrix.name }}.tar.gz
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'macOS'
+        with:
+          name: bedrud-desktop-${{ matrix.name }}-dmg
+          path: bedrud-desktop-${{ matrix.name }}.dmg
+
+  # ── GitHub Release ───────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [server-binary, docker-debian, docker-alpine, docker-distroless, android, desktop]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          pattern: "{server-*,android-debug-*,android-release-*,ios-*,bedrud-desktop-*,docker-*}"
+
+      - name: Collect release assets
+        run: |
+          mkdir -p release-assets
+
+          # Server binaries – static (tar.xz + raw Linux)
+          find artifacts/server-linux_amd64 artifacts/server-linux_arm64 -type f \
+            -exec cp {} release-assets/ \; 2>/dev/null || true
+
+          # Server binaries – Windows
+          find artifacts/server-windows_* -type f \
+            -exec cp {} release-assets/ \; 2>/dev/null || true
+
+          # Server .deb packages
+          find artifacts/server-deb-* -name "*.deb" -exec cp {} release-assets/ \;
+
+          # Server .rpm packages
+          find artifacts/server-rpm-* -name "*.rpm" -exec cp {} release-assets/ \; 2>/dev/null || true
+
+          # Server .apk packages (Alpine)
+          find artifacts/server-apk-* -name "*.apk" -exec cp {} release-assets/ \; 2>/dev/null || true
+
+          # Android debug APKs
+          for f in \
+            "android-debug-universal/app-universal-debug.apk:bedrud-android-universal-debug.apk" \
+            "android-debug-arm64-v8a/app-arm64-v8a-debug.apk:bedrud-android-arm64-v8a-debug.apk" \
+            "android-debug-armeabi-v7a/app-armeabi-v7a-debug.apk:bedrud-android-armeabi-v7a-debug.apk" \
+            "android-debug-x86_64/app-x86_64-debug.apk:bedrud-android-x86_64-debug.apk"; do
+            src="${f%%:*}" dst="${f##*:}"
+            [ -f "artifacts/${src}" ] && cp "artifacts/${src}" "release-assets/${dst}" || true
+          done
+
+          # Android release APKs (signed)
+          for f in \
+            "android-release-universal/app-universal-release.apk:bedrud-android-universal-release.apk" \
+            "android-release-arm64-v8a/app-arm64-v8a-release.apk:bedrud-android-arm64-v8a-release.apk" \
+            "android-release-armeabi-v7a/app-armeabi-v7a-release.apk:bedrud-android-armeabi-v7a-release.apk" \
+            "android-release-x86_64/app-x86_64-release.apk:bedrud-android-x86_64-release.apk"; do
+            src="${f%%:*}" dst="${f##*:}"
+            [ -f "artifacts/${src}" ] && cp "artifacts/${src}" "release-assets/${dst}" || true
+          done
+
+          # iOS IPA (optional — may not exist without signing certs)
+          [ -f artifacts/ios-ipa/Bedrud.ipa ] && cp artifacts/ios-ipa/Bedrud.ipa release-assets/Bedrud.ipa || true
+
+          # Desktop: AppImages, portables, installers, debs, RPMs, DMGs
+          find artifacts/bedrud-desktop-* -type f -exec cp {} release-assets/ \;
+
+          # Docker images for offline/air-gapped use
+          find artifacts/docker-* -name "*.tar.gz" -exec cp {} release-assets/ \; 2>/dev/null || true
+
+          ls -la release-assets/
+
+      - name: Generate release body
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          VERSION="${TAG#v}"
+          BASE="https://github.com/${REPO}/releases/download/${TAG}"
+          cat > release-body.md <<'BODY'
+          ## 🚀 Quick Start
+
+          **Pick the right binary for your OS:**
+
+           | Platform | Binary |
+           |----------|--------|
+           | x86_64 | `bedrud_linux_amd64.tar.xz` |
+           | ARM64 | `bedrud_linux_arm64.tar.xz` |
+
+           Static binary — works on Debian, Ubuntu, Alpine, Raspbian, etc.
+
+          ```bash
+          # Download, extract, run
+          tar -xJf bedrud_linux_amd64.tar.xz
+          ./bedrud run
+          ```
+
+          ---
+
+           ## 🐳 Docker
+
+           ```bash
+           # Debian (default)
+           docker pull ghcr.io/bedrud-ir/bedrud:latest
+
+           # Alpine
+           docker pull ghcr.io/bedrud-ir/bedrud:latest-alpine
+
+           # Distroless
+           docker pull ghcr.io/bedrud-ir/bedrud:latest-distroless
+           ```
+
+           Offline / air-gapped:
+           ```bash
+           docker load < bedrud-docker-debian-amd64.tar.gz
+           # or Alpine:
+           docker load < bedrud-docker-alpine-amd64.tar.gz
+           # or Distroless:
+           docker load < bedrud-docker-distroless-amd64.tar.gz
+           ```
+
+          ---
+
+          ## 📦 Package Managers
+
+          | Format | Architecture | File |
+          |--------|-------------|------|
+          | `.deb` | x86_64 / ARM64 | `bedrud_amd64.deb` / `bedrud_arm64.deb` |
+          | `.rpm` | x86_64 / aarch64 | See assets below |
+          | `.apk` | x86_64 / aarch64 | `bedrud_x86_64.apk` / `bedrud_aarch64.apk` |
+
+          ```bash
+          # Debian/Ubuntu
+          sudo dpkg -i bedrud_amd64.deb
+
+          # Alpine
+          apk add --allow-untrusted bedrud_x86_64.apk
+          ```
+
+          ---
+
+          ## 🖥 Server Binaries
+
+           | File | Platform |
+           |------|----------|
+           | `bedrud_linux_amd64.tar.xz` | Linux x86_64 (static) |
+           | `bedrud_linux_arm64.tar.xz` | Linux ARM64 (static) |
+           | `bedrud_windows_amd64.zip` | Windows x86_64 |
+
+          ---
+
+          ## 🐳 Docker Images (offline)
+
+           | File | Platform | Base |
+           |------|----------|-------|
+           | `bedrud-docker-debian-amd64.tar.gz` | x86_64 | Debian 12 |
+           | `bedrud-docker-debian-arm64.tar.gz` | ARM64 | Debian 12 |
+           | `bedrud-docker-alpine-amd64.tar.gz` | x86_64 | Alpine 3.21 |
+           | `bedrud-docker-alpine-arm64.tar.gz` | ARM64 | Alpine 3.21 |
+           | `bedrud-docker-distroless-amd64.tar.gz` | x86_64 | Distroless |
+           | `bedrud-docker-distroless-arm64.tar.gz` | ARM64 | Distroless |
+
+          ---
+
+          ## What Changed
+
+          BODY
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          body_path: release-body.md
+          generate_release_notes: true
+          files: release-assets/*
+
+  # ── Secret availability check ────────────────────────────────
+  check-secrets:
+    name: Check available secrets
+    runs-on: ubuntu-latest
+    needs: release
+    if: needs.release.result == 'success'
+    outputs:
+      has_aur: ${{ steps.check.outputs.has_aur }}
+      has_snap: ${{ steps.check.outputs.has_snap }}
+      has_choco: ${{ steps.check.outputs.has_choco }}
+      has_homebrew: ${{ steps.check.outputs.has_homebrew }}
+      has_winget: ${{ steps.check.outputs.has_winget }}
+      has_telegram: ${{ steps.check.outputs.has_telegram }}
+    steps:
+      - name: Check secrets
+        id: check
+        env:
+          AUR_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          SNAP_CREDS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+          CHOCO_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+          HOMEBREW_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          WINGET_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          echo "has_aur=${{ env.AUR_KEY != '' }}" >> "$GITHUB_OUTPUT"
+          echo "has_snap=${{ env.SNAP_CREDS != '' }}" >> "$GITHUB_OUTPUT"
+          echo "has_choco=${{ env.CHOCO_KEY != '' }}" >> "$GITHUB_OUTPUT"
+          echo "has_homebrew=${{ env.HOMEBREW_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+          echo "has_winget=${{ env.WINGET_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+          echo "has_telegram=${{ env.TG_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
+  # ── Telegram notification ─────────────────────────────────────
+  telegram:
+    name: Notify Telegram
+    runs-on: ubuntu-latest
+    needs: [release, check-secrets]
+    if: needs.check-secrets.outputs.has_telegram == 'true'
+    steps:
+      - name: Send Telegram notification
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          BASE="https://github.com/${REPO}/releases/download/${TAG}"
+          RELEASE_URL="https://github.com/${REPO}/releases/tag/${TAG}"
+
+          MSG=$(cat <<EOF
+          🚀 <b>Bedrud ${TAG} released!</b>
+
+          <a href="${RELEASE_URL}">📦 View full release on GitHub</a>
+
+           <b>🖥 Server binaries</b>
+           • <a href="${BASE}/bedrud_linux_amd64.tar.xz">Linux x86_64 (static)</a>
+           • <a href="${BASE}/bedrud_linux_arm64.tar.xz">Linux ARM64 (static)</a>
+
+          <b>🖥 Server packages</b>
+          • <a href="${BASE}/bedrud_amd64.deb">x86_64 .deb</a>
+          • <a href="${BASE}/bedrud_arm64.deb">ARM64 .deb</a>
+          • x86_64 .rpm / ARM64 .rpm (see release page)
+          • x86_64 .apk / aarch64 .apk (Alpine)
+
+          <b>🤖 Android (release)</b>
+          • <a href="${BASE}/bedrud-android-universal-release.apk">Universal APK</a>
+          • <a href="${BASE}/bedrud-android-arm64-v8a-release.apk">arm64-v8a</a>
+          • <a href="${BASE}/bedrud-android-armeabi-v7a-release.apk">armeabi-v7a</a>
+          • <a href="${BASE}/bedrud-android-x86_64-release.apk">x86_64</a>
+
+          <b>🤖 Android (debug)</b>
+          • <a href="${BASE}/bedrud-android-universal-debug.apk">Universal APK</a>
+          • <a href="${BASE}/bedrud-android-arm64-v8a-debug.apk">arm64-v8a</a>
+          • <a href="${BASE}/bedrud-android-armeabi-v7a-debug.apk">armeabi-v7a</a>
+          • <a href="${BASE}/bedrud-android-x86_64-debug.apk">x86_64</a>
+
+          <b>🪟 Desktop Windows (installer)</b>
+          • <a href="${BASE}/bedrud-desktop-windows-x86_64-setup.exe">x86_64 Setup</a>
+          • <a href="${BASE}/bedrud-desktop-windows-arm64-setup.exe">ARM64 Setup</a>
+
+          <b>🪟 Desktop Windows (portable)</b>
+          • <a href="${BASE}/bedrud-desktop-windows-x86_64.zip">x86_64 zip</a>
+          • <a href="${BASE}/bedrud-desktop-windows-arm64.zip">ARM64 zip</a>
+
+          <b>🐧 Desktop Linux (AppImage)</b>
+          • <a href="${BASE}/bedrud-desktop-linux-x86_64.AppImage">x86_64 AppImage</a>
+          • <a href="${BASE}/bedrud-desktop-linux-arm64.AppImage">ARM64 AppImage</a>
+
+          <b>🐧 Desktop Linux (portable)</b>
+          • <a href="${BASE}/bedrud-desktop-linux-x86_64.tar.xz">x86_64 tar.xz</a>
+          • <a href="${BASE}/bedrud-desktop-linux-arm64.tar.xz">ARM64 tar.xz</a>
+
+          <b>🐧 Desktop Linux (.deb)</b>
+          • <a href="${BASE}/bedrud-desktop-linux-x86_64.deb">x86_64 .deb</a>
+          • <a href="${BASE}/bedrud-desktop-linux-arm64.deb">ARM64 .deb</a>
+
+          <b>🐧 Desktop Linux (.rpm)</b>
+          • x86_64 .rpm / aarch64 .rpm (see release page)
+
+          <b>🍎 Desktop macOS</b>
+          • <a href="${BASE}/bedrud-desktop-macos-x86_64.dmg">Intel DMG</a>
+          • <a href="${BASE}/bedrud-desktop-macos-arm64.dmg">Apple Silicon DMG</a>
+
+           <b>🐳 Docker (Debian, default)</b>
+           <code>docker pull ghcr.io/${REPO}:${TAG}</code>
+
+           <b>🐳 Docker (Alpine)</b>
+           <code>docker pull ghcr.io/${REPO}:${TAG}-alpine</code>
+
+           <b>🐳 Docker (Distroless)</b>
+           <code>docker pull ghcr.io/${REPO}:${TAG}-distroless</code>
+
+          <b>🐳 Docker offline / air-gapped</b>
+           • <a href="${BASE}/bedrud-docker-debian-amd64.tar.gz">x86_64 Debian image</a>
+           • <a href="${BASE}/bedrud-docker-debian-arm64.tar.gz">ARM64 Debian image</a>
+           • <a href="${BASE}/bedrud-docker-alpine-amd64.tar.gz">x86_64 Alpine image</a>
+           • <a href="${BASE}/bedrud-docker-alpine-arm64.tar.gz">ARM64 Alpine image</a>
+           • <a href="${BASE}/bedrud-docker-distroless-amd64.tar.gz">x86_64 Distroless image</a>
+           • <a href="${BASE}/bedrud-docker-distroless-arm64.tar.gz">ARM64 Distroless image</a>
+           <code>docker load &lt; bedrud-docker-debian-amd64.tar.gz</code>
+          EOF
+          )
+
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${CHAT_ID}" \
+            -d "parse_mode=HTML" \
+            -d "disable_web_page_preview=true" \
+            --data-urlencode "text=${MSG}"
+
+  # ── AUR: desktop client ───────────────────────────────────────
+  aur-desktop:
+    name: AUR – bedrud-desktop-bin
+    runs-on: ubuntu-latest
+    needs: [release, check-secrets]
+    if: needs.check-secrets.outputs.has_aur == 'true'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Update PKGBUILD checksums
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          BASE="https://github.com/${REPO}/releases/download/${TAG}"
+          PKGVER="${TAG#v}"
+          X86_URL="${BASE}/bedrud-desktop-linux-x86_64.tar.xz"
+          ARM_URL="${BASE}/bedrud-desktop-linux-arm64.tar.xz"
+
+          X86_SHA=$(curl -fsSL "$X86_URL" | sha256sum | awk '{print $1}')
+          ARM_SHA=$(curl -fsSL "$ARM_URL" | sha256sum | awk '{print $1}')
+
+          sed -i "s/^pkgver=.*/pkgver=${PKGVER}/" packages/aur/PKGBUILD
+          sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('${X86_SHA}')/" packages/aur/PKGBUILD
+          sed -i "s/^sha256sums_aarch64=.*/sha256sums_aarch64=('${ARM_SHA}')/" packages/aur/PKGBUILD
+
+          sed -i "s/pkgver = .*/pkgver = ${PKGVER}/" packages/aur/.SRCINFO
+          sed -i "s|source_x86_64 = .*tar.xz.*|source_x86_64 = bedrud-desktop-bin-${PKGVER}-x86_64.tar.xz::${X86_URL}|" packages/aur/.SRCINFO
+          sed -i "s|source_aarch64 = .*tar.xz.*|source_aarch64 = bedrud-desktop-bin-${PKGVER}-aarch64.tar.xz::${ARM_URL}|" packages/aur/.SRCINFO
+          sed -i "s/sha256sums_x86_64 = .*/sha256sums_x86_64 = ${X86_SHA}/" packages/aur/.SRCINFO
+          sed -i "s/sha256sums_aarch64 = .*/sha256sums_aarch64 = ${ARM_SHA}/" packages/aur/.SRCINFO
+
+      - name: Push to AUR
+        uses: KSXGitHub/github-actions-deploy-aur@v3
+        with:
+          pkgname: bedrud-desktop-bin
+          pkgbuild: packages/aur/PKGBUILD
+          assets: packages/aur/.SRCINFO
+          commit_username: bedrud-bot
+          commit_email: info@bedrud.ir
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "Update to ${{ github.ref_name }}"
+
+  # ── AUR: server ───────────────────────────────────────────────
+  aur-server:
+    name: AUR – bedrud-bin
+    runs-on: ubuntu-latest
+    needs: [release, check-secrets]
+    if: needs.check-secrets.outputs.has_aur == 'true'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Update PKGBUILD checksums
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          BASE="https://github.com/${REPO}/releases/download/${TAG}"
+          PKGVER="${TAG#v}"
+          X86_URL="${BASE}/bedrud_linux_amd64.tar.xz"
+          ARM_URL="${BASE}/bedrud_linux_arm64.tar.xz"
+
+          X86_SHA=$(curl -fsSL "$X86_URL" | sha256sum | awk '{print $1}')
+          ARM_SHA=$(curl -fsSL "$ARM_URL" | sha256sum | awk '{print $1}')
+
+          sed -i "s/^pkgver=.*/pkgver=${PKGVER}/" packages/aur/bedrud-server/PKGBUILD
+          sed -i "0,/^sha256sums_x86_64=/{s/^sha256sums_x86_64=.*/sha256sums_x86_64=('${X86_SHA}' 'SKIP')/}" packages/aur/bedrud-server/PKGBUILD
+          sed -i "0,/^sha256sums_aarch64=/{s/^sha256sums_aarch64=.*/sha256sums_aarch64=('${ARM_SHA}' 'SKIP')/}" packages/aur/bedrud-server/PKGBUILD
+
+          sed -i "s/pkgver = .*/pkgver = ${PKGVER}/" packages/aur/bedrud-server/.SRCINFO
+          sed -i "s|source_x86_64 = .*tar.xz.*|source_x86_64 = bedrud-bin-${PKGVER}-x86_64.tar.xz::${X86_URL}|" packages/aur/bedrud-server/.SRCINFO
+          sed -i "s|source_aarch64 = .*tar.xz.*|source_aarch64 = bedrud-bin-${PKGVER}-aarch64.tar.xz::${ARM_URL}|" packages/aur/bedrud-server/.SRCINFO
+
+      - name: Push to AUR
+        uses: KSXGitHub/github-actions-deploy-aur@v3
+        with:
+          pkgname: bedrud-bin
+          pkgbuild: packages/aur/bedrud-server/PKGBUILD
+          assets: packages/aur/bedrud-server/.SRCINFO
+          commit_username: bedrud-bot
+          commit_email: info@bedrud.ir
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "Update to ${{ github.ref_name }}"
+
+  # ── Snap Store ────────────────────────────────────────────────
+  snap-publish:
+    name: Snap Store – bedrud-desktop
+    runs-on: ubuntu-latest
+    needs: [release, check-secrets]
+    if: needs.check-secrets.outputs.has_snap == 'true'
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: bedrud-desktop-linux-x86_64-portable
+          path: snap-staging
+
+      - name: Prepare snap source directory
+        run: |
+          # Extract binary from the tar.xz
+          tar -xJf snap-staging/bedrud-desktop-linux-x86_64.tar.xz \
+            -C snap-staging/ 2>/dev/null || \
+          cp snap-staging/bedrud-desktop snap-staging/ 2>/dev/null || true
+
+          # Place snapcraft.yaml in expected location
+          mkdir -p snap-staging/snap
+          cp apps/desktop/installer/snap/snapcraft.yaml snap-staging/snap/
+
+          # Update version in snapcraft.yaml
+          VERSION="${{ github.ref_name }}"
+          sed -i "s/^version: .*/version: '${VERSION#v}'/" \
+            snap-staging/snap/snapcraft.yaml
+
+      - uses: snapcore/action-build@v1
+        id: build
+        with:
+          path: snap-staging
+
+      - name: Publish to Snap Store
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        run: |
+          sudo snap install snapcraft --classic
+          snapcraft upload --release=stable "${{ steps.build.outputs.snap }}"
+
+  # ── Flatpak bundle ─────────────────────────────────────────────
+  flatpak-bundle:
+    name: Flatpak Bundle
+    runs-on: ubuntu-latest
+    needs: [release, check-secrets]
+    if: needs.check-secrets.result == 'success'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Flatpak tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder python3-yaml
+          sudo flatpak remote-add --if-not-exists flathub \
+            https://flathub.org/repo/flathub.flatpakrepo
+
+      - name: Install Flatpak runtime
+        run: |
+          sudo flatpak install -y flathub \
+            org.freedesktop.Platform//23.08 \
+            org.freedesktop.Sdk//23.08
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: bedrud-desktop-linux-x86_64-portable
+          path: flatpak-src
+
+      - name: Prepare Flatpak sources
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Extract binary
+          cd flatpak-src
+          tar -xJf *.tar.xz 2>/dev/null || true
+          cd ..
+
+          # Update manifest with local binary path
+          cp packages/flatpak/ir.bedrud.Desktop.yml flatpak-manifest.yml
+          cp packages/flatpak/ir.bedrud.Desktop.desktop flatpak-src/
+          cp apps/web/public/logo512.png flatpak-src/bedrud.png
+          cp packages/flatpak/ir.bedrud.Desktop.desktop \
+            flatpak-src/ir.bedrud.Desktop.desktop
+          cp packages/flatpak/ir.bedrud.Desktop.metainfo.xml flatpak-src/
+
+          # Replace extra-data sources with local file source
+          python3 - << 'PYEOF'
+          import yaml, sys
+          with open('flatpak-manifest.yml') as f:
+              m = yaml.safe_load(f)
+          for mod in m.get('modules', []):
+              if mod.get('name') == 'bedrud-desktop':
+                  mod['sources'] = [
+                      {'type': 'file', 'path': 'flatpak-src/bedrud-desktop',
+                       'dest-filename': 'bedrud-desktop'},
+                      {'type': 'file', 'path': 'flatpak-src/ir.bedrud.Desktop.desktop',
+                       'dest-filename': 'ir.bedrud.Desktop.desktop'},
+                      {'type': 'file', 'path': 'flatpak-src/bedrud.png',
+                       'dest-filename': 'bedrud.png'},
+                      {'type': 'file',
+                       'path': 'flatpak-src/ir.bedrud.Desktop.metainfo.xml',
+                       'dest-filename': 'ir.bedrud.Desktop.metainfo.xml'},
+                  ]
+          with open('flatpak-manifest.yml', 'w') as f:
+              yaml.dump(m, f, default_flow_style=False)
+          PYEOF
+
+      - name: Build Flatpak bundle
+        run: |
+          flatpak-builder --force-clean --repo=flatpak-repo \
+            build-flatpak flatpak-manifest.yml
+          flatpak build-bundle flatpak-repo \
+            bedrud-desktop-linux-x86_64.flatpak ir.bedrud.Desktop
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bedrud-desktop-linux-x86_64-flatpak
+          path: bedrud-desktop-linux-x86_64.flatpak
+
+      - name: Upload Flatpak bundle to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh release upload "$TAG" \
+            bedrud-desktop-linux-x86_64.flatpak \
+            --repo "$REPO" \
+            --clobber
+
+  # ── Chocolatey ────────────────────────────────────────────────
+  chocolatey-push:
+    name: Chocolatey – bedrud-desktop
+    runs-on: windows-latest
+    needs: [release, check-secrets]
+    if: needs.check-secrets.outputs.has_choco == 'true'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Update nuspec version and checksums
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          CHOCO_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+        shell: pwsh
+        run: |
+          $version = $env:TAG.TrimStart('v')
+          $base = "https://github.com/$env:REPO/releases/download/$env:TAG"
+          $url64 = "$base/bedrud-desktop-windows-x86_64-setup.exe"
+
+          # Download installer to compute checksum
+          Invoke-WebRequest -Uri $url64 -OutFile "setup-x64.exe"
+          $hash = (Get-FileHash "setup-x64.exe" -Algorithm SHA256).Hash.ToLower()
+
+          # Update nuspec version
+          $nuspec = "packages/chocolatey/bedrud-desktop/bedrud-desktop.nuspec"
+          (Get-Content $nuspec) `
+            -replace '<version>.*</version>', "<version>$version</version>" `
+            -replace '<releaseNotes>.*</releaseNotes>',
+              "<releaseNotes>https://github.com/$env:REPO/releases/tag/$env:TAG</releaseNotes>" |
+            Set-Content $nuspec
+
+          # Update install script
+          $install = "packages/chocolatey/bedrud-desktop/tools/chocolateyinstall.ps1"
+          (Get-Content $install) `
+            -replace "releases/download/v[\d.]+/", "releases/download/$env:TAG/" `
+            -replace "checksum64  = '.*'", "checksum64  = '$hash'" |
+            Set-Content $install
+
+      - name: Pack and push to Chocolatey
+        env:
+          CHOCO_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+        shell: pwsh
+        working-directory: packages/chocolatey/bedrud-desktop
+        run: |
+          choco pack
+          choco push bedrud-desktop.*.nupkg `
+            --source "https://push.chocolatey.org/" `
+            --api-key "$env:CHOCO_API_KEY"
+
+  # ── Homebrew tap ──────────────────────────────────────────────
+  homebrew-update:
+    name: Homebrew Tap – bedrud-desktop
+    runs-on: ubuntu-latest
+    needs: [release, check-secrets]
+    if: needs.check-secrets.outputs.has_homebrew == 'true'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Compute macOS tarball checksums
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          BASE="https://github.com/${REPO}/releases/download/${TAG}"
+          ARM_URL="${BASE}/bedrud-desktop-macos-arm64.tar.gz"
+          X86_URL="${BASE}/bedrud-desktop-macos-x86_64.tar.gz"
+
+          ARM_SHA=$(curl -fsSL "$ARM_URL" | sha256sum | awk '{print $1}')
+          X86_SHA=$(curl -fsSL "$X86_URL" | sha256sum | awk '{print $1}')
+          VERSION="${TAG#v}"
+
+          sed -i \
+            -e "s/  version \".*\"/  version \"${VERSION}\"/" \
+            -e "s/ARM64_SHA256_PLACEHOLDER/${ARM_SHA}/" \
+            -e "s/X86_64_SHA256_PLACEHOLDER/${X86_SHA}/" \
+            packages/homebrew/Formula/bedrud-desktop.rb
+
+          echo "FORMULA_VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "Updated formula:"
+          cat packages/homebrew/Formula/bedrud-desktop.rb
+
+      - name: Push formula to homebrew-bedrud tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          FORMULA_VERSION: ${{ env.FORMULA_VERSION }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          # Clone the tap repo
+          git clone \
+            "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${REPO_OWNER}/homebrew-bedrud.git" \
+            tap-repo
+
+          mkdir -p tap-repo/Formula
+          cp packages/homebrew/Formula/bedrud-desktop.rb tap-repo/Formula/
+
+          cd tap-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/bedrud-desktop.rb
+          git commit -m "Update bedrud-desktop to ${FORMULA_VERSION}" || \
+            echo "No changes to commit"
+          git push
+
+  # ── WinGet ────────────────────────────────────────────────────
+  winget-submit:
+    name: WinGet – Bedrud.BedrudDesktop
+    runs-on: ubuntu-latest
+    needs: [release, check-secrets]
+    if: needs.check-secrets.outputs.has_winget == 'true'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Submit WinGet manifests
+        uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: Bedrud.BedrudDesktop
+          release-tag: ${{ github.ref_name }}
+          installers-regex: 'bedrud-desktop-windows-(x86_64|arm64)-setup\.exe$'
+          token: ${{ secrets.WINGET_GITHUB_TOKEN }}

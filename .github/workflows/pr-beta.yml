@@ -1,0 +1,674 @@
+name: PR Beta Release
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, closed]
+
+concurrency:
+  group: pr-beta-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # ── Cleanup on PR close/merge ─────────────────────────────────
+  cleanup:
+    name: Cleanup PR Beta
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed'
+    steps:
+      - name: Delete PR beta release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+        run: |
+          gh release delete "pr-${PR_NUM}" \
+            --repo "${{ github.repository }}" \
+            --yes --cleanup-tag 2>/dev/null || true
+          echo "Cleaned up beta release for PR #${PR_NUM}"
+
+  # ── Collect PR metadata ───────────────────────────────────────
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    outputs:
+      tag: ${{ steps.info.outputs.tag }}
+      title: ${{ steps.info.outputs.title }}
+      sha_short: ${{ steps.info.outputs.sha_short }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set release info
+        id: info
+        env:
+          PR_NUM: ${{ github.event.pull_request.number }}
+        run: |
+          SHA_SHORT=$(git rev-parse --short=7 HEAD)
+          echo "sha_short=$SHA_SHORT" >> "$GITHUB_OUTPUT"
+          echo "tag=pr-${PR_NUM}" >> "$GITHUB_OUTPUT"
+          echo "title=PR #${PR_NUM} Beta – ${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+
+  # ── Server binaries (multi-platform) ─────────────────────────
+  server-binary:
+    name: Server – ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    needs: prepare
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            suffix: linux_amd64
+            deb_arch: amd64
+            cgo: "1"
+            cc: zig cc -target x86_64-linux-musl
+            lk_arch: amd64
+          - goos: linux
+            goarch: arm64
+            suffix: linux_arm64
+            deb_arch: arm64
+            cgo: "1"
+            cc: zig cc -target aarch64-linux-musl
+            lk_arch: arm64
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: mlugg/setup-zig@v1
+        with:
+          version: 0.14.0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25"
+          cache-dependency-path: server/go.sum
+
+      - name: Build and embed frontend
+        working-directory: apps/web
+        run: |
+          bun install --frozen-lockfile
+          bun run build:embed
+
+      - name: Cache LiveKit binary
+        uses: actions/cache@v5
+        with:
+          path: /tmp/livekit-cache
+          key: livekit-1.10.1-${{ matrix.goos }}-${{ matrix.goarch }}
+
+      - name: Download LiveKit binary
+        env:
+          LIVEKIT_VERSION: "1.10.1"
+          LK_ARCH: ${{ matrix.lk_arch }}
+        run: |
+          mkdir -p server/internal/livekit/bin /tmp/livekit-cache
+          LK_FILE="livekit_${LIVEKIT_VERSION}_linux_${LK_ARCH}.tar.gz"
+          if [ ! -f "/tmp/livekit-cache/${LK_FILE}" ]; then
+            curl -fsSL "https://github.com/livekit/livekit/releases/download/v${LIVEKIT_VERSION}/${LK_FILE}" \
+              -o "/tmp/livekit-cache/${LK_FILE}"
+          fi
+          tar -xzf "/tmp/livekit-cache/${LK_FILE}" -C server/internal/livekit/bin/ livekit-server
+          chmod +x server/internal/livekit/bin/livekit-server
+
+      - name: Build server binary
+        working-directory: server
+        env:
+          CGO_ENABLED: ${{ matrix.cgo }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CC: ${{ matrix.cc }}
+        run: |
+          go build -ldflags="-s -w -X main.version=${{ needs.prepare.outputs.tag }}-${{ needs.prepare.outputs.sha_short }} -linkmode external -extldflags -static" -o ../dist/bedrud ./cmd/bedrud/main.go
+
+      - name: Package server (tar.xz + .deb)
+        run: |
+          # .deb — built before binary is removed
+          mkdir -p deb/DEBIAN deb/usr/bin deb/usr/lib/systemd/system \
+            deb/etc/bedrud deb/var/lib/bedrud deb/var/log/bedrud
+
+          cp dist/bedrud deb/usr/bin/bedrud
+          cp apps/server/installer/linux/bedrud.service deb/usr/lib/systemd/system/
+          cp apps/server/installer/linux/postinst deb/DEBIAN/postinst
+          chmod 0755 deb/DEBIAN/postinst
+
+          {
+            echo "Package: bedrud"
+            DEB_VER=$(printf '%s' "${{ needs.prepare.outputs.tag }}" | sed 's/^[^0-9]/0~&/')
+            echo "Version: ${DEB_VER}"
+            echo "Architecture: ${{ matrix.deb_arch }}"
+            echo "Maintainer: Bedrud <info@bedrud.ir>"
+            echo "Description: Bedrud self-hosted video meeting server"
+            echo " A single binary packaging the web UI, REST API, and LiveKit WebRTC."
+
+          } > deb/DEBIAN/control
+
+          dpkg-deb --build deb bedrud_${{ matrix.deb_arch }}.deb
+
+          # tar.xz portable
+          cd dist
+          cp bedrud bedrud_${{ matrix.suffix }}
+          tar -cJf bedrud_${{ matrix.suffix }}.tar.xz bedrud
+          rm bedrud
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: server-${{ matrix.suffix }}
+          path: |
+            dist/bedrud_${{ matrix.suffix }}.tar.xz
+            dist/bedrud_${{ matrix.suffix }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: server-deb-${{ matrix.deb_arch }}
+          path: bedrud_${{ matrix.deb_arch }}.deb
+
+  # ── Android APK ──────────────────────────────────────────────
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    needs: prepare
+    defaults:
+      run:
+        working-directory: apps/android
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Build APKs and bundle
+        run: ./gradlew assembleDebug bundleDebug
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-apk-universal
+          path: apps/android/app/build/outputs/apk/debug/app-universal-debug.apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-apk-arm64-v8a
+          path: apps/android/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-apk-armeabi-v7a
+          path: apps/android/app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-apk-x86_64
+          path: apps/android/app/build/outputs/apk/debug/app-x86_64-debug.apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-bundle
+          path: apps/android/app/build/outputs/bundle/debug/app-debug.aab
+
+  # ── Web bundle ───────────────────────────────────────────────
+  web:
+    name: Web Bundle
+    runs-on: ubuntu-latest
+    needs: prepare
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+
+      - name: Package web build
+        run: |
+          mkdir -p ../../dist
+          tar -cJf ../../dist/web.tar.xz -C dist .
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: web-bundle
+          path: dist/web.tar.xz
+
+  # ── Desktop (multi-platform) ──────────────────────────────────
+  desktop:
+    name: Desktop – ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            name: linux-x86_64
+            deb_arch: amd64
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            name: linux-arm64
+            deb_arch: arm64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: windows-x86_64
+            nsis_arch: x64
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            name: windows-arm64
+            nsis_arch: arm64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            name: macos-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: macos-arm64
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Install Slint dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libwayland-dev libgles2-mesa-dev libegl1-mesa-dev \
+            libdbus-1-dev libsecret-1-dev \
+            libasound2-dev
+      - name: Install NSIS (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Build release binary
+        run: cargo build -p bedrud-desktop --release --target ${{ matrix.target }}
+
+      # ── Linux packaging ─────────────────────────────────────
+      - name: Package Linux (portable tar.xz)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/bedrud-desktop dist/
+          tar -cJf bedrud-desktop-${{ matrix.name }}.tar.xz -C dist .
+
+      - name: Package Linux (.deb)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p deb/DEBIAN deb/usr/bin \
+            deb/usr/share/applications \
+            deb/usr/share/icons/hicolor/512x512/apps
+
+          cp target/${{ matrix.target }}/release/bedrud-desktop deb/usr/bin/
+          cp apps/web/public/logo512.png deb/usr/share/icons/hicolor/512x512/apps/bedrud.png
+          cp apps/desktop/installer/linux/bedrud.desktop deb/usr/share/applications/
+
+          {
+            echo "Package: bedrud-desktop"
+            DEB_VER=$(printf '%s' "${{ needs.prepare.outputs.tag }}" | sed 's/^[^0-9]/0~&/')
+            echo "Version: ${DEB_VER}"
+            echo "Architecture: ${{ matrix.deb_arch }}"
+            echo "Maintainer: Bedrud <info@bedrud.ir>"
+            echo "Description: Bedrud Desktop — self-hosted video meeting client"
+            echo " Native desktop client for the Bedrud video meeting platform."
+            echo "Depends: libc6, libgcc1, libfontconfig1, libxkbcommon0, libsecret-1-0, libasound2"
+          } > deb/DEBIAN/control
+
+          dpkg-deb --build deb bedrud-desktop-${{ matrix.name }}.deb
+
+      - name: Package Linux (AppImage)
+        if: runner.os == 'Linux'
+        run: |
+          ARCH_TOOL=$([ "${{ matrix.name }}" = "linux-x86_64" ] && echo "x86_64" || echo "aarch64")
+
+          wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${ARCH_TOOL}.AppImage" \
+            -O appimagetool
+          chmod +x appimagetool
+
+          mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/512x512/apps
+
+          cp target/${{ matrix.target }}/release/bedrud-desktop AppDir/usr/bin/
+          cp apps/web/public/logo512.png AppDir/usr/share/icons/hicolor/512x512/apps/bedrud.png
+          cp apps/web/public/logo512.png AppDir/bedrud.png
+          cp apps/desktop/installer/linux/bedrud.desktop AppDir/bedrud.desktop
+          cp apps/desktop/installer/linux/AppRun AppDir/AppRun
+          chmod +x AppDir/AppRun
+
+          ARCH="${ARCH_TOOL}" APPIMAGE_EXTRACT_AND_RUN=1 \
+            ./appimagetool AppDir "bedrud-desktop-${{ matrix.name }}.AppImage"
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Linux'
+        with:
+          name: bedrud-desktop-${{ matrix.name }}-portable
+          path: bedrud-desktop-${{ matrix.name }}.tar.xz
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Linux'
+        with:
+          name: bedrud-desktop-${{ matrix.name }}-deb
+          path: bedrud-desktop-${{ matrix.name }}.deb
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Linux'
+        with:
+          name: bedrud-desktop-${{ matrix.name }}-appimage
+          path: bedrud-desktop-${{ matrix.name }}.AppImage
+
+      # ── Windows packaging ────────────────────────────────────
+      - name: Package Windows (portable zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item "target\${{ matrix.target }}\release\bedrud-desktop.exe" dist\
+          Compress-Archive -Path dist\* -DestinationPath "bedrud-desktop-${{ matrix.name }}.zip"
+
+      - name: Package Windows (NSIS installer)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Copy-Item "target\${{ matrix.target }}\release\bedrud-desktop.exe" apps\desktop\installer\windows\
+          cd apps\desktop\installer\windows
+          makensis /DARCH=${{ matrix.nsis_arch }} bedrud.nsi
+          Move-Item "bedrud-desktop-setup-${{ matrix.nsis_arch }}.exe" "${{ github.workspace }}\bedrud-desktop-${{ matrix.name }}-setup.exe"
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Windows'
+        with:
+          name: bedrud-desktop-${{ matrix.name }}-portable
+          path: bedrud-desktop-${{ matrix.name }}.zip
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Windows'
+        with:
+          name: bedrud-desktop-${{ matrix.name }}-setup
+          path: bedrud-desktop-${{ matrix.name }}-setup.exe
+
+      # ── macOS packaging ──────────────────────────────────────
+      - name: Package macOS (portable tar.gz + DMG)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/bedrud-desktop dist/
+          tar -czf bedrud-desktop-${{ matrix.name }}.tar.gz -C dist .
+          mkdir -p dmg-staging
+          cp target/${{ matrix.target }}/release/bedrud-desktop dmg-staging/
+          hdiutil create -volname "Bedrud Desktop" -srcfolder dmg-staging -ov -format UDZO \
+            "bedrud-desktop-${{ matrix.name }}.dmg"
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'macOS'
+        with:
+          name: bedrud-desktop-${{ matrix.name }}-portable
+          path: bedrud-desktop-${{ matrix.name }}.tar.gz
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'macOS'
+        with:
+          name: bedrud-desktop-${{ matrix.name }}-dmg
+          path: bedrud-desktop-${{ matrix.name }}.dmg
+
+  # ── Publish beta release & comment on PR ─────────────────────
+  release:
+    name: Publish Beta for PR #${{ github.event.pull_request.number }}
+    runs-on: ubuntu-latest
+    needs: [prepare, server-binary, android, desktop, web]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          pattern: "{server-*,android-*,web-*,bedrud-desktop-*}"
+
+      - name: Collect release assets
+        run: |
+          mkdir -p release-assets
+
+          find artifacts/server-linux_* -name "*.tar.xz" -exec cp {} release-assets/ \; 2>/dev/null || true
+          find artifacts/server-deb-* -name "*.deb" -exec cp {} release-assets/ \; 2>/dev/null || true
+
+          [ -f artifacts/android-apk-universal/app-universal-debug.apk ] && \
+            cp artifacts/android-apk-universal/app-universal-debug.apk release-assets/bedrud-android-universal.apk
+          [ -f artifacts/android-apk-arm64-v8a/app-arm64-v8a-debug.apk ] && \
+            cp artifacts/android-apk-arm64-v8a/app-arm64-v8a-debug.apk release-assets/bedrud-android-arm64-v8a.apk
+          [ -f artifacts/android-apk-armeabi-v7a/app-armeabi-v7a-debug.apk ] && \
+            cp artifacts/android-apk-armeabi-v7a/app-armeabi-v7a-debug.apk release-assets/bedrud-android-armeabi-v7a.apk
+          [ -f artifacts/android-apk-x86_64/app-x86_64-debug.apk ] && \
+            cp artifacts/android-apk-x86_64/app-x86_64-debug.apk release-assets/bedrud-android-x86_64.apk
+          [ -f artifacts/android-bundle/app-debug.aab ] && \
+            cp artifacts/android-bundle/app-debug.aab release-assets/bedrud-android.aab
+
+          # Desktop binaries
+          find artifacts/bedrud-desktop-* -type f -exec cp {} release-assets/ \; 2>/dev/null || true
+
+          [ -f artifacts/web-bundle/web.tar.xz ] && \
+            cp artifacts/web-bundle/web.tar.xz release-assets/bedrud-web.tar.xz
+
+          ls -la release-assets/
+
+      - name: Delete existing PR beta release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          gh release delete "$RELEASE_TAG" \
+            --repo "${{ github.repository }}" \
+            --yes --cleanup-tag 2>/dev/null || true
+
+      - name: Create beta release
+        id: create_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          RELEASE_TITLE: ${{ needs.prepare.outputs.title }}
+          SHA_SHORT: ${{ needs.prepare.outputs.sha_short }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          NOTES=$(cat <<NOTES_EOF
+          ## Beta Build for [PR #${PR_NUM}](${PR_URL})
+
+          **${PR_TITLE}**
+
+          Built from [\`${SHA_SHORT}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) on branch \`${HEAD_BRANCH}\`.
+
+          ### Artifacts
+
+          | Platform | Asset |
+          |----------|-------|
+          | Linux x86_64 | [bedrud_linux_amd64.tar.xz](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud_linux_amd64.tar.xz) |
+          | Linux ARM64 | [bedrud_linux_arm64.tar.xz](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud_linux_arm64.tar.xz) |
+          | Android (universal) | [bedrud-android-universal.apk](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-android-universal.apk) |
+          | Android arm64-v8a | [bedrud-android-arm64-v8a.apk](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-android-arm64-v8a.apk) |
+          | Android armeabi-v7a | [bedrud-android-armeabi-v7a.apk](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-android-armeabi-v7a.apk) |
+          | Android x86\_64 | [bedrud-android-x86_64.apk](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-android-x86_64.apk) |
+          | Android bundle (AAB) | [bedrud-android.aab](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-android.aab) |
+          | Desktop Linux x86_64 (AppImage) | [bedrud-desktop-linux-x86_64.AppImage](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-desktop-linux-x86_64.AppImage) |
+          | Desktop Linux x86_64 (portable) | [bedrud-desktop-linux-x86_64.tar.xz](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-desktop-linux-x86_64.tar.xz) |
+          | Desktop Linux x86_64 (.deb) | [bedrud-desktop-linux-x86_64.deb](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-desktop-linux-x86_64.deb) |
+          | Desktop Linux ARM64 (AppImage) | [bedrud-desktop-linux-arm64.AppImage](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-desktop-linux-arm64.AppImage) |
+          | Desktop Linux ARM64 (portable) | [bedrud-desktop-linux-arm64.tar.xz](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-desktop-linux-arm64.tar.xz) |
+          | Desktop Linux ARM64 (.deb) | [bedrud-desktop-linux-arm64.deb](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-desktop-linux-arm64.deb) |
+          | Desktop Windows x86_64 (installer) | [bedrud-desktop-windows-x86_64-setup.exe](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-desktop-windows-x86_64-setup.exe) |
+          | Desktop Windows x86_64 (portable) | [bedrud-desktop-windows-x86_64.zip](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-desktop-windows-x86_64.zip) |
+          | Desktop Windows ARM64 (installer) | [bedrud-desktop-windows-arm64-setup.exe](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-desktop-windows-arm64-setup.exe) |
+          | Desktop Windows ARM64 (portable) | [bedrud-desktop-windows-arm64.zip](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-desktop-windows-arm64.zip) |
+          | Web | [bedrud-web.tar.xz](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-web.tar.xz) |
+
+          > This is an automated beta pre-release. It will be deleted when the PR is closed or merged.
+          NOTES_EOF
+          )
+
+          gh release create "$RELEASE_TAG" \
+            --repo "${{ github.repository }}" \
+            --title "$RELEASE_TITLE" \
+            --notes "$NOTES" \
+            --prerelease \
+            --target "${{ github.sha }}" \
+            release-assets/*
+
+          RELEASE_URL=$(gh release view "$RELEASE_TAG" \
+            --repo "${{ github.repository }}" \
+            --json url --jq '.url')
+          echo "release_url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Post or update PR comment
+        uses: actions/github-script@v9
+        env:
+          RELEASE_URL: ${{ steps.create_release.outputs.release_url }}
+          SHA_SHORT: ${{ needs.prepare.outputs.sha_short }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        with:
+          script: |
+            const marker = '<!-- pr-beta-release -->';
+            const releaseUrl = process.env.RELEASE_URL;
+            const sha = process.env.SHA_SHORT;
+            const base = `https://github.com/${context.repo.owner}/${context.repo.repo}/releases/download/${process.env.RELEASE_TAG}`;
+
+            const asset = (name) => `[${name}](${base}/${name})`;
+
+            const body = [
+              marker,
+              `## Beta Release Ready`,
+              ``,
+              `Binaries built from \`${sha}\` are available as a pre-release:`,
+              ``,
+              `**[Download Beta Binaries](${releaseUrl})**`,
+              ``,
+              `| Platform | Asset |`,
+              `|----------|-------|`,
+              `| Linux x86_64 | ${asset('bedrud_linux_amd64.tar.xz')} |`,
+              `| Linux ARM64 | ${asset('bedrud_linux_arm64.tar.xz')} |`,
+              `| Android (universal) | ${asset('bedrud-android-universal.apk')} |`,
+              `| Android arm64-v8a | ${asset('bedrud-android-arm64-v8a.apk')} |`,
+              `| Android armeabi-v7a | ${asset('bedrud-android-armeabi-v7a.apk')} |`,
+              `| Android x86_64 | ${asset('bedrud-android-x86_64.apk')} |`,
+              `| Android bundle (AAB) | ${asset('bedrud-android.aab')} |`,
+              `| Desktop Linux x86_64 (AppImage) | ${asset('bedrud-desktop-linux-x86_64.AppImage')} |`,
+              `| Desktop Linux x86_64 (portable) | ${asset('bedrud-desktop-linux-x86_64.tar.xz')} |`,
+              `| Desktop Linux x86_64 (.deb) | ${asset('bedrud-desktop-linux-x86_64.deb')} |`,
+              `| Desktop Linux ARM64 (AppImage) | ${asset('bedrud-desktop-linux-arm64.AppImage')} |`,
+              `| Desktop Linux ARM64 (portable) | ${asset('bedrud-desktop-linux-arm64.tar.xz')} |`,
+              `| Desktop Linux ARM64 (.deb) | ${asset('bedrud-desktop-linux-arm64.deb')} |`,
+              `| Desktop Windows x86_64 (installer) | ${asset('bedrud-desktop-windows-x86_64-setup.exe')} |`,
+              `| Desktop Windows x86_64 (portable) | ${asset('bedrud-desktop-windows-x86_64.zip')} |`,
+              `| Desktop Windows ARM64 (installer) | ${asset('bedrud-desktop-windows-arm64-setup.exe')} |`,
+              `| Desktop Windows ARM64 (portable) | ${asset('bedrud-desktop-windows-arm64.zip')} |`,
+              `| Web bundle | ${asset('bedrud-web.tar.xz')} |`,
+              ``,
+              `> Updated on each push. Deleted when the PR is closed.`,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+  # ── Telegram notification ─────────────────────────────────────
+  telegram:
+    name: Notify Telegram
+    runs-on: ubuntu-latest
+    needs: [prepare, release]
+    if: needs.release.result == 'success'
+    steps:
+      - name: Send Telegram notification
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          SHA: ${{ needs.prepare.outputs.sha_short }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_CREATOR: ${{ github.event.pull_request.user.login }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          REPO: ${{ github.repository }}
+        run: |
+          BASE="https://github.com/${REPO}/releases/download/${TAG}"
+          RELEASE_URL="https://github.com/${REPO}/releases/tag/${TAG}"
+
+          MSG=$(cat <<EOF
+          🔀 <b>PR Beta Build — PR #${PR_NUM}</b>
+
+          <b>${PR_TITLE}</b>
+          by <a href="https://github.com/${PR_CREATOR}">@${PR_CREATOR}</a> · <a href="${PR_URL}">View PR</a>
+
+          Commit: <code>${SHA}</code>
+          <a href="${RELEASE_URL}">📦 View all artifacts on GitHub</a>
+
+          <b>🖥 Server binaries</b>
+          • <a href="${BASE}/bedrud_linux_amd64.tar.xz">Linux x86_64</a>
+          • <a href="${BASE}/bedrud_linux_arm64.tar.xz">Linux ARM64</a>
+
+          <b>🤖 Android (debug)</b>
+          • <a href="${BASE}/bedrud-android-universal.apk">Universal APK</a>
+          • <a href="${BASE}/bedrud-android-arm64-v8a.apk">arm64-v8a</a>
+          • <a href="${BASE}/bedrud-android-armeabi-v7a.apk">armeabi-v7a</a>
+          • <a href="${BASE}/bedrud-android-x86_64.apk">x86_64</a>
+
+          <b>🪟 Desktop Windows (installer)</b>
+          • <a href="${BASE}/bedrud-desktop-windows-x86_64-setup.exe">x86_64 Setup</a>
+          • <a href="${BASE}/bedrud-desktop-windows-arm64-setup.exe">ARM64 Setup</a>
+
+          <b>🪟 Desktop Windows (portable)</b>
+          • <a href="${BASE}/bedrud-desktop-windows-x86_64.zip">x86_64 zip</a>
+          • <a href="${BASE}/bedrud-desktop-windows-arm64.zip">ARM64 zip</a>
+
+          <b>🐧 Desktop Linux (AppImage)</b>
+          • <a href="${BASE}/bedrud-desktop-linux-x86_64.AppImage">x86_64 AppImage</a>
+          • <a href="${BASE}/bedrud-desktop-linux-arm64.AppImage">ARM64 AppImage</a>
+
+          <b>🐧 Desktop Linux (portable)</b>
+          • <a href="${BASE}/bedrud-desktop-linux-x86_64.tar.xz">x86_64 tar.xz</a>
+          • <a href="${BASE}/bedrud-desktop-linux-arm64.tar.xz">ARM64 tar.xz</a>
+
+          <b>🐧 Desktop Linux (.deb)</b>
+          • <a href="${BASE}/bedrud-desktop-linux-x86_64.deb">x86_64 .deb</a>
+          • <a href="${BASE}/bedrud-desktop-linux-arm64.deb">ARM64 .deb</a>
+          EOF
+          )
+
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${CHAT_ID}" \
+            -d "parse_mode=HTML" \
+            -d "disable_web_page_preview=true" \
+            --data-urlencode "text=${MSG}"

@@ -1,0 +1,153 @@
+import { theme } from "theme.slint";
+import { Button, ButtonVariant } from "components/button.slint";
+import { ComboBox } from "std-widgets.slint";
+
+export component SettingsScreen inherits Rectangle {
+    background: theme.bg-primary;
+
+    in property <[string]> mic-devices: [];
+    in property <[string]> speaker-devices: [];
+    in-out property <string> selected-mic: "";
+    in-out property <string> selected-speaker: "";
+    in-out property <int> theme-index: 2;        // 0=Light 1=Dark 2=System
+    in-out property <int> noise-suppression-index: 0; // 0=None 1=RNNoise 2=Krisp
+    in-out property <bool> echo-cancellation: true;
+
+    callback back-clicked;
+    callback save-clicked;
+    callback settings-changed;  // fired on any change for live apply
+
+    VerticalLayout {
+        // Toolbar
+        Rectangle {
+            height: 56px;
+            background: theme.bg-secondary;
+            border-width: 1px;
+            border-color: theme.border;
+
+            HorizontalLayout {
+                padding-left: theme.space-md;
+                padding-right: theme.space-md;
+                spacing: theme.space-md;
+
+                Button {
+                    text: "← Back";
+                    variant: ButtonVariant.secondary;
+                    height: 32px;
+                    clicked => { back-clicked(); }
+                }
+                Text {
+                    text: "Settings";
+                    font-size: theme.font-lg;
+                    font-weight: 700;
+                    color: theme.text-primary;
+                    vertical-alignment: center;
+                    height: parent.height;
+                }
+            }
+        }
+
+        // Content
+        VerticalLayout {
+            padding: theme.space-xl;
+            spacing: theme.space-lg;
+            width: 480px;
+            x: theme.space-xl;
+
+            // Appearance section
+            VerticalLayout {
+                spacing: theme.space-sm;
+                Text { text: "Appearance"; font-size: theme.font-lg; font-weight: 600; color: theme.text-primary; }
+                Text { text: "Theme"; color: theme.text-secondary; font-size: theme.font-sm; }
+                ComboBox {
+                    width: 200px;
+                    model: ["Light", "Dark", "System"];
+                    current-index <=> theme-index;
+                }
+            }
+
+            // Audio devices section
+            VerticalLayout {
+                spacing: theme.space-sm;
+                Text { text: "Audio Devices"; font-size: theme.font-lg; font-weight: 600; color: theme.text-primary; }
+                Text { text: "Microphone"; color: theme.text-secondary; font-size: theme.font-sm; }
+                ComboBox {
+                    width: 300px;
+                    model: mic-devices;
+                    current-value <=> selected-mic;
+                    selected(val) => { settings-changed(); }
+                }
+                Text { text: "Speaker"; color: theme.text-secondary; font-size: theme.font-sm; }
+                ComboBox {
+                    width: 300px;
+                    model: speaker-devices;
+                    current-value <=> selected-speaker;
+                    selected(val) => { settings-changed(); }
+                }
+            }
+
+            // Audio processing section
+            VerticalLayout {
+                spacing: theme.space-sm;
+                Text { text: "Audio Processing"; font-size: theme.font-lg; font-weight: 600; color: theme.text-primary; }
+
+                Text { text: "Noise Suppression"; color: theme.text-secondary; font-size: theme.font-sm; }
+                ComboBox {
+                    width: 200px;
+                    model: ["None", "RNNoise (WASM)", "Krisp"];
+                    current-index <=> noise-suppression-index;
+                    selected(val) => { settings-changed(); }
+                }
+
+                // Echo cancellation — shown for all noise suppression types
+                HorizontalLayout {
+                    spacing: theme.space-sm;
+                    alignment: start;
+                    height: 32px;
+
+                    Rectangle {
+                        width: 40px;
+                        height: 22px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 11px;
+                        background: echo-cancellation ? theme.accent : theme.bg-hover;
+                        border-width: 1px;
+                        border-color: echo-cancellation ? theme.accent : theme.border;
+                        animate background { duration: 150ms; }
+
+                        // Knob
+                        Rectangle {
+                            width: 18px;
+                            height: 18px;
+                            y: 2px;
+                            x: echo-cancellation ? 20px : 2px;
+                            border-radius: 9px;
+                            background: #ffffff;
+                            animate x { duration: 150ms; }
+                        }
+
+                        TouchArea {
+                            clicked => {
+                                echo-cancellation = !echo-cancellation;
+                                settings-changed();
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: "Echo Cancellation";
+                        color: theme.text-primary;
+                        font-size: theme.font-base;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            Button {
+                text: "Save Settings";
+                width: 160px;
+                clicked => { save-clicked(); }
+            }
+        }
+    }
+}

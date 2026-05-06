@@ -1,0 +1,246 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Server (Go) ───────────────────────────────────────────────
+  server:
+    name: Server – Build & Vet
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25"
+          cache-dependency-path: server/go.sum
+      - run: go mod download
+      # Create placeholders for //go:embed directives
+      - run: mkdir -p frontend && touch frontend/.gitkeep
+      - run: mkdir -p internal/livekit/bin && touch internal/livekit/bin/livekit-server
+      - run: go vet ./...
+      - run: go build ./...
+
+  server-test:
+    name: Server – Tests
+    runs-on: ubuntu-latest
+    needs: server
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25"
+          cache-dependency-path: server/go.sum
+      - run: go mod download
+      - run: mkdir -p frontend && touch frontend/.gitkeep
+      - run: mkdir -p internal/livekit/bin && touch internal/livekit/bin/livekit-server
+      - run: go test -race -count=1 ./...
+
+  # ── Web (React) ───────────────────────────────────────────────
+  web:
+    name: Web – Build & Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+      - run: bun run build
+
+  # ── Android ───────────────────────────────────────────────────
+  android:
+    name: Android – Lint & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/android
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6
+      - run: ./gradlew lint
+      - run: ./gradlew testDebugUnitTest
+      - run: ./gradlew assembleDebug bundleDebug
+
+      - name: Upload universal APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-apk-universal
+          path: apps/android/app/build/outputs/apk/debug/app-universal-debug.apk
+          retention-days: 7
+
+      - name: Upload arm64-v8a APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-apk-arm64-v8a
+          path: apps/android/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+          retention-days: 7
+
+      - name: Upload armeabi-v7a APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-apk-armeabi-v7a
+          path: apps/android/app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk
+          retention-days: 7
+
+      - name: Upload x86_64 APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-apk-x86_64
+          path: apps/android/app/build/outputs/apk/debug/app-x86_64-debug.apk
+          retention-days: 7
+
+      - name: Upload debug bundle (AAB)
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-bundle-debug
+          path: apps/android/app/build/outputs/bundle/debug/app-debug.aab
+          retention-days: 7
+
+  # ── iOS ───────────────────────────────────────────────────────
+  ios:
+    name: iOS – Build & Test
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: apps/ios
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache Swift packages
+        uses: actions/cache@v5
+        with:
+          path: apps/ios/.spm-cache
+          key: ios-spm-${{ hashFiles('apps/ios/Bedrud.xcodeproj/project.pbxproj') }}
+          restore-keys: ios-spm-
+
+      - name: Resolve Swift packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project Bedrud.xcodeproj \
+            -scheme Bedrud \
+            -clonedSourcePackagesDirPath .spm-cache
+
+      - name: Build for testing with coverage
+        run: |
+          xcodebuild build-for-testing \
+            -project Bedrud.xcodeproj \
+            -scheme Bedrud \
+            -destination "platform=iOS Simulator,name=iPhone 17 Pro" \
+            -clonedSourcePackagesDirPath .spm-cache \
+            -enableCodeCoverage YES \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Run tests with coverage
+        run: |
+          xcodebuild test-without-building \
+            -project Bedrud.xcodeproj \
+            -scheme Bedrud \
+            -destination "platform=iOS Simulator,name=iPhone 17 Pro" \
+            -enableCodeCoverage YES \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Generate coverage report
+        run: |
+          xcrun xccov view --report TestResults.xcresult | tee coverage-report.txt
+
+      - name: Calculate coverage percentage
+        id: coverage
+        run: |
+          # Extract line coverage from xccov report
+          COVERAGE=$(xcrun xccov view --report --json TestResults.xcresult | jq -r '.targets[0].lineCoverage * 100 | floor')
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+
+          # Create summary
+          echo "## iOS Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Line Coverage: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Files with low coverage (<50%)" >> $GITHUB_STEP_SUMMARY
+          xcrun xccov view --report --json TestResults.xcresult | \
+            jq -r '.targets[].files[] | select(.lineCoverage < 0.5) | "\(.path): \(.lineCoverage * 100 | floor)% coverage"' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-coverage-report
+          path: apps/ios/coverage-report.txt
+          retention-days: 30
+
+  # ── Desktop (Rust/Slint) ──────────────────────────────────────
+  desktop:
+    name: Desktop – Build & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+      - name: Install Slint dependencies (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libfontconfig1-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev \
+            libwayland-dev \
+            libgles2-mesa-dev \
+            libegl1-mesa-dev \
+            libdbus-1-dev \
+            libsecret-1-dev \
+            libasound2-dev
+      - name: Build
+        run: cargo build -p bedrud-desktop
+      - name: Test
+        run: cargo test -p bedrud-desktop
+
+  # ── Site (Astro) ───────────────────────────────────────────────
+  site:
+    name: Site – Build & Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/site
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+          cache: true
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+      - run: bun run typecheck:astro
+      - run: bun run build
