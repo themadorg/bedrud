@@ -2,6 +2,7 @@
 # NEVER commit config.local.yaml — it contains secrets.
 server:
   port: "8090"
+  httpPort: ""  # HTTP listener when TLS enabled. Default: "80". Unprivileged: "8080". Env: SERVER_HTTP_PORT
   host: "0.0.0.0"
   readTimeout: 30
   writeTimeout: 30
@@ -11,7 +12,7 @@ database:
   path: "./bedrud-local.db"
 
 logger:
-  level: "debug"
+  level: "debug"  # Log level: debug, info, warn, error. Controls both app and SQL query logs.
   outputPath: "" # Log to stdout
 
 livekit:

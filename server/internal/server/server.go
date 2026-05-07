@@ -326,12 +326,16 @@ func Run(configPath string) error {
 		addr := cfg.Server.Host + ":" + cfg.Server.Port
 		tlsEnabled := cfg.Server.EnableTLS && !cfg.Server.DisableTLS
 		if tlsEnabled {
-			// Start HTTP on port 80 for bots/local use
+			// Start HTTP redirect for bots/local use
+			httpPort := cfg.Server.HTTPPort
+			if httpPort == "" {
+				httpPort = "80"
+			}
 			go func() {
-				httpAddr := cfg.Server.Host + ":80"
-				log.Info().Msgf("➜ Also listening on HTTP %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, "80"), httpAddr)
+				httpAddr := cfg.Server.Host + ":" + httpPort
+				log.Info().Msgf("➜ Also listening on HTTP %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, httpPort), httpAddr)
 				if err := app.Listen(httpAddr); err != nil {
-					log.Debug().Err(err).Msg("HTTP server failed (might be port 80 restricted)")
+					log.Debug().Err(err).Msg("HTTP server failed")
 				}
 			}()
 			// Start HTTPS on primary port

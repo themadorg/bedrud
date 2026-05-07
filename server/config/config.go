@@ -22,6 +22,7 @@ type Config struct {
 
 type ServerConfig struct {
 	Port           string   `yaml:"port"`
+	HTTPPort       string   `yaml:"httpPort"`
 	Host           string   `yaml:"host"`
 	ReadTimeout    int      `yaml:"readTimeout"`
 	WriteTimeout   int      `yaml:"writeTimeout"`
@@ -164,6 +165,9 @@ func Load(configPath string) (*Config, error) {
 		// Override with environment variables if they exist
 		if envPort := os.Getenv("SERVER_PORT"); envPort != "" {
 			config.Server.Port = envPort
+		}
+		if envHTTPPort := os.Getenv("SERVER_HTTP_PORT"); envHTTPPort != "" {
+			config.Server.HTTPPort = envHTTPPort
 		}
 		if envEnableTLS := os.Getenv("SERVER_ENABLE_TLS"); envEnableTLS != "" {
 			if b, err := strconv.ParseBool(envEnableTLS); err == nil {
