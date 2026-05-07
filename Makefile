@@ -1,4 +1,4 @@
-.PHONY: help init dev dev-web dev-server dev-server-hot dev-api dev-livekit dev-ios dev-android dev-desktop dev-site build build-front build-back build-dist build-android-debug build-android install-android release-android build-ios export-ios build-ios-sim build-desktop build-site deploy docker docker-debian docker-alpine docker-distroless test-back fmt lint lint-fix push-dev push-prod run-front-dev local-build local-run swagger-gen swagger-open scalar-open clean full-clean ensure-zig
+.PHONY: help init dev dev-web dev-server dev-server-hot dev-api dev-livekit dev-ios dev-android dev-desktop dev-site build build-front build-back build-dist build-android-debug build-android install-android release-android build-ios export-ios build-ios-sim build-desktop build-site build-embed deploy docker docker-debian docker-alpine docker-distroless test-back fmt lint lint-fix push-dev push-prod run-front-dev local-build local-run swagger-gen swagger-open scalar-open clean full-clean ensure-zig
 
 GREEN  := \033[0;32m
 RED    := \033[0;31m
@@ -256,15 +256,16 @@ dev-site:
 build-front:
 	cd apps/web && bun run build
 
+# Build frontend with SSR → index.html + shell.html
+build-embed:
+	cd apps/web && bun run build:embed
+
 # Build backend
 build-back: ensure-zig
 	cd server && CGO_ENABLED=1 CC="$(CC_LINUX_AMD64)" go build $(LDFLAGS) -o dist/bedrud ./cmd/bedrud/main.go
 
 # Build both frontend and backend
-build: build-front
-	find server/frontend -mindepth 1 ! -name '.gitkeep' -delete 2>/dev/null || true
-	mkdir -p server/frontend
-	cp -r apps/web/dist/client/* server/frontend/
+build: build-embed
 	@$(MAKE) build-back && \
 		printf "$(GREEN)✅ Build succeeded: server/dist/bedrud$(RESET)\n" || \
 		( printf "$(RED)❌ Build failed$(RESET)\n"; exit 1 )
@@ -516,10 +517,7 @@ push-prod:
 # ---- Local single-binary targets ---------------------------------------------
 
 # Build a single binary with frontend embedded
-local-build: build-front ensure-zig
-	find server/frontend -mindepth 1 ! -name '.gitkeep' -delete 2>/dev/null || true
-	mkdir -p server/frontend
-	cp -r apps/web/dist/client/* server/frontend/
+local-build: build-embed ensure-zig
 	@cd server && CGO_ENABLED=1 CC="$(CC_LINUX_AMD64)" go build $(LDFLAGS) -o dist/bedrud ./cmd/bedrud/main.go && \
 		printf "$(GREEN)✅ Single binary ready: server/dist/bedrud$(RESET)\n" || \
 		( printf "$(RED)❌ Local build failed$(RESET)\n"; exit 1 )
