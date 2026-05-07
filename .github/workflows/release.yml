@@ -1394,12 +1394,12 @@ jobs:
           cd ..
 
           # Update manifest with local binary path
-          cp packages/flatpak/ir.bedrud.Desktop.yml flatpak-manifest.yml
-          cp packages/flatpak/ir.bedrud.Desktop.desktop flatpak-src/
+          cp packages/flatpak/orgbedrud.Desktop.yml flatpak-manifest.yml
+          cp packages/flatpak/orgbedrud.Desktop.desktop flatpak-src/
           cp apps/web/public/logo512.png flatpak-src/bedrud.png
-          cp packages/flatpak/ir.bedrud.Desktop.desktop \
-            flatpak-src/ir.bedrud.Desktop.desktop
-          cp packages/flatpak/ir.bedrud.Desktop.metainfo.xml flatpak-src/
+          cp packages/flatpak/orgbedrud.Desktop.desktop \
+            flatpak-src/orgbedrud.Desktop.desktop
+          cp packages/flatpak/orgbedrud.Desktop.metainfo.xml flatpak-src/
 
           # Replace extra-data sources with local file source
           python3 - << 'PYEOF'
@@ -1411,13 +1411,13 @@ jobs:
                   mod['sources'] = [
                       {'type': 'file', 'path': 'flatpak-src/bedrud-desktop',
                        'dest-filename': 'bedrud-desktop'},
-                      {'type': 'file', 'path': 'flatpak-src/ir.bedrud.Desktop.desktop',
-                       'dest-filename': 'ir.bedrud.Desktop.desktop'},
+                      {'type': 'file', 'path': 'flatpak-src/orgbedrud.Desktop.desktop',
+                       'dest-filename': 'orgbedrud.Desktop.desktop'},
                       {'type': 'file', 'path': 'flatpak-src/bedrud.png',
                        'dest-filename': 'bedrud.png'},
                       {'type': 'file',
-                       'path': 'flatpak-src/ir.bedrud.Desktop.metainfo.xml',
-                       'dest-filename': 'ir.bedrud.Desktop.metainfo.xml'},
+                       'path': 'flatpak-src/orgbedrud.Desktop.metainfo.xml',
+                       'dest-filename': 'orgbedrud.Desktop.metainfo.xml'},
                   ]
           with open('flatpak-manifest.yml', 'w') as f:
               yaml.dump(m, f, default_flow_style=False)
@@ -1428,7 +1428,7 @@ jobs:
           flatpak-builder --force-clean --repo=flatpak-repo \
             build-flatpak flatpak-manifest.yml
           flatpak build-bundle flatpak-repo \
-            bedrud-desktop-linux-x86_64.flatpak ir.bedrud.Desktop
+            bedrud-desktop-linux-x86_64.flatpak orgbedrud.Desktop
 
       - uses: actions/upload-artifact@v7
         with:

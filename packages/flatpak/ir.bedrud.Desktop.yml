@@ -1,4 +1,4 @@
-id: ir.bedrud.Desktop
+id: orgbedrud.Desktop
 runtime: org.freedesktop.Platform
 runtime-version: "23.08"
 sdk: org.freedesktop.Sdk
@@ -21,12 +21,12 @@ modules:
     buildsystem: simple
     build-commands:
       - install -Dm755 bedrud-desktop /app/bin/bedrud-desktop
-      - install -Dm644 ir.bedrud.Desktop.desktop
-          /app/share/applications/ir.bedrud.Desktop.desktop
+      - install -Dm644 orgbedrud.Desktop.desktop
+          /app/share/applications/orgbedrud.Desktop.desktop
       - install -Dm644 bedrud.png
-          /app/share/icons/hicolor/512x512/apps/ir.bedrud.Desktop.png
-      - install -Dm644 ir.bedrud.Desktop.metainfo.xml
-          /app/share/metainfo/ir.bedrud.Desktop.metainfo.xml
+          /app/share/icons/hicolor/512x512/apps/orgbedrud.Desktop.png
+      - install -Dm644 orgbedrud.Desktop.metainfo.xml
+          /app/share/metainfo/orgbedrud.Desktop.metainfo.xml
     sources:
       # Pre-built binary — downloaded at Flatpak install time (extra-data)
       - type: extra-data
@@ -58,8 +58,8 @@ modules:
             select(.name == "bedrud-desktop-linux-arm64.tar.xz") |
             .browser_download_url
       - type: file
-        path: ir.bedrud.Desktop.desktop
+        path: orgbedrud.Desktop.desktop
       - type: file
         path: bedrud.png
       - type: file
-        path: ir.bedrud.Desktop.metainfo.xml
+        path: orgbedrud.Desktop.metainfo.xml
