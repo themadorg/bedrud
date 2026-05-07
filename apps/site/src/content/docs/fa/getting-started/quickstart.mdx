@@ -80,7 +80,7 @@ order: 1
     به صورت دستی دانلود و استخراج کنید. `linux_amd64` را با پلتفرم خود جایگزین کنید (`linux_arm64`، `darwin_amd64`، `darwin_arm64`):
 
     ```bash
-    curl -fsSL -o bedrud.tar.xz https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
+    curl -fsSL -o bedrud.tar.xz https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
     tar -xJf bedrud.tar.xz
     chmod +x bedrud
     sudo mv bedrud /usr/local/bin/
@@ -90,7 +90,7 @@ order: 1
 
     > **اینترنت ندارید؟** در هر ماشین‌ای دانلود کنید، با USB یا `scp bedrud.tar.xz user@server:/tmp/` منتقل کنید، سپس extract کنید. باینری کاملاً self-contained است — بدون درخواست خروجی پس از انتقال.
 
-    > **دانلود شکست خورد؟** اتصال اینترنت را بررسی کنید، یا URL را در [GitHub Releases](https://github.com/bedrud-ir/bedrud/releases/latest) تأیید کنید.
+    > **دانلود شکست خورد؟** اتصال اینترنت را بررسی کنید، یا URL را در [GitHub Releases](https://github.com/themadorg/bedrud/releases/latest) تأیید کنید.
   </TabsContent>
 </Tabs>
 
@@ -143,7 +143,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8090
 
 > **مرجع CLI** — مدیریت کامل کاربران: `bedrud user promote`، `demote`، `create`، `delete`.
 
-**کلاینت‌های بومی** برای Android، Windows، macOS، و Linux: [GitHub Releases](https://github.com/bedrud-ir/bedrud/releases/latest). یا لینک جلسه را به اشتراک بگذارید - شرکت‌کنندگان در هر مرورگری می‌پیوندند.
+**کلاینت‌های بومی** برای Android، Windows، macOS، و Linux: [GitHub Releases](https://github.com/themadorg/bedrud/releases/latest). یا لینک جلسه را به اشتراک بگذارید - شرکت‌کنندگان در هر مرورگری می‌پیوندند.
 
 ---
 
@@ -158,7 +158,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest
+  ghcr.io/themadorg/bedrud:latest
 
 # Alpine (smaller, ~30 MB)
 docker run -d --name bedrud \
@@ -166,7 +166,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-alpine
+  ghcr.io/themadorg/bedrud:latest-alpine
 
 # Distroless (smallest, ~25 MB)
 docker run -d --name bedrud \
@@ -174,7 +174,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-distroless
+  ghcr.io/themadorg/bedrud:latest-distroless
 ```
 
 تنظیمات سفارشی، Docker Compose، و متغیرهای محیطی: به [راهنمای Docker](/fa/docs/guides/docker) ببینید.
@@ -184,7 +184,7 @@ docker run -d --name bedrud \
 نیاز به [Go 1.24+](https://go.dev/dl/) و [Bun](https://bun.sh/) دارد:
 
 ```bash
-git clone https://github.com/bedrud-ir/bedrud.git
+git clone https://github.com/themadorg/bedrud.git
 cd bedrud
 make init
 make local-run

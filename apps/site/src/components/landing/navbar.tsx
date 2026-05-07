@@ -133,7 +133,7 @@ export function Navbar({
               <LanguageSwitcher lang={lang} />
               {scrolled && stars && (
                 <a
-                  href={`https://github.com/bedrud-ir/bedrud`}
+                  href={`https://github.com/themadorg/bedrud`}
                   target="_blank"
                   rel="noreferrer"
                   className="ms-1.5 inline-flex items-center gap-1 rounded-full border border-border/60 px-2.5 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"

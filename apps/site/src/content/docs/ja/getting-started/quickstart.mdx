@@ -80,7 +80,7 @@ order: 1
     手動でダウンロードして展開します。`linux_amd64` をお使いのプラットフォーム（`linux_arm64`、`darwin_amd64`、`darwin_arm64`）に置き換えてください:
 
     ```bash
-    curl -fsSL -o bedrud.tar.xz https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
+    curl -fsSL -o bedrud.tar.xz https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
     tar -xJf bedrud.tar.xz
     chmod +x bedrud
     sudo mv bedrud /usr/local/bin/
@@ -91,7 +91,7 @@ order: 1
 
     > **サーバーにインターネットがない場合？** 任意のマシンでダウンロードし、USB または `scp bedrud.tar.xz user@server:/tmp/` で転送してから展開してください。バイナリは完全に自己完結しています — 転送後の外部リクエストはゼロです。
 
-    > **ダウンロードに失敗？** インターネットアクセスを確認するか、URL を [github.com/bedrud-ir/bedrud/releases](https://github.com/bedrud-ir/bedrud/releases/latest) で確認してください。
+    > **ダウンロードに失敗？** インターネットアクセスを確認するか、URL を [github.com/themadorg/bedrud/releases](https://github.com/themadorg/bedrud/releases/latest) で確認してください。
   </TabsContent>
 </Tabs>
 
@@ -144,7 +144,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8090
 
 > **CLI リファレンス** — 完全なユーザー管理: `bedrud user promote`、`demote`、`create`、`delete`。
 
-Android、Windows、macOS、Linux 用 **ネイティブクライアント**: [GitHub Releases](https://github.com/bedrud-ir/bedrud/releases/latest)。または会議リンクを共有 — 参加者は任意のブラウザで参加できます。
+Android、Windows、macOS、Linux 用 **ネイティブクライアント**: [GitHub Releases](https://github.com/themadorg/bedrud/releases/latest)。または会議リンクを共有 — 参加者は任意のブラウザで参加できます。
 
 ---
 
@@ -159,7 +159,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest
+  ghcr.io/themadorg/bedrud:latest
 
 # Alpine (smaller, ~30 MB)
 docker run -d --name bedrud \
@@ -167,7 +167,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-alpine
+  ghcr.io/themadorg/bedrud:latest-alpine
 
 # Distroless (smallest, ~25 MB)
 docker run -d --name bedrud \
@@ -175,7 +175,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-distroless
+  ghcr.io/themadorg/bedrud:latest-distroless
 ```
 
 カスタム設定、Docker Compose、環境変数については [Docker ガイド](/ja/docs/guides/docker) を参照。
@@ -185,7 +185,7 @@ docker run -d --name bedrud \
 [Go 1.24+](https://go.dev/dl/) と [Bun](https://bun.sh/) が必要:
 
 ```bash
-git clone https://github.com/bedrud-ir/bedrud.git
+git clone https://github.com/themadorg/bedrud.git
 cd bedrud
 make init
 make local-run

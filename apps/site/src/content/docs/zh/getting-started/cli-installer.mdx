@@ -13,7 +13,7 @@ order: 2
 ## 功能说明
 
 1. 检测操作系统、CPU 架构、平台变体（Rosetta 2/WSL）和 init 系统（systemd/OpenRC/SysV init/容器）
-2. 从 [GitHub Releases](https://github.com/bedrud-ir/bedrud/releases) 下载对应的二进制文件（或使用 `--build` 从源码构建）
+2. 从 [GitHub Releases](https://github.com/themadorg/bedrud/releases) 下载对应的二进制文件（或使用 `--build` 从源码构建）
 3. 安装到 `~/bin` 或 `%USERPROFILE%\bin`（可通过 `--install-dir` 自定义）
 4. 通过 shell 配置文件（Bash）或注册表（Windows）将安装目录添加到 `PATH`
 5. **Windows 和 Linux**：提供交互式问答来配置 TLS、Postgres 并创建初始管理员用户
@@ -144,7 +144,7 @@ irm https://bedrud.org/install.ps1 | iex
 | 变量 | 默认值 | 平台 | 说明 |
 |------|--------|------|------|
 | `BEDRUD_INSTALL` | `~/bin` | 仅 Bash | 覆盖安装目录（等同于 `--install-dir`） |
-| `BEDRUD_REPO` | `bedrud-ir/bedrud` | 两者 | 覆盖 GitHub 仓库（用于 fork 或镜像） |
+| `BEDRUD_REPO` | `themadorg/bedrud` | 两者 | 覆盖 GitHub 仓库（用于 fork 或镜像） |
 
 ```bash
 BEDRUD_INSTALL=/opt/bedrud curl -fsSL https://bedrud.org/install.sh | bash
@@ -270,7 +270,7 @@ source ~/.config/fish/config.fish  # fish
 
 ```bash
 curl -fsSL -o bedrud.tar.xz \
-  https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
+  https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
 scp bedrud.tar.xz airgapped-server:/tmp/
 # 在目标机器上：
 tar -xf /tmp/bedrud.tar.xz -C /tmp/bedrud-extracted
@@ -286,7 +286,7 @@ BEDRUD_REPO=mycompany/bedrud-mirror curl -fsSL https://bedrud.org/install.sh | b
 
 ### 直接使用二进制文件
 
-从 [Releases](https://github.com/bedrud-ir/bedrud/releases) 下载，解压后移动到 `PATH` 中的目录即可。
+从 [Releases](https://github.com/themadorg/bedrud/releases) 下载，解压后移动到 `PATH` 中的目录即可。
 
 ---
 
@@ -332,7 +332,7 @@ source ~/.bashrc
 ### `Failed to download bedrud`
 
 1. 检查网络连接
-2. 在 [Releases](https://github.com/bedrud-ir/bedrud/releases) 确认目标版本存在
+2. 在 [Releases](https://github.com/themadorg/bedrud/releases) 确认目标版本存在
 3. 尝试指定版本：`--version v1.0.0`
 4. 你的平台可能暂无预构建二进制文件
 
@@ -357,7 +357,7 @@ irm https://bedrud.org/install.ps1 | iex
 
 ### Windows：ARM64 设备（Surface Pro 等）
 
-安装程序自动检测 `windows_arm64` 并下载原生二进制文件。如果需要强制指定架构，请从 [Releases](https://github.com/bedrud-ir/bedrud/releases) 下载特定的 zip 文件。
+安装程序自动检测 `windows_arm64` 并下载原生二进制文件。如果需要强制指定架构，请从 [Releases](https://github.com/themadorg/bedrud/releases) 下载特定的 zip 文件。
 
 ### Windows：用于 Postgres 的 Docker Desktop
 

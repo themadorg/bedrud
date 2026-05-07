@@ -17,10 +17,10 @@ order: 32
 **1. 添加仓库和 GPG 密钥：**
 
 ```bash
-curl -fsSL https://bedrud-ir.github.io/bedrud/bedrud.gpg.key \
+curl -fsSL https://themadorg.github.io/bedrud/bedrud.gpg.key \
   | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/bedrud.gpg
 
-echo "deb https://bedrud-ir.github.io/bedrud stable main" \
+echo "deb https://themadorg.github.io/bedrud stable main" \
   | sudo tee /etc/apt/sources.list.d/bedrud.list
 ```
 
@@ -59,10 +59,10 @@ sudo bedrud install
 **1. 添加仓库：**
 
 ```bash
-sudo curl -fsSL https://bedrud-ir.github.io/bedrud/dnf/bedrud.gpg.key \
+sudo curl -fsSL https://themadorg.github.io/bedrud/dnf/bedrud.gpg.key \
   -o /etc/pki/rpm-gpg/RPM-GPG-KEY-bedrud
 
-sudo curl -fsSL https://bedrud-ir.github.io/bedrud/dnf/bedrud.repo \
+sudo curl -fsSL https://themadorg.github.io/bedrud/dnf/bedrud.repo \
   -o /etc/yum.repos.d/bedrud.repo
 ```
 
@@ -76,7 +76,7 @@ sudo dnf install bedrud
 
 ### 直接下载 .deb 包
 
-从 [最新 GitHub release](https://github.com/bedrud-ir/bedrud/releases/latest) 直接下载 `.deb` 软件包：
+从 [最新 GitHub release](https://github.com/themadorg/bedrud/releases/latest) 直接下载 `.deb` 软件包：
 
 <Tabs>
   <TabsList>
@@ -86,7 +86,7 @@ sudo dnf install bedrud
 
   <TabsContent value="x86-64">
     ```bash
-    wget https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_amd64.deb
+    wget https://github.com/themadorg/bedrud/releases/latest/download/bedrud_amd64.deb
     sudo dpkg -i bedrud_amd64.deb
     sudo apt-get install -f   # resolve any missing dependencies
     ```
@@ -94,7 +94,7 @@ sudo dnf install bedrud
 
   <TabsContent value="arm64">
     ```bash
-    wget https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_arm64.deb
+    wget https://github.com/themadorg/bedrud/releases/latest/download/bedrud_arm64.deb
     sudo dpkg -i bedrud_arm64.deb
     sudo apt-get install -f
     ```
@@ -105,7 +105,7 @@ sudo dnf install bedrud
 
 ### 直接下载 .rpm 包
 
-从 [最新 GitHub release](https://github.com/bedrud-ir/bedrud/releases/latest) 下载 `.rpm` 软件包：
+从 [最新 GitHub release](https://github.com/themadorg/bedrud/releases/latest) 下载 `.rpm` 软件包：
 
 <Tabs>
   <TabsList>
@@ -115,13 +115,13 @@ sudo dnf install bedrud
 
   <TabsContent value="x86-64">
     ```bash
-    sudo dnf install https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-*.x86_64.rpm
+    sudo dnf install https://github.com/themadorg/bedrud/releases/latest/download/bedrud-*.x86_64.rpm
     ```
   </TabsContent>
 
   <TabsContent value="aarch64">
     ```bash
-    sudo dnf install https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-*.aarch64.rpm
+    sudo dnf install https://github.com/themadorg/bedrud/releases/latest/download/bedrud-*.aarch64.rpm
     ```
   </TabsContent>
 </Tabs>
@@ -140,7 +140,7 @@ sudo dnf install bedrud
 
   <TabsContent value="linux-x86-64">
     ```bash
-    curl -L https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz \
+    curl -L https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz \
       | tar xJ
     sudo mv bedrud /usr/local/bin/
     ```
@@ -148,7 +148,7 @@ sudo dnf install bedrud
 
   <TabsContent value="linux-arm64">
     ```bash
-    curl -L https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_arm64.tar.xz \
+    curl -L https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_arm64.tar.xz \
       | tar xJ
     sudo mv bedrud /usr/local/bin/
     ```
@@ -163,31 +163,31 @@ sudo dnf install bedrud
 
 ```bash
 # glibc (default)
-docker pull ghcr.io/bedrud-ir/bedrud:latest
+docker pull ghcr.io/themadorg/bedrud:latest
 docker run -d \
   --name bedrud \
   -p 8090:8090 \
   -p 7880:7880 \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest
+  ghcr.io/themadorg/bedrud:latest
 
 # Alpine (musl)
-docker pull ghcr.io/bedrud-ir/bedrud:latest-alpine
+docker pull ghcr.io/themadorg/bedrud:latest-alpine
 docker run -d \
   --name bedrud \
   -p 8090:8090 \
   -p 7880:7880 \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-alpine
+  ghcr.io/themadorg/bedrud:latest-alpine
 
 # Distroless (~25 MB)
-docker pull ghcr.io/bedrud-ir/bedrud:latest-distroless
+docker pull ghcr.io/themadorg/bedrud:latest-distroless
 docker run -d \
   --name bedrud \
   -p 8090:8090 \
   -p 7880:7880 \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-distroless
+  ghcr.io/themadorg/bedrud:latest-distroless
 ```
 
 | 标签 | 基础镜像 | 大小 |
@@ -251,7 +251,7 @@ docker run -d \
     从 Flatpak 包安装：
 
     ```bash
-    flatpak install https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-desktop-linux-x86_64.flatpak
+    flatpak install https://github.com/themadorg/bedrud/releases/latest/download/bedrud-desktop-linux-x86_64.flatpak
     flatpak run ir.bedrud.Desktop
     ```
   </TabsContent>
@@ -260,7 +260,7 @@ docker run -d \
     AppImage 是自包含的，可在任何 Linux 发行版上运行而无需安装。
 
     ```bash
-    wget https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-desktop-linux-x86_64.AppImage
+    wget https://github.com/themadorg/bedrud/releases/latest/download/bedrud-desktop-linux-x86_64.AppImage
     chmod +x bedrud-desktop-linux-x86_64.AppImage
     ./bedrud-desktop-linux-x86_64.AppImage
     ```
@@ -295,7 +295,7 @@ docker run -d \
 
   <TabsContent value="arm64">
     ```bash
-    curl -L https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-desktop-macos-arm64.tar.gz \
+    curl -L https://github.com/themadorg/bedrud/releases/latest/download/bedrud-desktop-macos-arm64.tar.gz \
       | tar xz
     # Allow the binary if macOS blocks it:
     xattr -d com.apple.quarantine bedrud-desktop
@@ -305,7 +305,7 @@ docker run -d \
 
   <TabsContent value="x86-64">
     ```bash
-    curl -L https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-desktop-macos-x86_64.tar.gz \
+    curl -L https://github.com/themadorg/bedrud/releases/latest/download/bedrud-desktop-macos-x86_64.tar.gz \
       | tar xz
     xattr -d com.apple.quarantine bedrud-desktop
     ./bedrud-desktop
@@ -314,7 +314,7 @@ docker run -d \
 
   <TabsContent value="homebrew">
     ```bash
-    brew tap bedrud-ir/bedrud
+    brew tap themadorg/bedrud
     brew install bedrud-desktop
     ```
   </TabsContent>
@@ -341,7 +341,7 @@ docker run -d \
   </TabsList>
 
   <TabsContent value="nsis">
-    从[最新版本](https://github.com/bedrud-ir/bedrud/releases/latest)下载并运行安装程序：
+    从[最新版本](https://github.com/themadorg/bedrud/releases/latest)下载并运行安装程序：
 
     | 架构 | 文件 |
     |---|---|
@@ -385,7 +385,7 @@ docker run -d \
 | 任意 Linux | AppImage / `tar.xz` 二进制文件 | AppImage / Flatpak / Snap / `tar.xz` |
 | macOS | `tar.xz` 二进制文件 | Homebrew tap / 便携 `tar.gz` |
 | Windows | - | WinGet / Chocolatey / NSIS 安装程序 / 便携 `.zip` |
-| Docker | `ghcr.io/bedrud-ir/bedrud` | - |
+| Docker | `ghcr.io/themadorg/bedrud` | - |
 
 ---
 
@@ -401,7 +401,7 @@ docker run -d \
 | `RPM_GPG_PRIVATE_KEY` | DNF 仓库 | 用于签名 RPM 软件包的 GPG 密钥 |
 | `SNAPCRAFT_STORE_CREDENTIALS` | Snap Store | 从 `snapcraft export-login` 获取的登录凭据 |
 | `CHOCOLATEY_API_KEY` | Chocolatey | 来自 chocolatey.org 的 API 密钥 |
-| `HOMEBREW_TAP_TOKEN` | Homebrew tap | 具有对 `bedrud-ir/homebrew-bedrud` 写入权限的 GitHub PAT |
+| `HOMEBREW_TAP_TOKEN` | Homebrew tap | 具有对 `themadorg/homebrew-bedrud` 写入权限的 GitHub PAT |
 | `WINGET_GITHUB_TOKEN` | WinGet | 用于向 `microsoft/winget-pkgs` 提交 PR 的 GitHub PAT |
 | `MACOS_CERTIFICATE` | macOS 签名 | Base64 编码的 Developer ID `.p12` 证书 |
 | `MACOS_CERTIFICATE_PWD` | macOS 签名 | `.p12` 文件的密码 |

@@ -206,7 +206,7 @@
     subtitle: "复制。粘贴。运行。安装完成。",
     command: "curl -fsSL https://bedrud.org/install.sh | bash",
     powershellCommand: "irm https://bedrud.org/install.ps1 | iex",
-    dockerCommand: "docker pull ghcr.io/bedrud-ir/bedrud:latest",
+    dockerCommand: "docker pull ghcr.io/themadorg/bedrud:latest",
     or: "或",
     whatItDoes:
       "Downloads the Bedrud CLI binary to ~/bin and adds it to your PATH.",

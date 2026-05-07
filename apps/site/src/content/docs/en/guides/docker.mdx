@@ -135,12 +135,12 @@ Docker images are published to GitHub Container Registry on every release:
 
 ```bash
 # Distroless (smallest, no shell)
-docker pull ghcr.io/bedrud-ir/bedrud:latest-distroless
+docker pull ghcr.io/themadorg/bedrud:latest-distroless
 
 # Specific version
-docker pull ghcr.io/bedrud-ir/bedrud:v1.0.0
-docker pull ghcr.io/bedrud-ir/bedrud:v1.0.0-alpine
-docker pull ghcr.io/bedrud-ir/bedrud:v1.0.0-distroless
+docker pull ghcr.io/themadorg/bedrud:v1.0.0
+docker pull ghcr.io/themadorg/bedrud:v1.0.0-alpine
+docker pull ghcr.io/themadorg/bedrud:v1.0.0-distroless
 ```
 
 ## Docker Compose Example
@@ -149,7 +149,7 @@ docker pull ghcr.io/bedrud-ir/bedrud:v1.0.0-distroless
 services:
   bedrud:
     # Use :latest-alpine or :latest-distroless for smaller images
-    image: ghcr.io/bedrud-ir/bedrud:latest
+    image: ghcr.io/themadorg/bedrud:latest
     ports:
       - "8090:8090"
       - "7880:7880"

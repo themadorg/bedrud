@@ -80,7 +80,7 @@ Déployez Bedrud et rejoignez une réunion vidéo en moins de 5 minutes.
     Téléchargez et extrayez manuellement. Remplacez `linux_amd64` par votre plateforme (`linux_arm64`, `darwin_amd64`, `darwin_arm64`) :
 
     ```bash
-    curl -fsSL -o bedrud.tar.xz https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
+    curl -fsSL -o bedrud.tar.xz https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
     tar -xJf bedrud.tar.xz
     chmod +x bedrud
     sudo mv bedrud /usr/local/bin/
@@ -91,7 +91,7 @@ Déployez Bedrud et rejoignez une réunion vidéo en moins de 5 minutes.
 
     > **Pas d'Internet sur le serveur ?** Téléchargez sur n'importe quelle machine, transférez via USB ou `scp bedrud.tar.xz user@server:/tmp/`, puis extrayez là-bas. Le binaire est entièrement autonome - zéro requête sortante après le transfert.
 
-    > **Échec du téléchargement ?** Vérifiez l'accès Internet, ou vérifiez l'URL sur [github.com/bedrud-ir/bedrud/releases](https://github.com/bedrud-ir/bedrud/releases/latest).
+    > **Échec du téléchargement ?** Vérifiez l'accès Internet, ou vérifiez l'URL sur [github.com/themadorg/bedrud/releases](https://github.com/themadorg/bedrud/releases/latest).
   </TabsContent>
 </Tabs>
 
@@ -144,7 +144,7 @@ Ouvrez `https://meet.example.com` (ou `https://<votre-ip>:8090`) dans votre navi
 
 > **Référence CLI** - Gestion complète des utilisateurs : `bedrud user promote`, `demote`, `create`, `delete`.
 
-**Clients natifs** pour Android, Windows, macOS et Linux : [GitHub Releases](https://github.com/bedrud-ir/bedrud/releases/latest). Ou partagez le lien de réunion - les participants rejoignent dans n'importe quel navigateur.
+**Clients natifs** pour Android, Windows, macOS et Linux : [GitHub Releases](https://github.com/themadorg/bedrud/releases/latest). Ou partagez le lien de réunion - les participants rejoignent dans n'importe quel navigateur.
 
 ---
 
@@ -159,7 +159,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest
+  ghcr.io/themadorg/bedrud:latest
 
 # Alpine (smaller, ~30 MB)
 docker run -d --name bedrud \
@@ -167,7 +167,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-alpine
+  ghcr.io/themadorg/bedrud:latest-alpine
 
 # Distroless (smallest, ~25 MB)
 docker run -d --name bedrud \
@@ -175,7 +175,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-distroless
+  ghcr.io/themadorg/bedrud:latest-distroless
 ```
 
 Configuration personnalisée, Docker Compose et variables d'environnement : voir [Guide Docker](/fr/docs/guides/docker).
@@ -185,7 +185,7 @@ Configuration personnalisée, Docker Compose et variables d'environnement : voir
 Nécessite [Go 1.24+](https://go.dev/dl/) et [Bun](https://bun.sh/) :
 
 ```bash
-git clone https://github.com/bedrud-ir/bedrud.git
+git clone https://github.com/themadorg/bedrud.git
 cd bedrud
 make init
 make local-run

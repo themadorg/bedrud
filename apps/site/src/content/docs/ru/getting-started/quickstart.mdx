@@ -80,7 +80,7 @@ order: 1
     Загрузите и распакуйте вручную. Замените `linux_amd64` на вашу платформу (`linux_arm64`, `darwin_amd64`, `darwin_arm64`):
 
     ```bash
-    curl -fsSL -o bedrud.tar.xz https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
+    curl -fsSL -o bedrud.tar.xz https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
     tar -xJf bedrud.tar.xz
     chmod +x bedrud
     sudo mv bedrud /usr/local/bin/
@@ -91,7 +91,7 @@ order: 1
 
     > **Нет интернета на сервере?** Загрузите на любой компьютер, перенесите через USB или `scp bedrud.tar.xz user@server:/tmp/`, затем распакуйте. Бинарный файл полностью автономен — никаких исходящих запросов после переноса.
 
-    > **Загрузка не удалась?** Проверьте доступ в интернет или убедитесь, что URL доступен: [github.com/bedrud-ir/bedrud/releases](https://github.com/bedrud-ir/bedrud/releases/latest).
+    > **Загрузка не удалась?** Проверьте доступ в интернет или убедитесь, что URL доступен: [github.com/themadorg/bedrud/releases](https://github.com/themadorg/bedrud/releases/latest).
   </TabsContent>
 </Tabs>
 
@@ -144,7 +144,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8090
 
 > **Справка по CLI** — Полное управление пользователями: `bedrud user promote`, `demote`, `create`, `delete`.
 
-**Нативные клиенты** для Android, Windows, macOS и Linux: [GitHub Releases](https://github.com/bedrud-ir/bedrud/releases/latest). Или поделитесь ссылкой на конференцию - участники подключатся в любом браузере.
+**Нативные клиенты** для Android, Windows, macOS и Linux: [GitHub Releases](https://github.com/themadorg/bedrud/releases/latest). Или поделитесь ссылкой на конференцию - участники подключатся в любом браузере.
 
 ---
 
@@ -159,7 +159,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest
+  ghcr.io/themadorg/bedrud:latest
 
 # Alpine (smaller, ~30 MB)
 docker run -d --name bedrud \
@@ -167,7 +167,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-alpine
+  ghcr.io/themadorg/bedrud:latest-alpine
 
 # Distroless (smallest, ~25 MB)
 docker run -d --name bedrud \
@@ -175,7 +175,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-distroless
+  ghcr.io/themadorg/bedrud:latest-distroless
 ```
 
 Пользовательская конфигурация, Docker Compose и переменные окружения: см. [Руководство по Docker](/ru/docs/guides/docker).
@@ -185,7 +185,7 @@ docker run -d --name bedrud \
 Требуется [Go 1.24+](https://go.dev/dl/) и [Bun](https://bun.sh/):
 
 ```bash
-git clone https://github.com/bedrud-ir/bedrud.git
+git clone https://github.com/themadorg/bedrud.git
 cd bedrud
 make init
 make local-run

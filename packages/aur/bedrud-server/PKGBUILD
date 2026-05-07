@@ -5,7 +5,7 @@ pkgver=0.1.0
 pkgrel=1
 pkgdesc="Self-hosted video meeting server (single binary with embedded UI and LiveKit)"
 arch=('x86_64' 'aarch64')
-url="https://github.com/bedrud-ir/bedrud"
+url="https://github.com/themadorg/bedrud"
 license=('Apache-2.0')
 depends=('glibc')
 provides=('bedrud')
@@ -14,10 +14,10 @@ options=('!strip')
 backup=('etc/bedrud/config.yaml')
 install=bedrud-bin.install
 
-source_x86_64=("${pkgname}-${pkgver}-x86_64.tar.xz::https://github.com/bedrud-ir/bedrud/releases/download/v${pkgver}/bedrud_linux_amd64.tar.xz"
-               "bedrud.service::https://raw.githubusercontent.com/bedrud-ir/bedrud/main/apps/server/installer/linux/bedrud.service")
-source_aarch64=("${pkgname}-${pkgver}-aarch64.tar.xz::https://github.com/bedrud-ir/bedrud/releases/download/v${pkgver}/bedrud_linux_arm64.tar.xz"
-                "bedrud.service::https://raw.githubusercontent.com/bedrud-ir/bedrud/main/apps/server/installer/linux/bedrud.service")
+source_x86_64=("${pkgname}-${pkgver}-x86_64.tar.xz::https://github.com/themadorg/bedrud/releases/download/v${pkgver}/bedrud_linux_amd64.tar.xz"
+               "bedrud.service::https://raw.githubusercontent.com/themadorg/bedrud/main/apps/server/installer/linux/bedrud.service")
+source_aarch64=("${pkgname}-${pkgver}-aarch64.tar.xz::https://github.com/themadorg/bedrud/releases/download/v${pkgver}/bedrud_linux_arm64.tar.xz"
+                "bedrud.service::https://raw.githubusercontent.com/themadorg/bedrud/main/apps/server/installer/linux/bedrud.service")
 
 # Checksums are updated automatically by the release workflow
 sha256sums_x86_64=('SKIP' 'SKIP')

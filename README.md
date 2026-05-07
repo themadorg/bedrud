@@ -2,14 +2,14 @@
 
 **Self-hosted video meeting platform** — a single binary that packages the web UI, REST API, and WebRTC media server into one deployable unit.
 
-[![CI](https://github.com/bedrud-ir/bedrud/actions/workflows/ci.yml/badge.svg)](https://github.com/bedrud-ir/bedrud/actions/workflows/ci.yml)
-[![Release](https://github.com/bedrud-ir/bedrud/actions/workflows/release.yml/badge.svg)](https://github.com/bedrud-ir/bedrud/actions/workflows/release.yml)
-[![Latest Release](https://img.shields.io/github/v/release/bedrud-ir/bedrud)](https://github.com/bedrud-ir/bedrud/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/bedrud-ir/bedrud/total)](https://github.com/bedrud-ir/bedrud/releases/latest)
+[![CI](https://github.com/themadorg/bedrud/actions/workflows/ci.yml/badge.svg)](https://github.com/themadorg/bedrud/actions/workflows/ci.yml)
+[![Release](https://github.com/themadorg/bedrud/actions/workflows/release.yml/badge.svg)](https://github.com/themadorg/bedrud/actions/workflows/release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/themadorg/bedrud)](https://github.com/themadorg/bedrud/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/themadorg/bedrud/total)](https://github.com/themadorg/bedrud/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://go.dev)
-[![Docker](https://img.shields.io/badge/Docker-ghcr.io-2496ED?logo=docker&logoColor=white)](https://github.com/bedrud-ir/bedrud/pkgs/container/bedrud)
-[![Project Status](https://img.shields.io/badge/status-active--development-success)](https://github.com/bedrud-ir/bedrud/commits/main)
+[![Docker](https://img.shields.io/badge/Docker-ghcr.io-2496ED?logo=docker&logoColor=white)](https://github.com/themadorg/bedrud/pkgs/container/bedrud)
+[![Project Status](https://img.shields.io/badge/status-active--development-success)](https://github.com/themadorg/bedrud/commits/main)
 
 [![Android](https://img.shields.io/badge/Android-API%2028+-3DDC84?logo=android&logoColor=white)](https://bedrud.org/en/docs/guides/packages/#android)
 [![iOS](https://img.shields.io/badge/iOS-18.0+-000000?logo=apple&logoColor=white)](https://bedrud.org/en/docs/guides/packages/#ios)
@@ -54,7 +54,7 @@ Designed for privacy-first teams who want full control without managing complex 
 Run with Docker:
 
 ```bash
-docker run -p 8090:8090 -p 7880:7880 ghcr.io/bedrud-ir/bedrud:latest
+docker run -p 8090:8090 -p 7880:7880 ghcr.io/themadorg/bedrud:latest
 ```
 
 Open `http://localhost:8090`, create an account, and start a meeting.
@@ -150,16 +150,16 @@ Open `http://localhost:8090`, create an account, and start a meeting.
 
 ```bash
 # Debian-based (default)
-docker pull ghcr.io/bedrud-ir/bedrud:latest
-docker run -p 8090:8090 -p 7880:7880 ghcr.io/bedrud-ir/bedrud:latest
+docker pull ghcr.io/themadorg/bedrud:latest
+docker run -p 8090:8090 -p 7880:7880 ghcr.io/themadorg/bedrud:latest
 
 # Alpine-based (smaller image)
-docker pull ghcr.io/bedrud-ir/bedrud:latest-alpine
-docker run -p 8090:8090 -p 7880:7880 ghcr.io/bedrud-ir/bedrud:latest-alpine
+docker pull ghcr.io/themadorg/bedrud:latest-alpine
+docker run -p 8090:8090 -p 7880:7880 ghcr.io/themadorg/bedrud:latest-alpine
 
 # Distroless (smallest, no shell)
-docker pull ghcr.io/bedrud-ir/bedrud:latest-distroless
-docker run -p 8090:8090 -p 7880:7880 ghcr.io/bedrud-ir/bedrud:latest-distroless
+docker pull ghcr.io/themadorg/bedrud:latest-distroless
+docker run -p 8090:8090 -p 7880:7880 ghcr.io/themadorg/bedrud:latest-distroless
 ```
 
 Open `http://localhost:8090`, create an account, and start a meeting.
@@ -203,7 +203,7 @@ docker run -p 8090:8090 -p 7880:7880 bedrud
 <summary>Linux (x86_64 / ARM64)</summary>
 
 ```bash
-curl -L https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz | tar xJ
+curl -L https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz | tar xJ
 sudo mv bedrud /usr/local/bin/
 sudo bedrud install   # sets up systemd, TLS, and config
 ```
@@ -215,11 +215,11 @@ For ARM64 (Raspberry Pi, ARM servers): replace `amd64` with `arm64`.
 <details>
 <summary>Windows</summary>
 
-Download `bedrud_windows_amd64.zip` from the [latest release](https://github.com/bedrud-ir/bedrud/releases/latest).
+Download `bedrud_windows_amd64.zip` from the [latest release](https://github.com/themadorg/bedrud/releases/latest).
 
 </details>
 
-See [latest release](https://github.com/bedrud-ir/bedrud/releases/latest) for all platforms.
+See [latest release](https://github.com/themadorg/bedrud/releases/latest) for all platforms.
 
 ### Ubuntu/Debian (APT)
 
@@ -227,9 +227,9 @@ See [latest release](https://github.com/bedrud-ir/bedrud/releases/latest) for al
 <summary>Install via apt repository</summary>
 
 ```bash
-curl -fsSL https://bedrud-ir.github.io/bedrud/bedrud.gpg.key \
+curl -fsSL https://themadorg.github.io/bedrud/bedrud.gpg.key \
   | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/bedrud.gpg
-echo "deb https://bedrud-ir.github.io/bedrud stable main" \
+echo "deb https://themadorg.github.io/bedrud stable main" \
   | sudo tee /etc/apt/sources.list.d/bedrud.list
 sudo apt update && sudo apt install bedrud
 sudo bedrud install
@@ -255,7 +255,7 @@ sudo bedrud install
 <summary>Install Alpine package</summary>
 
 ```bash
-wget https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_x86_64.apk
+wget https://github.com/themadorg/bedrud/releases/latest/download/bedrud_x86_64.apk
 apk add --allow-untrusted bedrud_x86_64.apk
 ```
 
@@ -288,7 +288,7 @@ yay -S bedrud-desktop-bin
 <summary>AppImage (any Linux)</summary>
 
 ```bash
-wget https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-desktop-linux-x86_64.AppImage
+wget https://github.com/themadorg/bedrud/releases/latest/download/bedrud-desktop-linux-x86_64.AppImage
 chmod +x bedrud-desktop-linux-x86_64.AppImage
 ./bedrud-desktop-linux-x86_64.AppImage
 ```
@@ -300,9 +300,9 @@ chmod +x bedrud-desktop-linux-x86_64.AppImage
 
 ```bash
 # Apple Silicon
-curl -L https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-desktop-macos-arm64.tar.gz | tar xz
+curl -L https://github.com/themadorg/bedrud/releases/latest/download/bedrud-desktop-macos-arm64.tar.gz | tar xz
 # Intel
-curl -L https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-desktop-macos-x86_64.tar.gz | tar xz
+curl -L https://github.com/themadorg/bedrud/releases/latest/download/bedrud-desktop-macos-x86_64.tar.gz | tar xz
 ```
 
 > [!WARNING]
@@ -313,7 +313,7 @@ curl -L https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-desk
 <details>
 <summary>Windows</summary>
 
-Download the NSIS installer or portable `.zip` from the [latest release](https://github.com/bedrud-ir/bedrud/releases/latest) for x86_64 or ARM64.
+Download the NSIS installer or portable `.zip` from the [latest release](https://github.com/themadorg/bedrud/releases/latest) for x86_64 or ARM64.
 
 </details>
 
@@ -446,7 +446,7 @@ Key pages:
 ### Commands
 
 ```bash
-git clone https://github.com/bedrud-ir/bedrud.git
+git clone https://github.com/themadorg/bedrud.git
 cd bedrud
 make init     # install all dependencies
 make dev      # start LiveKit + server + web frontend
@@ -569,14 +569,14 @@ Bedrud is in **active development**. Core features are functional and used in pr
 - [ ] Whiteboard collaboration (shared canvas)
 - [ ] Signed and notarized macOS / Windows builds
 
-See [GitHub Issues](https://github.com/bedrud-ir/bedrud/issues) and [Discussions](https://github.com/bedrud-ir/bedrud/discussions) for the latest plans.
+See [GitHub Issues](https://github.com/themadorg/bedrud/issues) and [Discussions](https://github.com/themadorg/bedrud/discussions) for the latest plans.
 
 ---
 
 ## Support
 
-- **Bug Reports & Feature Requests:** [GitHub Issues](https://github.com/bedrud-ir/bedrud/issues)
-- **Architecture Discussions & Questions:** [GitHub Discussions](https://github.com/bedrud-ir/bedrud/discussions)
+- **Bug Reports & Feature Requests:** [GitHub Issues](https://github.com/themadorg/bedrud/issues)
+- **Architecture Discussions & Questions:** [GitHub Discussions](https://github.com/themadorg/bedrud/discussions)
 - **Documentation:** [bedrud.org/en/docs](https://bedrud.org/en/docs/)
 
 > [!NOTE]

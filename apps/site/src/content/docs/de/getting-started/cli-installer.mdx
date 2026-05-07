@@ -13,7 +13,7 @@ Für die Server-Einrichtung nach der Installation siehe [Schnellstart](/de/docs/
 ## Funktionsweise
 
 1. Erkennt Betriebssystem, CPU-Architektur, Plattformvarianten (Rosetta 2/WSL) und Init-System (systemd/OpenRC/SysV/Container)
-2. Lädt die richtige Binärdatei von [GitHub Releases](https://github.com/bedrud-ir/bedrud/releases) herunter (oder erstellt aus dem Quellcode mit `--build`)
+2. Lädt die richtige Binärdatei von [GitHub Releases](https://github.com/themadorg/bedrud/releases) herunter (oder erstellt aus dem Quellcode mit `--build`)
 3. Installiert nach `~/bin` oder `%USERPROFILE%\bin` (anpassbar über `--install-dir`)
 4. Fügt das Installationsverzeichnis zum `PATH` hinzu (Shell-Profile für Bash, Registry für Windows)
 5. **Windows & Linux**: Bietet einen interaktiven Dialog zur Konfiguration von TLS, Postgres und Erstellung des ersten Admin-Benutzers
@@ -145,7 +145,7 @@ irm https://bedrud.org/install.ps1 | iex
 | Variable | Standard | Plattformen | Beschreibung |
 |----------|----------|-------------|-------------|
 | `BEDRUD_INSTALL` | `~/bin` | Nur Bash | Installationsverzeichnis überschreiben (gleich wie `--install-dir`) |
-| `BEDRUD_REPO` | `bedrud-ir/bedrud` | Beide | GitHub-Repo überschreiben (für Forks oder Mirrors) |
+| `BEDRUD_REPO` | `themadorg/bedrud` | Beide | GitHub-Repo überschreiben (für Forks oder Mirrors) |
 
 ```bash
 BEDRUD_INSTALL=/opt/bedrud curl -fsSL https://bedrud.org/install.sh | bash
@@ -271,7 +271,7 @@ source ~/.config/fish/config.fish  # fish
 
 ```bash
 curl -fsSL -o bedrud.tar.xz \
-  https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
+  https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
 scp bedrud.tar.xz airgapped-server:/tmp/
 # Auf dem Zielsystem:
 tar -xf /tmp/bedrud.tar.xz -C /tmp/bedrud-extracted
@@ -287,7 +287,7 @@ BEDRUD_REPO=mycompany/bedrud-mirror curl -fsSL https://bedrud.org/install.sh | b
 
 ### Direkte Binärdatei
 
-Von [Releases](https://github.com/bedrud-ir/bedrud/releases) herunterladen, entpacken und in ein Verzeichnis in Ihrem `PATH` verschieben.
+Von [Releases](https://github.com/themadorg/bedrud/releases) herunterladen, entpacken und in ein Verzeichnis in Ihrem `PATH` verschieben.
 
 ---
 
@@ -333,7 +333,7 @@ source ~/.bashrc
 ### `Failed to download bedrud`
 
 1. Internetverbindung prüfen
-2. Überprüfen, ob das Ziel unter [Releases](https://github.com/bedrud-ir/bedrud/releases) existiert
+2. Überprüfen, ob das Ziel unter [Releases](https://github.com/themadorg/bedrud/releases) existiert
 3. Eine bestimmte Version versuchen: `--version v1.0.0`
 4. Ihre Plattform verfügt möglicherweise noch nicht über eine vorkompilierte Binärdatei
 
@@ -358,7 +358,7 @@ Wenn Sie in einem WSL-Terminal arbeiten (z. B. Ubuntu unter Windows), erkennt de
 
 ### Windows: ARM64-Geräte (Surface Pro usw.)
 
-Der Installer erkennt automatisch `windows_arm64` und lädt die native Binärdatei herunter. Wenn Sie eine Architektur erzwingen müssen, laden Sie das spezifische Zip-Archiv von [Releases](https://github.com/bedrud-ir/bedrud/releases) herunter.
+Der Installer erkennt automatisch `windows_arm64` und lädt die native Binärdatei herunter. Wenn Sie eine Architektur erzwingen müssen, laden Sie das spezifische Zip-Archiv von [Releases](https://github.com/themadorg/bedrud/releases) herunter.
 
 ### Windows: Docker Desktop für Postgres
 

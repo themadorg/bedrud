@@ -82,10 +82,10 @@ Install via your distribution's package manager.
   <TabsContent value="ubuntu-debian-apt">
 
     ```bash
-    curl -fsSL https://bedrud-ir.github.io/bedrud/bedrud.gpg.key \
+    curl -fsSL https://themadorg.github.io/bedrud/bedrud.gpg.key \
       | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/bedrud.gpg
 
-    echo "deb https://bedrud-ir.github.io/bedrud stable main" \
+    echo "deb https://themadorg.github.io/bedrud stable main" \
       | sudo tee /etc/apt/sources.list.d/bedrud.list
 
     sudo apt update && sudo apt install bedrud
@@ -107,10 +107,10 @@ Install via your distribution's package manager.
   <TabsContent value="fedora-rhel-dnf">
 
     ```bash
-    sudo curl -fsSL https://bedrud-ir.github.io/bedrud/dnf/bedrud.gpg.key \
+    sudo curl -fsSL https://themadorg.github.io/bedrud/dnf/bedrud.gpg.key \
       -o /etc/pki/rpm-gpg/RPM-GPG-KEY-bedrud
 
-    sudo curl -fsSL https://bedrud-ir.github.io/bedrud/dnf/bedrud.repo \
+    sudo curl -fsSL https://themadorg.github.io/bedrud/dnf/bedrud.repo \
       -o /etc/yum.repos.d/bedrud.repo
 
     sudo dnf install bedrud
@@ -119,10 +119,10 @@ Install via your distribution's package manager.
   </TabsContent>
   <TabsContent value="alpine-apk">
 
-    Download the `.apk` package from the [latest release](https://github.com/bedrud-ir/bedrud/releases/latest):
+    Download the `.apk` package from the [latest release](https://github.com/themadorg/bedrud/releases/latest):
 
     ```bash
-    wget https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_x86_64.apk
+    wget https://github.com/themadorg/bedrud/releases/latest/download/bedrud_x86_64.apk
     apk add --allow-untrusted bedrud_x86_64.apk
     ```
 
@@ -145,20 +145,20 @@ Run Bedrud in a container - no Linux server setup, no init system setup, no bina
 
 ```bash
 # Debian (default, ~50 MB)
-docker pull ghcr.io/bedrud-ir/bedrud:latest
+docker pull ghcr.io/themadorg/bedrud:latest
 
 # Alpine (smaller, ~30 MB)
-docker pull ghcr.io/bedrud-ir/bedrud:latest-alpine
+docker pull ghcr.io/themadorg/bedrud:latest-alpine
 
 # Distroless (smallest, ~25 MB, no shell)
-docker pull ghcr.io/bedrud-ir/bedrud:latest-distroless
+docker pull ghcr.io/themadorg/bedrud:latest-distroless
 
 docker run -d --name bedrud \
   -p 8090:8090 \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest
+  ghcr.io/themadorg/bedrud:latest
 ```
 
 ### Docker Compose
@@ -167,7 +167,7 @@ docker run -d --name bedrud \
 services:
   bedrud:
     # Use :latest-alpine or :latest-distroless for smaller images
-    image: ghcr.io/bedrud-ir/bedrud:latest
+    image: ghcr.io/themadorg/bedrud:latest
     ports:
       - "8090:8090"
       - "7880:7880"
@@ -200,7 +200,7 @@ docker run -d --name bedrud \
   -e LIVEKIT_API_KEY=prodkey \
   -e LIVEKIT_API_SECRET=prodsecret \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest
+  ghcr.io/themadorg/bedrud:latest
 ```
 
 <Callout type="warning">
@@ -460,7 +460,7 @@ Services restart automatically after package upgrade.
 Download the latest release and re-run install. The installer is safe to re-run - it overwrites the binary and config while preserving the database:
 
 ```bash
-curl -fsSL -o bedrud.tar.xz https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
+curl -fsSL -o bedrud.tar.xz https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
 tar -xJf bedrud.tar.xz && chmod +x bedrud
 sudo ./bedrud install --fresh
 ```
@@ -472,16 +472,16 @@ sudo ./bedrud install --fresh
 ### Docker
 
 ```bash
-docker pull ghcr.io/bedrud-ir/bedrud:latest
-# or: docker pull ghcr.io/bedrud-ir/bedrud:latest-alpine
-# or: docker pull ghcr.io/bedrud-ir/bedrud:latest-distroless
+docker pull ghcr.io/themadorg/bedrud:latest
+# or: docker pull ghcr.io/themadorg/bedrud:latest-alpine
+# or: docker pull ghcr.io/themadorg/bedrud:latest-distroless
 docker stop bedrud && docker rm bedrud
 docker run -d --name bedrud \
   -p 8090:8090 \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest
+  ghcr.io/themadorg/bedrud:latest
 ```
 
 With Docker Compose:

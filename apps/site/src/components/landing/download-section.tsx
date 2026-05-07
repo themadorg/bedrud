@@ -191,7 +191,7 @@ function PlatformContent({
               {t(lang, "downloadPage.flathub")}
             </p>
             <CopyButton
-              text="flatpak install https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-desktop-linux-x86_64.flatpak"
+              text="flatpak install https://github.com/themadorg/bedrud/releases/latest/download/bedrud-desktop-linux-x86_64.flatpak"
               label="flatpak install"
               className={cn(btnClass, "mt-4")}
             />
@@ -250,7 +250,7 @@ function PlatformContent({
               {t(lang, "downloadPage.brew")}
             </p>
             <CopyButton
-              text="brew tap bedrud-ir/bedrud && brew install bedrud-desktop"
+              text="brew tap themadorg/bedrud && brew install bedrud-desktop"
               label="brew install bedrud-desktop"
               className={cn(btnClass, "mt-4")}
             />
@@ -512,17 +512,17 @@ function PlatformContent({
               <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground">
                 <li className="flex items-center gap-2">
                   <span className="font-mono rounded bg-muted/50 px-1.5 py-0.5 text-xs font-medium text-foreground">
-                    ghcr.io/bedrud-ir/bedrud:latest
+                    ghcr.io/themadorg/bedrud:latest
                   </span>
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="font-mono rounded bg-muted/50 px-1.5 py-0.5 text-xs font-medium text-foreground">
-                    ghcr.io/bedrud-ir/bedrud:latest-alpine
+                    ghcr.io/themadorg/bedrud:latest-alpine
                   </span>
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="font-mono rounded bg-muted/50 px-1.5 py-0.5 text-xs font-medium text-foreground">
-                    ghcr.io/bedrud-ir/bedrud:latest-distroless
+                    ghcr.io/themadorg/bedrud:latest-distroless
                   </span>
                 </li>
               </ul>

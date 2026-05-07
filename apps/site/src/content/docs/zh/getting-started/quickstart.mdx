@@ -80,7 +80,7 @@ order: 1
     手动下载并解压。将 `linux_amd64` 替换为你的平台（`linux_arm64`、`darwin_amd64`、`darwin_arm64`）：
 
     ```bash
-    curl -fsSL -o bedrud.tar.xz https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
+    curl -fsSL -o bedrud.tar.xz https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
     tar -xJf bedrud.tar.xz
     chmod +x bedrud
     sudo mv bedrud /usr/local/bin/
@@ -91,7 +91,7 @@ order: 1
 
     > **服务器没有网络？** 在任意机器上下载，通过 USB 或 `scp bedrud.tar.xz user@server:/tmp/` 传输，然后在服务器上解压。二进制文件完全自包含 - 传输后不会产生任何出站请求。
 
-    > **下载失败？** 检查网络连接，或在 [github.com/bedrud-ir/bedrud/releases](https://github.com/bedrud-ir/bedrud/releases/latest) 验证 URL。
+    > **下载失败？** 检查网络连接，或在 [github.com/themadorg/bedrud/releases](https://github.com/themadorg/bedrud/releases/latest) 验证 URL。
   </TabsContent>
 </Tabs>
 
@@ -144,7 +144,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8090
 
 > **CLI 参考** - 完整的用户管理：`bedrud user promote`、`demote`、`create`、`delete`。
 
-Android、Windows、macOS 和 Linux **原生客户端**：[GitHub Releases](https://github.com/bedrud-ir/bedrud/releases/latest)。或者直接分享会议链接 - 参与者在任意浏览器中即可加入。
+Android、Windows、macOS 和 Linux **原生客户端**：[GitHub Releases](https://github.com/themadorg/bedrud/releases/latest)。或者直接分享会议链接 - 参与者在任意浏览器中即可加入。
 
 ---
 
@@ -159,7 +159,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest
+  ghcr.io/themadorg/bedrud:latest
 
 # Alpine (smaller, ~30 MB)
 docker run -d --name bedrud \
@@ -167,7 +167,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-alpine
+  ghcr.io/themadorg/bedrud:latest-alpine
 
 # Distroless (smallest, ~25 MB)
 docker run -d --name bedrud \
@@ -175,7 +175,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-distroless
+  ghcr.io/themadorg/bedrud:latest-distroless
 ```
 
 自定义配置、Docker Compose 和环境变量：参见 [Docker 指南](/zh/docs/guides/docker)。
@@ -185,7 +185,7 @@ docker run -d --name bedrud \
 需要 [Go 1.24+](https://go.dev/dl/) 和 [Bun](https://bun.sh/)：
 
 ```bash
-git clone https://github.com/bedrud-ir/bedrud.git
+git clone https://github.com/themadorg/bedrud.git
 cd bedrud
 make init
 make local-run

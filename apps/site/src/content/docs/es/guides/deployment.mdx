@@ -121,7 +121,7 @@ docker run -d --name bedrud -p 8090:8090 -p 7880:7880 -v bedrud-data:/var/lib/be
 También hay una imagen precompilada disponible:
 
 ```bash
-docker pull ghcr.io/bedrud-ir/bedrud:latest
+docker pull ghcr.io/themadorg/bedrud:latest
 ```
 
 Consulta la [guía de Docker](/es/docs/guides/docker) para obtener detalles completos incluyendo volúmenes, configuración y Docker Compose.
@@ -189,7 +189,7 @@ El workflow `release.yml` se dispara con tags de versión (`v*`) y produce:
 |-----------|-------------|
 | `bedrud_linux_amd64.tar.xz` / `bedrud_linux_arm64.tar.xz` | Binarios del servidor (Linux x86_64 / ARM64) |
 | `bedrud_amd64.deb` / `bedrud_arm64.deb` | Paquetes Debian/Ubuntu (servidor) |
-| Imagen Docker (`ghcr.io/bedrud-ir/bedrud`) | Imagen contenedora multi-arquitectura publicada en GHCR |
+| Imagen Docker (`ghcr.io/themadorg/bedrud`) | Imagen contenedora multi-arquitectura publicada en GHCR |
 | `bedrud-desktop-linux-x86_64.AppImage` | Escritorio - AppImage universal de Linux |
 | `bedrud-desktop-linux-x86_64.deb` | Escritorio - Paquete Debian/Ubuntu |
 | `bedrud-desktop-linux-x86_64.tar.xz` | Escritorio - Tarball portátil de Linux |

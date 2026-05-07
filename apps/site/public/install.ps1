@@ -17,7 +17,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $BinaryName = "bedrud.exe"
-$Repo = if ($env:BEDRUD_REPO) { $env:BEDRUD_REPO } else { "bedrud-ir/bedrud" }
+$Repo = if ($env:BEDRUD_REPO) { $env:BEDRUD_REPO } else { "themadorg/bedrud" }
 $ConfigDir = Join-Path $env:APPDATA "bedrud"
 $ConfigFile = Join-Path $ConfigDir "config.yaml"
 
@@ -99,7 +99,7 @@ Parameters:
   -Help                Show this help
 
 Environment:
-  BEDRUD_REPO          Override GitHub repo (default: bedrud-ir/bedrud)
+  BEDRUD_REPO          Override GitHub repo (default: themadorg/bedrud)
 
 "@
     exit 0

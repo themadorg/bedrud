@@ -88,7 +88,7 @@ cd apps/web && bun run check && bun run build
 
 ## Reporting Issues
 
-File issues on [GitHub Issues](https://github.com/bedrud-ir/bedrud/issues) with:
+File issues on [GitHub Issues](https://github.com/themadorg/bedrud/issues) with:
 
 - Steps to reproduce
 - Expected vs actual behavior

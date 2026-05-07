@@ -17,10 +17,10 @@ La forma más fácil de instalar el servidor de Bedrud en sistemas basados en De
 **1. Añadir el repositorio y la clave GPG:**
 
 ```bash
-curl -fsSL https://bedrud-ir.github.io/bedrud/bedrud.gpg.key \
+curl -fsSL https://themadorg.github.io/bedrud/bedrud.gpg.key \
   | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/bedrud.gpg
 
-echo "deb https://bedrud-ir.github.io/bedrud stable main" \
+echo "deb https://themadorg.github.io/bedrud stable main" \
   | sudo tee /etc/apt/sources.list.d/bedrud.list
 ```
 
@@ -59,10 +59,10 @@ sudo bedrud install
 **1. Añadir el repositorio:**
 
 ```bash
-sudo curl -fsSL https://bedrud-ir.github.io/bedrud/dnf/bedrud.gpg.key \
+sudo curl -fsSL https://themadorg.github.io/bedrud/dnf/bedrud.gpg.key \
   -o /etc/pki/rpm-gpg/RPM-GPG-KEY-bedrud
 
-sudo curl -fsSL https://bedrud-ir.github.io/bedrud/dnf/bedrud.repo \
+sudo curl -fsSL https://themadorg.github.io/bedrud/dnf/bedrud.repo \
   -o /etc/yum.repos.d/bedrud.repo
 ```
 
@@ -76,7 +76,7 @@ sudo dnf install bedrud
 
 ### Descarga directa de .deb
 
-Descarga el paquete `.deb` directamente desde el [último lanzamiento en GitHub](https://github.com/bedrud-ir/bedrud/releases/latest):
+Descarga el paquete `.deb` directamente desde el [último lanzamiento en GitHub](https://github.com/themadorg/bedrud/releases/latest):
 
 <Tabs>
   <TabsList>
@@ -86,7 +86,7 @@ Descarga el paquete `.deb` directamente desde el [último lanzamiento en GitHub]
 
   <TabsContent value="x86-64">
     ```bash
-    wget https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_amd64.deb
+    wget https://github.com/themadorg/bedrud/releases/latest/download/bedrud_amd64.deb
     sudo dpkg -i bedrud_amd64.deb
     sudo apt-get install -f   # resolver dependencias faltantes
     ```
@@ -94,7 +94,7 @@ Descarga el paquete `.deb` directamente desde el [último lanzamiento en GitHub]
 
   <TabsContent value="arm64">
     ```bash
-    wget https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_arm64.deb
+    wget https://github.com/themadorg/bedrud/releases/latest/download/bedrud_arm64.deb
     sudo dpkg -i bedrud_arm64.deb
     sudo apt-get install -f
     ```
@@ -105,7 +105,7 @@ Descarga el paquete `.deb` directamente desde el [último lanzamiento en GitHub]
 
 ### Descarga directa de .rpm
 
-Descarga el paquete `.rpm` desde el [último lanzamiento en GitHub](https://github.com/bedrud-ir/bedrud/releases/latest):
+Descarga el paquete `.rpm` desde el [último lanzamiento en GitHub](https://github.com/themadorg/bedrud/releases/latest):
 
 <Tabs>
   <TabsList>
@@ -115,13 +115,13 @@ Descarga el paquete `.rpm` desde el [último lanzamiento en GitHub](https://gith
 
   <TabsContent value="x86-64">
     ```bash
-    sudo dnf install https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-*.x86_64.rpm
+    sudo dnf install https://github.com/themadorg/bedrud/releases/latest/download/bedrud-*.x86_64.rpm
     ```
   </TabsContent>
 
   <TabsContent value="aarch64">
     ```bash
-    sudo dnf install https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-*.aarch64.rpm
+    sudo dnf install https://github.com/themadorg/bedrud/releases/latest/download/bedrud-*.aarch64.rpm
     ```
   </TabsContent>
 </Tabs>
@@ -140,7 +140,7 @@ Descarga el tarball comprimido y extráelo en cualquier ubicación de tu `$PATH`
 
   <TabsContent value="linux-x86-64">
     ```bash
-    curl -L https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz \
+    curl -L https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz \
       | tar xJ
     sudo mv bedrud /usr/local/bin/
     ```
@@ -148,7 +148,7 @@ Descarga el tarball comprimido y extráelo en cualquier ubicación de tu `$PATH`
 
   <TabsContent value="linux-arm64">
     ```bash
-    curl -L https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_arm64.tar.xz \
+    curl -L https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_arm64.tar.xz \
       | tar xJ
     sudo mv bedrud /usr/local/bin/
     ```
@@ -163,31 +163,31 @@ Obtén la imagen precompilada desde GitHub Container Registry:
 
 ```bash
 # glibc (default)
-docker pull ghcr.io/bedrud-ir/bedrud:latest
+docker pull ghcr.io/themadorg/bedrud:latest
 docker run -d \
   --name bedrud \
   -p 8090:8090 \
   -p 7880:7880 \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest
+  ghcr.io/themadorg/bedrud:latest
 
 # Alpine (musl)
-docker pull ghcr.io/bedrud-ir/bedrud:latest-alpine
+docker pull ghcr.io/themadorg/bedrud:latest-alpine
 docker run -d \
   --name bedrud \
   -p 8090:8090 \
   -p 7880:7880 \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-alpine
+  ghcr.io/themadorg/bedrud:latest-alpine
 
 # Distroless (~25 MB)
-docker pull ghcr.io/bedrud-ir/bedrud:latest-distroless
+docker pull ghcr.io/themadorg/bedrud:latest-distroless
 docker run -d \
   --name bedrud \
   -p 8090:8090 \
   -p 7880:7880 \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-distroless
+  ghcr.io/themadorg/bedrud:latest-distroless
 ```
 
 | Etiqueta | Base | Tamaño |
@@ -251,7 +251,7 @@ Consulta la [guía de Docker](/es/docs/guides/docker) para obtener detalles comp
     Instala desde el bundle de Flatpak:
 
     ```bash
-    flatpak install https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-desktop-linux-x86_64.flatpak
+    flatpak install https://github.com/themadorg/bedrud/releases/latest/download/bedrud-desktop-linux-x86_64.flatpak
     flatpak run ir.bedrud.Desktop
     ```
   </TabsContent>
@@ -260,7 +260,7 @@ Consulta la [guía de Docker](/es/docs/guides/docker) para obtener detalles comp
     El AppImage es autocontenido y funciona en cualquier distribución Linux sin necesidad de instalación.
 
     ```bash
-    wget https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-desktop-linux-x86_64.AppImage
+    wget https://github.com/themadorg/bedrud/releases/latest/download/bedrud-desktop-linux-x86_64.AppImage
     chmod +x bedrud-desktop-linux-x86_64.AppImage
     ./bedrud-desktop-linux-x86_64.AppImage
     ```
@@ -295,7 +295,7 @@ Hay tarballs portátiles precompilados disponibles tanto para Intel como para Ap
 
   <TabsContent value="arm64">
     ```bash
-    curl -L https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-desktop-macos-arm64.tar.gz \
+    curl -L https://github.com/themadorg/bedrud/releases/latest/download/bedrud-desktop-macos-arm64.tar.gz \
       | tar xz
     # Permitir el binario si macOS lo bloquea:
     xattr -d com.apple.quarantine bedrud-desktop
@@ -305,7 +305,7 @@ Hay tarballs portátiles precompilados disponibles tanto para Intel como para Ap
 
   <TabsContent value="x86-64">
     ```bash
-    curl -L https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud-desktop-macos-x86_64.tar.gz \
+    curl -L https://github.com/themadorg/bedrud/releases/latest/download/bedrud-desktop-macos-x86_64.tar.gz \
       | tar xz
     xattr -d com.apple.quarantine bedrud-desktop
     ./bedrud-desktop
@@ -314,7 +314,7 @@ Hay tarballs portátiles precompilados disponibles tanto para Intel como para Ap
 
   <TabsContent value="homebrew">
     ```bash
-    brew tap bedrud-ir/bedrud
+    brew tap themadorg/bedrud
     brew install bedrud-desktop
     ```
   </TabsContent>
@@ -341,7 +341,7 @@ Hay tarballs portátiles precompilados disponibles tanto para Intel como para Ap
   </TabsList>
 
   <TabsContent value="nsis">
-    Descarga y ejecuta el instalador desde el [último lanzamiento](https://github.com/bedrud-ir/bedrud/releases/latest):
+    Descarga y ejecuta el instalador desde el [último lanzamiento](https://github.com/themadorg/bedrud/releases/latest):
 
     | Arquitectura | Archivo |
     |---|---|
@@ -385,7 +385,7 @@ Hay tarballs portátiles precompilados disponibles tanto para Intel como para Ap
 | Cualquier Linux | AppImage / binario `tar.xz` | AppImage / Flatpak / Snap / `tar.xz` |
 | macOS | binario `tar.xz` | Homebrew tap / `tar.gz` portátil |
 | Windows | - | WinGet / Chocolatey / Instalador NSIS / `.zip` portátil |
-| Docker | `ghcr.io/bedrud-ir/bedrud` | - |
+| Docker | `ghcr.io/themadorg/bedrud` | - |
 
 ---
 
@@ -401,7 +401,7 @@ Estos secretos de GitHub Actions habilitan los canales de distribución opcional
 | `RPM_GPG_PRIVATE_KEY` | repositorio DNF | Clave GPG para firmar paquetes RPM |
 | `SNAPCRAFT_STORE_CREDENTIALS` | Snap Store | Credenciales de `snapcraft export-login` |
 | `CHOCOLATEY_API_KEY` | Chocolatey | Clave API de chocolatey.org |
-| `HOMEBREW_TAP_TOKEN` | Homebrew tap | GitHub PAT con acceso de escritura a `bedrud-ir/homebrew-bedrud` |
+| `HOMEBREW_TAP_TOKEN` | Homebrew tap | GitHub PAT con acceso de escritura a `themadorg/homebrew-bedrud` |
 | `WINGET_GITHUB_TOKEN` | WinGet | GitHub PAT para enviar PR a `microsoft/winget-pkgs` |
 | `MACOS_CERTIFICATE` | Firma macOS | Certificado `.p12` de Developer ID codificado en Base64 |
 | `MACOS_CERTIFICATE_PWD` | Firma macOS | Contraseña del archivo `.p12` |

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 BINARY_NAME="bedrud"
-REPO="${BEDRUD_REPO:-bedrud-ir/bedrud}"
+REPO="${BEDRUD_REPO:-themadorg/bedrud}"
 if [[ "$(id -u)" -eq 0 ]]; then
   INSTALL_DIR="${BEDRUD_INSTALL:-/usr/local/bin}"
 else
@@ -450,7 +450,7 @@ Options:
 
 Environment:
   BEDRUD_INSTALL        Override install directory
-  BEDRUD_REPO           Override GitHub repo (default: bedrud-ir/bedrud)
+  BEDRUD_REPO           Override GitHub repo (default: themadorg/bedrud)
 
 Examples:
   curl -fsSL https://bedrud.org/install.sh | bash

@@ -121,7 +121,7 @@ docker run -d --name bedrud -p 8090:8090 -p 7880:7880 -v bedrud-data:/var/lib/be
 ビルド済みイメージも利用可能です：
 
 ```bash
-docker pull ghcr.io/bedrud-ir/bedrud:latest
+docker pull ghcr.io/themadorg/bedrud:latest
 ```
 
 ボリューム、設定、Docker Compose を含む詳細は、[Docker ガイド](/ja/docs/guides/docker)を参照してください。
@@ -189,7 +189,7 @@ tail -f /var/log/bedrud/bedrud.log
 |---|---|
 | `bedrud_linux_amd64.tar.xz` / `bedrud_linux_arm64.tar.xz` | サーバーバイナリ（Linux x86_64 / ARM64） |
 | `bedrud_amd64.deb` / `bedrud_arm64.deb` | Debian/Ubuntu パッケージ（サーバー） |
-| Docker イメージ (`ghcr.io/bedrud-ir/bedrud`) | GHCR にプッシュされるマルチアーキテクチャコンテナイメージ |
+| Docker イメージ (`ghcr.io/themadorg/bedrud`) | GHCR にプッシュされるマルチアーキテクチャコンテナイメージ |
 | `bedrud-desktop-linux-x86_64.AppImage` | デスクトップ - 汎用 Linux AppImage |
 | `bedrud-desktop-linux-x86_64.deb` | デスクトップ - Debian/Ubuntu パッケージ |
 | `bedrud-desktop-linux-x86_64.tar.xz` | デスクトップ - Linux ポータブル tarball |

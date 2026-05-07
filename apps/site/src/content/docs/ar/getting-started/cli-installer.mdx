@@ -13,7 +13,7 @@ order: 2
 ## ما يفعله المُثبّت
 
 ١. يكتشف نظام التشغيل وبنية المعالج وتفاوتات المنصة (Rosetta ٢/WSL) ونظام التهيئة (systemd/OpenRC/SysV/حاوية)
-٢. يُنزّل الملف الثنائي الصحيح من [إصدارات GitHub](https://github.com/bedrud-ir/bedrud/releases) (أو يبني من المصدر مع `--build`)
+٢. يُنزّل الملف الثنائي الصحيح من [إصدارات GitHub](https://github.com/themadorg/bedrud/releases) (أو يبني من المصدر مع `--build`)
 ٣. يُثبّت في `~/bin` أو `%USERPROFILE%\bin` (قابل للتخصيص عبر `--install-dir`)
 ٤. يُضيف مجلد التثبيت إلى `PATH` (ملفات الصدفة لـ Bash، سجل Windows)
 ٥. **Windows و Linux**: يقدم حواراً تفاعلياً لتكوين TLS و Postgres وإنشاء أول مستخدم مسؤول
@@ -144,7 +144,7 @@ irm https://bedrud.org/install.ps1 | iex
 | المتغير | الافتراضي | المنصات | الوصف |
 |---------|-----------|---------|------|
 | `BEDRUD_INSTALL` | `~/bin` | Bash فقط | تجاوز مجلد التثبيت (مثل `--install-dir`) |
-| `BEDRUD_REPO` | `bedrud-ir/bedrud` | كلاهما | تجاوز مستودع GitHub (للمسارات أو النسخ المطابقة) |
+| `BEDRUD_REPO` | `themadorg/bedrud` | كلاهما | تجاوز مستودع GitHub (للمسارات أو النسخ المطابقة) |
 
 ```bash
 BEDRUD_INSTALL=/opt/bedrud curl -fsSL https://bedrud.org/install.sh | bash
@@ -270,7 +270,7 @@ source ~/.config/fish/config.fish  # fish
 
 ```bash
 curl -fsSL -o bedrud.tar.xz \
-  https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
+  https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
 scp bedrud.tar.xz airgapped-server:/tmp/
 # على الخادم الهدف:
 tar -xf /tmp/bedrud.tar.xz -C /tmp/bedrud-extracted
@@ -286,7 +286,7 @@ BEDRUD_REPO=mycompany/bedrud-mirror curl -fsSL https://bedrud.org/install.sh | b
 
 ### الملف الثنائي المباشر
 
-نزّل من [الإصدارات](https://github.com/bedrud-ir/bedrud/releases)، واستخرج، وانقل إلى مجلد في `PATH`.
+نزّل من [الإصدارات](https://github.com/themadorg/bedrud/releases)، واستخرج، وانقل إلى مجلد في `PATH`.
 
 ---
 
@@ -332,7 +332,7 @@ source ~/.bashrc
 ### `Failed to download bedrud`
 
 ١. تحقق من اتصال الإنترنت
-٢. تأكد من وجود الهدف في [الإصدارات](https://github.com/bedrud-ir/bedrud/releases)
+٢. تأكد من وجود الهدف في [الإصدارات](https://github.com/themadorg/bedrud/releases)
 ٣. جرّب إصداراً محدداً: `--version v1.0.0`
 ٤. قد لا تتوفر نسخة مُبنية مسبقاً لمنصتك بعد
 
@@ -357,7 +357,7 @@ irm https://bedrud.org/install.ps1 | iex
 
 ### Windows: أجهزة ARM64 (Surface Pro، إلخ.)
 
-يكتشف المُثبّت تلقائياً `windows_arm64` ويقوم بتنزيل الملف الثنائي الأصلي. إذا كنت بحاجة إلى فرض هيكلية معينة، فقم بتنزيل ملف zip المحدد من [الإصدارات](https://github.com/bedrud-ir/bedrud/releases).
+يكتشف المُثبّت تلقائياً `windows_arm64` ويقوم بتنزيل الملف الثنائي الأصلي. إذا كنت بحاجة إلى فرض هيكلية معينة، فقم بتنزيل ملف zip المحدد من [الإصدارات](https://github.com/themadorg/bedrud/releases).
 
 ### Windows: Docker Desktop لـ Postgres
 

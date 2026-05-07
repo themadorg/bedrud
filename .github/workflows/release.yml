@@ -139,7 +139,7 @@ jobs:
             echo "Version: ${GITHUB_REF_NAME#v}"
             echo "Architecture: ${{ matrix.deb_arch }}"
             echo "Maintainer: Bedrud <info@bedrud.ir>"
-            echo "Homepage: https://github.com/bedrud-ir/bedrud"
+            echo "Homepage: https://github.com/themadorg/bedrud"
             echo "Description: Bedrud self-hosted video meeting server"
             echo " A single binary packaging the web UI, REST API, and LiveKit WebRTC"
             echo " media server. Supports Let's Encrypt TLS and SQLite/PostgreSQL."
@@ -1030,13 +1030,13 @@ jobs:
 
            ```bash
            # Debian (default)
-           docker pull ghcr.io/bedrud-ir/bedrud:latest
+           docker pull ghcr.io/themadorg/bedrud:latest
 
            # Alpine
-           docker pull ghcr.io/bedrud-ir/bedrud:latest-alpine
+           docker pull ghcr.io/themadorg/bedrud:latest-alpine
 
            # Distroless
-           docker pull ghcr.io/bedrud-ir/bedrud:latest-distroless
+           docker pull ghcr.io/themadorg/bedrud:latest-distroless
            ```
 
            Offline / air-gapped:

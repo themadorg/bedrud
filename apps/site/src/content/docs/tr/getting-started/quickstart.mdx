@@ -80,7 +80,7 @@ Bedrud'u dağıtın ve 5 dakikadan kısa sürede video toplantısına katılın.
     Manuel olarak indirin ve çıkarın. `linux_amd64` değerini platformunuza göre değiştirin (`linux_arm64`, `darwin_amd64`, `darwin_arm64`):
 
     ```bash
-    curl -fsSL -o bedrud.tar.xz https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
+    curl -fsSL -o bedrud.tar.xz https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
     tar -xJf bedrud.tar.xz
     chmod +x bedrud
     sudo mv bedrud /usr/local/bin/
@@ -91,7 +91,7 @@ Bedrud'u dağıtın ve 5 dakikadan kısa sürede video toplantısına katılın.
 
     > **Sunucuda internet yok mu?** Herhangi bir makinede indirin, USB ile veya `scp bedrud.tar.xz user@server:/tmp/` ile aktarın, ardından orada çıkarın. İkili dosya tamamen kendi kendine yetkidir - aktarımdan sonra sıfır dışarıya istek.
 
-    > **İndirme başarısız oldu mu?** İnternet erişimini kontrol edin veya URL'yi [github.com/bedrud-ir/bedrud/releases](https://github.com/bedrud-ir/bedrud/releases/latest) adresinden doğrulayın.
+    > **İndirme başarısız oldu mu?** İnternet erişimini kontrol edin veya URL'yi [github.com/themadorg/bedrud/releases](https://github.com/themadorg/bedrud/releases/latest) adresinden doğrulayın.
   </TabsContent>
 </Tabs>
 
@@ -144,7 +144,7 @@ Tarayıcınızda `https://meet.example.com` (veya `https://<sizin-ip>:8090`) adr
 
 > **CLI referansı** — Tam kullanıcı yönetimi: `bedrud user promote`, `demote`, `create`, `delete`.
 
-**Yerel istemciler** için Android, Windows, macOS ve Linux: [GitHub Sürümleri](https://github.com/bedrud-ir/bedrud/releases/latest). Veya toplantı bağlantısını paylaşın — katılımcılar herhangi bir tarayıcıda katılır.
+**Yerel istemciler** için Android, Windows, macOS ve Linux: [GitHub Sürümleri](https://github.com/themadorg/bedrud/releases/latest). Veya toplantı bağlantısını paylaşın — katılımcılar herhangi bir tarayıcıda katılır.
 
 ---
 
@@ -159,7 +159,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest
+  ghcr.io/themadorg/bedrud:latest
 
 # Alpine (smaller, ~30 MB)
 docker run -d --name bedrud \
@@ -167,7 +167,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-alpine
+  ghcr.io/themadorg/bedrud:latest-alpine
 
 # Distroless (smallest, ~25 MB)
 docker run -d --name bedrud \
@@ -175,7 +175,7 @@ docker run -d --name bedrud \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest-distroless
+  ghcr.io/themadorg/bedrud:latest-distroless
 ```
 
 Özel yapılandırma, Docker Compose ve ortam değişkenleri için bkz. [Docker kılavuzu](/tr/docs/guides/docker).
@@ -185,7 +185,7 @@ docker run -d --name bedrud \
 [Go 1.24+](https://go.dev/dl/) ve [Bun](https://bun.sh/) gerektirir:
 
 ```bash
-git clone https://github.com/bedrud-ir/bedrud.git
+git clone https://github.com/themadorg/bedrud.git
 cd bedrud
 make init
 make local-run

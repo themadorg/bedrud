@@ -1,6 +1,6 @@
 [Unit]
 Description=Bedrud Video Meeting Server
-Documentation=https://bedrud-ir.github.io/bedrud/
+Documentation=https://themadorg.github.io/bedrud/
 After=network.target network-online.target
 Wants=network-online.target
 

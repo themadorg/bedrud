@@ -5,7 +5,7 @@ pkgver=0.1.0
 pkgrel=1
 pkgdesc="Self-hosted video meeting client (native desktop)"
 arch=('x86_64' 'aarch64')
-url="https://github.com/bedrud-ir/bedrud"
+url="https://github.com/themadorg/bedrud"
 license=('Apache-2.0')
 depends=(
     'glibc'
@@ -20,8 +20,8 @@ provides=('bedrud-desktop')
 conflicts=('bedrud-desktop')
 options=('!strip')
 
-source_x86_64=("${pkgname}-${pkgver}-x86_64.tar.xz::https://github.com/bedrud-ir/bedrud/releases/download/v${pkgver}/bedrud-desktop-linux-x86_64.tar.xz")
-source_aarch64=("${pkgname}-${pkgver}-aarch64.tar.xz::https://github.com/bedrud-ir/bedrud/releases/download/v${pkgver}/bedrud-desktop-linux-arm64.tar.xz")
+source_x86_64=("${pkgname}-${pkgver}-x86_64.tar.xz::https://github.com/themadorg/bedrud/releases/download/v${pkgver}/bedrud-desktop-linux-x86_64.tar.xz")
+source_aarch64=("${pkgname}-${pkgver}-aarch64.tar.xz::https://github.com/themadorg/bedrud/releases/download/v${pkgver}/bedrud-desktop-linux-arm64.tar.xz")
 
 # Checksums are updated automatically by the release workflow
 sha256sums_x86_64=('SKIP')

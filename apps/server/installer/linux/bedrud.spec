@@ -7,7 +7,7 @@ Version:        VERSION_PLACEHOLDER
 Release:        1%{?dist}
 Summary:        Self-hosted video meeting server
 License:        Apache-2.0
-URL:            https://github.com/bedrud-ir/bedrud
+URL:            https://github.com/themadorg/bedrud
 Requires:       glibc
 
 %description
@@ -38,7 +38,7 @@ systemctl daemon-reload >/dev/null 2>&1 || :
 echo ""
 echo "Bedrud installed. Configure /etc/bedrud/config.yaml"
 echo "then run: systemctl enable --now bedrud"
-echo "Docs: https://bedrud-ir.github.io/bedrud/"
+echo "Docs: https://themadorg.github.io/bedrud/"
 
 %preun
 if [ $1 -eq 0 ]; then

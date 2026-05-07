@@ -121,7 +121,7 @@ docker run -d --name bedrud -p 8090:8090 -p 7880:7880 -v bedrud-data:/var/lib/be
 也提供预构建镜像：
 
 ```bash
-docker pull ghcr.io/bedrud-ir/bedrud:latest
+docker pull ghcr.io/themadorg/bedrud:latest
 ```
 
 完整详情（包括卷挂载、配置和 Docker Compose）请参阅 [Docker 指南](/zh/docs/guides/docker)。
@@ -189,7 +189,7 @@ tail -f /var/log/bedrud/bedrud.log
 |---|---|
 | `bedrud_linux_amd64.tar.xz` / `bedrud_linux_arm64.tar.xz` | 服务器二进制文件（Linux x86_64 / ARM64） |
 | `bedrud_amd64.deb` / `bedrud_arm64.deb` | Debian/Ubuntu 软件包（服务器） |
-| Docker 镜像（`ghcr.io/bedrud-ir/bedrud`） | 推送到 GHCR 的多架构容器镜像 |
+| Docker 镜像（`ghcr.io/themadorg/bedrud`） | 推送到 GHCR 的多架构容器镜像 |
 | `bedrud-desktop-linux-x86_64.AppImage` | 桌面端 - 通用 Linux AppImage |
 | `bedrud-desktop-linux-x86_64.deb` | 桌面端 - Debian/Ubuntu 软件包 |
 | `bedrud-desktop-linux-x86_64.tar.xz` | 桌面端 - Linux 便携 tar 包 |

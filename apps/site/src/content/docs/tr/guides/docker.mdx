@@ -123,10 +123,10 @@ Docker imajları her sürümde GitHub Container Registry'e yayınlanır:
 
 ```bash
 # En son sürüm
-docker pull ghcr.io/bedrud-ir/bedrud:latest
+docker pull ghcr.io/themadorg/bedrud:latest
 
 # Belirli bir sürüm
-docker pull ghcr.io/bedrud-ir/bedrud:v1.0.0
+docker pull ghcr.io/themadorg/bedrud:v1.0.0
 ```
 
 ## Docker Compose Örneği
@@ -134,7 +134,7 @@ docker pull ghcr.io/bedrud-ir/bedrud:v1.0.0
 ```yaml
 services:
   bedrud:
-    image: ghcr.io/bedrud-ir/bedrud:latest
+    image: ghcr.io/themadorg/bedrud:latest
     ports:
       - "8090:8090"
       - "7880:7880"

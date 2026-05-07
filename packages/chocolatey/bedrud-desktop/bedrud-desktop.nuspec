@@ -6,12 +6,12 @@
     <title>Bedrud Desktop</title>
     <authors>Bedrud</authors>
     <projectUrl>https://bedrud.ir</projectUrl>
-    <iconUrl>https://raw.githubusercontent.com/bedrud-ir/bedrud/main/apps/web/public/logo512.png</iconUrl>
-    <licenseUrl>https://github.com/bedrud-ir/bedrud/blob/main/LICENSE</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/themadorg/bedrud/main/apps/web/public/logo512.png</iconUrl>
+    <licenseUrl>https://github.com/themadorg/bedrud/blob/main/LICENSE</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <projectSourceUrl>https://github.com/bedrud-ir/bedrud</projectSourceUrl>
-    <bugTrackerUrl>https://github.com/bedrud-ir/bedrud/issues</bugTrackerUrl>
-    <docsUrl>https://bedrud-ir.github.io/bedrud/</docsUrl>
+    <projectSourceUrl>https://github.com/themadorg/bedrud</projectSourceUrl>
+    <bugTrackerUrl>https://github.com/themadorg/bedrud/issues</bugTrackerUrl>
+    <docsUrl>https://themadorg.github.io/bedrud/</docsUrl>
     <tags>video-meeting webrtc self-hosted livekit desktop</tags>
     <summary>Native desktop client for the Bedrud self-hosted video meeting platform.</summary>
     <description><![CDATA[
@@ -28,9 +28,9 @@ powered by WebRTC and LiveKit. No data leaves your infrastructure.
 
 ## Usage
 After installing, launch Bedrud Desktop and point it at your Bedrud server URL.
-See https://bedrud-ir.github.io/bedrud/ for self-hosting instructions.
+See https://themadorg.github.io/bedrud/ for self-hosting instructions.
     ]]></description>
-    <releaseNotes>https://github.com/bedrud-ir/bedrud/releases/tag/v0.1.0</releaseNotes>
+    <releaseNotes>https://github.com/themadorg/bedrud/releases/tag/v0.1.0</releaseNotes>
   </metadata>
   <files>
     <file src="tools\**" target="tools" />

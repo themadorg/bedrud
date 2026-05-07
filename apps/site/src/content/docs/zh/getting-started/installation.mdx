@@ -82,10 +82,10 @@ bedrud --version
   <TabsContent value="ubuntu-debian-apt">
 
     ```bash
-    curl -fsSL https://bedrud-ir.github.io/bedrud/bedrud.gpg.key \
+    curl -fsSL https://themadorg.github.io/bedrud/bedrud.gpg.key \
       | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/bedrud.gpg
 
-    echo "deb https://bedrud-ir.github.io/bedrud stable main" \
+    echo "deb https://themadorg.github.io/bedrud stable main" \
       | sudo tee /etc/apt/sources.list.d/bedrud.list
 
     sudo apt update && sudo apt install bedrud
@@ -107,10 +107,10 @@ bedrud --version
   <TabsContent value="fedora-rhel-dnf">
 
     ```bash
-    sudo curl -fsSL https://bedrud-ir.github.io/bedrud/dnf/bedrud.gpg.key \
+    sudo curl -fsSL https://themadorg.github.io/bedrud/dnf/bedrud.gpg.key \
       -o /etc/pki/rpm-gpg/RPM-GPG-KEY-bedrud
 
-    sudo curl -fsSL https://bedrud-ir.github.io/bedrud/dnf/bedrud.repo \
+    sudo curl -fsSL https://themadorg.github.io/bedrud/dnf/bedrud.repo \
       -o /etc/yum.repos.d/bedrud.repo
 
     sudo dnf install bedrud
@@ -133,19 +133,19 @@ bedrud --version
 
 ```bash
 # glibc (Debian-based, default)
-docker pull ghcr.io/bedrud-ir/bedrud:latest
+docker pull ghcr.io/themadorg/bedrud:latest
 
 # musl (Alpine-based, smaller image)
-docker pull ghcr.io/bedrud-ir/bedrud:latest-alpine
+docker pull ghcr.io/themadorg/bedrud:latest-alpine
 
-docker pull ghcr.io/bedrud-ir/bedrud:latest-distroless
+docker pull ghcr.io/themadorg/bedrud:latest-distroless
 
 docker run -d --name bedrud \
   -p 8090:8090 \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest
+  ghcr.io/themadorg/bedrud:latest
 ```
 
 ### Docker Compose
@@ -153,7 +153,7 @@ docker run -d --name bedrud \
 ```yaml
 services:
   bedrud:
-    image: ghcr.io/bedrud-ir/bedrud:latest
+    image: ghcr.io/themadorg/bedrud:latest
     ports:
       - "8090:8090"
       - "7880:7880"
@@ -186,7 +186,7 @@ docker run -d --name bedrud \
   -e LIVEKIT_API_KEY=prodkey \
   -e LIVEKIT_API_SECRET=prodsecret \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest
+  ghcr.io/themadorg/bedrud:latest
 ```
 
 <Callout type="warning">
@@ -446,7 +446,7 @@ sudo dnf upgrade bedrud
 下载最新版本并重新运行安装。安装程序可安全地重复运行 - 它会覆盖二进制文件和配置，同时保留数据库：
 
 ```bash
-curl -fsSL -o bedrud.tar.xz https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
+curl -fsSL -o bedrud.tar.xz https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
 tar -xJf bedrud.tar.xz && chmod +x bedrud
 sudo ./bedrud install --fresh
 ```
@@ -458,14 +458,14 @@ sudo ./bedrud install --fresh
 ### Docker
 
 ```bash
-docker pull ghcr.io/bedrud-ir/bedrud:latest
+docker pull ghcr.io/themadorg/bedrud:latest
 docker stop bedrud && docker rm bedrud
 docker run -d --name bedrud \
   -p 8090:8090 \
   -p 7880:7880 \
   -p 50000-60000:50000-60000/udp \
   -v bedrud-data:/var/lib/bedrud \
-  ghcr.io/bedrud-ir/bedrud:latest
+  ghcr.io/themadorg/bedrud:latest
 ```
 
 使用 Docker Compose：

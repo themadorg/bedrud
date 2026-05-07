@@ -8,7 +8,7 @@ post_install() {
     echo "==> Bedrud server installed."
     echo "==> Configure: /etc/bedrud/config.yaml"
     echo "==> Then run:  bedrud install  or  systemctl enable --now bedrud"
-    echo "==> Docs: https://bedrud-ir.github.io/bedrud/"
+    echo "==> Docs: https://themadorg.github.io/bedrud/"
     systemctl daemon-reload
 }
 

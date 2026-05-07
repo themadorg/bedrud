@@ -31,13 +31,13 @@ modules:
       # Pre-built binary — downloaded at Flatpak install time (extra-data)
       - type: extra-data
         filename: bedrud-desktop
-        url: https://github.com/bedrud-ir/bedrud/releases/download/v0.1.0/bedrud-desktop-linux-x86_64.tar.xz
+        url: https://github.com/themadorg/bedrud/releases/download/v0.1.0/bedrud-desktop-linux-x86_64.tar.xz
         sha256: SKIP
         size: 0
         only-arches: [x86_64]
         x-checker-data:
           type: json
-          url: https://api.github.com/repos/bedrud-ir/bedrud/releases/latest
+          url: https://api.github.com/repos/themadorg/bedrud/releases/latest
           version-query: .tag_name | ltrimstr("v")
           url-query: >-
             .assets[] |
@@ -45,13 +45,13 @@ modules:
             .browser_download_url
       - type: extra-data
         filename: bedrud-desktop
-        url: https://github.com/bedrud-ir/bedrud/releases/download/v0.1.0/bedrud-desktop-linux-arm64.tar.xz
+        url: https://github.com/themadorg/bedrud/releases/download/v0.1.0/bedrud-desktop-linux-arm64.tar.xz
         sha256: SKIP
         size: 0
         only-arches: [aarch64]
         x-checker-data:
           type: json
-          url: https://api.github.com/repos/bedrud-ir/bedrud/releases/latest
+          url: https://api.github.com/repos/themadorg/bedrud/releases/latest
           version-query: .tag_name | ltrimstr("v")
           url-query: >-
             .assets[] |

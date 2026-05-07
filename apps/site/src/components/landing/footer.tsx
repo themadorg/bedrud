@@ -202,7 +202,7 @@ export function Footer({ lang }: { lang: Locale }) {
 
         <div className="mt-14 flex flex-col items-center gap-4 border-t pt-6 sm:flex-row sm:justify-between">
           <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-            <span>&copy; {new Date().getFullYear()} bedrud-ir</span>
+            <span>&copy; {new Date().getFullYear()} themadorg</span>
             <a
               href={`${GITHUB_URL}/blob/main/LICENSE`}
               target="_blank"

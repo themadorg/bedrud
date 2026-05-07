@@ -209,7 +209,7 @@
     subtitle: "Kopyala. Yapıştır. Çalışıyor. Kurulum bu kadar.",
     command: "curl -fsSL https://bedrud.org/install.sh | bash",
     powershellCommand: "irm https://bedrud.org/install.ps1 | iex",
-    dockerCommand: "docker pull ghcr.io/bedrud-ir/bedrud:latest",
+    dockerCommand: "docker pull ghcr.io/themadorg/bedrud:latest",
     or: "veya",
     whatItDoes:
       "Downloads the Bedrud CLI binary to ~/bin and adds it to your PATH.",

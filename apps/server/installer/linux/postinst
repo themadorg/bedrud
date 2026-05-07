@@ -20,4 +20,4 @@ fi
 echo ""
 echo "Bedrud installed. Before starting, configure /etc/bedrud/config.yaml"
 echo "then run: bedrud install  or  systemctl start bedrud"
-echo "Docs: https://bedrud-ir.github.io/bedrud/getting-started/installation/"
+echo "Docs: https://themadorg.github.io/bedrud/getting-started/installation/"

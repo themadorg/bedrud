@@ -13,7 +13,7 @@ For server setup after installing, see [Quick Start](/en/docs/getting-started/qu
 ## What It Does
 
 1. Detects OS, CPU architecture, platform variants (Rosetta 2/WSL), and init system (systemd/OpenRC/SysV/container)
-2. Downloads the correct binary from [GitHub Releases](https://github.com/bedrud-ir/bedrud/releases) (or builds from source with `--build`)
+2. Downloads the correct binary from [GitHub Releases](https://github.com/themadorg/bedrud/releases) (or builds from source with `--build`)
 3. Installs to `~/bin` or `%USERPROFILE%\bin` (customizable via `--install-dir`)
 4. Adds install directory to `PATH` (shell profiles for Bash, Registry for Windows)
 5. **Windows & Linux**: Offers an interactive Q&A to configure TLS, Postgres, and create the initial Admin user
@@ -145,7 +145,7 @@ irm https://bedrud.org/install.ps1 | iex
 | Variable | Default | Platforms | Description |
 |----------|---------|-----------|-------------|
 | `BEDRUD_INSTALL` | `~/bin` | Bash only | Override install directory (same as `--install-dir`) |
-| `BEDRUD_REPO` | `bedrud-ir/bedrud` | Both | Override GitHub repo (for forks or mirrors) |
+| `BEDRUD_REPO` | `themadorg/bedrud` | Both | Override GitHub repo (for forks or mirrors) |
 
 ```bash
 BEDRUD_INSTALL=/opt/bedrud curl -fsSL https://bedrud.org/install.sh | bash
@@ -271,7 +271,7 @@ source ~/.config/fish/config.fish  # fish
 
 ```bash
 curl -fsSL -o bedrud.tar.xz \
-  https://github.com/bedrud-ir/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
+  https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
 scp bedrud.tar.xz airgapped-server:/tmp/
 # On target:
 tar -xf /tmp/bedrud.tar.xz -C /tmp/bedrud-extracted
@@ -287,7 +287,7 @@ BEDRUD_REPO=mycompany/bedrud-mirror curl -fsSL https://bedrud.org/install.sh | b
 
 ### Direct Binary
 
-Download from [Releases](https://github.com/bedrud-ir/bedrud/releases), extract, move to a directory in your `PATH`.
+Download from [Releases](https://github.com/themadorg/bedrud/releases), extract, move to a directory in your `PATH`.
 
 ---
 
@@ -333,7 +333,7 @@ source ~/.bashrc
 ### `Failed to download bedrud`
 
 1. Check internet connection
-2. Verify target exists at [Releases](https://github.com/bedrud-ir/bedrud/releases)
+2. Verify target exists at [Releases](https://github.com/themadorg/bedrud/releases)
 3. Try a specific version: `--version v1.0.0`
 4. Your platform may not have a pre-built binary yet
 
@@ -358,7 +358,7 @@ If you are running in a WSL terminal (e.g., Ubuntu on Windows), the PowerShell i
 
 ### Windows: ARM64 devices (Surface Pro, etc.)
 
-The installer auto-detects `windows_arm64` and downloads the native binary. If you need to force an architecture, download the specific zip from [Releases](https://github.com/bedrud-ir/bedrud/releases).
+The installer auto-detects `windows_arm64` and downloads the native binary. If you need to force an architecture, download the specific zip from [Releases](https://github.com/themadorg/bedrud/releases).
 
 ### Windows: Docker Desktop for Postgres
 
