@@ -5,4 +5,4 @@ export const DOCS_URL = "https://bedrud.org/en/docs";
 export const DEMO_URL = "https://bedrud.xyz";
 export const DISCORD_URL = "https://discord.gg/bedrud";
 export const TWITTER_URL = "https://x.com/bedrudhq";
-export const CONTACT_EMAIL = "hello@bedrud.com";
+export const CONTACT_EMAIL = "info@bedrud.org";
