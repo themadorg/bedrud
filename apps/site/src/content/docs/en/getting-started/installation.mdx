@@ -424,6 +424,13 @@ sudo ufw allow 7880/tcp
 sudo ufw allow 50000:60000/udp
 ```
 
+If using auto-TLS (ports 80/443) or a custom `httpPort`, allow those too:
+
+```bash
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+```
+
 ### View Logs
 
 ```bash
@@ -510,6 +517,7 @@ This stops services, removes service files for all init systems, deletes the bin
 | Problem | Solution |
 |---------|----------|
 | **Port 80/443 in use** | Stop conflicting web servers: `systemctl stop nginx apache2 caddy` |
+| **Port 80 permission denied** | Non-root can't bind ports < 1024. Set `httpPort: "8080"` in config, or `sudo setcap 'cap_net_bind_service=+ep' $(which bedrud)` (re-run after each update) |
 | **Services won't start** | Check logs: `journalctl -u bedrud -u livekit --no-pager -n 50` |
 | **TLS certificate issues** | Verify DNS: `dig +short meet.example.com` - must return this server's IP |
 | **LiveKit port conflicts** | Use `--lk-port`, `--lk-tcp-port`, `--lk-udp-port` flags to change ports |

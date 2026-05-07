@@ -36,7 +36,8 @@ Full reference below.
 
 ```yaml
 server:
-  port: 8090                    # HTTP port
+  port: 8090                    # HTTPS port (or HTTP if TLS disabled)
+  httpPort: ""                  # HTTP listener when TLS enabled. Default: "80". Unprivileged: "8080". Empty = disabled.
   host: "localhost"             # Bind address
 
 database:
@@ -44,7 +45,7 @@ database:
   path: "data.db"               # SQLite database file path
 
 logger:
-  level: "debug"                # Log level: debug, info, warn, error
+  level: "debug"                # Log level: debug, info, warn, error. Controls both app and SQL query logs.
   outputPath: ""                # Log file path (empty = stdout)
 
 livekit:
@@ -178,6 +179,7 @@ For Docker deployments, see the [Docker Guide](/en/docs/guides/docker).
 
 ```bash
 export SERVER_PORT=8090
+export SERVER_HTTP_PORT=8080  # Optional: HTTP port when TLS enabled (default: 80)
 export DB_PATH=/var/lib/bedrud/bedrud.db
 export JWT_SECRET=production-secret
 export LIVEKIT_HOST=http://localhost:8090/livekit
@@ -189,7 +191,8 @@ export LIVEKIT_API_SECRET=prodsecret
 
 | Env Var | YAML Path | Description |
 |---------|-----------|-------------|
-| `SERVER_PORT` | `server.port` | HTTP listening port |
+| `SERVER_PORT` | `server.port` | HTTPS port (or HTTP if TLS disabled) |
+| `SERVER_HTTP_PORT` | `server.httpPort` | HTTP listener port when TLS enabled (default `80`) |
 | `SERVER_ENABLE_TLS` | `server.enableTLS` | Enable HTTPS (`true`/`false`) |
 | `SERVER_CERT_FILE` | `server.certFile` | Path to TLS certificate |
 | `SERVER_KEY_FILE` | `server.keyFile` | Path to TLS private key |
@@ -229,5 +232,32 @@ export LIVEKIT_API_SECRET=prodsecret
 - [ ] Configure OAuth providers if needed
 - [ ] Open LiveKit RTC port range in your firewall
 - [ ] Set up log rotation for `/var/log/bedrud/`
+
+### Privileged Ports (< 1024)
+
+When TLS is enabled, Bedrud also starts an HTTP listener (default port 80). Ports below 1024 require root on Linux. If running as a non-root user:
+
+**Option 1: Use an unprivileged port** (recommended for dev/reverse-proxy setups):
+
+```yaml
+server:
+  httpPort: "8080"
+```
+
+Or via environment variable:
+
+```bash
+export SERVER_HTTP_PORT=8080
+```
+
+**Option 2: Allow the binary to bind low ports without root:**
+
+```bash
+sudo setcap 'cap_net_bind_service=+ep' $(which bedrud)
+```
+
+<Callout type="warning">
+    `setcap` must be re-run after each binary update (reinstall, upgrade, new build).
+</Callout>
 
 For complete production setup, see the [Deployment Guide](/en/docs/guides/deployment).

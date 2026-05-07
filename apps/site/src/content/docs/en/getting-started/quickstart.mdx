@@ -28,7 +28,7 @@ Deploy Bedrud and join a video meeting in under 5 minutes.
 | Requirement | Details |
 |-------------|---------|
 | A Linux server | amd64 or arm64, with `sudo` access and a supported init system (systemd, OpenRC, or SysV init). macOS/Windows: use Docker or WSL2 for server |
-| Open ports | `8090`, `7880`, `50000–60000/udp`. For auto-TLS: also `80` and `443` |
+| Open ports | `8090`, `7880`, `50000–60000/udp`. For auto-TLS: also `80` and `443` (or set `httpPort` to unprivileged port — see [Configuration](/en/docs/getting-started/configuration#privileged-ports)) |
 | A domain (optional) | With DNS A record pointing to your server. No domain? Works with IP — see alternatives below |
 
 > **How it works:** You run one Bedrud **server**. People join meetings in their **browser** (no install) or via **native apps** (Android, Windows, macOS, Linux).

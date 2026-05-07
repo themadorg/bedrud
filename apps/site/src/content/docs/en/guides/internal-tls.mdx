@@ -24,6 +24,33 @@ openssl x509 -req -days 365 -in server.csr \
 sudo ./bedrud install --tls --cert server.crt --key server.key --ip YOUR_SERVER_IP
 ```
 
+## HTTP Listener Port
+
+When TLS is enabled, Bedrud also starts an HTTP listener (default port 80) for bots and local access. Ports below 1024 require root on Linux.
+
+**Non-root setups** — set an unprivileged port in `/etc/bedrud/config.yaml`:
+
+```yaml
+server:
+  httpPort: "8080"
+```
+
+Or via environment variable:
+
+```bash
+export SERVER_HTTP_PORT=8080
+```
+
+Alternatively, grant the binary permission to bind low ports:
+
+```bash
+sudo setcap 'cap_net_bind_service=+ep' $(which bedrud)
+```
+
+<Callout type="warning">
+    `setcap` must be re-run after each binary update (reinstall, upgrade, new build).
+</Callout>
+
 ## Add CA to Client Trust Stores
 
 Distribute `ca.crt` to all client machines:
