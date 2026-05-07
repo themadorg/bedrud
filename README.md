@@ -34,14 +34,14 @@ Deploying self-hosted video infrastructure typically requires managing multiple 
 
 ## Why Bedrud?
 
-| | Bedrud | Jitsi Meet | BigBlueButton |
-|---|---|---|---|
-| **Deployment** | Single binary, no dependencies | Multiple services (Jicofo, JVB, Prosody) | Heavy stack (Tomcat, Redis, FreeSWITCH, etc.) |
-| **Media server** | Embedded LiveKit SFU | External Jitsi Videobridge | External FreeSWITCH |
-| **Native clients** | Android, iOS, Desktop (Rust) | Web only (Electron wrapper) | Web only |
-| **Mobile multi-server** | Connect to multiple instances | Single server | Single server |
-| **Built-in installer** | `bedrud install` (systemd + TLS) | Manual setup | Manual setup |
-| **Resource usage** | ~200 MB RAM* | ~1 GB+ RAM* | ~2 GB+ RAM* |
+|                         | Bedrud                           | Jitsi Meet                               | BigBlueButton                                 |
+|-------------------------|----------------------------------|------------------------------------------|-----------------------------------------------|
+| **Deployment**          | Single binary, no dependencies   | Multiple services (Jicofo, JVB, Prosody) | Heavy stack (Tomcat, Redis, FreeSWITCH, etc.) |
+| **Media server**        | Embedded LiveKit SFU             | External Jitsi Videobridge               | External FreeSWITCH                           |
+| **Native clients**      | Android, iOS, Desktop (Rust)     | Web only (Electron wrapper)              | Web only                                      |
+| **Mobile multi-server** | Connect to multiple instances    | Single server                            | Single server                                 |
+| **Built-in installer**  | `bedrud install` (systemd + TLS) | Manual setup                             | Manual setup                                  |
+| **Resource usage**      | ~200 MB RAM*                     | ~1 GB+ RAM*                              | ~2 GB+ RAM*                                   |
 
 *\*Approximate, varies by load and configuration.*
 
@@ -166,11 +166,11 @@ Open `http://localhost:8090`, create an account, and start a meeting.
 
 Three image variants are available:
 
-| Tag | Base | Size | Use when |
-|-----|------|------|----------|
-| `:latest` | Debian Bookworm | ~50 MB | Default — compatible with most systems |
-| `:latest-alpine` | Alpine 3.21 | ~30 MB | Alpine hosts, minimal footprint |
-| `:latest-distroless` | Distroless | ~25 MB | Smallest attack surface, no shell |
+| Tag                  | Base            | Size   | Use when                               |
+|----------------------|-----------------|--------|----------------------------------------|
+| `:latest`            | Debian Bookworm | ~50 MB | Default — compatible with most systems |
+| `:latest-alpine`     | Alpine 3.21     | ~30 MB | Alpine hosts, minimal footprint        |
+| `:latest-distroless` | Distroless      | ~25 MB | Smallest attack surface, no shell      |
 
 All images contain the same static binary — the base image only affects runtime utilities (ca-certs, timezone data).
 
@@ -179,13 +179,13 @@ All images contain the same static binary — the base image only affects runtim
 
 #### Ports
 
-| Port | Protocol | Purpose |
-|------|----------|---------|
-| 8090 | TCP | Web UI, REST API, WebSocket |
-| 7880 | TCP | LiveKit signaling |
-| 50000–60000 | UDP | WebRTC media (configurable range) |
-| 3478 | UDP | TURN relay |
-| 5349 | TCP | TURN/TLS relay |
+| Port        | Protocol | Purpose                           |
+|-------------|----------|-----------------------------------|
+| 8090        | TCP      | Web UI, REST API, WebSocket       |
+| 7880        | TCP      | LiveKit signaling                 |
+| 50000–60000 | UDP      | WebRTC media (configurable range) |
+| 3478        | UDP      | TURN relay                        |
+| 5349        | TCP      | TURN/TLS relay                    |
 
 <details>
 <summary>Build Docker image from source</summary>
@@ -352,12 +352,12 @@ See the [Production Checklist](https://bedrud.org/en/docs/getting-started/config
 
 ## Troubleshooting
 
-| Issue | Cause | Fix |
-|-------|-------|-----|
-| No video/audio | UDP ports blocked | Open port range 50000–60000 (or your configured `rtc.port_range_start`–`port_range_end`) |
-| Media works on LAN only | Missing external IP | Set `rtc.use_external_ip: true` and configure your public IP in LiveKit config |
-| TURN not connecting | TLS certificate missing | TURN/TLS (port 5349) needs a valid certificate. See [TURN Server Guide](https://bedrud.org/en/docs/architecture/turn-server/) |
-| CORS errors in browser | Mismatched origins | Set `cors.allowedOrigins` to your frontend URL |
+| Issue                   | Cause                   | Fix                                                                                                                           |
+|-------------------------|-------------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| No video/audio          | UDP ports blocked       | Open port range 50000–60000 (or your configured `rtc.port_range_start`–`port_range_end`)                                      |
+| Media works on LAN only | Missing external IP     | Set `rtc.use_external_ip: true` and configure your public IP in LiveKit config                                                |
+| TURN not connecting     | TLS certificate missing | TURN/TLS (port 5349) needs a valid certificate. See [TURN Server Guide](https://bedrud.org/en/docs/architecture/turn-server/) |
+| CORS errors in browser  | Mismatched origins      | Set `cors.allowedOrigins` to your frontend URL                                                                                |
 
 For more, see [WebRTC Connectivity](https://bedrud.org/en/docs/architecture/webrtc-connectivity/) and [TURN Server](https://bedrud.org/en/docs/architecture/turn-server/).
 
@@ -472,12 +472,12 @@ make build-dist       # Build compressed linux/amd64 tarball (static)
 
 ## Client Apps
 
-| Client | Platform | Stack | Download |
-|--------|----------|-------|----------|
-| Web | Browser | React 19, TanStack Start | N/A (runs on server) |
-| Android | API 28+ | Kotlin, Jetpack Compose, LiveKit SDK | [APK / Play Store](https://bedrud.org/en/docs/guides/packages/#android) |
-| iOS | 18.0+ | Swift, SwiftUI, LiveKit SDK | [IPA / App Store](https://bedrud.org/en/docs/guides/packages/#ios) |
-| Desktop | Windows / Linux / macOS | Rust, Slint, LiveKit SDK | [Installers](https://bedrud.org/en/docs/guides/packages/#desktop) |
+| Client  | Platform                | Stack                                | Download                                                                |
+|---------|-------------------------|--------------------------------------|-------------------------------------------------------------------------|
+| Web     | Browser                 | React 19, TanStack Start             | N/A (runs on server)                                                    |
+| Android | API 28+                 | Kotlin, Jetpack Compose, LiveKit SDK | [APK / Play Store](https://bedrud.org/en/docs/guides/packages/#android) |
+| iOS     | 18.0+                   | Swift, SwiftUI, LiveKit SDK          | [IPA / App Store](https://bedrud.org/en/docs/guides/packages/#ios)      |
+| Desktop | Windows / Linux / macOS | Rust, Slint, LiveKit SDK             | [Installers](https://bedrud.org/en/docs/guides/packages/#desktop)       |
 
 > [!NOTE]
 > Building client apps from source? See [Development Setup](#development-setup) and [Contributing Guide](https://bedrud.org/en/docs/contributing/) for platform-specific commands.
@@ -507,18 +507,18 @@ Go + Fiber backend · React 19 frontend · LiveKit WebRTC SFU · Android / iOS /
 <details>
 <summary>View full technology stack</summary>
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | Go 1.24, Fiber, GORM, LiveKit Protocol SDK |
+| Layer        | Technology                                                      |
+|--------------|-----------------------------------------------------------------|
+| Backend      | Go 1.24, Fiber, GORM, LiveKit Protocol SDK                      |
 | Web Frontend | React 19, TanStack Start, TanStack Router, TailwindCSS v4, Vite |
-| Android | Kotlin, Jetpack Compose, Koin, Retrofit, LiveKit Android SDK |
-| iOS | Swift, SwiftUI, KeychainAccess, LiveKit Swift SDK |
-| Desktop | Rust, Slint, reqwest, LiveKit Rust SDK |
-| Auth | JWT, OAuth2 (Goth), WebAuthn / FIDO2 Passkeys |
-| Database | SQLite (default), PostgreSQL (production) |
-| Media | LiveKit (embedded WebRTC SFU) |
-| CI/CD | GitHub Actions, Docker, GHCR |
-| Deployment | pyinfra, systemd, Traefik |
+| Android      | Kotlin, Jetpack Compose, Koin, Retrofit, LiveKit Android SDK    |
+| iOS          | Swift, SwiftUI, KeychainAccess, LiveKit Swift SDK               |
+| Desktop      | Rust, Slint, reqwest, LiveKit Rust SDK                          |
+| Auth         | JWT, OAuth2 (Goth), WebAuthn / FIDO2 Passkeys                   |
+| Database     | SQLite (default), PostgreSQL (production)                       |
+| Media        | LiveKit (embedded WebRTC SFU)                                   |
+| CI/CD        | GitHub Actions, Docker, GHCR                                    |
+| Deployment   | pyinfra, systemd, Traefik                                       |
 
 </details>
 
@@ -529,22 +529,22 @@ Go + Fiber backend · React 19 frontend · LiveKit WebRTC SFU · Android / iOS /
 <details>
 <summary>View all Makefile targets</summary>
 
-| Command | Description |
-|---------|-------------|
-| `make help` | Show all available targets |
-| `make init` | Install all dependencies |
-| `make dev` | Run LiveKit + server + web concurrently |
-| `make build` | Build frontend + backend (embedded single binary) |
-| `make build-dist` | Build production linux/amd64 tarball (static) |
-| `make build-android-debug` | Build Android debug APK |
-| `make build-android` | Build Android release APK |
-| `make build-ios` | Build iOS archive |
-| `make build-ios-sim` | Build for iOS simulator |
-| `make build-desktop` | Build desktop release binary |
-| `make dev-desktop` | Run desktop app (debug) |
-| `make test-back` | Run server tests |
-| `make deploy ARGS=...` | Run deployment CLI |
-| `make clean` | Remove build artifacts |
+| Command                    | Description                                       |
+|----------------------------|---------------------------------------------------|
+| `make help`                | Show all available targets                        |
+| `make init`                | Install all dependencies                          |
+| `make dev`                 | Run LiveKit + server + web concurrently           |
+| `make build`               | Build frontend + backend (embedded single binary) |
+| `make build-dist`          | Build production linux/amd64 tarball (static)     |
+| `make build-android-debug` | Build Android debug APK                           |
+| `make build-android`       | Build Android release APK                         |
+| `make build-ios`           | Build iOS archive                                 |
+| `make build-ios-sim`       | Build for iOS simulator                           |
+| `make build-desktop`       | Build desktop release binary                      |
+| `make dev-desktop`         | Run desktop app (debug)                           |
+| `make test-back`           | Run server tests                                  |
+| `make deploy ARGS=...`     | Run deployment CLI                                |
+| `make clean`               | Remove build artifacts                            |
 
 For the full target list, see the [Makefile Reference](https://bedrud.org/en/docs/guides/makefile/) or run `make help`.
 
