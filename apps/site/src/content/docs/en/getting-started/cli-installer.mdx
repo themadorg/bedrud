@@ -76,7 +76,7 @@ Usage: curl -fsSL https://bedrud.org/install.sh | bash -s -- [options]
 | `--install-dir <dir>` | `~/bin` | Where to place the binary |
 | `--version <ver>` | `latest` | Pin to a release (e.g. `v1.2.0`) |
 | `--build` | off | Build from source instead of downloading a release |
-| `--branch <name>` | `main` | Git branch to clone (requires `--build`) |
+| `--branch <name>` | `master` | Git branch to clone (requires `--build`) |
 | `--skip-shell` | off | Don't modify shell RC files or PATH |
 | `--no-setup` | off | Download binary only, skip interactive server setup |
 | `-h`, `--help` | — | Print usage and exit |
@@ -122,7 +122,7 @@ irm https://bedrud.org/install.ps1 -OutFile install.ps1
 | `-Version <ver>` | `latest` | Install a specific release version |
 | `-SkipPath` | `$false` | Don't add install dir to user PATH |
 | `-Build` | `$false` | Build from source instead of downloading |
-| `-Branch <name>` | `main` | Git branch to clone (requires `-Build`) |
+| `-Branch <name>` | `master` | Git branch to clone (requires `-Build`) |
 | `-NoSetup` | `$false` | Download only, skip interactive server setup |
 
 **Examples:**

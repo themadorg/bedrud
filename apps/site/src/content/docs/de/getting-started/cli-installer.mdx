@@ -76,7 +76,7 @@ Usage: curl -fsSL https://bedrud.org/install.sh | bash -s -- [options]
 | `--install-dir <dir>` | `~/bin` | Ablageort der Binärdatei |
 | `--version <ver>` | `latest` | Eine Release-Version festlegen (z. B. `v1.2.0`) |
 | `--build` | off | Aus Quellcode erstellen statt Release herunterzuladen |
-| `--branch <name>` | `main` | Zu klonender Git-Branch (erfordert `--build`) |
+| `--branch <name>` | `master` | Zu klonender Git-Branch (erfordert `--build`) |
 | `--skip-shell` | off | Shell-RC-Dateien und PATH nicht ändern |
 | `--no-setup` | off | Nur Binärdatei herunterladen, interaktives Server-Setup überspringen |
 | `-h`, `--help` | — | Verwendung anzeigen und beenden |
@@ -122,7 +122,7 @@ irm https://bedrud.org/install.ps1 -OutFile install.ps1
 | `-Version <ver>` | `latest` | Eine bestimmte Release-Version installieren |
 | `-SkipPath` | `$false` | Installationsverzeichnis nicht zum Benutzer-PATH hinzufügen |
 | `-Build` | `$false` | Aus Quellcode erstellen statt herunterzuladen |
-| `-Branch <name>` | `main` | Zu klonender Git-Branch (erfordert `-Build`) |
+| `-Branch <name>` | `master` | Zu klonender Git-Branch (erfordert `-Build`) |
 | `-NoSetup` | `$false` | Nur herunterladen, interaktives Server-Setup überspringen |
 
 **Beispiele:**

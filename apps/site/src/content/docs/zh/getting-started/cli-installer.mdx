@@ -75,7 +75,7 @@ Usage: curl -fsSL https://bedrud.org/install.sh | bash -s -- [options]
 | `--install-dir <dir>` | `~/bin` | 二进制文件安装位置 |
 | `--version <ver>` | `latest` | 固定到指定版本（如 `v1.2.0`） |
 | `--build` | 关闭 | 从源码构建而不下载预编译版本 |
-| `--branch <name>` | `main` | 要克隆的 Git 分支（需要 `--build`） |
+| `--branch <name>` | `master` | 要克隆的 Git 分支（需要 `--build`） |
 | `--no-setup` | 关闭 | 仅下载二进制文件，跳过交互式服务器设置 |
 | `--skip-shell` | 关闭 | 不修改 shell RC 文件或 PATH |
 | `-h`, `--help` | — | 打印用法并退出 |
@@ -121,7 +121,7 @@ irm https://bedrud.org/install.ps1 -OutFile install.ps1
 | `-Version <ver>` | `latest` | 安装指定版本 |
 | `-SkipPath` | `$false` | 不将安装目录添加到用户 PATH |
 | `-Build` | `$false` | 从源码构建而不下载 |
-| `-Branch <name>` | `main` | 要克隆的 Git 分支（需要 `-Build`） |
+| `-Branch <name>` | `master` | 要克隆的 Git 分支（需要 `-Build`） |
 | `-NoSetup` | `$false` | 仅下载，跳过交互式服务器设置 |
 
 **示例：**

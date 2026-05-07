@@ -16,11 +16,11 @@
 
 ## Pull Requests
 
-1. Create a feature branch from `main`
+1. Create a feature branch from `master`
 2. Make your changes
 3. Ensure Biome passes (`bun run check`)
 4. Ensure types check (`bun run typecheck:astro`)
-5. Open a pull request against `main`
+5. Open a pull request against `master`
 
 ## Code Style
 

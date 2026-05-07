@@ -8,7 +8,7 @@ For documentation-specific contributions, see [docs/contributing.md](docs/contri
 
 1. Fork the repository
 2. Clone your fork
-3. Create a feature branch from `main`
+3. Create a feature branch from `master`
 4. Make your changes
 5. Submit a pull request
 
