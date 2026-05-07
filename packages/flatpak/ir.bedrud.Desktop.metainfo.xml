@@ -10,7 +10,7 @@
       No data leaves your infrastructure.
     </p>
   </description>
-  <url type="homepage">https://bedrud.ir</url>
+  <url type="homepage">https://bedrud.org</url>
   <url type="bugtracker">https://github.com/themadorg/bedrud/issues</url>
   <url type="help">https://themadorg.github.io/bedrud/</url>
   <launchable type="desktop-id">ir.bedrud.Desktop.desktop</launchable>

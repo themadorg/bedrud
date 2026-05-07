@@ -5,7 +5,7 @@
     <version>0.1.0</version>
     <title>Bedrud Desktop</title>
     <authors>Bedrud</authors>
-    <projectUrl>https://bedrud.ir</projectUrl>
+    <projectUrl>https://bedrud.org</projectUrl>
     <iconUrl>https://raw.githubusercontent.com/themadorg/bedrud/main/apps/web/public/logo512.png</iconUrl>
     <licenseUrl>https://github.com/themadorg/bedrud/blob/main/LICENSE</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>

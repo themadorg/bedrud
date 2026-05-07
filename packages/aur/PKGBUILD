@@ -1,4 +1,4 @@
-# Maintainer: Bedrud <info@bedrud.ir>
+# Maintainer: Bedrud <info@bedrud.org>
 # Binary package — downloads pre-built release from GitHub
 pkgname=bedrud-desktop-bin
 pkgver=0.1.0

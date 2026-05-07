@@ -1,6 +1,6 @@
 class BedrudDesktop < Formula
   desc "Native desktop client for the Bedrud self-hosted video meeting platform"
-  homepage "https://bedrud.ir"
+  homepage "https://bedrud.org"
   version "0.1.0"
   license "Apache-2.0"
 

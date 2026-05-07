@@ -142,7 +142,7 @@ jobs:
             DEB_VER=$(printf '%s' "${{ needs.prepare.outputs.tag }}" | sed 's/^[^0-9]/0~&/')
             echo "Version: ${DEB_VER}"
             echo "Architecture: ${{ matrix.deb_arch }}"
-            echo "Maintainer: Bedrud <info@bedrud.ir>"
+            echo "Maintainer: Bedrud <info@bedrud.org>"
             echo "Description: Bedrud self-hosted video meeting server"
             echo " A single binary packaging the web UI, REST API, and LiveKit WebRTC."
 
@@ -324,7 +324,7 @@ jobs:
             DEB_VER=$(printf '%s' "${{ needs.prepare.outputs.tag }}" | sed 's/^[^0-9]/0~&/')
             echo "Version: ${DEB_VER}"
             echo "Architecture: ${{ matrix.deb_arch }}"
-            echo "Maintainer: Bedrud <info@bedrud.ir>"
+            echo "Maintainer: Bedrud <info@bedrud.org>"
             echo "Description: Bedrud Desktop — self-hosted video meeting client"
             echo " Native desktop client for the Bedrud video meeting platform."
             echo "Depends: libc6, libgcc1, libfontconfig1, libxkbcommon0, libsecret-1-0, libasound2"

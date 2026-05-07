@@ -138,7 +138,7 @@ jobs:
             echo "Package: bedrud"
             echo "Version: ${GITHUB_REF_NAME#v}"
             echo "Architecture: ${{ matrix.deb_arch }}"
-            echo "Maintainer: Bedrud <info@bedrud.ir>"
+            echo "Maintainer: Bedrud <info@bedrud.org>"
             echo "Homepage: https://github.com/themadorg/bedrud"
             echo "Description: Bedrud self-hosted video meeting server"
             echo " A single binary packaging the web UI, REST API, and LiveKit WebRTC"
@@ -731,7 +731,7 @@ jobs:
             echo "Package: bedrud-desktop"
             echo "Version: ${GITHUB_REF_NAME#v}"
             echo "Architecture: ${{ matrix.deb_arch }}"
-            echo "Maintainer: Bedrud <info@bedrud.ir>"
+            echo "Maintainer: Bedrud <info@bedrud.org>"
             echo "Description: Bedrud Desktop — self-hosted video meeting client"
             echo " Native desktop client for the Bedrud video meeting platform."
             echo "Depends: libc6, libgcc1, libfontconfig1, libxkbcommon0, libsecret-1-0, libasound2"
@@ -1269,7 +1269,7 @@ jobs:
           pkgbuild: packages/aur/PKGBUILD
           assets: packages/aur/.SRCINFO
           commit_username: bedrud-bot
-          commit_email: info@bedrud.ir
+          commit_email: info@bedrud.org
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_message: "Update to ${{ github.ref_name }}"
 
@@ -1310,7 +1310,7 @@ jobs:
           pkgbuild: packages/aur/bedrud-server/PKGBUILD
           assets: packages/aur/bedrud-server/.SRCINFO
           commit_username: bedrud-bot
-          commit_email: info@bedrud.ir
+          commit_email: info@bedrud.org
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_message: "Update to ${{ github.ref_name }}"
 
