@@ -36,6 +36,7 @@ export function DeviceSelector({ kind }: DeviceSelectorProps) {
   }, [kind, syncActiveFromRoom])
 
   useEffect(() => {
+    if (!navigator.mediaDevices) return
     refreshDevices()
     navigator.mediaDevices.addEventListener('devicechange', refreshDevices)
     return () => navigator.mediaDevices.removeEventListener('devicechange', refreshDevices)

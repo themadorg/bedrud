@@ -160,12 +160,12 @@ function useDeviceList(kind: 'audioinput' | 'audiooutput') {
   }, [room, kind])
 
   useEffect(() => {
+    if (!navigator.mediaDevices) return
     const refresh = async () => {
       try {
         const all = await navigator.mediaDevices.enumerateDevices()
         const filtered = all.filter((d) => d.kind === kind)
         setDevices(filtered)
-        // After device list refreshes, verify our activeId still exists
         syncActiveFromRoom()
       } catch {
         /* permissions not yet granted */

@@ -16,10 +16,12 @@ import { BeforeUnloadLock } from '@/components/meeting/BeforeUnloadLock'
 import { FocusLayout } from '@/components/meeting/FocusLayout'
 import { KickDetector } from '@/components/meeting/KickDetector'
 import { MeetingProvider, useMeetingChatContext } from '@/components/meeting/MeetingContext'
+import { MeetingErrorBoundary } from '@/components/meeting/MeetingErrorBoundary'
 import { MeetingHeader } from '@/components/meeting/MeetingHeader'
 import { MeetingPanels } from '@/components/meeting/MeetingPanels'
 import { MeetingSoundEffects } from '@/components/meeting/MeetingSoundEffects'
 import { ParticipantGrid } from '@/components/meeting/ParticipantGrid'
+import { SecureContextBanner } from '@/components/meeting/SecureContextBanner'
 
 interface JoinResponse {
   id: string
@@ -277,68 +279,71 @@ function MeetingPage() {
   }
 
   return (
-    <LiveKitRoom token={token} serverUrl={wsUrl} connect audio={audioConstraints} video={false}>
-      <RoomAudioRenderer />
-      {/* LiveKitRoom renders as display:contents — this div is the actual viewport container */}
-      <div className="fixed inset-0 overflow-hidden" style={{ background: '#07070f' }}>
-        <MeetingProvider roomId={id} roomName={roomName} adminId={adminId ?? ''}>
-          <BeforeUnloadLock />
-          <KickDetector onKicked={() => setWasKicked(true)} />
-          <AskActionBanner />
-          <AudioProcessorManager />
-          <MeetingSoundEffects />
-          {/* Ambient depth gradients */}
-          <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+    <MeetingErrorBoundary>
+      <LiveKitRoom token={token} serverUrl={wsUrl} connect audio={audioConstraints} video={false}>
+        <RoomAudioRenderer />
+        {/* LiveKitRoom renders as display:contents — this div is the actual viewport container */}
+        <div className="fixed inset-0 overflow-hidden" style={{ background: '#07070f' }}>
+          <SecureContextBanner />
+          <MeetingProvider roomId={id} roomName={roomName} adminId={adminId ?? ''}>
+            <BeforeUnloadLock />
+            <KickDetector onKicked={() => setWasKicked(true)} />
+            <AskActionBanner />
+            <AudioProcessorManager />
+            <MeetingSoundEffects />
+            {/* Ambient depth gradients */}
+            <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+              <div
+                style={{
+                  position: 'absolute',
+                  width: 900,
+                  height: 900,
+                  borderRadius: '50%',
+                  background:
+                    'radial-gradient(circle, color-mix(in oklab, var(--primary) 5.5%, transparent) 0%, transparent 65%)',
+                  top: '-300px',
+                  left: '-300px',
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  width: 700,
+                  height: 700,
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(6,182,212,0.04) 0%, transparent 65%)',
+                  bottom: '-200px',
+                  right: '-150px',
+                }}
+              />
+            </div>
+
+            <MeetingLayout />
+
+            {/* Vignettes for header/controls legibility */}
             <div
+              className="pointer-events-none absolute left-0 right-0 top-0 z-10"
               style={{
-                position: 'absolute',
-                width: 900,
-                height: 900,
-                borderRadius: '50%',
-                background:
-                  'radial-gradient(circle, color-mix(in oklab, var(--primary) 5.5%, transparent) 0%, transparent 65%)',
-                top: '-300px',
-                left: '-300px',
+                height: 'calc(96px + env(safe-area-inset-top, 0px))',
+                background: 'linear-gradient(to bottom, rgba(7,7,15,0.65) 0%, transparent 100%)',
               }}
             />
             <div
+              className="pointer-events-none absolute bottom-0 left-0 right-0 z-10"
               style={{
-                position: 'absolute',
-                width: 700,
-                height: 700,
-                borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(6,182,212,0.04) 0%, transparent 65%)',
-                bottom: '-200px',
-                right: '-150px',
+                height: 'calc(128px + env(safe-area-inset-bottom, 0px))',
+                background: 'linear-gradient(to top, rgba(7,7,15,0.6) 0%, transparent 100%)',
               }}
             />
-          </div>
 
-          <MeetingLayout />
+            <MeetingHeader meetId={meetId} />
 
-          {/* Vignettes for header/controls legibility */}
-          <div
-            className="pointer-events-none absolute left-0 right-0 top-0 z-10"
-            style={{
-              height: 'calc(96px + env(safe-area-inset-top, 0px))',
-              background: 'linear-gradient(to bottom, rgba(7,7,15,0.65) 0%, transparent 100%)',
-            }}
-          />
-          <div
-            className="pointer-events-none absolute bottom-0 left-0 right-0 z-10"
-            style={{
-              height: 'calc(128px + env(safe-area-inset-bottom, 0px))',
-              background: 'linear-gradient(to top, rgba(7,7,15,0.6) 0%, transparent 100%)',
-            }}
-          />
-
-          <MeetingHeader meetId={meetId} />
-
-          {/* Side panels */}
-          <MeetingPanels navigate={() => navigate({ to: '/dashboard' })} />
-        </MeetingProvider>
-      </div>
-    </LiveKitRoom>
+            {/* Side panels */}
+            <MeetingPanels navigate={() => navigate({ to: '/dashboard' })} />
+          </MeetingProvider>
+        </div>
+      </LiveKitRoom>
+    </MeetingErrorBoundary>
   )
 }
 
