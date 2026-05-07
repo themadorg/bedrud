@@ -45,3 +45,7 @@ server/tmp/
 
 # Playwright MCP snapshots
 .playwright-mcp/
+
+# certificates
+crt.pem
+key.pem

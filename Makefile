@@ -15,9 +15,11 @@ export PATH := $(HOME)/.local/bin:$(PATH)
 
 # Ensure zig is installed (auto-installs to ~/.local/opt/zig-VERSION, symlinks to ~/.local/bin)
 ensure-zig:
-	@if command -v zig >/dev/null 2>&1; then exit 0; fi
-	@echo "➜ Installing zig $(ZIG_VERSION)..."
-	@OS=$$(uname -s); ARCH=$$(uname -m); \
+	@if zig version >/dev/null 2>&1; then \
+		exit 0; \
+	fi; \
+	echo "➜ Installing zig $(ZIG_VERSION)..."; \
+	OS=$$(uname -s); ARCH=$$(uname -m); \
 	if [ "$$OS" = "Darwin" ]; then ZIG_OS="macos"; \
 	elif [ "$$OS" = "Linux" ]; then ZIG_OS="linux"; \
 	else echo "❌ Auto-install not supported on $$OS. Install zig manually: https://ziglang.org/download/"; exit 1; fi; \
@@ -29,7 +31,7 @@ ensure-zig:
 	curl -fsSL "https://ziglang.org/download/$(ZIG_VERSION)/$$ZIG_DIR.tar.xz" \
 		| tar -xJ -C $(HOME)/.local/opt; \
 	ln -sf $(HOME)/.local/opt/$$ZIG_DIR/zig $(HOME)/.local/bin/zig; \
-	if ! command -v zig >/dev/null 2>&1; then \
+	if ! zig version >/dev/null 2>&1; then \
 		echo "❌ zig install failed. Install manually: https://ziglang.org/download/"; exit 1; \
 	fi; \
 	echo "✅ zig $(ZIG_VERSION) installed"
