@@ -27,15 +27,75 @@ func ExportBinary(destPath string) error {
 	return nil
 }
 
+// resolveLiveKitPath tries to export the embedded LiveKit binary to a series
+// of candidate directories, returning the first successful path.
+// Falls back to bare executable name (PATH lookup) if all exports fail.
+func resolveLiveKitPath() string {
+	candidates := []func() string{
+		tempDirPath,
+		userCachePath,
+		exeDirPath,
+		cwdPath,
+	}
+
+	for _, fn := range candidates {
+		p := fn()
+		if p == "" {
+			continue
+		}
+		// Ensure parent directory exists.
+		dir := filepath.Dir(p)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			log.Debug().Err(err).Str("dir", dir).Msg("LiveKit: cannot create parent dir, skipping candidate")
+			continue
+		}
+		if err := ExportBinary(p); err != nil {
+			log.Debug().Err(err).Str("path", p).Msg("LiveKit: export failed, trying next candidate")
+			continue
+		}
+		if err := os.Chmod(p, 0o755); err != nil {
+			log.Warn().Err(err).Str("path", p).Msg("Failed to chmod LiveKit binary")
+		}
+		log.Info().Str("path", p).Msg("LiveKit: binary exported successfully")
+		return p
+	}
+
+	// Last resort: bare name, relies on $PATH containing livekit-server
+	log.Warn().Msg("LiveKit: all export candidates failed, falling back to PATH lookup")
+	return lkExeName
+}
+
+func tempDirPath() string {
+	return filepath.Join(os.TempDir(), lkExeName)
+}
+
+func userCachePath() string {
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(dir, "bedrud", lkExeName)
+}
+
+func exeDirPath() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(exe), lkExeName)
+}
+
+func cwdPath() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(dir, lkExeName)
+}
+
 // RunLiveKit starts the embedded LiveKit server directly with the provided config
 func RunLiveKit(configPath string) error {
-	lkPath := filepath.Join(os.TempDir(), lkExeName)
-	if err := ExportBinary(lkPath); err != nil {
-		return err
-	}
-	if err := os.Chmod(lkPath, 0o755); err != nil {
-		log.Warn().Err(err).Msg("Failed to set executable permissions on LiveKit binary")
-	}
+	lkPath := resolveLiveKitPath()
 
 	args := []string{}
 	if configPath != "" {
@@ -58,17 +118,7 @@ func StartInternalServer(ctx context.Context, apiKey, apiSecret string, port int
 		return nil
 	}
 
-	tempDir := os.TempDir()
-	lkPath := filepath.Join(tempDir, lkExeName)
-	if err := ExportBinary(lkPath); err != nil {
-		log.Error().Err(err).Msg("Failed to export embedded LiveKit binary")
-		// Fallback to PATH if export fails
-		lkPath = lkExeName
-	} else {
-		if err := os.Chmod(lkPath, 0o755); err != nil {
-			log.Warn().Err(err).Msg("Failed to set executable permissions on LiveKit binary")
-		}
-	}
+	lkPath := resolveLiveKitPath()
 
 	args := []string{}
 	if externalConfigPath != "" {
