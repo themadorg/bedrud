@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite" // Added for SQLite support
@@ -25,9 +26,13 @@ func Initialize(cfg *config.DatabaseConfig) error {
 	var dsn string
 	var dialector gorm.Dialector
 
+	// Map zerolog global level to GORM log level so GORM respects
+	// the logger.level setting from config.yaml.
+	gormLogLevel := gormLogLevelFromZerolog(zerolog.GlobalLevel())
+
 	// Configure GORM
 	gormConfig := &gorm.Config{
-		Logger:                                   logger.Default.LogMode(logger.Info),
+		Logger:                                   logger.Default.LogMode(gormLogLevel),
 		DisableForeignKeyConstraintWhenMigrating: true,
 	}
 
@@ -106,6 +111,21 @@ func Initialize(cfg *config.DatabaseConfig) error {
 // GetDB returns the database instance
 func GetDB() *gorm.DB {
 	return db
+}
+
+// gormLogLevelFromZerolog maps a zerolog level to the corresponding GORM log level.
+// GORM levels: Silent (no logs), Error, Warn, Info (all queries).
+func gormLogLevelFromZerolog(level zerolog.Level) logger.LogLevel {
+	switch {
+	case level >= zerolog.ErrorLevel:
+		return logger.Error
+	case level >= zerolog.WarnLevel:
+		return logger.Warn
+	case level >= zerolog.InfoLevel:
+		return logger.Info
+	default: // debug/trace — show everything
+		return logger.Info
+	}
 }
 
 // Close closes the database connection
