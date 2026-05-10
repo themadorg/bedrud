@@ -43,11 +43,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
+import com.bedrud.app.R
 import com.bedrud.app.core.instance.InstanceManager
 import com.bedrud.app.models.RegisterRequest
 import kotlinx.coroutines.launch
@@ -83,10 +86,10 @@ fun RegisterScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Create Account") },
+                title = { Text(stringResource(R.string.auth_title_createAccount)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateToLogin) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_action_back))
                     }
                 }
             )
@@ -123,7 +126,7 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("Full Name") },
+                label = { Text(stringResource(R.string.auth_label_fullName)) },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Text,
                     imeAction = ImeAction.Next
@@ -132,7 +135,8 @@ fun RegisterScreen(
                     onNext = { focusManager.moveFocus(FocusDirection.Down) }
                 ),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -141,7 +145,7 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
-                label = { Text("Email") },
+                label = { Text(stringResource(R.string.auth_label_email)) },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Next
@@ -150,7 +154,8 @@ fun RegisterScreen(
                     onNext = { focusManager.moveFocus(FocusDirection.Down) }
                 ),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -159,13 +164,14 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Password") },
+                label = { Text(stringResource(R.string.auth_label_password)) },
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
                             if (passwordVisible) Icons.Default.VisibilityOff
                             else Icons.Default.Visibility,
-                            contentDescription = if (passwordVisible) "Hide" else "Show"
+                            contentDescription = if (passwordVisible) stringResource(R.string.auth_password_toggle_hide)
+                                else stringResource(R.string.auth_password_toggle_show)
                         )
                     }
                 },
@@ -179,7 +185,8 @@ fun RegisterScreen(
                     onNext = { focusManager.moveFocus(FocusDirection.Down) }
                 ),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -188,78 +195,84 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
-                label = { Text("Confirm Password") },
-                visualTransformation = if (passwordVisible) VisualTransformation.None
-                else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = { focusManager.clearFocus() }
-                ),
-                singleLine = true,
-                isError = confirmPassword.isNotEmpty() && password != confirmPassword,
-                supportingText = if (confirmPassword.isNotEmpty() && password != confirmPassword) {
-                    { Text("Passwords do not match") }
-                } else null,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Create Account button
-            Button(
-                onClick = {
-                    if (password != confirmPassword) {
-                        errorMessage = "Passwords do not match"
-                        return@Button
-                    }
-                    scope.launch {
-                        isLoading = true
-                        try {
-                            val response = authApi.register(
-                                RegisterRequest(
-                                    email = email.trim(),
-                                    password = password,
-                                    name = name.trim()
+                label = {
+                    Text(
+                        stringResource(
+                            R.string.auth_label_confirmPassword)) },
+                                    visualTransformation =
+                            if (passwordVisible) VisualTransformation.None
+                            else PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Password,
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = { focusManager.clearFocus() }
+                            ),
+                            singleLine = true,
+                            isError = confirmPassword.isNotEmpty() && password != confirmPassword,
+                            supportingText = if (confirmPassword.isNotEmpty() && password != confirmPassword) {
+                                {
+                                    Text(stringResource(R.string.auth_error_passwordMismatch)) }
+                                } else null,
+                                modifier = Modifier.fillMaxWidth()
                                 )
-                            )
-                            if (response.isSuccessful) {
-                                onRegisterSuccess()
-                            } else {
-                                errorMessage = "Registration failed. Please try again."
+
+                                Spacer(modifier = Modifier.height(24.dp))
+
+                                // Create Account button
+                                Button(
+                                    onClick = {
+                                        if (password != confirmPassword) {
+                                            errorMessage = "Passwords do not match"
+                                            return@Button
+                                        }
+                                        scope.launch {
+                                            isLoading = true
+                                            try {
+                                                val response = authApi.register(
+                                                    RegisterRequest(
+                                                        email = email.trim(),
+                                                        password = password,
+                                                        name = name.trim()
+                                                    )
+                                                )
+                                                if (response.isSuccessful) {
+                                                    onRegisterSuccess()
+                                                } else {
+                                                    errorMessage =
+                                                        "Registration failed. Please try again."
+                                                }
+                                            } catch (e: Exception) {
+                                                errorMessage = e.message ?: "An error occurred"
+                                            } finally {
+                                                isLoading = false
+                                            }
+                                        }
+                                    },
+                                    enabled = name.isNotBlank() && email.isNotBlank() &&
+                                            password.isNotBlank() && confirmPassword.isNotBlank() &&
+                                            password == confirmPassword && !isLoading,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    if (isLoading) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
+                                    Text(stringResource(R.string.auth_title_createAccount))
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                TextButton(onClick = onNavigateToLogin) {
+                                    Text(stringResource(R.string.auth_link_alreadyHaveAccount))
+                                }
+
+                                Spacer(modifier = Modifier.height(48.dp))
                             }
-                        } catch (e: Exception) {
-                            errorMessage = e.message ?: "An error occurred"
-                        } finally {
-                            isLoading = false
-                        }
-                    }
-                },
-                enabled = name.isNotBlank() && email.isNotBlank() &&
-                        password.isNotBlank() && confirmPassword.isNotBlank() &&
-                        password == confirmPassword && !isLoading,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
                 }
-                Text("Create Account")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            TextButton(onClick = onNavigateToLogin) {
-                Text("Already have an account? Sign in")
-            }
-
-            Spacer(modifier = Modifier.height(48.dp))
         }
-    }
-}

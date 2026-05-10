@@ -58,11 +58,14 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
+import com.bedrud.app.R
 import com.bedrud.app.core.instance.InstanceManager
 import com.bedrud.app.models.LoginRequest
 import kotlinx.coroutines.launch
@@ -107,7 +110,7 @@ fun LoginScreen(
                 navigationIcon = {
                     if (onBack != null) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_action_back))
                         }
                     }
                 },
@@ -147,12 +150,12 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = activeInstance.displayName,
-                    style = MaterialTheme.typography.headlineMedium
+                    style = MaterialTheme.typography.headlineMedium.copy(textDirection = TextDirection.Content)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = activeInstance.serverURL,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Ltr),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
@@ -184,7 +187,7 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
-                        label = { Text("Email") },
+                        label = { Text(stringResource(R.string.auth_label_email)) },
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Email,
                             imeAction = ImeAction.Next
@@ -194,7 +197,8 @@ fun LoginScreen(
                         ),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr)
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -202,13 +206,13 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
-                        label = { Text("Password") },
+                        label = { Text(stringResource(R.string.auth_label_password)) },
                         trailingIcon = {
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(
                                     if (passwordVisible) Icons.Default.VisibilityOff
                                     else Icons.Default.Visibility,
-                                    contentDescription = if (passwordVisible) "Hide" else "Show"
+                                    contentDescription = if (passwordVisible) stringResource(R.string.auth_password_toggle_hide) else stringResource(R.string.auth_password_toggle_show)
                                 )
                             }
                         },
@@ -223,7 +227,8 @@ fun LoginScreen(
                         ),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr)
                     )
                 }
             }
@@ -268,7 +273,7 @@ fun LoginScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                 }
-                Text("Sign In", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.auth_button_signIn), style = MaterialTheme.typography.labelLarge)
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -315,7 +320,7 @@ fun LoginScreen(
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Sign in with Passkey", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.auth_button_signInWithPasskey), style = MaterialTheme.typography.labelLarge)
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -331,7 +336,7 @@ fun LoginScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 TextButton(onClick = onNavigateToRegister) {
-                    Text("Sign Up", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.auth_button_signUp), style = MaterialTheme.typography.labelLarge)
                 }
             }
 

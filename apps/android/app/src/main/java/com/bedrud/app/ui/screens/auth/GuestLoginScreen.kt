@@ -49,8 +49,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
+import com.bedrud.app.R
 import com.bedrud.app.core.instance.InstanceManager
 import com.bedrud.app.models.GuestLoginRequest
 import kotlinx.coroutines.launch
@@ -166,8 +169,8 @@ fun GuestLoginScreen(
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
-                        label = { Text("Display name") },
-                        placeholder = { Text("What should we call you?") },
+                        label = { Text(stringResource(R.string.auth_label_displayName)) },
+                        placeholder = { Text(stringResource(R.string.auth_placeholder_displayName)) },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = {
                             focusManager.clearFocus()
@@ -175,7 +178,8 @@ fun GuestLoginScreen(
                         }),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content)
                     )
                 }
             }
@@ -223,7 +227,7 @@ fun GuestLoginScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 TextButton(onClick = onNavigateToLogin) {
-                    Text("Sign In", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.auth_button_signIn), style = MaterialTheme.typography.labelLarge)
                 }
             }
 
