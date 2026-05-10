@@ -5,6 +5,7 @@
   <string name="common_button_save">保存</string>
   <string name="common_button_create">创建</string>
   <string name="common_button_join">加入</string>
+  <string name="common_label_or">或</string>
   <string name="common_button_generate">生成</string>
   <string name="common_action_back">返回</string>
   <string name="common_action_remove">移除</string>
@@ -52,6 +53,7 @@
   <string name="dashboard_roomSettings_title">房间设置</string>
   <string name="meeting_status_connecting">正在连接到 <xliff:g id="roomName" example="Team Standup">%1$s</xliff:g>…</string>
   <string name="meeting_status_preparing">准备中…</string>
+  <string name="meeting_status_joining">正在加入…</string>
   <string name="meeting_dialog_leaveTitle">离开会议</string>
   <string name="meeting_dialog_leaveMessage">您想结束所有人的会议还是仅自己离开？</string>
   <string name="meeting_button_endForEveryone">结束所有人</string>
@@ -185,4 +187,12 @@
   <string name="profile_label_userId">用户ID</string>
   <string name="profile_label_provider">提供商</string>
   <string name="profile_button_signOut">退出登录</string>
+  <string name="auth_label_dontHaveAccount">没有账户？</string>
+  <string name="auth_action_signIn">登录您的账户</string>
+  <string name="auth_button_joinAsGuest">以访客身份加入</string>
+  <string name="auth_label_haveAccount">已有账户？</string>
+  <string name="auth_description_noAccountNeeded">无需账户 - 只需输入名字即可加入。</string>
+  <string name="auth_button_continueAsGuest">以访客身份继续</string>
+  <string name="auth_button_joinBedrud">加入 Bedrud</string>
+  <string name="auth_subtitle_createAccountToGetStarted">创建账户开始使用</string>
 </resources>

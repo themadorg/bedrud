@@ -5,6 +5,7 @@
   <string name="common_button_save">Save</string>
   <string name="common_button_create">Create</string>
   <string name="common_button_join">Join</string>
+  <string name="common_label_or">or</string>
   <string name="common_button_generate">Generate</string>
   <string name="common_action_back">Back</string>
   <string name="common_action_remove">Remove</string>
@@ -13,6 +14,7 @@
   <string name="auth_label_fullName">Full Name</string>
   <string name="auth_label_confirmPassword">Confirm Password</string>
   <string name="auth_label_displayName">Display name</string>
+  <string name="auth_label_dontHaveAccount">Don\'t have an account?</string>
   <string name="auth_placeholder_displayName">What should we call you?</string>
   <string name="auth_button_signIn">Sign In</string>
   <string name="auth_button_signUp">Sign Up</string>
@@ -52,6 +54,7 @@
   <string name="dashboard_roomSettings_title">Room Settings</string>
   <string name="meeting_status_connecting">Connecting to <xliff:g id="roomName" example="Team Standup">%1$s</xliff:g>…</string>
   <string name="meeting_status_preparing">Preparing…</string>
+  <string name="meeting_status_joining">Joining…</string>
   <string name="meeting_dialog_leaveTitle">Leave Meeting</string>
   <string name="meeting_dialog_leaveMessage">Do you want to end the meeting for everyone or just leave?</string>
   <string name="meeting_button_endForEveryone">End for Everyone</string>
@@ -144,7 +147,7 @@
   <string name="settings_section_about">About</string>
   <string name="settings_label_version">Version</string>
   <string name="settings_label_build">Build</string>
-  <string name="call_phone_account_label">Bedrud</string>
+  <string name="call_phone_account_label" translatable="false">Bedrud</string>
   <string name="call_channel_name">Active Calls</string>
   <string name="call_channel_description">Ongoing call notifications</string>
   <string name="call_action_mute">Mute</string>
@@ -186,4 +189,11 @@
   <string name="profile_label_userId">User ID</string>
   <string name="profile_label_provider">Provider</string>
   <string name="profile_button_signOut">Sign Out</string>
+  <string name="auth_action_signIn">sign in to your account</string>
+  <string name="auth_button_joinAsGuest">join as guest</string>
+  <string name="auth_label_haveAccount">have an account?</string>
+  <string name="auth_description_noAccountNeeded">no account needed - just pick a name and you\'re in.</string>
+  <string name="auth_button_continueAsGuest">continue as guest</string>
+  <string name="auth_button_joinBedrud">join bedrud</string>
+  <string name="auth_subtitle_createAccountToGetStarted">create your account to get started</string>
 </resources>

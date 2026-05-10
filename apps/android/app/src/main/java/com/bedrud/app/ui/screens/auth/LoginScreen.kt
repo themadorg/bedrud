@@ -168,7 +168,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Sign in to your account",
+                text = stringResource(R.string.auth_action_signIn),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -285,7 +285,7 @@ fun LoginScreen(
             ) {
                 HorizontalDivider(modifier = Modifier.weight(1f))
                 Text(
-                    "or",
+                    text = stringResource(R.string.common_label_or),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp)
@@ -331,7 +331,7 @@ fun LoginScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Don't have an account?",
+                    text = stringResource(R.string.auth_label_dontHaveAccount),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -344,7 +344,7 @@ fun LoginScreen(
             if (onNavigateToGuest != null) {
                 TextButton(onClick = onNavigateToGuest) {
                     Text(
-                        "Join as guest",
+                        text = stringResource(R.string.auth_button_joinAsGuest),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -5,6 +5,7 @@
   <string name="common_button_save">حفظ</string>
   <string name="common_button_create">إنشاء</string>
   <string name="common_button_join">انضمام</string>
+  <string name="common_label_or">أو</string>
   <string name="common_button_generate">توليد</string>
   <string name="common_action_back">رجوع</string>
   <string name="common_action_remove">إزالة</string>
@@ -52,6 +53,7 @@
   <string name="dashboard_roomSettings_title">إعدادات الغرفة</string>
   <string name="meeting_status_connecting">جارٍ الاتصال بـ <xliff:g id="roomName" example="Team Standup">%1$s</xliff:g>…</string>
   <string name="meeting_status_preparing">جارٍ التحضير…</string>
+  <string name="meeting_status_joining">جارٍ الانضمام…</string>
   <string name="meeting_dialog_leaveTitle">مغادرة الاجتماع</string>
   <string name="meeting_dialog_leaveMessage">هل تريد إنهاء الاجتماع للجميع أم المغادرة فقط؟</string>
   <string name="meeting_button_endForEveryone">إنهاء للجميع</string>
@@ -185,4 +187,12 @@
   <string name="profile_label_userId">معرف المستخدم</string>
   <string name="profile_label_provider">المزود</string>
   <string name="profile_button_signOut">تسجيل الخروج</string>
+  <string name="auth_label_dontHaveAccount">ليس لديك حساب؟</string>
+  <string name="auth_action_signIn">تسجيل الدخول إلى حسابك</string>
+  <string name="auth_button_joinAsGuest">الانضمام كضيف</string>
+  <string name="auth_label_haveAccount">هل لديك حساب؟</string>
+  <string name="auth_description_noAccountNeeded">لا حاجة لحساب - فقط اختر اسمًا وستكون بالداخل.</string>
+  <string name="auth_button_continueAsGuest">المتابعة كضيف</string>
+  <string name="auth_button_joinBedrud">الانضمام إلى Bedrud</string>
+  <string name="auth_subtitle_createAccountToGetStarted">أنشئ حسابك للبدء</string>
 </resources>

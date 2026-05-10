@@ -5,6 +5,7 @@
   <string name="common_button_save">Сохранить</string>
   <string name="common_button_create">Создать</string>
   <string name="common_button_join">Присоединиться</string>
+  <string name="common_label_or">или</string>
   <string name="common_button_generate">Сгенерировать</string>
   <string name="common_action_back">Назад</string>
   <string name="common_action_remove">Удалить</string>
@@ -52,6 +53,7 @@
   <string name="dashboard_roomSettings_title">Настройки комнаты</string>
   <string name="meeting_status_connecting">Подключение к <xliff:g id="roomName" example="Team Standup">%1$s</xliff:g>…</string>
   <string name="meeting_status_preparing">Подготовка…</string>
+  <string name="meeting_status_joining">Присоединение…</string>
   <string name="meeting_dialog_leaveTitle">Покинуть встречу</string>
   <string name="meeting_dialog_leaveMessage">Завершить встречу для всех или только выйти?</string>
   <string name="meeting_button_endForEveryone">Завершить для всех</string>
@@ -185,4 +187,12 @@
   <string name="profile_label_userId">ID пользователя</string>
   <string name="profile_label_provider">Провайдер</string>
   <string name="profile_button_signOut">Выйти</string>
+  <string name="auth_label_dontHaveAccount">Нет аккаунта?</string>
+  <string name="auth_action_signIn">войти в аккаунт</string>
+  <string name="auth_button_joinAsGuest">присоединиться как гость</string>
+  <string name="auth_label_haveAccount">Есть аккаунт?</string>
+  <string name="auth_description_noAccountNeeded">аккаунт не нужен - просто выберите имя и вы внутри.</string>
+  <string name="auth_button_continueAsGuest">продолжить как гость</string>
+  <string name="auth_button_joinBedrud">присоединиться к Bedrud</string>
+  <string name="auth_subtitle_createAccountToGetStarted">создайте аккаунт, чтобы начать</string>
 </resources>

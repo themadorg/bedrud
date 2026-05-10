@@ -5,6 +5,7 @@
   <string name="common_button_save">保存</string>
   <string name="common_button_create">作成</string>
   <string name="common_button_join">参加</string>
+  <string name="common_label_or">または</string>
   <string name="common_button_generate">生成</string>
   <string name="common_action_back">戻る</string>
   <string name="common_action_remove">削除</string>
@@ -52,6 +53,7 @@
   <string name="dashboard_roomSettings_title">ルーム設定</string>
   <string name="meeting_status_connecting"><xliff:g id="roomName" example="Team Standup">%1$s</xliff:g> に接続中…</string>
   <string name="meeting_status_preparing">準備中…</string>
+  <string name="meeting_status_joining">参加中…</string>
   <string name="meeting_dialog_leaveTitle">退室</string>
   <string name="meeting_dialog_leaveMessage">全員のミーティングを終了しますか、それとも自分だけ退室しますか？</string>
   <string name="meeting_button_endForEveryone">全員終了</string>
@@ -185,4 +187,12 @@
   <string name="profile_label_userId">ユーザーID</string>
   <string name="profile_label_provider">プロバイダー</string>
   <string name="profile_button_signOut">サインアウト</string>
+  <string name="auth_label_dontHaveAccount">アカウントをお持ちでない方</string>
+  <string name="auth_action_signIn">アカウントにサインイン</string>
+  <string name="auth_button_joinAsGuest">ゲストとして参加</string>
+  <string name="auth_label_haveAccount">アカウントをお持ちですか？</string>
+  <string name="auth_description_noAccountNeeded">アカウント不要 - 名前を入力するだけですぐに参加できます。</string>
+  <string name="auth_button_continueAsGuest">ゲストとして続ける</string>
+  <string name="auth_button_joinBedrud">Bedrudに参加</string>
+  <string name="auth_subtitle_createAccountToGetStarted">アカウントを作成して始めましょう</string>
 </resources>
