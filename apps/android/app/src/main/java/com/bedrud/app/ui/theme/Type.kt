@@ -1,11 +1,26 @@
 package com.bedrud.app.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.bedrud.app.R
 
+private fun buildVazirmatnFamily(): FontFamily {
+    @OptIn(ExperimentalTextApi::class)
+    return FontFamily(
+        Font(R.font.vazirmatn, weight = FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.Setting("wght", 400f))),
+        Font(R.font.vazirmatn, weight = FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.Setting("wght", 500f))),
+        Font(R.font.vazirmatn, weight = FontWeight.SemiBold, variationSettings = FontVariation.Settings(FontVariation.Setting("wght", 600f))),
+        Font(R.font.vazirmatn, weight = FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.Setting("wght", 700f)))
+    )
+}
+
+val VazirmatnFontFamily = buildVazirmatnFamily()
 val BedrudTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
@@ -112,4 +127,22 @@ val BedrudTypography = Typography(
         lineHeight = 16.sp,
         letterSpacing = 0.5.sp
     )
+)
+
+val VazirmatnTypography = Typography(
+    displayLarge = BedrudTypography.displayLarge.copy(fontFamily = VazirmatnFontFamily),
+    displayMedium = BedrudTypography.displayMedium.copy(fontFamily = VazirmatnFontFamily),
+    displaySmall = BedrudTypography.displaySmall.copy(fontFamily = VazirmatnFontFamily),
+    headlineLarge = BedrudTypography.headlineLarge.copy(fontFamily = VazirmatnFontFamily),
+    headlineMedium = BedrudTypography.headlineMedium.copy(fontFamily = VazirmatnFontFamily),
+    headlineSmall = BedrudTypography.headlineSmall.copy(fontFamily = VazirmatnFontFamily),
+    titleLarge = BedrudTypography.titleLarge.copy(fontFamily = VazirmatnFontFamily),
+    titleMedium = BedrudTypography.titleMedium.copy(fontFamily = VazirmatnFontFamily),
+    titleSmall = BedrudTypography.titleSmall.copy(fontFamily = VazirmatnFontFamily),
+    bodyLarge = BedrudTypography.bodyLarge.copy(fontFamily = VazirmatnFontFamily),
+    bodyMedium = BedrudTypography.bodyMedium.copy(fontFamily = VazirmatnFontFamily),
+    bodySmall = BedrudTypography.bodySmall.copy(fontFamily = VazirmatnFontFamily),
+    labelLarge = BedrudTypography.labelLarge.copy(fontFamily = VazirmatnFontFamily),
+    labelMedium = BedrudTypography.labelMedium.copy(fontFamily = VazirmatnFontFamily),
+    labelSmall = BedrudTypography.labelSmall.copy(fontFamily = VazirmatnFontFamily)
 )
