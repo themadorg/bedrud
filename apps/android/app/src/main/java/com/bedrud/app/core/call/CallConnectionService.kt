@@ -12,6 +12,7 @@ import android.telecom.PhoneAccount
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
 import android.util.Log
+import com.bedrud.app.R
 
 class CallConnectionService : ConnectionService() {
 
@@ -73,7 +74,7 @@ class CallConnectionService : ConnectionService() {
             val phoneAccountHandle = PhoneAccountHandle(componentName, PHONE_ACCOUNT_ID)
 
             // Register PhoneAccount if needed
-            val builder = PhoneAccount.builder(phoneAccountHandle, "Bedrud")
+            val builder = PhoneAccount.builder(phoneAccountHandle, context.getString(R.string.call_phone_account_label))
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 builder.setCapabilities(PhoneAccount.CAPABILITY_SELF_MANAGED)
             }

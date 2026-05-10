@@ -139,10 +139,10 @@ class CallService : Service() {
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Active Calls",
+            getString(R.string.call_channel_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Ongoing call notifications"
+            description = getString(R.string.call_channel_description)
             setShowBadge(false)
         }
         val nm = getSystemService(NotificationManager::class.java)
@@ -168,7 +168,7 @@ class CallService : Service() {
         val muteAction = NotificationCompat.Action.Builder(
             if (isMuted) android.R.drawable.ic_lock_silent_mode
             else android.R.drawable.ic_lock_silent_mode_off,
-            if (isMuted) "Unmute" else "Mute",
+            if (isMuted) getString(R.string.call_action_unmute) else getString(R.string.call_action_mute),
             muteIntent
         ).build()
 
@@ -180,13 +180,13 @@ class CallService : Service() {
         )
         val hangUpAction = NotificationCompat.Action.Builder(
             android.R.drawable.ic_menu_close_clear_cancel,
-            "Hang Up",
+            getString(R.string.call_action_hangUp),
             hangUpIntent
         ).build()
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Call: $roomName")
-            .setContentText("Ongoing call")
+            .setContentTitle(getString(R.string.call_notification_title, roomName))
+            .setContentText(getString(R.string.call_notification_text))
             .setSmallIcon(R.drawable.ic_call_notification)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setOngoing(true)

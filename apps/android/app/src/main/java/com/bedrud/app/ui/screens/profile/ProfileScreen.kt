@@ -44,11 +44,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.bedrud.app.R
 import com.bedrud.app.core.instance.InstanceManager
 import com.bedrud.app.ui.screens.instance.InstanceSwitcherSheet
 import org.koin.compose.koinInject
@@ -85,7 +88,7 @@ fun ProfileContent(
             .nestedScroll(scrollBehavior.nestedScrollConnection)
     ) {
         LargeTopAppBar(
-            title = { Text("Profile") },
+            title = { Text(stringResource(R.string.profile_title)) },
             scrollBehavior = scrollBehavior
         )
 
@@ -114,7 +117,7 @@ fun ProfileContent(
                     if (!user?.avatarUrl.isNullOrBlank()) {
                         AsyncImage(
                             model = user?.avatarUrl,
-                            contentDescription = "Profile picture",
+                            contentDescription = stringResource(R.string.profile_contentDescription_profilePicture),
                             modifier = Modifier
                                 .size(56.dp)
                                 .clip(CircleShape),
@@ -142,12 +145,12 @@ fun ProfileContent(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                user?.name ?: "Unknown",
-                                style = MaterialTheme.typography.titleLarge
+                                user?.name ?: stringResource(R.string.profile_fallback_name),
+                                style = MaterialTheme.typography.titleLarge.copy(textDirection = TextDirection.Content)
                             )
                             if (user?.isAdmin == true) {
                                 Text(
-                                    "Admin",
+                                    stringResource(R.string.profile_badge_admin),
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.Bold
                                     ),
@@ -163,7 +166,7 @@ fun ProfileContent(
                         }
                         Text(
                             user?.email ?: "",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -179,7 +182,7 @@ fun ProfileContent(
             ) {
                 Column {
                     Text(
-                        "Server",
+                        stringResource(R.string.profile_section_server),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp)
@@ -188,12 +191,12 @@ fun ProfileContent(
                     if (activeInstance != null) {
                         ListItem(
                             headlineContent = {
-                                Text(activeInstance.displayName, style = MaterialTheme.typography.bodyLarge)
+                                Text(activeInstance.displayName, style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content))
                             },
                             supportingContent = {
                                 Text(
                                     activeInstance.serverURL,
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Ltr),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -222,7 +225,7 @@ fun ProfileContent(
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Switch")
+                                    Text(stringResource(R.string.profile_button_switch))
                                 }
                             },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
@@ -240,7 +243,7 @@ fun ProfileContent(
             ) {
                 Column {
                     Text(
-                        "Account",
+                        stringResource(R.string.profile_section_account),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp)
@@ -248,7 +251,7 @@ fun ProfileContent(
 
                     if (user != null) {
                         ListItem(
-                            headlineContent = { Text("User ID") },
+                            headlineContent = { Text(stringResource(R.string.profile_label_userId)) },
                             trailingContent = {
                                 Text(
                                     user!!.id.take(8) + "...",
@@ -265,7 +268,7 @@ fun ProfileContent(
                                 color = MaterialTheme.colorScheme.outlineVariant
                             )
                             ListItem(
-                                headlineContent = { Text("Provider") },
+                                headlineContent = { Text(stringResource(R.string.profile_label_provider)) },
                                 trailingContent = {
                                     Text(
                                         user!!.provider!!.replaceFirstChar { it.uppercase() },
@@ -294,7 +297,7 @@ fun ProfileContent(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Sign Out", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.profile_button_signOut), style = MaterialTheme.typography.labelLarge)
             }
 
             Spacer(modifier = Modifier.height(16.dp))

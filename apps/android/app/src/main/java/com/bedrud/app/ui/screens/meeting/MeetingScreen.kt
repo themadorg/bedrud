@@ -7,6 +7,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -37,20 +39,20 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.filled.Cameraswitch
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Cameraswitch
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.ScreenShare
 import androidx.compose.material.icons.filled.StopScreenShare
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -78,27 +80,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import com.bedrud.app.R
+import com.bedrud.app.core.BidiUtils
 import com.bedrud.app.core.api.RoomApi
 import com.bedrud.app.core.call.CallService
 import com.bedrud.app.core.instance.InstanceManager
-import com.bedrud.app.core.pip.PipStateHolder
-import com.bedrud.app.core.livekit.ChatAttachment
 import com.bedrud.app.core.livekit.ChatMessage
 import com.bedrud.app.core.livekit.ConnectionState
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.toRequestBody
+import com.bedrud.app.core.pip.PipStateHolder
 import com.bedrud.app.models.JoinRoomRequest
 import com.bedrud.app.models.JoinRoomResponse
 import io.livekit.android.compose.ui.VideoTrackView
@@ -106,6 +108,9 @@ import io.livekit.android.room.Room
 import io.livekit.android.room.participant.Participant
 import io.livekit.android.room.track.Track
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import org.koin.compose.koinInject
 
@@ -243,8 +248,8 @@ fun MeetingScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = if (connectionState == ConnectionState.CONNECTING)
-                                "Connecting to $roomName..."
-                            else "Preparing...",
+                                stringResource(R.string.meeting_status_connecting)
+                            else stringResource(R.string.meeting_status_preparing),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onBackground
                         )
@@ -370,7 +375,7 @@ fun MeetingScreen(
                                         Icon(
                                             if (isMicEnabled) Icons.Default.Mic
                                             else Icons.Default.MicOff,
-                                            contentDescription = "Toggle Microphone"
+                                            contentDescription = stringResource(R.string.meeting_contentDescription_toggleMic)
                                         )
                                     }
 
@@ -384,7 +389,7 @@ fun MeetingScreen(
                                         Icon(
                                             if (isCameraEnabled) Icons.Default.Videocam
                                             else Icons.Default.VideocamOff,
-                                            contentDescription = "Toggle Camera"
+                                            contentDescription = stringResource(R.string.meeting_contentDescription_toggleCamera)
                                         )
                                     }
 
@@ -395,7 +400,7 @@ fun MeetingScreen(
                                     ) {
                                         Icon(
                                             Icons.Default.Cameraswitch,
-                                            contentDescription = "Switch Camera"
+                                            contentDescription = stringResource(R.string.meeting_contentDescription_switchCamera)
                                         )
                                     }
 
@@ -409,7 +414,7 @@ fun MeetingScreen(
                                         Icon(
                                             if (isScreenShareEnabled) Icons.Default.StopScreenShare
                                             else Icons.Default.ScreenShare,
-                                            contentDescription = "Toggle Screen Share"
+                                            contentDescription = stringResource(R.string.meeting_contentDescription_toggleScreenShare)
                                         )
                                     }
 
@@ -428,7 +433,7 @@ fun MeetingScreen(
                                                 Badge { Text(if (unreadCount > 9) "9+" else unreadCount.toString()) }
                                             }
                                         }) {
-                                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Toggle Chat")
+                                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = stringResource(R.string.meeting_contentDescription_toggleChat))
                                         }
                                     }
 
@@ -442,7 +447,7 @@ fun MeetingScreen(
                                             MaterialTheme.colorScheme.primary
                                         else MaterialTheme.colorScheme.surfaceVariant
                                     ) {
-                                        Icon(Icons.Default.People, contentDescription = "Participants")
+                                        Icon(Icons.Default.People, contentDescription = stringResource(R.string.meeting_contentDescription_participants))
                                     }
 
                                     // Leave / End call
@@ -455,15 +460,15 @@ fun MeetingScreen(
                                         contentColor = MaterialTheme.colorScheme.onError,
                                         elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp)
                                     ) {
-                                        Icon(Icons.Default.CallEnd, contentDescription = "Leave Call")
+                                        Icon(Icons.Default.CallEnd, contentDescription = stringResource(R.string.meeting_contentDescription_leaveCall))
                                     }
 
                                     // Leave/End dialog for room creator
                                     if (showLeaveDialog) {
                                         AlertDialog(
                                             onDismissRequest = { showLeaveDialog = false },
-                                            title = { Text("Leave Meeting") },
-                                            text = { Text("Do you want to end the meeting for everyone or just leave?") },
+                                            title = { Text(stringResource(R.string.meeting_dialog_leaveTitle)) },
+                                            text = { Text(stringResource(R.string.meeting_dialog_leaveMessage)) },
                                             confirmButton = {
                                                 TextButton(onClick = {
                                                     showLeaveDialog = false
@@ -475,7 +480,7 @@ fun MeetingScreen(
                                                         onLeave()
                                                     }
                                                 }) {
-                                                    Text("End for Everyone", color = MaterialTheme.colorScheme.error)
+                                                    Text(stringResource(R.string.meeting_button_endForEveryone), color = MaterialTheme.colorScheme.error)
                                                 }
                                             },
                                             dismissButton = {
@@ -484,8 +489,8 @@ fun MeetingScreen(
                                                         showLeaveDialog = false
                                                         CallService.stop(context)
                                                         onLeave()
-                                                    }) { Text("Just Leave") }
-                                                    TextButton(onClick = { showLeaveDialog = false }) { Text("Cancel") }
+                                                    }) { Text(stringResource(R.string.meeting_button_justLeave)) }
+                                                    TextButton(onClick = { showLeaveDialog = false }) { Text(stringResource(R.string.common_button_cancel)) }
                                                 }
                                             }
                                         )
@@ -493,11 +498,18 @@ fun MeetingScreen(
                                 }
                             }
 
-                            // Chat panel - slides in from the right
+                            // Chat panel - slides in from the end side
+                            val layoutDirection = LocalLayoutDirection.current
+                            val slideIn = slideInHorizontally(
+                                initialOffsetX = { if (layoutDirection == LayoutDirection.Rtl) -it else it }
+                            )
+                            val slideOut = slideOutHorizontally(
+                                targetOffsetX = { if (layoutDirection == LayoutDirection.Rtl) -it else it }
+                            )
                             AnimatedVisibility(
                                 visible = showChat,
-                                enter = slideInHorizontally(initialOffsetX = { it }),
-                                exit = slideOutHorizontally(targetOffsetX = { it }),
+                                enter = slideIn,
+                                exit = slideOut,
                                 modifier = Modifier.align(Alignment.CenterEnd)
                             ) {
                                 ChatPanel(
@@ -523,11 +535,11 @@ fun MeetingScreen(
                                 )
                             }
 
-                            // Participants panel - slides in from the right
+                            // Participants panel - slides in from the end side
                             AnimatedVisibility(
                                 visible = showParticipants,
-                                enter = slideInHorizontally(initialOffsetX = { it }),
-                                exit = slideOutHorizontally(targetOffsetX = { it }),
+                                enter = slideIn,
+                                exit = slideOut,
                                 modifier = Modifier.align(Alignment.CenterEnd)
                             ) {
                                 ParticipantsPanel(
@@ -555,13 +567,13 @@ fun MeetingScreen(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "Connection Failed",
+                            text = stringResource(R.string.meeting_state_connectionFailed),
                             style = MaterialTheme.typography.headlineSmall,
                             color = MaterialTheme.colorScheme.error
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = error ?: "Unable to connect to the meeting",
+                            text = error ?: stringResource(R.string.meeting_state_connectionFailedMessage),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
@@ -569,7 +581,7 @@ fun MeetingScreen(
                         )
                         Spacer(modifier = Modifier.height(24.dp))
                         androidx.compose.material3.FilledTonalButton(onClick = onLeave) {
-                            Text("Go Back")
+                            Text(stringResource(R.string.meeting_button_goBack))
                         }
                     }
                 }
@@ -615,8 +627,8 @@ private fun ParticipantTile(
     if (showKickConfirm) {
         AlertDialog(
             onDismissRequest = { showKickConfirm = false },
-            title = { Text("Kick Participant") },
-            text = { Text("Are you sure you want to kick $name from the room?") },
+            title = { Text(text = stringResource(R.string.meeting_dialog_kickTitle)) },
+            text = { Text(text = stringResource(R.string.meeting_dialog_kickMessage)) },
             confirmButton = {
                 TextButton(onClick = {
                     showKickConfirm = false
@@ -628,12 +640,12 @@ private fun ParticipantTile(
                         }
                     }
                 }) {
-                    Text("Kick", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.meeting_action_kick), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showKickConfirm = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_button_cancel))
                 }
             }
         )
@@ -664,7 +676,7 @@ private fun ParticipantTile(
         } else if (!avatarUrl.isNullOrBlank()) {
             AsyncImage(
                 model = avatarUrl,
-                contentDescription = "$name avatar",
+                contentDescription = stringResource(R.string.meeting_contentDescription_participantAvatar),
                 modifier = Modifier
                     .size(56.dp)
                     .clip(CircleShape),
@@ -700,7 +712,7 @@ private fun ParticipantTile(
         ) {
             Text(
                 text = name,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.Content),
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -714,7 +726,7 @@ private fun ParticipantTile(
                 onDismissRequest = { showMenu = false }
             ) {
                 DropdownMenuItem(
-                    text = { Text("Mute") },
+                    text = { Text(stringResource(R.string.meeting_action_mute)) },
                     onClick = {
                         showMenu = false
                         scope?.launch {
@@ -727,7 +739,7 @@ private fun ParticipantTile(
                     }
                 )
                 DropdownMenuItem(
-                    text = { Text("Disable Video") },
+                    text = { Text(stringResource(R.string.meeting_action_disableVideo)) },
                     onClick = {
                         showMenu = false
                         scope?.launch {
@@ -740,7 +752,7 @@ private fun ParticipantTile(
                     }
                 )
                 DropdownMenuItem(
-                    text = { Text("Bring to Stage") },
+                    text = { Text(stringResource(R.string.meeting_action_bringToStage)) },
                     onClick = {
                         showMenu = false
                         scope?.launch {
@@ -753,7 +765,7 @@ private fun ParticipantTile(
                     }
                 )
                 DropdownMenuItem(
-                    text = { Text("Remove from Stage") },
+                    text = { Text(stringResource(R.string.meeting_action_removeFromStage)) },
                     onClick = {
                         showMenu = false
                         scope?.launch {
@@ -766,14 +778,14 @@ private fun ParticipantTile(
                     }
                 )
                 DropdownMenuItem(
-                    text = { Text("Kick", color = MaterialTheme.colorScheme.error) },
+                    text = { Text(stringResource(R.string.meeting_action_kick), color = MaterialTheme.colorScheme.error) },
                     onClick = {
                         showMenu = false
                         showKickConfirm = true
                     }
                 )
                 DropdownMenuItem(
-                    text = { Text("Ban", color = MaterialTheme.colorScheme.error) },
+                    text = { Text(stringResource(R.string.meeting_action_ban), color = MaterialTheme.colorScheme.error) },
                     onClick = {
                         showMenu = false
                         scope?.launch {
@@ -818,11 +830,11 @@ private fun ParticipantsPanel(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                "Participants (${participants.size})",
+                stringResource(R.string.meeting_panel_participants),
                 style = MaterialTheme.typography.titleMedium
             )
             IconButton(onClick = onClose) {
-                Icon(Icons.Default.Close, contentDescription = "Close")
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.meeting_contentDescription_close))
             }
         }
 
@@ -897,14 +909,14 @@ private fun ParticipantListRow(
         Column(modifier = Modifier.weight(1f)) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    name,
+                    text = name,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 if (isLocal) {
                     Text(
-                        "you",
+                        text = stringResource(R.string.meeting_label_you),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -921,14 +933,14 @@ private fun ParticipantListRow(
                 ) {
                     Icon(
                         Icons.Default.Badge,
-                        contentDescription = "More options",
+                        contentDescription = stringResource(R.string.meeting_contentDescription_moreOptions),
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                     DropdownMenuItem(
-                        text = { Text("Mute") },
+                        text = { Text(stringResource(R.string.meeting_action_mute)) },
                         onClick = {
                             showMenu = false
                             scope.launch {
@@ -938,7 +950,7 @@ private fun ParticipantListRow(
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Kick", color = MaterialTheme.colorScheme.error) },
+                        text = { Text(stringResource(R.string.meeting_action_kick), color = MaterialTheme.colorScheme.error) },
                         onClick = {
                             showMenu = false
                             scope.launch {
@@ -948,7 +960,7 @@ private fun ParticipantListRow(
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Ban", color = MaterialTheme.colorScheme.error) },
+                        text = { Text(stringResource(R.string.meeting_action_ban), color = MaterialTheme.colorScheme.error) },
                         onClick = {
                             showMenu = false
                             scope.launch {
@@ -980,13 +992,13 @@ private fun KickedScreen(onBack: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                "You were removed",
+                text = stringResource(R.string.meeting_state_kickedTitle),
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "A moderator removed you from this meeting.",
+                text = stringResource(R.string.meeting_state_kickedMessage),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -994,7 +1006,7 @@ private fun KickedScreen(onBack: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(24.dp))
             androidx.compose.material3.FilledTonalButton(onClick = onBack) {
-                Text("Back to Dashboard")
+                Text(stringResource(R.string.meeting_button_backToDashboard))
             }
         }
     }
@@ -1034,14 +1046,17 @@ private fun MeetingHeaderHUD(
                 .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp))
                 .padding(horizontal = 6.dp, vertical = 2.dp)
         ) {
-            Text("LIVE", style = MaterialTheme.typography.labelSmall,
+            Text(text = stringResource(R.string.meeting_badge_live), style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer)
         }
 
         // Room name (monospace)
         Text(
             text = roomName,
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = FontFamily.Monospace,
+                textDirection = TextDirection.Ltr
+            ),
             color = MaterialTheme.colorScheme.onBackground,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1171,12 +1186,12 @@ private fun ChatPanel(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "Chat",
+                text = stringResource(R.string.meeting_panel_chat),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
             IconButton(onClick = onClose) {
-                Icon(Icons.Default.Close, contentDescription = "Close Chat")
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.meeting_contentDescription_closeChat))
             }
         }
 
@@ -1213,7 +1228,7 @@ private fun ChatPanel(
                 ) {
                     Icon(
                         Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Scroll to bottom",
+                        contentDescription = stringResource(R.string.meeting_contentDescription_scrollToBottom),
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
@@ -1228,7 +1243,7 @@ private fun ChatPanel(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
-                Text("Uploading…", style = MaterialTheme.typography.labelSmall)
+                Text(text = stringResource(R.string.meeting_chat_uploading), style = MaterialTheme.typography.labelSmall)
             }
         }
         uploadError?.let { err ->
@@ -1259,7 +1274,7 @@ private fun ChatPanel(
                 ) {
                     Icon(
                         Icons.Default.Image,
-                        contentDescription = "Attach image",
+                        contentDescription = stringResource(R.string.meeting_contentDescription_attachImage),
                         tint = if (!isUploading) MaterialTheme.colorScheme.onSurfaceVariant
                                else MaterialTheme.colorScheme.outline,
                     )
@@ -1268,10 +1283,11 @@ private fun ChatPanel(
             OutlinedTextField(
                 value = chatInput,
                 onValueChange = onChatInputChange,
-                placeholder = { Text("Type a message...") },
+                placeholder = { Text(stringResource(R.string.meeting_chat_placeholder)) },
                 singleLine = true,
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(24.dp)
+                shape = RoundedCornerShape(24.dp),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content)
             )
             Spacer(modifier = Modifier.width(4.dp))
             IconButton(
@@ -1280,7 +1296,7 @@ private fun ChatPanel(
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Send",
+                    contentDescription = stringResource(R.string.meeting_contentDescription_send),
                     tint = if (chatInput.isNotBlank() && !isUploading)
                         MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant
@@ -1298,7 +1314,7 @@ private fun ChatBubble(message: ChatMessage) {
     ) {
         Text(
             text = message.senderName,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.Content),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(2.dp))
@@ -1321,7 +1337,7 @@ private fun ChatBubble(message: ChatMessage) {
                     if (bitmap != null) {
                         Image(
                             bitmap = bitmap,
-                            contentDescription = "Shared image",
+                            contentDescription = stringResource(R.string.meeting_chat_sharedImage),
                             modifier = Modifier
                                 .fillMaxWidth(0.8f)
                                 .clip(RoundedCornerShape(10.dp)),
@@ -1331,7 +1347,7 @@ private fun ChatBubble(message: ChatMessage) {
                 } else {
                     AsyncImage(
                         model = att.url,
-                        contentDescription = "Shared image",
+                        contentDescription = stringResource(R.string.meeting_chat_sharedImage),
                         modifier = Modifier
                             .fillMaxWidth(0.8f)
                             .clip(RoundedCornerShape(10.dp)),
@@ -1352,8 +1368,8 @@ private fun ChatBubble(message: ChatMessage) {
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = message.text,
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = BidiUtils.wrap(message.text),
+                        style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
                         color = if (message.isLocal) MaterialTheme.colorScheme.onPrimaryContainer
                         else MaterialTheme.colorScheme.onSurfaceVariant
                     )
