@@ -17,7 +17,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.bedrud.app.R
 import com.bedrud.app.models.RoomSettings
 import com.bedrud.app.models.UserRoomResponse
 
@@ -35,14 +37,14 @@ fun RoomSettingsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Room Settings") },
+        title = { Text(stringResource(R.string.dashboard_roomSettings_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                SettingsToggleRow("Allow Chat", allowChat) { allowChat = it }
-                SettingsToggleRow("Allow Video", allowVideo) { allowVideo = it }
-                SettingsToggleRow("Allow Audio", allowAudio) { allowAudio = it }
-                SettingsToggleRow("Require Approval", requireApproval) { requireApproval = it }
-                SettingsToggleRow("End-to-End Encryption", e2ee) { e2ee = it }
+                SettingsToggleRow(stringResource(R.string.dashboard_roomSettings_allowChat), allowChat) { allowChat = it }
+                SettingsToggleRow(stringResource(R.string.dashboard_roomSettings_allowVideo), allowVideo) { allowVideo = it }
+                SettingsToggleRow(stringResource(R.string.dashboard_roomSettings_allowAudio), allowAudio) { allowAudio = it }
+                SettingsToggleRow(stringResource(R.string.dashboard_roomSettings_requireApproval), requireApproval) { requireApproval = it }
+                SettingsToggleRow(stringResource(R.string.dashboard_roomSettings_e2ee), e2ee) { e2ee = it }
             }
         },
         confirmButton = {
@@ -57,12 +59,12 @@ fun RoomSettingsDialog(
                     )
                 )
             }) {
-                Text("Save")
+                Text(stringResource(R.string.common_button_save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.common_button_cancel))
             }
         }
     )

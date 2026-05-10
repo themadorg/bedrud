@@ -21,7 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
@@ -50,6 +50,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import com.bedrud.app.ui.components.BedrudButton
+import com.bedrud.app.ui.components.BedrudButtonVariant
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -64,9 +66,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.bedrud.app.R
 import com.bedrud.app.core.instance.InstanceManager
 import com.bedrud.app.models.CreateRoomRequest
 import com.bedrud.app.models.UserRoomResponse
@@ -176,10 +181,10 @@ fun DashboardContent(
         modifier = modifier,
         topBar = {
             LargeTopAppBar(
-                title = { Text("Rooms") },
+                title = { Text(stringResource(R.string.dashboard_title_rooms)) },
                 actions = {
                     IconButton(onClick = { loadRooms() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.dashboard_contentDescription_refresh))
                     }
                 },
                 scrollBehavior = scrollBehavior
@@ -190,7 +195,7 @@ fun DashboardContent(
                 onClick = { showCreateDialog = true },
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            ) { Icon(Icons.Default.Add, contentDescription = "Create Room") }
+            ) { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.dashboard_contentDescription_createRoom)) }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
@@ -285,9 +290,9 @@ fun DashboardContent(
 @Composable
 private fun StatsRow(rooms: List<UserRoomResponse>, modifier: Modifier = Modifier) {
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        StatChip(label = "Total", count = rooms.size, modifier = Modifier.weight(1f))
-        StatChip(label = "Live", count = rooms.count { it.isActive }, modifier = Modifier.weight(1f))
-        StatChip(label = "Private", count = rooms.count { it.isPublic == false }, modifier = Modifier.weight(1f))
+        StatChip(label = stringResource(R.string.dashboard_stat_total), count = rooms.size, modifier = Modifier.weight(1f))
+        StatChip(label = stringResource(R.string.dashboard_stat_live), count = rooms.count { it.isActive }, modifier = Modifier.weight(1f))
+        StatChip(label = stringResource(R.string.dashboard_stat_private), count = rooms.count { it.isPublic == false }, modifier = Modifier.weight(1f))
     }
 }
 
@@ -329,7 +334,7 @@ private fun QuickJoinBar(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            placeholder = { Text("Enter room name or link…") },
+            placeholder = { Text(stringResource(R.string.dashboard_placeholder_search)) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
@@ -339,7 +344,7 @@ private fun QuickJoinBar(
         FilledTonalButton(
             onClick = onJoin,
             enabled = value.isNotBlank()
-        ) { Text("Join") }
+        ) { Text(stringResource(R.string.common_button_join)) }
     }
 }
 
@@ -357,7 +362,13 @@ private fun FilterRow(
                 selected = activeFilter == filter,
                 onClick = { onFilterChange(filter) },
                 label = {
-                    Text(filter.name.lowercase().replaceFirstChar { it.uppercase() })
+                    Text(
+                        when (filter) {
+                            RoomFilter.ALL -> stringResource(R.string.dashboard_filter_all)
+                            RoomFilter.ACTIVE -> stringResource(R.string.dashboard_filter_active)
+                            RoomFilter.PRIVATE -> stringResource(R.string.dashboard_filter_private)
+                        }
+                    )
                 }
             )
         }
@@ -402,13 +413,16 @@ private fun RoomCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = FontFamily.Monospace,
+                            textDirection = TextDirection.Ltr
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (room.isActive) "● Live" else "○ Idle",
+                        text = if (room.isActive) stringResource(R.string.dashboard_status_live) else stringResource(R.string.dashboard_status_idle),
                         style = MaterialTheme.typography.bodySmall,
                         color = activeTint
                     )
@@ -416,7 +430,7 @@ private fun RoomCard(
                 Row {
                     if (onSettings != null) {
                         IconButton(onClick = onSettings, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings",
+                            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.dashboard_contentDescription_settings),
                                 modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -428,11 +442,11 @@ private fun RoomCard(
 
             // Feature badge pills
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (room.settings.allowChat)  FeaturePill(Icons.Default.Chat, "Chat")
-                if (room.settings.allowVideo) FeaturePill(Icons.Default.Videocam, "Video")
-                if (room.settings.allowAudio) FeaturePill(Icons.Default.Mic, "Audio")
-                if (room.settings.e2ee)       FeaturePill(Icons.Default.Shield, "E2EE")
-                if (room.isPublic == false)   FeaturePill(Icons.Default.Lock, "Private")
+                if (room.settings.allowChat)  FeaturePill(Icons.AutoMirrored.Filled.Chat, stringResource(R.string.dashboard_feature_chat))
+                if (room.settings.allowVideo) FeaturePill(Icons.Default.Videocam, stringResource(R.string.dashboard_feature_video))
+                if (room.settings.allowAudio) FeaturePill(Icons.Default.Mic, stringResource(R.string.dashboard_feature_audio))
+                if (room.settings.e2ee)       FeaturePill(Icons.Default.Shield, stringResource(R.string.dashboard_feature_e2ee))
+                if (room.isPublic == false)   FeaturePill(Icons.Default.Lock, stringResource(R.string.dashboard_feature_private))
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -443,10 +457,10 @@ private fun RoomCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onDelete) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.common_button_delete), color = MaterialTheme.colorScheme.error)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                FilledTonalButton(onClick = onJoin) { Text("Join") }
+                FilledTonalButton(onClick = onJoin) { Text(stringResource(R.string.common_button_join)) }
             }
         }
     }
@@ -478,13 +492,17 @@ private fun EmptyState(hasFilter: Boolean, onCreateRoom: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = if (hasFilter) "No rooms match this filter" else "No rooms yet",
+                text = if (hasFilter) stringResource(R.string.dashboard_empty_noMatch) else stringResource(R.string.dashboard_empty_noRooms),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (!hasFilter) {
                 Spacer(modifier = Modifier.height(4.dp))
-                TextButton(onClick = onCreateRoom) { Text("Create your first room") }
+                BedrudButton(
+                    text = stringResource(R.string.dashboard_button_createFirstRoom),
+                    onClick = onCreateRoom,
+                    variant = BedrudButtonVariant.OUTLINE
+                )
             }
         }
     }
@@ -498,23 +516,25 @@ private fun CreateRoomDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) 
 
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create Room") },
+        title = { Text(stringResource(R.string.dashboard_dialog_createTitle)) },
         text = {
             Column {
-                Text("Enter a name for your room, or leave blank for an auto-generated name.",
+                Text(stringResource(R.string.dashboard_dialog_createDescription),
                     style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = roomName,
                     onValueChange = { roomName = it },
-                    label = { Text("Room Name (optional)") },
+                    label = { Text(stringResource(R.string.dashboard_label_roomName)) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr)
                 )
             }
         },
-        confirmButton = { TextButton(onClick = { onCreate(roomName) }) { Text("Create") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        confirmButton = { TextButton(onClick = { onCreate(roomName) }) { Text(stringResource(
+            R.string.common_button_create)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_button_cancel)) } }
     )
 }

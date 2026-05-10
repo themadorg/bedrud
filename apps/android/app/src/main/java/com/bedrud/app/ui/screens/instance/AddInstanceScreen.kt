@@ -58,11 +58,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.bedrud.app.R
 import com.bedrud.app.core.instance.InstanceManager
 import com.bedrud.app.models.Instance
 import kotlinx.coroutines.launch
@@ -122,10 +125,10 @@ fun AddInstanceScreen(
                         modifier = Modifier.size(56.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Bedrud", style = MaterialTheme.typography.headlineLarge)
+                    Text(text = stringResource(R.string.instance_default_displayName), style = MaterialTheme.typography.headlineLarge)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "Connect to a server to get started",
+                        text = stringResource(R.string.instance_subtitle_connectToServer),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -136,7 +139,7 @@ fun AddInstanceScreen(
             if (instances.isNotEmpty()) {
                 item {
                     Text(
-                        "Your Servers",
+                        text = stringResource(R.string.instance_subtitle_yourServers),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -177,7 +180,7 @@ fun AddInstanceScreen(
 
                 item {
                     Text(
-                        "Tap a server to sign in.",
+                        text = stringResource(R.string.instance_subtitle_tapToSignIn),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
@@ -189,7 +192,9 @@ fun AddInstanceScreen(
             // Add Server Form
             item {
                 Text(
-                    if (instances.isEmpty()) "Server" else "Add New Server",
+                    if (instances.isEmpty()) stringResource(R.string.instance_default_serverName) else stringResource(
+                        R.string.instance_title_addServer
+                    ),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -213,13 +218,14 @@ fun AddInstanceScreen(
                                 serverHost = it
                                 errorMessage = null
                             },
-                            label = { Text("Server Address") },
-                            placeholder = { Text("meet.example.com") },
+                            label = { Text(text = stringResource(R.string.instance_label_serverAddress)) },
+                            placeholder = { Text(text = stringResource(R.string.instance_placeholder_serverAddress)) },
                             prefix = {
                                 Text(
                                     "$scheme://",
                                     style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontFamily = FontFamily.Monospace
+                                        fontFamily = FontFamily.Monospace,
+                                        textDirection = TextDirection.Ltr
                                     ),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -233,7 +239,11 @@ fun AddInstanceScreen(
                             ),
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                fontFamily = FontFamily.Monospace,
+                                textDirection = TextDirection.Ltr
+                            )
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
@@ -241,15 +251,16 @@ fun AddInstanceScreen(
                         OutlinedTextField(
                             value = displayName,
                             onValueChange = { displayName = it },
-                            label = { Text("Display Name") },
-                            placeholder = { Text("My Server") },
+                            label = { Text(stringResource(R.string.instance_label_displayName)) },
+                            placeholder = { Text(stringResource(R.string.instance_placeholder_displayName)) },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(
                                 onDone = { focusManager.clearFocus() }
                             ),
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content)
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -274,7 +285,7 @@ fun AddInstanceScreen(
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                "Insecure (no TLS)",
+                                text = stringResource(R.string.instance_switch_insecure),
                                 style = MaterialTheme.typography.bodyLarge,
                                 modifier = Modifier.weight(1f)
                             )
@@ -289,7 +300,7 @@ fun AddInstanceScreen(
 
                         AnimatedVisibility(visible = insecure) {
                             Text(
-                                "Connection will not be encrypted. Only use for local or development servers.",
+                                text = stringResource(R.string.instance_warning_insecure),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.padding(top = 4.dp)
@@ -314,7 +325,7 @@ fun AddInstanceScreen(
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            "A server with this address already exists.",
+                            text = stringResource(R.string.instance_error_duplicate),
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFFF59E0B)
                         )
@@ -381,7 +392,10 @@ fun AddInstanceScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text("Add Server", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        text = stringResource(R.string.instance_button_addServer),
+                        style = MaterialTheme.typography.labelLarge
+                    )
                 }
             }
         }
@@ -401,7 +415,7 @@ private fun ServerRow(
                 instance.displayName,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content)
             )
         },
         supportingContent = {
@@ -409,7 +423,7 @@ private fun ServerRow(
                 instance.serverURL,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Ltr),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         },
@@ -433,7 +447,7 @@ private fun ServerRow(
                 if (isActive) {
                     Icon(
                         Icons.Default.Check,
-                        contentDescription = "Active",
+                        contentDescription = stringResource(R.string.instance_status_active),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
@@ -442,7 +456,7 @@ private fun ServerRow(
                 IconButton(onClick = onDelete) {
                     Icon(
                         Icons.Default.Close,
-                        contentDescription = "Remove",
+                        contentDescription = stringResource(R.string.common_action_remove),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )

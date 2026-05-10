@@ -34,8 +34,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.bedrud.app.R
 import com.bedrud.app.core.instance.InstanceManager
 import com.bedrud.app.models.Instance
 import org.koin.compose.koinInject
@@ -52,10 +55,10 @@ fun InstanceListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Servers") },
+                title = { Text(stringResource(R.string.instance_title_servers)) },
                 actions = {
                     IconButton(onClick = onNavigateToAddInstance) {
-                        Icon(Icons.Default.Add, contentDescription = "Add Server")
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.instance_button_addServer))
                     }
                 }
             )
@@ -69,7 +72,7 @@ fun InstanceListScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    "No servers configured",
+                    text = stringResource(R.string.instance_empty_noServers),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -135,13 +138,13 @@ private fun InstanceRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = instance.displayName,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = instance.serverURL,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Ltr),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -152,7 +155,7 @@ private fun InstanceRow(
         if (isActive) {
             Icon(
                 Icons.Default.Check,
-                contentDescription = "Active",
+                contentDescription = stringResource(R.string.instance_status_active),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp)
             )
@@ -162,7 +165,7 @@ private fun InstanceRow(
         IconButton(onClick = onDelete) {
             Icon(
                 Icons.Default.Delete,
-                contentDescription = "Delete",
+                contentDescription = stringResource(R.string.common_button_delete),
                 tint = MaterialTheme.colorScheme.error
             )
         }

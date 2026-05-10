@@ -32,8 +32,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.bedrud.app.R
 import com.bedrud.app.core.instance.InstanceManager
 import com.bedrud.app.models.Instance
 
@@ -54,7 +57,7 @@ fun InstanceSwitcherSheet(
     ) {
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
             Text(
-                text = "Switch Server",
+                text = stringResource(R.string.instance_title_switchServer),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
@@ -86,12 +89,12 @@ fun InstanceSwitcherSheet(
             ) {
                 Icon(
                     Icons.Default.Add,
-                    contentDescription = "Add Server",
+                    contentDescription = stringResource(R.string.instance_button_addServer),
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    "Add Server",
+                    text = stringResource(R.string.instance_button_addServer),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -137,13 +140,13 @@ private fun SwitcherRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = instance.displayName,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = instance.serverURL,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Ltr),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -154,7 +157,7 @@ private fun SwitcherRow(
         if (isActive) {
             Icon(
                 Icons.Default.Check,
-                contentDescription = "Active",
+                contentDescription = stringResource(R.string.instance_status_active),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp)
             )
