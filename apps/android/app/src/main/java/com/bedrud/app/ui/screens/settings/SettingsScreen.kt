@@ -1,5 +1,6 @@
 package com.bedrud.app.ui.screens.settings
 
+import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,8 +16,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
@@ -45,7 +49,10 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.bedrud.app.R
 import com.bedrud.app.core.instance.InstanceManager
 import com.bedrud.app.models.ChangePasswordRequest
 import kotlinx.coroutines.launch
@@ -60,6 +67,7 @@ fun SettingsContent(
 ) {
     val appearance by settingsStore.appearance.collectAsState()
     val notificationsEnabled by settingsStore.notificationsEnabled.collectAsState()
+    val language by settingsStore.language.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -79,7 +87,7 @@ fun SettingsContent(
             .nestedScroll(scrollBehavior.nestedScrollConnection)
     ) {
         LargeTopAppBar(
-            title = { Text("Settings") },
+            title = { Text(stringResource(R.string.settings_title)) },
             scrollBehavior = scrollBehavior
         )
 
@@ -103,13 +111,13 @@ fun SettingsContent(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "Appearance",
+                        stringResource(R.string.settings_section_appearance),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        "Theme",
+                        stringResource(R.string.settings_label_theme),
                         style = MaterialTheme.typography.bodyLarge
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -123,7 +131,42 @@ fun SettingsContent(
                                     count = AppAppearance.entries.size
                                 )
                             ) {
-                                Text(option.label)
+                                Text(stringResource(option.stringResId))
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        stringResource(R.string.settings_label_language),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    var languageExpanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = languageExpanded,
+                        onExpandedChange = { languageExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = language.label,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = languageExpanded) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = languageExpanded,
+                            onDismissRequest = { languageExpanded = false }
+                        ) {
+                            AppLanguage.entries.forEach { lang ->
+                                DropdownMenuItem(
+                                    text = { Text(lang.label) },
+                                    onClick = {
+                                        settingsStore.setLanguage(lang)
+                                        languageExpanded = false
+                                        (context as? Activity)?.recreate()
+                                    }
+                                )
                             }
                         }
                     }
@@ -139,13 +182,13 @@ fun SettingsContent(
             ) {
                 Column {
                     Text(
-                        "Notifications",
+                        stringResource(R.string.settings_section_notifications),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp)
                     )
                     ListItem(
-                        headlineContent = { Text("Enable Notifications") },
+                        headlineContent = { Text(stringResource(R.string.settings_label_enableNotifications)) },
                         trailingContent = {
                             Switch(
                                 checked = notificationsEnabled,
@@ -168,7 +211,7 @@ fun SettingsContent(
                             modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("Account", style = MaterialTheme.typography.labelLarge,
+                            Text(stringResource(R.string.settings_section_account), style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary)
                             if (currentUser?.isAdmin == true) {
                                 Icon(Icons.Default.AdminPanelSettings, contentDescription = null,
@@ -176,7 +219,7 @@ fun SettingsContent(
                             }
                         }
                         ListItem(
-                            headlineContent = { Text("Account ID") },
+                            headlineContent = { Text(stringResource(R.string.settings_label_accountId)) },
                             trailingContent = {
                                 Text(currentUser?.id?.take(8) ?: "", style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -186,9 +229,9 @@ fun SettingsContent(
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp),
                             color = MaterialTheme.colorScheme.outlineVariant)
                         ListItem(
-                            headlineContent = { Text("Sign-in method") },
+                            headlineContent = { Text(stringResource(R.string.settings_label_signInMethod)) },
                             trailingContent = {
-                                Text(currentUser?.provider?.replaceFirstChar { it.uppercase() } ?: "Email",
+                                Text(currentUser?.provider?.replaceFirstChar { it.uppercase() } ?: stringResource(R.string.settings_provider_email),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
@@ -196,9 +239,9 @@ fun SettingsContent(
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp),
                             color = MaterialTheme.colorScheme.outlineVariant)
                         ListItem(
-                            headlineContent = { Text("Role") },
+                            headlineContent = { Text(stringResource(R.string.settings_label_role)) },
                             trailingContent = {
-                                Text(if (currentUser?.isAdmin == true) "Admin" else "User",
+                                Text(if (currentUser?.isAdmin == true) stringResource(R.string.settings_role_admin) else stringResource(R.string.settings_role_user),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
@@ -214,19 +257,19 @@ fun SettingsContent(
                 colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Security", style = MaterialTheme.typography.labelLarge,
+                    Text(stringResource(R.string.settings_section_security), style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(12.dp))
 
                     if (!isLocalAccount) {
-                        Text("Password change is not available for ${currentUser?.provider?.replaceFirstChar { it.uppercase() }} sign-in.",
+                        Text(stringResource(R.string.settings_password_unavailable, currentUser?.provider?.replaceFirstChar { it.uppercase() } ?: ""),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         OutlinedTextField(
                             value = currentPassword,
                             onValueChange = { currentPassword = it },
-                            label = { Text("Current password") },
+                            label = { Text(stringResource(R.string.settings_label_currentPassword)) },
                             visualTransformation = PasswordVisualTransformation(),
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
@@ -236,7 +279,7 @@ fun SettingsContent(
                         OutlinedTextField(
                             value = newPassword,
                             onValueChange = { newPassword = it },
-                            label = { Text("New password") },
+                            label = { Text(stringResource(R.string.settings_label_newPassword)) },
                             visualTransformation = PasswordVisualTransformation(),
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
@@ -246,7 +289,7 @@ fun SettingsContent(
                         OutlinedTextField(
                             value = confirmPassword,
                             onValueChange = { confirmPassword = it },
-                            label = { Text("Confirm new password") },
+                            label = { Text(stringResource(R.string.settings_label_confirmNewPassword)) },
                             visualTransformation = PasswordVisualTransformation(),
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
@@ -283,7 +326,7 @@ fun SettingsContent(
                             },
                             enabled = currentPassword.isNotBlank() && newPassword.isNotBlank() && confirmPassword.isNotBlank(),
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("Change Password") }
+                        ) { Text(stringResource(R.string.settings_button_changePassword)) }
                     }
                 }
             }
@@ -297,7 +340,7 @@ fun SettingsContent(
             ) {
                 Column {
                     Text(
-                        "About",
+                        stringResource(R.string.settings_section_about),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp)
@@ -310,7 +353,7 @@ fun SettingsContent(
                     }
 
                     ListItem(
-                        headlineContent = { Text("Version") },
+                        headlineContent = { Text(stringResource(R.string.settings_label_version)) },
                         trailingContent = {
                             Text(
                                 packageInfo?.versionName ?: "1.0.0",
@@ -327,7 +370,7 @@ fun SettingsContent(
                     )
 
                     ListItem(
-                        headlineContent = { Text("Build") },
+                        headlineContent = { Text(stringResource(R.string.settings_label_build)) },
                         trailingContent = {
                             Text(
                                 packageInfo?.longVersionCode?.toString() ?: "1",
@@ -344,3 +387,4 @@ fun SettingsContent(
         }
     }
 }
+
