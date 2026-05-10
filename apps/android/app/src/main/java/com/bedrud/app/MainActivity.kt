@@ -1,6 +1,7 @@
 package com.bedrud.app
 
 import android.app.PictureInPictureParams
+import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Build
@@ -24,6 +25,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.bedrud.app.core.auth.OAuthLoginHandler
+import com.bedrud.app.core.createLocaleContext
 import com.bedrud.app.core.deeplink.BedrudURLParser
 import com.bedrud.app.core.instance.InstanceManager
 import com.bedrud.app.core.pip.PipStateHolder
@@ -48,6 +50,11 @@ class MainActivity : ComponentActivity() {
     private val _deepLinkRoomName = MutableStateFlow<String?>(null)
     private val _oauthToken = MutableStateFlow<String?>(null)
 
+    override fun attachBaseContext(base: Context) {
+        val localeTag = SettingsStore(base).getLanguageTag()
+        super.attachBaseContext(base.createLocaleContext(localeTag))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -66,7 +73,9 @@ class MainActivity : ComponentActivity() {
                 AppAppearance.SYSTEM -> isSystemInDarkTheme()
             }
 
-            BedrudTheme(darkTheme = darkTheme) {
+            val language by settingsStore.language.collectAsState()
+
+            BedrudTheme(darkTheme = darkTheme, isRtl = language.resolveIsRtl()) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

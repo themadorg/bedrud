@@ -1,9 +1,12 @@
 package com.bedrud.app
 
 import android.app.Application
+import android.content.Context
+import com.bedrud.app.core.createLocaleContext
 import com.bedrud.app.core.di.appModule
 import com.bedrud.app.core.instance.InstanceStore
 import com.bedrud.app.core.instance.MigrationHelper
+import com.bedrud.app.ui.screens.settings.SettingsStore
 import org.koin.android.ext.android.inject
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -11,6 +14,11 @@ import org.koin.core.context.startKoin
 import org.koin.core.logger.Level
 
 class BedrudApplication : Application() {
+
+    override fun attachBaseContext(base: Context) {
+        val localeTag = SettingsStore(base).getLanguageTag()
+        super.attachBaseContext(base.createLocaleContext(localeTag))
+    }
 
     override fun onCreate() {
         super.onCreate()
