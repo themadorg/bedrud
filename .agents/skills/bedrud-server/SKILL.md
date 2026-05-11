@@ -22,10 +22,10 @@ Dispatches by arg:
 | `--livekit` | `livekit.RunLiveKit(configPath)` | Run LK binary standalone |
 | `install` | `install.DebianInstall(...)` | Systemd install on Debian |
 | `uninstall` | `install.DebianUninstall()` | Remove install |
-| `user promote <email>` | `usercli.PromoteUser()` | Add superadmin access |
-| `user demote <email>` | `usercli.DemoteUser()` | Remove superadmin access |
-| `user create <email> <pass> <name>` | `usercli.CreateUser()` | Create local user |
-| `user delete <email>` | `usercli.DeleteUser()` | Delete user |
+| `user [--config <path>] promote --email <email>` | `usercli.PromoteUser()` | Add superadmin access |
+| `user [--config <path>] demote --email <email>` | `usercli.DemoteUser()` | Remove superadmin access |
+| `user [--config <path>] create --email <e> --password <p> --name <n>` | `usercli.CreateUser()` | Create local user |
+| `user [--config <path>] delete --email <email>` | `usercli.DeleteUser()` | Delete user |
 
 ### `cmd/server/main.go` — Dev API server
 

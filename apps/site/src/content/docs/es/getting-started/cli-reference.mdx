@@ -156,7 +156,7 @@ bedrud uninstall
 Gestiona usuarios en la base de datos de Bedrud.
 
 ```bash
-bedrud user <subcommand> [--config <path>] <flags>
+bedrud user [--config <path>] <subcommand> [flags]
 ```
 
 | Flag global | Predeterminado                | Descripción                                    |
@@ -168,7 +168,7 @@ bedrud user <subcommand> [--config <path>] <flags>
 Crea un nuevo usuario con autenticación local (contraseña con hash bcrypt).
 
 ```bash
-bedrud user create --email <email> --password <password> --name <name>
+bedrud user [--config <path>] create --email <email> --password <password> --name <name>
 ```
 
 **Flags requeridos:**
@@ -183,7 +183,7 @@ bedrud user create --email <email> --password <password> --name <name>
 Elimina un usuario por dirección de correo electrónico.
 
 ```bash
-bedrud user delete --email <email>
+bedrud user [--config <path>] delete --email <email>
 ```
 
 #### `promote`
@@ -191,7 +191,7 @@ bedrud user delete --email <email>
 Otorga acceso `superadmin` a un usuario.
 
 ```bash
-bedrud user promote --email <email>
+bedrud user [--config <path>] promote --email <email>
 ```
 
 #### `demote`
@@ -199,7 +199,7 @@ bedrud user promote --email <email>
 Elimina el acceso `superadmin` de un usuario (revierte al nivel `user`).
 
 ```bash
-bedrud user demote --email <email>
+bedrud user [--config <path>] demote --email <email>
 ```
 
 **Implementación:** `server/internal/usercli/usercli.go`
@@ -268,19 +268,19 @@ bedrud install --fresh --domain example.com --email admin@example.com
 
 ```bash
 # Crear el primer usuario administrador
-bedrud user create --email admin@example.com --password secret123 --name "Admin User"
+bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User"
 
 # Otorgar acceso superadmin
-bedrud user promote --email admin@example.com
+bedrud user [--config <path>] promote --email admin@example.com
 
 # Crear usuario regular
-bedrud user create --email user@example.com --password pass456 --name "Regular User"
+bedrud user [--config <path>] create --email user@example.com --password pass456 --name "Regular User"
 
 # Eliminar un usuario
-bedrud user delete --email user@example.com
+bedrud user [--config <path>] delete --email user@example.com
 
 # Eliminar acceso de administrador
-bedrud user demote --email admin@example.com
+bedrud user [--config <path>] demote --email admin@example.com
 ```
 
 ---

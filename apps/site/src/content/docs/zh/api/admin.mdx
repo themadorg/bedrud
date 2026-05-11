@@ -114,10 +114,10 @@ PUT /api/admin/users/:id/status
 
 ```bash
 # Create a user
-bedrud user create --email "admin@example.com" --password "securepassword" --name "Admin"
+bedrud user [--config <path>] create --email "admin@example.com" --password "securepassword" --name "Admin"
 
 # Promote to admin
-bedrud user promote --email "admin@example.com"
+bedrud user [--config <path>] promote --email "admin@example.com"
 ```
 
 没有用于提升用户权限的 API endpoint - 这是出于安全考虑的刻意设计。

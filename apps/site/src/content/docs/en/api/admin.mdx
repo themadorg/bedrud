@@ -114,10 +114,10 @@ Admin users are created via the CLI:
 
 ```bash
 # Create a user
-bedrud user create --email "admin@example.com" --password "securepassword" --name "Admin"
+bedrud user [--config <path>] create --email "admin@example.com" --password "securepassword" --name "Admin"
 
 # Promote to admin
-bedrud user promote --email "admin@example.com"
+bedrud user [--config <path>] promote --email "admin@example.com"
 ```
 
 There is no API endpoint to promote users - this is intentional for security.

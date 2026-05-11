@@ -156,7 +156,7 @@ bedrud uninstall
 إدارة المستخدمين في قاعدة بيانات بدرود.
 
 ```bash
-bedrud user <subcommand> [--config <path>] <flags>
+bedrud user [--config <path>] <subcommand> [flags]
 ```
 
 | العلامة العامة | الافتراضي                  | الوصف                                          |
@@ -168,7 +168,7 @@ bedrud user <subcommand> [--config <path>] <flags>
 أنشئ مستخدماً جديداً بمصادقة محلية (كلمة مرور مشفّرة بـ bcrypt).
 
 ```bash
-bedrud user create --email <email> --password <password> --name <name>
+bedrud user [--config <path>] create --email <email> --password <password> --name <name>
 ```
 
 **العلامات المطلوبة:**
@@ -183,7 +183,7 @@ bedrud user create --email <email> --password <password> --name <name>
 احذف مستخدماً بعنوان البريد الإلكتروني.
 
 ```bash
-bedrud user delete --email <email>
+bedrud user [--config <path>] delete --email <email>
 ```
 
 #### `promote`
@@ -191,7 +191,7 @@ bedrud user delete --email <email>
 امنح وصول `superadmin` لمستخدم.
 
 ```bash
-bedrud user promote --email <email>
+bedrud user [--config <path>] promote --email <email>
 ```
 
 #### `demote`
@@ -199,7 +199,7 @@ bedrud user promote --email <email>
 أزِل وصول `superadmin` من مستخدم (يعود إلى مستوى `user`).
 
 ```bash
-bedrud user demote --email <email>
+bedrud user [--config <path>] demote --email <email>
 ```
 
 **التنفيذ:** `server/internal/usercli/usercli.go`
@@ -268,19 +268,19 @@ bedrud install --fresh --domain example.com --email admin@example.com
 
 ```bash
 # إنشاء أول مستخدم مدير
-bedrud user create --email admin@example.com --password secret123 --name "Admin User"
+bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User"
 
 # منح وصول superadmin
-bedrud user promote --email admin@example.com
+bedrud user [--config <path>] promote --email admin@example.com
 
 # إنشاء مستخدم عادي
-bedrud user create --email user@example.com --password pass456 --name "Regular User"
+bedrud user [--config <path>] create --email user@example.com --password pass456 --name "Regular User"
 
 # حذف مستخدم
-bedrud user delete --email user@example.com
+bedrud user [--config <path>] delete --email user@example.com
 
 # إزالة وصول المدير
-bedrud user demote --email admin@example.com
+bedrud user [--config <path>] demote --email admin@example.com
 ```
 
 ---

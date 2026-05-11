@@ -156,7 +156,7 @@ func main() {
 		_ = userCmd.Parse(os.Args[2:])
 
 		if len(userCmd.Args()) == 0 {
-			fmt.Println("Usage: bedrud user <subcommand> [flags]")
+			fmt.Println("Usage: bedrud user [--config <path>] <subcommand> [flags]")
 			fmt.Println("  create  --email <email> --password <password> --name <name>")
 			fmt.Println("  delete  --email <email>")
 			fmt.Println("  promote --email <email>")

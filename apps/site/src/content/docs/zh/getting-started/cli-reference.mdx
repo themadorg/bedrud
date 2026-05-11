@@ -156,7 +156,7 @@ bedrud uninstall
 管理 Bedrud 数据库中的用户。
 
 ```bash
-bedrud user <subcommand> [--config <path>] <flags>
+bedrud user [--config <path>] <subcommand> [flags]
 ```
 
 | 全局标志 | 默认值 | 说明 |
@@ -168,7 +168,7 @@ bedrud user <subcommand> [--config <path>] <flags>
 使用本地身份验证（bcrypt 哈希密码）创建新用户。
 
 ```bash
-bedrud user create --email <email> --password <password> --name <name>
+bedrud user [--config <path>] create --email <email> --password <password> --name <name>
 ```
 
 **必需标志：**
@@ -183,7 +183,7 @@ bedrud user create --email <email> --password <password> --name <name>
 通过邮箱地址删除用户。
 
 ```bash
-bedrud user delete --email <email>
+bedrud user [--config <path>] delete --email <email>
 ```
 
 #### `promote`
@@ -191,7 +191,7 @@ bedrud user delete --email <email>
 授予用户 `superadmin` 访问权限。
 
 ```bash
-bedrud user promote --email <email>
+bedrud user [--config <path>] promote --email <email>
 ```
 
 #### `demote`
@@ -199,7 +199,7 @@ bedrud user promote --email <email>
 移除用户的 `superadmin` 访问权限（降级为 `user` 级别）。
 
 ```bash
-bedrud user demote --email <email>
+bedrud user [--config <path>] demote --email <email>
 ```
 
 **实现：** `server/internal/usercli/usercli.go`
@@ -268,19 +268,19 @@ bedrud install --fresh --domain example.com --email admin@example.com
 
 ```bash
 # 创建第一个管理员用户
-bedrud user create --email admin@example.com --password secret123 --name "Admin User"
+bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User"
 
 # 授予 superadmin 权限
-bedrud user promote --email admin@example.com
+bedrud user [--config <path>] promote --email admin@example.com
 
 # 创建普通用户
-bedrud user create --email user@example.com --password pass456 --name "Regular User"
+bedrud user [--config <path>] create --email user@example.com --password pass456 --name "Regular User"
 
 # 删除用户
-bedrud user delete --email user@example.com
+bedrud user [--config <path>] delete --email user@example.com
 
 # 移除管理员权限
-bedrud user demote --email admin@example.com
+bedrud user [--config <path>] demote --email admin@example.com
 ```
 
 ---

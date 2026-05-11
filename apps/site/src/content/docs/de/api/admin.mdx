@@ -114,10 +114,10 @@ Admin-Benutzer werden über die CLI erstellt:
 
 ```bash
 # Create a user
-bedrud user create --email "admin@example.com" --password "securepassword" --name "Admin"
+bedrud user [--config <path>] create --email "admin@example.com" --password "securepassword" --name "Admin"
 
 # Promote to admin
-bedrud user promote --email "admin@example.com"
+bedrud user [--config <path>] promote --email "admin@example.com"
 ```
 
 Es gibt keinen API-Endpunkt zur Beförderung von Benutzern - dies ist aus Sicherheitsgründen beabsichtigt.

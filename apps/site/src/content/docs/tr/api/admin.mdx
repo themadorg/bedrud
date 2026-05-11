@@ -114,10 +114,10 @@ Yönetici kullanıcılar CLI üzerinden oluşturulur:
 
 ```bash
 # Bir kullanıcı oluştur
-bedrud user create --email "admin@example.com" --password "securepassword" --name "Admin"
+bedrud user [--config <yol>] create --email "admin@example.com" --password "securepassword" --name "Admin"
 
 # Yöneticiye yükselt
-bedrud user promote --email "admin@example.com"
+bedrud user [--config <yol>] promote --email "admin@example.com"
 ```
 
 Kullanıcıları yükseltmek için bir API uç noktası yoktur - bu, güvenlik amacıyla bilinçli olarak tasarlanmıştır.

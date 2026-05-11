@@ -114,10 +114,10 @@ Les utilisateurs administrateurs sont créés via la CLI :
 
 ```bash
 # Créer un utilisateur
-bedrud user create --email "admin@example.com" --password "securepassword" --name "Admin"
+bedrud user [--config <path>] create --email "admin@example.com" --password "securepassword" --name "Admin"
 
 # Promouvoir en administrateur
-bedrud user promote --email "admin@example.com"
+bedrud user [--config <path>] promote --email "admin@example.com"
 ```
 
 Il n'y a pas de point de terminaison API pour promouvoir les utilisateurs - c'est intentionnel pour des raisons de sécurité.
