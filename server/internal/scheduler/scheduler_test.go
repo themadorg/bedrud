@@ -14,7 +14,7 @@ import (
 
 func TestInitialize_DoesNotPanic(t *testing.T) {
 	// Initialize should not panic with nil deps
-	Initialize(nil, &config.LiveKitConfig{})
+	Initialize(nil, &config.LiveKitConfig{}, &config.ServerConfig{})
 	// Stop should not panic either
 	Stop()
 }

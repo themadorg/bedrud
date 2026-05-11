@@ -3,12 +3,16 @@ package scheduler
 import (
 	"bedrud/config"
 	"bedrud/internal/repository"
+	"bedrud/internal/utils"
 	"context"
 	"crypto/tls"
+	"encoding/pem"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
+	"crypto/x509"
 	"github.com/go-co-op/gocron"
 	lkauth "github.com/livekit/protocol/auth"
 	"github.com/livekit/protocol/livekit"
@@ -18,9 +22,18 @@ import (
 
 var scheduler *gocron.Scheduler
 
-// Initialize creates and starts the scheduler with idle room detection.
-func Initialize(roomRepo *repository.RoomRepository, lkCfg *config.LiveKitConfig) {
+var certFile string
+
+func Initialize(roomRepo *repository.RoomRepository, lkCfg *config.LiveKitConfig, serverCfg *config.ServerConfig) {
 	scheduler = gocron.NewScheduler(time.Local)
+
+	certFile = ""
+	if serverCfg.EnableTLS && !serverCfg.DisableTLS && !serverCfg.UseACME {
+		certFile = serverCfg.CertFile
+		if certFile == "" {
+			certFile = "/etc/bedrud/cert.pem"
+		}
+	}
 
 	apiHost := lkCfg.InternalHost
 	if apiHost == "" {
@@ -41,6 +54,12 @@ func Initialize(roomRepo *repository.RoomRepository, lkCfg *config.LiveKitConfig
 	_, _ = scheduler.Every(1).Minute().Do(func() {
 		checkIdleRooms(roomRepo, lkCfg, lkClient)
 	})
+
+	if certFile != "" {
+		_, _ = scheduler.Every(1).Day().At("09:00").Do(func() {
+			checkCertExpiry()
+		})
+	}
 
 	scheduler.StartAsync()
 }
@@ -98,5 +117,36 @@ func checkIdleRooms(roomRepo *repository.RoomRepository, cfg *config.LiveKitConf
 				log.Info().Str("room", room.Name).Msg("Room set to idle (no participants)")
 			}
 		}
+	}
+}
+
+func checkCertExpiry() {
+	if certFile == "" {
+		return
+	}
+
+	data, err := os.ReadFile(certFile)
+	if err != nil {
+		log.Error().Err(err).Str("path", certFile).Msg("Scheduler: cannot read TLS certificate")
+		return
+	}
+
+	block, _ := pem.Decode(data)
+	if block == nil {
+		log.Error().Str("path", certFile).Msg("Scheduler: failed to decode TLS certificate PEM")
+		return
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		log.Error().Err(err).Str("path", certFile).Msg("Scheduler: failed to parse TLS certificate")
+		return
+	}
+
+	daysRemaining := int(time.Until(cert.NotAfter).Hours() / 24)
+	if daysRemaining <= 0 {
+		log.Error().Int("daysRemaining", daysRemaining).Str("expires", cert.NotAfter.Format(time.RFC3339)).Msg("TLS certificate has EXPIRED")
+	} else if daysRemaining <= utils.CertWarnDays {
+		log.Warn().Int("daysRemaining", daysRemaining).Str("expires", cert.NotAfter.Format(time.RFC3339)).Msg("TLS certificate is expiring soon")
 	}
 }

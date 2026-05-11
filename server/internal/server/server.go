@@ -62,6 +62,27 @@ func Run(configPath string) error {
 	zerolog.SetGlobalLevel(logLevel)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 
+	tlsEnabled := cfg.Server.EnableTLS && !cfg.Server.DisableTLS
+	if tlsEnabled && !cfg.Server.UseACME {
+		certFile := cfg.Server.CertFile
+		keyFile := cfg.Server.KeyFile
+		if certFile == "" {
+			certFile = "/etc/bedrud/cert.pem"
+		}
+		if keyFile == "" {
+			keyFile = "/etc/bedrud/key.pem"
+		}
+		certInfo, err := utils.ValidateTLSCertPair(certFile, keyFile)
+		if err != nil {
+			return fmt.Errorf("TLS certificate validation failed: %w", err)
+		}
+		if certInfo.DaysRemaining <= utils.CertWarnDays {
+			log.Warn().Int("daysRemaining", certInfo.DaysRemaining).Str("expires", certInfo.NotAfter.Format(time.RFC3339)).Msg("TLS certificate is expiring soon")
+		} else {
+			log.Info().Str("subject", certInfo.Subject).Int("daysRemaining", certInfo.DaysRemaining).Str("expires", certInfo.NotAfter.Format(time.RFC3339)).Msg("TLS certificate validated")
+		}
+	}
+
 	// Start embedded LiveKit unless an external deployment is configured.
 	internalHost := strings.ToLower(cfg.LiveKit.InternalHost)
 	useInternalLK := !cfg.LiveKit.External &&
@@ -108,7 +129,7 @@ func Run(configPath string) error {
 		log.Error().Err(err).Msg("Failed to run database migrations")
 	}
 	roomRepo := repository.NewRoomRepository(database.GetDB())
-	scheduler.Initialize(roomRepo, &cfg.LiveKit)
+	scheduler.Initialize(roomRepo, &cfg.LiveKit, &cfg.Server)
 	defer scheduler.Stop()
 	auth.Init(cfg)
 
@@ -279,6 +300,7 @@ func Run(configPath string) error {
 	adminGroup.Get("/invite-tokens", adminHandler.ListInviteTokens)
 	adminGroup.Post("/invite-tokens", adminHandler.CreateInviteToken)
 	adminGroup.Delete("/invite-tokens/:id", adminHandler.DeleteInviteToken)
+	adminGroup.Get("/cert-info", certHandler.GetCertInfo)
 
 	app.Use("/", filesystem.New(filesystem.Config{Root: http.FS(root.UI), PathPrefix: "frontend"}))
 
@@ -331,7 +353,9 @@ func Run(configPath string) error {
 				// fall through to the plain-HTTP / manual-TLS block below
 			} else {
 				log.Info().Msgf("➜ Bedrud is running on HTTPS %s (bound 0.0.0.0:443)", utils.DisplayAddr("0.0.0.0", "443"))
-				_ = app.Listener(ln)
+				if err := app.Listener(ln); err != nil {
+					log.Error().Err(err).Msg("ACME TLS listener failed")
+				}
 				return
 			}
 		}
@@ -353,10 +377,14 @@ func Run(configPath string) error {
 			}()
 			// Start HTTPS on primary port
 			log.Info().Msgf("➜ Bedrud is running on HTTPS %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, cfg.Server.Port), addr)
-			_ = app.ListenTLS(addr, cfg.Server.CertFile, cfg.Server.KeyFile)
+			if err := app.ListenTLS(addr, cfg.Server.CertFile, cfg.Server.KeyFile); err != nil {
+				log.Error().Err(err).Str("addr", addr).Msg("TLS listener failed")
+			}
 		} else {
 			log.Info().Msgf("➜ Bedrud is running on HTTP %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, cfg.Server.Port), addr)
-			_ = app.Listen(addr)
+			if err := app.Listen(addr); err != nil {
+				log.Error().Err(err).Str("addr", addr).Msg("HTTP listener failed")
+			}
 		}
 	}()
 

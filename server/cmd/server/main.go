@@ -203,7 +203,7 @@ func run() error {
 	}
 	inviteTokenRepo := repository.NewInviteTokenRepository(database.GetDB())
 
-	scheduler.Initialize(roomRepo, &cfg.LiveKit)
+	scheduler.Initialize(roomRepo, &cfg.LiveKit, &cfg.Server)
 	defer scheduler.Stop()
 
 	// Periodically clean up expired blocked refresh tokens from the database.

@@ -2,12 +2,18 @@ package utils
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
+	"math/big"
 	"net"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestGenerateSelfSignedCert_Success(t *testing.T) {
@@ -254,6 +260,195 @@ func TestParseSanHosts_Mixed(t *testing.T) {
 	}
 	if len(ips) != 2 {
 		t.Fatalf("expected 2 IPs, got %d: %v", len(ips), ips)
+	}
+}
+
+func TestValidateTLSCertPair_ValidCert(t *testing.T) {
+	tmpDir := t.TempDir()
+	certFile := filepath.Join(tmpDir, "cert.pem")
+	keyFile := filepath.Join(tmpDir, "key.pem")
+
+	if err := GenerateSelfSignedCert(certFile, keyFile, "localhost"); err != nil {
+		t.Fatalf("failed to generate cert: %v", err)
+	}
+
+	info, err := ValidateTLSCertPair(certFile, keyFile)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.Status != "valid" {
+		t.Fatalf("expected status 'valid', got '%s'", info.Status)
+	}
+	if info.DaysRemaining < 360 || info.DaysRemaining > 366 {
+		t.Fatalf("expected ~365 days remaining, got %d", info.DaysRemaining)
+	}
+	if info.Subject == "" {
+		t.Fatal("expected non-empty subject")
+	}
+	if info.Issuer == "" {
+		t.Fatal("expected non-empty issuer")
+	}
+	if len(info.SANs) == 0 {
+		t.Fatal("expected at least one SAN")
+	}
+}
+
+func TestValidateTLSCertPair_CertNotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyFile := filepath.Join(tmpDir, "key.pem")
+	_ = GenerateSelfSignedCert(filepath.Join(tmpDir, "x.pem"), keyFile, "localhost")
+
+	_, err := ValidateTLSCertPair(filepath.Join(tmpDir, "nonexistent.pem"), keyFile)
+	if err == nil {
+		t.Fatal("expected error for missing cert file")
+	}
+	if !containsSubstring(err.Error(), "certificate file not found") {
+		t.Fatalf("expected 'not found' error, got: %v", err)
+	}
+}
+
+func TestValidateTLSCertPair_KeyNotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	certFile := filepath.Join(tmpDir, "cert.pem")
+	keyFile := filepath.Join(tmpDir, "key.pem")
+
+	_ = GenerateSelfSignedCert(certFile, keyFile, "localhost")
+
+	_, err := ValidateTLSCertPair(certFile, filepath.Join(tmpDir, "nonexistent.pem"))
+	if err == nil {
+		t.Fatal("expected error for missing key file")
+	}
+	if !containsSubstring(err.Error(), "key file not found") {
+		t.Fatalf("expected 'not found' error, got: %v", err)
+	}
+}
+
+func TestValidateTLSCertPair_KeyMismatch(t *testing.T) {
+	tmpDir := t.TempDir()
+	certFile := filepath.Join(tmpDir, "cert.pem")
+	keyFile := filepath.Join(tmpDir, "key.pem")
+	otherKeyFile := filepath.Join(tmpDir, "other_key.pem")
+
+	_ = GenerateSelfSignedCert(certFile, keyFile, "localhost")
+
+	tmpDir2 := t.TempDir()
+	_ = GenerateSelfSignedCert(filepath.Join(tmpDir2, "x.pem"), otherKeyFile, "localhost")
+
+	_, err := ValidateTLSCertPair(certFile, otherKeyFile)
+	if err == nil {
+		t.Fatal("expected error for key mismatch")
+	}
+	if !containsSubstring(err.Error(), "mismatch") {
+		t.Fatalf("expected 'mismatch' error, got: %v", err)
+	}
+}
+
+func TestValidateTLSCertPair_InvalidPEM(t *testing.T) {
+	tmpDir := t.TempDir()
+	certFile := filepath.Join(tmpDir, "cert.pem")
+	keyFile := filepath.Join(tmpDir, "key.pem")
+
+	_ = GenerateSelfSignedCert(certFile, keyFile, "localhost")
+
+	_ = os.WriteFile(certFile, []byte("not a pem file"), 0o644)
+
+	_, err := ValidateTLSCertPair(certFile, keyFile)
+	if err == nil {
+		t.Fatal("expected error for invalid PEM")
+	}
+	if !containsSubstring(err.Error(), "not a valid PEM file") {
+		t.Fatalf("expected PEM decode error, got: %v", err)
+	}
+}
+
+func TestValidateTLSCertPair_ExpiredCert(t *testing.T) {
+	tmpDir := t.TempDir()
+	certFile := filepath.Join(tmpDir, "cert.pem")
+	keyFile := filepath.Join(tmpDir, "key.pem")
+
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	serialNumber, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject:      pkix.Name{CommonName: "test"},
+		NotBefore:    time.Now().Add(-72 * time.Hour),
+		NotAfter:     time.Now().Add(-24 * time.Hour),
+		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		DNSNames:     []string{"localhost"},
+	}
+
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	certOut, _ := os.Create(certFile)
+	_ = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	certOut.Close()
+
+	keyOut, _ := os.OpenFile(keyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	privBytes, _ := x509.MarshalECPrivateKey(priv)
+	_ = pem.Encode(keyOut, &pem.Block{Type: "EC PRIVATE KEY", Bytes: privBytes})
+	keyOut.Close()
+
+	_, err = ValidateTLSCertPair(certFile, keyFile)
+	if err == nil {
+		t.Fatal("expected error for expired cert")
+	}
+	if !containsSubstring(err.Error(), "expired") {
+		t.Fatalf("expected 'expired' error, got: %v", err)
+	}
+}
+
+func TestValidateTLSCertPair_ExpiringSoon(t *testing.T) {
+	tmpDir := t.TempDir()
+	certFile := filepath.Join(tmpDir, "cert.pem")
+	keyFile := filepath.Join(tmpDir, "key.pem")
+
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	serialNumber, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject:      pkix.Name{CommonName: "test"},
+		NotBefore:    time.Now().Add(-24 * time.Hour),
+		NotAfter:     time.Now().Add(10 * 24 * time.Hour),
+		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		DNSNames:     []string{"localhost"},
+	}
+
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	certOut, _ := os.Create(certFile)
+	_ = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	certOut.Close()
+
+	keyOut, _ := os.OpenFile(keyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	privBytes, _ := x509.MarshalECPrivateKey(priv)
+	_ = pem.Encode(keyOut, &pem.Block{Type: "EC PRIVATE KEY", Bytes: privBytes})
+	keyOut.Close()
+
+	info, err := ValidateTLSCertPair(certFile, keyFile)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.Status != "expiring" {
+		t.Fatalf("expected status 'expiring', got '%s'", info.Status)
+	}
+	if info.DaysRemaining > CertWarnDays {
+		t.Fatalf("expected <= %d days remaining, got %d", CertWarnDays, info.DaysRemaining)
 	}
 }
 
