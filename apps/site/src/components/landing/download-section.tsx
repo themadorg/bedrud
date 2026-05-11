@@ -74,14 +74,7 @@ function CopyButton({
     try {
       await navigator.clipboard.writeText(val);
     } catch {
-      const ta = document.createElement("textarea");
-      ta.value = val;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
+      // Clipboard API unavailable
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);

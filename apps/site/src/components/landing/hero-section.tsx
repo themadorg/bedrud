@@ -16,14 +16,7 @@ export function HeroSection({ lang }: { lang: Locale }) {
     try {
       await navigator.clipboard.writeText(INSTALL_CMD);
     } catch {
-      const ta = document.createElement("textarea");
-      ta.value = INSTALL_CMD;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
+      // Clipboard API unavailable
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
