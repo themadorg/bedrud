@@ -76,7 +76,7 @@ kotlin {
 
 dependencies {
     // Compose BOM
-    val composeBom = platform("androidx.compose:compose-bom:2026.04.01")
+    val composeBom = platform("androidx.compose:compose-bom:2026.05.00")
     implementation(composeBom)
 
     // Compose
@@ -92,10 +92,10 @@ dependencies {
 
     // Kotlin
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // LiveKit
-    implementation("io.livekit:livekit-android:2.25.0")
+    implementation("io.livekit:livekit-android:2.25.2")
     implementation("io.livekit:livekit-android-compose-components:2.3.0")
 
     // Retrofit + OkHttp
@@ -115,7 +115,7 @@ dependencies {
     // Credential Manager (Passkeys)
     implementation("androidx.credentials:credentials:1.6.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
-    implementation("com.google.android.gms:play-services-fido:21.2.0")
+    implementation("com.google.android.gms:play-services-fido:21.3.0")
 
     // Coil for image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
@@ -125,7 +125,7 @@ dependencies {
 
     // Testing
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:5.3.2")
     testImplementation("io.mockk:mockk:1.14.9")
     androidTestImplementation(composeBom)
