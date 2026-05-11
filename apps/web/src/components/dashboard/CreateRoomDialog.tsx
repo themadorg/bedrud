@@ -108,8 +108,14 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate }: Props) {
         <form onSubmit={handleSubmit}>
           {/* ── Name section ── */}
           <div className="px-6 pt-6 pb-5">
-            <label className="text-[10px] tracking-widest uppercase font-semibold text-muted-foreground/50">Name</label>
+            <label
+              htmlFor="room-name"
+              className="text-[10px] tracking-widest uppercase font-semibold text-muted-foreground/50"
+            >
+              Name
+            </label>
             <input
+              id="room-name"
               value={name}
               onChange={(e) => {
                 const v = e.target.value
@@ -132,9 +138,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate }: Props) {
 
           {/* ── Access section ── */}
           <div className="border-t px-6 py-5">
-            <label className="text-[10px] tracking-widest uppercase font-semibold text-muted-foreground/50">
-              Access
-            </label>
+            <span className="text-[10px] tracking-widest uppercase font-semibold text-muted-foreground/50">Access</span>
             <div className="mt-3 grid grid-cols-2 gap-3">
               {/* Private card */}
               <button
@@ -182,9 +186,9 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate }: Props) {
           <div className="border-t px-6 py-5">
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-[10px] tracking-widest uppercase font-semibold text-muted-foreground/50">
+                <span className="text-[10px] tracking-widest uppercase font-semibold text-muted-foreground/50">
                   Capacity
-                </label>
+                </span>
                 <p className="mt-0.5 text-[11px] text-muted-foreground/60">{maxParticipants} seats</p>
               </div>
               <div className="flex items-center gap-1">
@@ -211,9 +215,9 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate }: Props) {
 
           {/* ── Features section ── */}
           <div className="border-t px-6 py-5">
-            <label className="text-[10px] tracking-widest uppercase font-semibold text-muted-foreground/50">
+            <span className="text-[10px] tracking-widest uppercase font-semibold text-muted-foreground/50">
               Features
-            </label>
+            </span>
             <div className="mt-3 flex flex-wrap gap-2">
               {FEATURES.map(({ key, icon: Icon, label }) => {
                 const active = settings[key]

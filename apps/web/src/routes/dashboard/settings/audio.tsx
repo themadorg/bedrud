@@ -92,7 +92,9 @@ function useMicTest(mode: NoiseSuppressionMode, echoCancellation: boolean, input
   const stop = useCallback(() => {
     cancelledRef.current = true
     cancelAnimationFrame(rafRef.current)
-    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current?.getTracks().forEach((t) => {
+      t.stop()
+    })
     ctxRef.current?.close().catch(() => {})
     streamRef.current = null
     ctxRef.current = null
@@ -118,7 +120,9 @@ function useMicTest(mode: NoiseSuppressionMode, echoCancellation: boolean, input
 
       // If stop() was called while awaiting getUserMedia, clean up and bail out
       if (cancelledRef.current) {
-        stream.getTracks().forEach((t) => t.stop())
+        stream.getTracks().forEach((t) => {
+          t.stop()
+        })
         return
       }
 
@@ -127,7 +131,9 @@ function useMicTest(mode: NoiseSuppressionMode, echoCancellation: boolean, input
 
       // If stop() was called while awaiting enumerateDevices, clean up and bail out
       if (cancelledRef.current) {
-        stream.getTracks().forEach((t) => t.stop())
+        stream.getTracks().forEach((t) => {
+          t.stop()
+        })
         streamRef.current = null
         return
       }
@@ -278,6 +284,7 @@ function AudioPage() {
             const disabled = value === 'krisp' && !krispSupported
             return (
               <button
+                type="button"
                 key={value}
                 onClick={() => !disabled && setMode(value)}
                 disabled={disabled}
@@ -298,15 +305,15 @@ function AudioPage() {
 
         {/* Echo cancellation works independently of noise mode */}
         <div className="flex items-center gap-4 border-l pl-4">
-          <label className="flex items-center gap-2 text-xs">
+          <span className="flex items-center gap-2 text-xs">
             <Switch className="scale-75" checked={echoCancellation} onCheckedChange={setEchoCancellation} />
             <span className="text-muted-foreground">Echo</span>
-          </label>
+          </span>
           {mode === 'browser' && (
-            <label className="flex items-center gap-2 text-xs">
+            <span className="flex items-center gap-2 text-xs">
               <Switch className="scale-75" checked={autoGainControl} onCheckedChange={setAutoGainControl} />
               <span className="text-muted-foreground">AGC</span>
-            </label>
+            </span>
           )}
         </div>
       </div>
@@ -332,6 +339,7 @@ function AudioPage() {
         )}
 
         <button
+          type="button"
           onClick={mic.testing ? mic.stop : mic.start}
           className={cn(
             'inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors',
@@ -402,15 +410,16 @@ function AudioPage() {
 
       {/* ── Row 5: Muted-mic beep alert ── */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t px-5 py-3">
-        <label className="flex items-center gap-2 text-xs">
+        <span className="flex items-center gap-2 text-xs">
           <Switch className="scale-75" checked={mutedBeepEnabled} onCheckedChange={setMutedBeepEnabled} />
           <span className="font-medium">Muted mic alert</span>
-        </label>
+        </span>
         <span className="text-xs text-muted-foreground">beep when talking while muted</span>
         {mutedBeepEnabled && (
           <div className="flex items-center gap-1 border-l pl-4">
             {BEEP_INTERVALS.map(({ value, label }) => (
               <button
+                type="button"
                 key={value}
                 onClick={() => setMutedBeepInterval(value)}
                 className={cn(

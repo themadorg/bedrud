@@ -100,7 +100,7 @@ function ProfilePage() {
           </div>
           {user?.email && (
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Email</label>
+              <span className="text-xs font-medium text-muted-foreground">Email</span>
               <Input value={user.email} disabled className="h-9 text-sm opacity-60" />
             </div>
           )}
