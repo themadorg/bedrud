@@ -8,12 +8,14 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"math/big"
+	"net"
 	"os"
 	"time"
 )
 
-// GenerateSelfSignedCert creates a self-signed certificate and key for development
-func GenerateSelfSignedCert(certFile, keyFile string) error {
+// GenerateSelfSignedCert creates a self-signed certificate and key for development.
+// hosts may include IP addresses and DNS names; they are added as SANs.
+func GenerateSelfSignedCert(certFile, keyFile string, hosts ...string) error {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return err
@@ -28,17 +30,29 @@ func GenerateSelfSignedCert(certFile, keyFile string) error {
 		return err
 	}
 
+	dnsNames, ipAddrs := ParseSanHosts(hosts...)
+	if len(dnsNames) == 0 && len(ipAddrs) == 0 {
+		dnsNames = []string{"localhost"}
+	}
+
+	commonName := "localhost"
+	if len(dnsNames) > 0 {
+		commonName = dnsNames[0]
+	}
+
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			Organization: []string{"Bedrud Open Source"},
-			CommonName:   "localhost",
+			CommonName:   commonName,
 		},
 		NotBefore:             notBefore,
 		NotAfter:              notAfter,
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
+		DNSNames:              dnsNames,
+		IPAddresses:           ipAddrs,
 	}
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
@@ -62,6 +76,7 @@ func GenerateSelfSignedCert(certFile, keyFile string) error {
 	}
 	privBytes, err := x509.MarshalECPrivateKey(priv)
 	if err != nil {
+		keyOut.Close()
 		return err
 	}
 	if err := pem.Encode(keyOut, &pem.Block{Type: "EC PRIVATE KEY", Bytes: privBytes}); err != nil {
@@ -71,4 +86,17 @@ func GenerateSelfSignedCert(certFile, keyFile string) error {
 	keyOut.Close()
 
 	return nil
+}
+
+// ParseSanHosts splits a list of hostnames into DNS names and IP addresses
+// suitable for use as Subject Alternative Names on a certificate.
+func ParseSanHosts(hosts ...string) (dnsNames []string, ipAddrs []net.IP) {
+	for _, host := range hosts {
+		if ip := net.ParseIP(host); ip != nil {
+			ipAddrs = append(ipAddrs, ip)
+		} else {
+			dnsNames = append(dnsNames, host)
+		}
+	}
+	return
 }

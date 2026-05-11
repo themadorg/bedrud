@@ -318,7 +318,14 @@ func LinuxInstall(cfg *InstallConfig) error {
 	if cfg.EnableTLS && cfg.CertPath == "" && cfg.KeyPath == "" {
 		cp, kp := "/etc/bedrud/cert.pem", "/etc/bedrud/key.pem"
 		if _, err := os.Stat(cp); os.IsNotExist(err) {
-			if err := utils.GenerateSelfSignedCert(cp, kp); err != nil {
+			hosts := []string{"localhost"}
+			if cfg.OverrideIP != "" && cfg.OverrideIP != "127.0.0.1" && cfg.OverrideIP != "localhost" {
+				hosts = append(hosts, cfg.OverrideIP)
+			}
+			if cfg.Domain != "" {
+				hosts = append(hosts, cfg.Domain)
+			}
+			if err := utils.GenerateSelfSignedCert(cp, kp, hosts...); err != nil {
 				return fmt.Errorf("failed to generate self-signed cert: %w", err)
 			}
 		}
