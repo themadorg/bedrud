@@ -5,6 +5,5 @@ export function getStaticPaths() {
   return supportedLocales.map((lang) => ({ params: { lang } }));
 }
 
-const lang = Astro.params.lang!;
-return Astro.redirect(`/${lang}/docs/getting-started/quickstart`, 301);
+return Astro.redirect(`/${Astro.params.lang!}/docs/getting-started/quickstart`, 301);
 ---
