@@ -24,114 +24,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/admin/rooms": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get detailed information about all rooms (requires superadmin access)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "admin"
-                ],
-                "summary": "List all rooms (Admin only)",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/handlers.AdminRoomResponse"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/admin/rooms/{roomId}/token": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Generate a new token for any user to join a room (requires superadmin access)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "admin"
-                ],
-                "summary": "Generate room token (Admin only)",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Room ID",
-                        "name": "roomId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "User ID to generate token for",
-                        "name": "userId",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/admin/users": {
             "get": {
                 "security": [
@@ -249,6 +141,75 @@ const docTemplate = `{
                         "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/cert": {
+            "get": {
+                "description": "Get the server's TLS certificate in PEM format. Only available when TLS is enabled.",
+                "produces": [
+                    "application/x-pem-file"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "Download server certificate",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/health": {
+            "get": {
+                "description": "Get the health status of the service",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Health check endpoint",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/ready": {
+            "get": {
+                "description": "Get the readiness status of the service",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Readiness check endpoint",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -582,151 +543,6 @@ const docTemplate = `{
                     }
                 }
             }
-        },
-        "/room/create": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Creates a new room with LiveKit integration",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "rooms"
-                ],
-                "summary": "Create a new room",
-                "parameters": [
-                    {
-                        "description": "Room creation parameters",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateRoomRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.RoomResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/room/join": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Join an existing room and get access token",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "rooms"
-                ],
-                "summary": "Join a room",
-                "parameters": [
-                    {
-                        "description": "Room join parameters",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.JoinRoomRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.RoomResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/room/list": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a list of rooms created by or participated in by the authenticated user",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "rooms"
-                ],
-                "summary": "List rooms for the current user",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/handlers.UserRoomResponse"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
         }
     },
     "definitions": {
@@ -783,44 +599,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.AdminRoomResponse": {
-            "type": "object",
-            "properties": {
-                "createdBy": {
-                    "type": "string"
-                },
-                "expiresAt": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "isActive": {
-                    "type": "boolean"
-                },
-                "livekitHost": {
-                    "type": "string"
-                },
-                "maxParticipants": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "participants": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handlers.ParticipantInfo"
-                    }
-                },
-                "settings": {
-                    "$ref": "#/definitions/models.RoomSettings"
-                },
-                "token": {
-                    "type": "string"
-                }
-            }
-        },
         "handlers.AuthResponse": {
             "type": "object",
             "properties": {
@@ -833,22 +611,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.CreateRoomRequest": {
-            "type": "object",
-            "properties": {
-                "maxParticipants": {
-                    "type": "integer",
-                    "example": 20
-                },
-                "name": {
-                    "type": "string",
-                    "example": "my-room"
-                },
-                "settings": {
-                    "$ref": "#/definitions/models.RoomSettings"
-                }
-            }
-        },
         "handlers.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -858,88 +620,12 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.JoinRoomRequest": {
-            "type": "object",
-            "properties": {
-                "roomName": {
-                    "type": "string",
-                    "example": "my-room"
-                }
-            }
-        },
-        "handlers.ParticipantInfo": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "isActive": {
-                    "type": "boolean"
-                },
-                "isChatBlocked": {
-                    "type": "boolean"
-                },
-                "isMuted": {
-                    "type": "boolean"
-                },
-                "isVideoOff": {
-                    "type": "boolean"
-                },
-                "joinedAt": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "permissions": {
-                    "type": "string"
-                },
-                "userId": {
-                    "type": "string"
-                }
-            }
-        },
         "handlers.RefreshRequest": {
             "type": "object",
             "properties": {
                 "refresh_token": {
                     "type": "string",
                     "example": "eyJhbGciOiJ..."
-                }
-            }
-        },
-        "handlers.RoomResponse": {
-            "type": "object",
-            "properties": {
-                "createdBy": {
-                    "type": "string"
-                },
-                "expiresAt": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "isActive": {
-                    "type": "boolean"
-                },
-                "livekitHost": {
-                    "type": "string"
-                },
-                "maxParticipants": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "settings": {
-                    "$ref": "#/definitions/models.RoomSettings"
-                },
-                "token": {
-                    "type": "string"
                 }
             }
         },
@@ -977,6 +663,11 @@ const docTemplate = `{
                     "description": "@Description Whether the user account is active",
                     "type": "boolean",
                     "example": true
+                },
+                "isAdmin": {
+                    "description": "@Description Whether the user has admin access",
+                    "type": "boolean",
+                    "example": false
                 },
                 "name": {
                     "description": "@Description User's display name",
@@ -1028,36 +719,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.UserRoomResponse": {
-            "type": "object",
-            "properties": {
-                "createdBy": {
-                    "type": "string"
-                },
-                "expiresAt": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "isActive": {
-                    "type": "boolean"
-                },
-                "maxParticipants": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "relationship": {
-                    "description": "e.g., \"creator\", \"participant\"",
-                    "type": "string"
-                },
-                "settings": {
-                    "$ref": "#/definitions/models.RoomSettings"
-                }
-            }
-        },
         "handlers.UserStatusUpdateRequest": {
             "description": "Request body for updating user status",
             "type": "object",
@@ -1075,23 +736,6 @@ const docTemplate = `{
                 "message": {
                     "type": "string",
                     "example": "User status updated successfully"
-                }
-            }
-        },
-        "models.RoomSettings": {
-            "type": "object",
-            "properties": {
-                "allowAudio": {
-                    "type": "boolean"
-                },
-                "allowChat": {
-                    "type": "boolean"
-                },
-                "allowVideo": {
-                    "type": "boolean"
-                },
-                "requireApproval": {
-                    "type": "boolean"
                 }
             }
         },

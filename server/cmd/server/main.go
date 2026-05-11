@@ -197,10 +197,10 @@ func run() error {
 	passkeyRepo := repository.NewPasskeyRepository(database.GetDB())
 	roomRepo := repository.NewRoomRepository(database.GetDB())
 	settingsRepo := repository.NewSettingsRepository(database.GetDB())
-		settingsRepo.SetConfig(cfg)
-		if effective, err := settingsRepo.GetEffectiveSettings(); err == nil {
-			auth.ReloadProviders(effective)
-		}
+	settingsRepo.SetConfig(cfg)
+	if effective, err := settingsRepo.GetEffectiveSettings(); err == nil {
+		auth.ReloadProviders(effective)
+	}
 	inviteTokenRepo := repository.NewInviteTokenRepository(database.GetDB())
 
 	scheduler.Initialize(roomRepo, &cfg.LiveKit)
@@ -420,6 +420,7 @@ func run() error {
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Router /health [get]
+// @Router /api/health [get]
 // Health check handler
 func healthCheck(c *fiber.Ctx) error {
 	log.Info().
@@ -439,6 +440,7 @@ func healthCheck(c *fiber.Ctx) error {
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Router /ready [get]
+// @Router /api/ready [get]
 // Readiness check handler
 func readinessCheck(c *fiber.Ctx) error {
 	log.Info().

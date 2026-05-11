@@ -19,6 +19,14 @@ func NewCertHandler(cfg *config.Config) *CertHandler {
 
 // GetCert returns the server's TLS certificate in PEM format.
 // Only available when TLS is enabled.
+//
+// @Summary Download server certificate
+// @Description Get the server's TLS certificate in PEM format. Only available when TLS is enabled.
+// @Tags system
+// @Produce application/x-pem-file
+// @Success 200 {file} binary
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/cert [get]
 func (h *CertHandler) GetCert(c *fiber.Ctx) error {
 	if !h.cfg.Server.EnableTLS || h.cfg.Server.DisableTLS {
 		return c.Status(404).JSON(fiber.Map{"error": "TLS not enabled"})
