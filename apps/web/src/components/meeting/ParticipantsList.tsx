@@ -74,6 +74,7 @@ export function ParticipantsList({ onClose }: Props) {
           </span>
         </div>
         <button
+          type="button"
           onClick={onClose}
           style={{
             width: 28,
@@ -121,6 +122,7 @@ function ParticipantRow({ p, adminId }: RowProps): React.ReactElement {
   const isGuest = !isRoomAdmin && !isMod && participantAccesses.includes('guest')
 
   const row = (
+    // biome-ignore lint/a11y/noStaticElementInteractions: hover highlight is visual only, not interactive
     <div
       className="group"
       style={{

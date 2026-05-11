@@ -74,6 +74,7 @@ export function ChatPanel({ onClose }: Props) {
           <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600 }}>Chat</span>
         </div>
         <button
+          type="button"
           onClick={onClose}
           style={{
             width: 28,

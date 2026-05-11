@@ -169,6 +169,7 @@ function RoomDetailPage() {
       {/* Back + header */}
       <div className="flex items-center gap-3">
         <button
+          type="button"
           onClick={() => navigate({ to: '/dashboard/admin/rooms' })}
           className="p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
         >
@@ -182,6 +183,7 @@ function RoomDetailPage() {
           </p>
         </div>
         <button
+          type="button"
           onClick={() => queryClient.invalidateQueries({ queryKey: ['admin', 'room', roomId, 'participants'] })}
           className="p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           title="Refresh now"
@@ -398,6 +400,7 @@ function RoomDetailPage() {
                   <div className="flex items-center gap-1 shrink-0">
                     {/* Mute */}
                     <button
+                      type="button"
                       onClick={() => mute.mutate(p.identity)}
                       disabled={mute.isPending || audioTracks.every((t) => t.muted)}
                       className="p-1.5 text-muted-foreground transition-colors hover:bg-amber-500/10 hover:text-amber-500 disabled:opacity-30 disabled:cursor-not-allowed"
@@ -410,6 +413,7 @@ function RoomDetailPage() {
                     {confirmKick === p.identity ? (
                       <div className="flex items-center gap-1">
                         <button
+                          type="button"
                           onClick={() => kick.mutate(p.identity)}
                           disabled={kick.isPending}
                           className="px-2 py-1 text-xs font-semibold text-white"
@@ -418,6 +422,7 @@ function RoomDetailPage() {
                           Kick
                         </button>
                         <button
+                          type="button"
                           onClick={() => setConfirmKick(null)}
                           className="px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground"
                         >
@@ -426,6 +431,7 @@ function RoomDetailPage() {
                       </div>
                     ) : (
                       <button
+                        type="button"
                         onClick={() => setConfirmKick(p.identity)}
                         className="p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                         title="Kick participant"

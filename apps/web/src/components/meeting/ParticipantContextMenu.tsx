@@ -332,6 +332,8 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
           </Item>
 
           {/* 4 — Volume slider (client-side, like Discord) — up to 200% */}
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: wrapper stops propagation so slider doesn't close menu */}
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: wrapper stops propagation, not an interactive action */}
           <div
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
@@ -429,6 +431,8 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
           </div>
 
           {statsOpen && (
+            // biome-ignore lint/a11y/noStaticElementInteractions: wrapper stops propagation so stats don't close menu
+            // biome-ignore lint/a11y/useKeyWithClickEvents: wrapper stops propagation, not an interactive action
             <div
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
@@ -576,6 +580,7 @@ export function ParticipantMenuButton({ participant, isPinned, onTogglePin }: Bu
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button
+          type="button"
           aria-label="Participant options"
           onClick={(e) => e.stopPropagation()}
           style={{

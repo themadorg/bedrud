@@ -141,6 +141,7 @@ function SidebarContent({
             <p className="truncate text-[10px] text-muted-foreground">{user?.email ?? ''}</p>
           </div>
           <button
+            type="button"
             onClick={onLogout}
             className="rounded p-1 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
             title="Sign out"
@@ -173,6 +174,7 @@ function MobileNav({ user, onLogout }: { user: User | null; onLogout: () => void
   return (
     <>
       <button
+        type="button"
         onClick={() => setOpen(true)}
         className="lg:hidden p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
         aria-label="Open navigation"
@@ -220,7 +222,10 @@ function TopBar({ user, onLogout }: { user: User | null; onLogout: () => void })
         <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring">
+            <button
+              type="button"
+              className="rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+            >
               <Avatar className="h-6 w-6">
                 {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
                 <AvatarFallback className="bg-primary text-[9px] font-semibold text-primary-foreground">

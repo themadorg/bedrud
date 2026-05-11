@@ -59,6 +59,7 @@ function ParticipantsToggle({ isOpen, onToggle }: { isOpen: boolean; onToggle: (
   const participants = useParticipants()
   return (
     <button
+      type="button"
       onClick={onToggle}
       style={{
         position: 'absolute',
@@ -93,6 +94,7 @@ function ChatToggle({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => voi
   const { unreadCount } = useMeetingChatContext()
   return (
     <button
+      type="button"
       onClick={onToggle}
       style={{
         position: 'absolute',

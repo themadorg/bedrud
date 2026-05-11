@@ -108,7 +108,9 @@ function useMutedMicMonitor() {
         return // no mic permission — nothing we can do
       }
       if (cancelled) {
-        stream.getTracks().forEach((t) => t.stop())
+        stream.getTracks().forEach((t) => {
+          t.stop()
+        })
         return
       }
 
@@ -139,7 +141,9 @@ function useMutedMicMonitor() {
     return () => {
       cancelled = true
       cancelAnimationFrame(animFrame)
-      stream?.getTracks().forEach((t) => t.stop())
+      stream?.getTracks().forEach((t) => {
+        t.stop()
+      })
       ac?.close()
     }
   }, [isMicrophoneEnabled, isSelfDeafened])

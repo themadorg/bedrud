@@ -126,6 +126,7 @@ export function SpotlightView({ participant, onClose }: Props) {
 
         {/* Exit spotlight */}
         <button
+          type="button"
           onClick={onClose}
           style={{
             position: 'absolute',

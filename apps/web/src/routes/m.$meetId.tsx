@@ -201,6 +201,7 @@ function MeetingPage() {
           />
           <div style={{ display: 'flex', gap: 10 }}>
             <button
+              type="button"
               disabled={!guestInput.trim()}
               onClick={() => setGuestName(guestInput.trim())}
               style={{
@@ -220,6 +221,7 @@ function MeetingPage() {
               Join
             </button>
             <button
+              type="button"
               onClick={() => navigate({ to: '/auth/login', search: { redirect: `/m/${meetId}` } })}
               style={{
                 padding: '10px 14px',

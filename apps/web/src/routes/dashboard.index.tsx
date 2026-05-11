@@ -91,6 +91,7 @@ function QuickJoinBar({ onJoin, onCreate }: { onJoin: (name: string) => void; on
         )}
       </form>
       <button
+        type="button"
         onClick={onCreate}
         className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
       >
@@ -131,12 +132,14 @@ function RoomRow({
         </p>
         <div className="flex items-center gap-1.5">
           <button
+            type="button"
             onClick={() => setConfirmDelete(false)}
             className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={() => {
               onDelete()
               setConfirmDelete(false)
@@ -158,7 +161,11 @@ function RoomRow({
           className={cn('h-2 w-2 shrink-0 rounded-full', room.isActive ? 'bg-emerald-500' : 'bg-muted-foreground/20')}
           title={room.isActive ? 'Live' : 'Inactive'}
         />
-        <button onClick={onJoin} className="min-w-0 truncate font-mono text-sm font-medium hover:underline">
+        <button
+          type="button"
+          onClick={onJoin}
+          className="min-w-0 truncate font-mono text-sm font-medium hover:underline"
+        >
           {room.name}
         </button>
       </div>
@@ -186,6 +193,7 @@ function RoomRow({
       {/* Actions */}
       <div className="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
         <button
+          type="button"
           onClick={copyLink}
           className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
           title={copied ? 'Copied!' : 'Copy link'}
@@ -193,6 +201,7 @@ function RoomRow({
           {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
         <button
+          type="button"
           onClick={onSettings}
           className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
           title="Settings"
@@ -200,6 +209,7 @@ function RoomRow({
           <Settings2 className="h-3.5 w-3.5" />
         </button>
         <button
+          type="button"
           onClick={() => setConfirmDelete(true)}
           className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
           title="Delete"
@@ -210,6 +220,7 @@ function RoomRow({
 
       {/* Join button */}
       <button
+        type="button"
         onClick={onJoin}
         className={cn(
           'inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2.5 text-xs font-medium transition-colors',
@@ -232,6 +243,7 @@ function RecentRoomRow({ recent, onJoin, onRemove }: { recent: RecentRoom; onJoi
     <div className="group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-accent/50">
       <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
       <button
+        type="button"
         onClick={onJoin}
         className="min-w-0 flex-1 truncate text-left font-mono text-sm font-medium hover:underline"
       >
@@ -240,6 +252,7 @@ function RecentRoomRow({ recent, onJoin, onRemove }: { recent: RecentRoom; onJoi
       <span className="text-xs text-muted-foreground/50">{timeAgo(recent.joinedAt)}</span>
       <div className="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
         <button
+          type="button"
           onClick={onRemove}
           className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
           title="Remove from recent"
@@ -248,6 +261,7 @@ function RecentRoomRow({ recent, onJoin, onRemove }: { recent: RecentRoom; onJoi
         </button>
       </div>
       <button
+        type="button"
         onClick={onJoin}
         className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       >
@@ -366,6 +380,7 @@ function DashboardPage() {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-0.5 rounded-lg border bg-background p-0.5">
           <button
+            type="button"
             onClick={() => setTab('rooms')}
             className={cn(
               'rounded-md px-3 py-1 text-sm font-medium transition-colors',
@@ -376,6 +391,7 @@ function DashboardPage() {
             {rooms && <span className="ml-1.5 text-xs text-muted-foreground">{rooms.length}</span>}
           </button>
           <button
+            type="button"
             onClick={() => setTab('recent')}
             className={cn(
               'rounded-md px-3 py-1 text-sm font-medium transition-colors',
@@ -424,7 +440,11 @@ function DashboardPage() {
               {(rooms?.length ?? 0) > 0 ? (
                 <>
                   <p className="text-sm font-medium">No rooms match "{query}"</p>
-                  <button onClick={() => setQuery('')} className="mt-2 text-sm text-primary hover:underline">
+                  <button
+                    type="button"
+                    onClick={() => setQuery('')}
+                    className="mt-2 text-sm text-primary hover:underline"
+                  >
                     Clear filter
                   </button>
                 </>
@@ -433,6 +453,7 @@ function DashboardPage() {
                   <p className="text-sm font-medium">No rooms yet</p>
                   <p className="mt-1 text-xs text-muted-foreground">Create your first room to get started.</p>
                   <button
+                    type="button"
                     onClick={() => setCreateOpen(true)}
                     className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"
                   >

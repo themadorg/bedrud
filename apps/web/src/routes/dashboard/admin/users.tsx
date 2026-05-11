@@ -28,6 +28,7 @@ function ProviderBadge({ provider }: { provider: string }) {
 function StatusToggle({ user, onToggle, isPending }: { user: AdminUser; onToggle: () => void; isPending: boolean }) {
   return (
     <button
+      type="button"
       onClick={onToggle}
       disabled={isPending}
       className={cn(
@@ -127,13 +128,22 @@ function AdminUsersPage() {
         <div className="overflow-x-auto">
           <div className="min-w-[560px]">
             <div className="grid grid-cols-[1fr_1fr_auto_auto_auto_auto] gap-3 border-b bg-muted/30 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              <button className="text-left hover:text-foreground transition-colors" onClick={() => toggleSort('name')}>
+              <button
+                type="button"
+                className="text-left hover:text-foreground transition-colors"
+                onClick={() => toggleSort('name')}
+              >
                 Name <SortIcon field="name" />
               </button>
-              <button className="text-left hover:text-foreground transition-colors" onClick={() => toggleSort('email')}>
+              <button
+                type="button"
+                className="text-left hover:text-foreground transition-colors"
+                onClick={() => toggleSort('email')}
+              >
                 Email <SortIcon field="email" />
               </button>
               <button
+                type="button"
                 className="hidden sm:block text-left hover:text-foreground transition-colors"
                 onClick={() => toggleSort('provider')}
               >
@@ -142,6 +152,7 @@ function AdminUsersPage() {
               <span>Status</span>
               <span>Role</span>
               <button
+                type="button"
                 className="hidden sm:block text-left hover:text-foreground transition-colors"
                 onClick={() => toggleSort('createdAt')}
               >
@@ -190,6 +201,7 @@ function AdminUsersPage() {
                         onToggle={() => toggleStatus.mutate({ id: user.id, active: !user.isActive })}
                       />
                       <button
+                        type="button"
                         onClick={() =>
                           toggleAdmin.mutate({
                             id: user.id,

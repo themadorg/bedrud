@@ -66,7 +66,14 @@ export function MeetingHeader({ meetId }: MeetingHeaderProps) {
               style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }}
             />
           ) : (
-            <svg className="meet-connecting" width="10" height="10" viewBox="0 0 10 10">
+            <svg
+              className="meet-connecting"
+              width="10"
+              height="10"
+              viewBox="0 0 10 10"
+              role="img"
+              aria-label="Connecting"
+            >
               <circle cx="5" cy="5" r="4" fill="none" stroke="#eab308" strokeWidth="1.5" strokeDasharray="6 4" />
             </svg>
           )}

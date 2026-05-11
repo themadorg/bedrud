@@ -147,6 +147,7 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
         {hasCameraVideo && cameraTrack ? (
           /* Video stream — wrapper suppresses browser's native <video> context menu
              so right-click bubbles to the Radix ContextMenuTrigger instead */
+          // biome-ignore lint/a11y/noStaticElementInteractions: wrapper prevents native <video> context menu so Radix ContextMenu works
           <div style={{ position: 'absolute', inset: 0 }} onContextMenu={(e) => e.preventDefault()}>
             <VideoTrack
               trackRef={{ participant, source: Track.Source.Camera, publication: cameraTrack }}
@@ -299,6 +300,7 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
         {/* Pin button — always visible when pinned, appears on hover otherwise */}
         {onTogglePin && (
           <button
+            type="button"
             onClick={onTogglePin}
             className={isPinned ? undefined : 'group-hover:opacity-100'}
             style={{

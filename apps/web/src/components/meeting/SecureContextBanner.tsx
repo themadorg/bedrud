@@ -59,6 +59,7 @@ export function SecureContextBanner() {
         </p>
       </div>
       <button
+        type="button"
         onClick={() => setDismissed(true)}
         style={{
           background: 'none',

@@ -60,6 +60,7 @@ export function AskActionBanner() {
         {isUnmute ? 'A moderator is asking you to unmute.' : 'A moderator is asking you to turn on your camera.'}
       </span>
       <button
+        type="button"
         onClick={() => setDismissed(lastAsk.ts)}
         style={{
           background: 'none',

@@ -135,7 +135,7 @@ function CtrlBtn({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button onClick={onClick} style={style} aria-label={tip}>
+        <button type="button" onClick={onClick} style={style} aria-label={tip}>
           {children}
         </button>
       </TooltipTrigger>
@@ -369,6 +369,7 @@ export function ControlsBar({ onLeave }: Props) {
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              type="button"
               onClick={onLeave}
               style={{
                 height: btnSize,
@@ -430,6 +431,7 @@ export function ControlsBar({ onLeave }: Props) {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
+                type="button"
                 style={{
                   width: isMobile ? 20 : 24,
                   height: btnSize,
@@ -549,6 +551,7 @@ export function ControlsBar({ onLeave }: Props) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
+              type="button"
               style={{ ...iconBtn(false, false, isMobile ? 34 : 44), width: isMobile ? 34 : 36 }}
               aria-label="More options"
             >

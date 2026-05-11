@@ -71,6 +71,7 @@ export function ChatMessageList({ chatMessages, systemMessages, onScrollUnreadCh
   return (
     <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
       <div
+        role="log"
         ref={messagesRef}
         onScroll={handleScroll}
         onDrop={handleDrop}

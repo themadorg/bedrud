@@ -149,6 +149,7 @@ function UserDetailPage() {
       {/* Back + header */}
       <div className="flex items-center gap-3">
         <button
+          type="button"
           onClick={() => navigate({ to: '/dashboard/admin/users' })}
           className="p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
         >
@@ -159,6 +160,7 @@ function UserDetailPage() {
           <p className="text-xs text-muted-foreground mt-0.5">User detail</p>
         </div>
         <button
+          type="button"
           onClick={() => queryClient.invalidateQueries({ queryKey: ['admin', 'user', userId] })}
           className="p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           title="Refresh"
@@ -205,6 +207,7 @@ function UserDetailPage() {
                 {/* Actions */}
                 <div className="flex items-center gap-2 pb-1">
                   <button
+                    type="button"
                     onClick={() => toggleAdmin.mutate(isSuperadmin ? ['user'] : ['superadmin', 'user'])}
                     disabled={toggleAdmin.isPending}
                     title={isSuperadmin ? 'Remove admin' : 'Promote to admin'}
@@ -223,6 +226,7 @@ function UserDetailPage() {
                     {isSuperadmin ? 'Admin' : 'User'}
                   </button>
                   <button
+                    type="button"
                     onClick={() => toggleStatus.mutate(!user.isActive)}
                     disabled={toggleStatus.isPending}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-all hover:opacity-80 disabled:opacity-50"

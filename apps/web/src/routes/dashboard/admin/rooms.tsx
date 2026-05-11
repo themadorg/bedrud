@@ -104,18 +104,24 @@ function AdminRoomsPage() {
         <div className="overflow-x-auto">
           <div className="min-w-[560px]">
             <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-3 border-b bg-muted/30 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              <button className="text-left hover:text-foreground transition-colors" onClick={() => toggleSort('name')}>
+              <button
+                type="button"
+                className="text-left hover:text-foreground transition-colors"
+                onClick={() => toggleSort('name')}
+              >
                 Room <SortIcon field="name" />
               </button>
               <span>Visibility</span>
               <span>Status</span>
               <button
+                type="button"
                 className="text-left hover:text-foreground transition-colors"
                 onClick={() => toggleSort('maxParticipants')}
               >
                 Cap. <SortIcon field="maxParticipants" />
               </button>
               <button
+                type="button"
                 className="text-left hover:text-foreground transition-colors hidden sm:block"
                 onClick={() => toggleSort('createdAt')}
               >
@@ -195,6 +201,7 @@ function AdminRoomsPage() {
                       />
                     ) : (
                       <button
+                        type="button"
                         onClick={() => {
                           setEditingLimit(room.id)
                           setLimitValue(room.maxParticipants)
@@ -217,6 +224,7 @@ function AdminRoomsPage() {
                     {confirmClose === room.id ? (
                       <div className="flex items-center gap-1">
                         <button
+                          type="button"
                           onClick={() => closeRoom.mutate(room.id)}
                           disabled={closeRoom.isPending}
                           className="bg-destructive px-2 py-1 text-[10px] font-semibold text-destructive-foreground transition-opacity hover:opacity-80 disabled:opacity-50"
@@ -224,6 +232,7 @@ function AdminRoomsPage() {
                           Confirm
                         </button>
                         <button
+                          type="button"
                           onClick={() => setConfirmClose(null)}
                           className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                         >
@@ -232,6 +241,7 @@ function AdminRoomsPage() {
                       </div>
                     ) : (
                       <button
+                        type="button"
                         onClick={() => setConfirmClose(room.id)}
                         disabled={!room.isActive}
                         className="p-1.5 transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground"
