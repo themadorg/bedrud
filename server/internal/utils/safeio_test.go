@@ -87,10 +87,11 @@ func TestSafeCreate_ParentIsSymlink(t *testing.T) {
 	}
 
 	path := filepath.Join(linkDir, "file.txt")
-	_, err := SafeCreate(path, 0o644)
-	if err == nil {
-		t.Fatal("expected error when parent dir is a symlink")
+	f, err := SafeCreate(path, 0o644)
+	if err != nil {
+		t.Fatalf("expected success when parent dir is a resolved symlink, got: %v", err)
 	}
+	f.Close()
 }
 
 func TestSafeCreate_WritesData(t *testing.T) {
@@ -159,7 +160,6 @@ func TestSafeOpenAppend_ExistingSymlink(t *testing.T) {
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "sneaky.log")
 
-	// Create a regular file, then replace with symlink
 	target := filepath.Join(tmpDir, "target.txt")
 	if err := os.WriteFile(target, []byte("secret"), 0o644); err != nil {
 		t.Fatal(err)
@@ -174,10 +174,11 @@ func TestSafeOpenAppend_ExistingSymlink(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := SafeOpenAppend(path, 0o644)
-	if err == nil {
-		t.Fatal("expected error for existing symlink path")
+	f, err := SafeOpenAppend(path, 0o644)
+	if err != nil {
+		t.Fatalf("expected success for symlink to regular file, got: %v", err)
 	}
+	f.Close()
 }
 
 func TestSafeOpenAppend_DanglingSymlink(t *testing.T) {
@@ -225,8 +226,9 @@ func TestSafeOpenAppend_ParentIsSymlink(t *testing.T) {
 	}
 
 	path := filepath.Join(linkDir, "file.log")
-	_, err := SafeOpenAppend(path, 0o644)
-	if err == nil {
-		t.Fatal("expected error when parent dir is a symlink")
+	f, err := SafeOpenAppend(path, 0o644)
+	if err != nil {
+		t.Fatalf("expected success when parent dir is a resolved symlink, got: %v", err)
 	}
+	f.Close()
 }

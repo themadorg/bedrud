@@ -12,8 +12,12 @@ func checkParentChain(path string) error {
 	if err != nil {
 		return fmt.Errorf("cannot resolve parent path %s: %w", dir, err)
 	}
-	if resolved != dir {
-		return fmt.Errorf("parent path resolves to different path via symlinks: %s → %s", dir, resolved)
+	fi, err := os.Stat(resolved)
+	if err != nil {
+		return fmt.Errorf("cannot stat resolved parent path %s: %w", resolved, err)
+	}
+	if !fi.IsDir() {
+		return fmt.Errorf("resolved parent path is not a directory: %s", resolved)
 	}
 	return nil
 }
@@ -36,10 +40,7 @@ func SafeCreate(path string, perm os.FileMode) (*os.File, error) {
 func SafeOpenAppend(path string, perm os.FileMode) (*os.File, error) {
 	path = filepath.Clean(path)
 	if fi, err := os.Lstat(path); err == nil {
-		if fi.Mode()&os.ModeSymlink != 0 {
-			return nil, fmt.Errorf("path is a symlink: %s", path)
-		}
-		if !fi.Mode().IsRegular() {
+		if !fi.Mode().IsRegular() && fi.Mode()&os.ModeSymlink == 0 {
 			return nil, fmt.Errorf("path exists but is not a regular file: %s", path)
 		}
 	} else if !os.IsNotExist(err) {
