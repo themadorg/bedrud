@@ -129,6 +129,34 @@ docker run -d \
   bedrud
 ```
 
+### TLS with Embedded LiveKit
+
+When server TLS is enabled, the embedded LiveKit process automatically configures TURN/TLS (port 5349) using the server's certificate. Mount your cert/key and enable TLS:
+
+```bash
+docker run -d \
+  --name bedrud \
+  -p 443:443 \
+  -p 5349:5349 \
+  -v /path/to/cert.pem:/etc/bedrud/cert.pem \
+  -v /path/to/key.pem:/etc/bedrud/key.pem \
+  -e SERVER_ENABLE_TLS=true \
+  -e SERVER_CERT_FILE=/etc/bedrud/cert.pem \
+  -e SERVER_KEY_FILE=/etc/bedrud/key.pem \
+  bedrud
+```
+
+For a custom LiveKit YAML (advanced TURN/RTC config), mount it and set `LIVEKIT_CONFIG_PATH`:
+
+```bash
+docker run -d \
+  --name bedrud \
+  -p 8090:8090 \
+  -v /path/to/livekit.yaml:/etc/bedrud/livekit.yaml \
+  -e LIVEKIT_CONFIG_PATH=/etc/bedrud/livekit.yaml \
+  bedrud
+```
+
 ## Pre-built Images
 
 Docker images are published to GitHub Container Registry on every release:

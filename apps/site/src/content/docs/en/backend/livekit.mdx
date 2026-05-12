@@ -10,7 +10,7 @@ Bedrud uses **LiveKit** to handle real-time video and audio communication. LiveK
 
 Bedrud supports two LiveKit deployment modes:
 
-1.  **Embedded Mode (Default):** The backend starts and manages a LiveKit server process internally. No additional infrastructure is required - the backend handles the LiveKit process lifecycle.
+1.  **Embedded Mode (Default):** The backend starts and manages a LiveKit server process internally. No additional infrastructure is required - the backend handles the LiveKit process lifecycle. When server TLS is enabled, TURN/TLS is automatically configured using the server's certificate.
 2.  **External Mode:** Bedrud connects to a separate LiveKit server or cluster. This is useful for horizontal scaling or when using a managed LiveKit Cloud instance.
 
 ### Configuring External Mode

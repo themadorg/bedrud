@@ -28,7 +28,47 @@ sudo bedrud install --tls --ip YOUR_SERVER_IP --domain your.domain.com
 
 ### Option 2: Manual Certificate Generation
 
-If the installer's built-in generation doesn't fit your workflow, add `-addext` flags to the openssl commands:
+If the installer's built-in generation doesn't fit your workflow, add `-addext` flags to the openssl commands.
+
+Bedrud generates **Ed25519** keys by default (PKCS8 format, ~128-bit security, deterministic signatures, 32-byte public keys), configurable to ECDSA P256 or RSA via the `certAlgorithm` config field or `--cert-algorithm` CLI flag. Choose the key type that matches your environment:
+
+#### Ed25519 (matches Bedrud's built-in generation, recommended)
+
+```bash
+openssl genpkey -algorithm ed25519 -out ca.key
+openssl req -new -x509 -days 3650 -key ca.key -out ca.crt \
+  -subj "/CN=Bedrud Internal CA"
+
+openssl genpkey -algorithm ed25519 -out server.key
+openssl req -new -key server.key -out server.csr \
+  -subj "/CN=<your-server-ip-or-hostname>" \
+  -addext "subjectAltName=IP:YOUR_SERVER_IP"
+openssl x509 -req -days 1825 -in server.csr \
+  -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt \
+  -addext "subjectAltName=IP:YOUR_SERVER_IP"
+
+sudo ./bedrud install --tls --cert server.crt --key server.key --ip YOUR_SERVER_IP
+```
+
+#### ECDSA P256 (alternative)
+
+```bash
+openssl ecparam -genkey -name prime256v1 -out ca.key
+openssl req -new -x509 -days 3650 -key ca.key -out ca.crt \
+  -subj "/CN=Bedrud Internal CA"
+
+openssl ecparam -genkey -name prime256v1 -out server.key
+openssl req -new -key server.key -out server.csr \
+  -subj "/CN=<your-server-ip-or-hostname>" \
+  -addext "subjectAltName=IP:YOUR_SERVER_IP"
+openssl x509 -req -days 1825 -in server.csr \
+  -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt \
+  -addext "subjectAltName=IP:YOUR_SERVER_IP"
+
+sudo ./bedrud install --tls --cert server.crt --key server.key --ip YOUR_SERVER_IP
+```
+
+#### RSA (legacy compatibility, larger keys)
 
 ```bash
 openssl genrsa -out ca.key 4096
@@ -49,6 +89,12 @@ sudo ./bedrud install --tls --cert server.crt --key server.key --ip YOUR_SERVER_
 ## HTTP Listener Port
 
 When TLS is enabled, Bedrud also starts an HTTP listener (default port 80) for bots and local access. Ports below 1024 require root on Linux.
+
+### TURN/TLS Auto-Configuration
+
+When server TLS is enabled (via the installer or `server.enableTLS: true`), the embedded LiveKit process automatically generates a temporary config with TURN/TLS settings. The server's TLS certificate is reused for TURN/TLS on port 5349. No additional configuration is needed.
+
+For custom TURN settings (separate domain, different cert, port overrides), provide a LiveKit YAML config file via `livekit.configPath` in `config.yaml` or the `LIVEKIT_CONFIG_PATH` environment variable.
 
 **Non-root setups** — set an unprivileged port in `/etc/bedrud/config.yaml`:
 
@@ -122,8 +168,8 @@ Restart browsers, then open `https://YOUR_SERVER_IP` (replace with the server's 
 |---------|-----|
 | Browser still warns certificate untrusted | Clear browser cache, restart browser after CA install |
 | Camera/mic blocked | Verify CA is in Trusted Root CAs, not intermediate |
-| Certificate expired | Regenerate with longer `-days` value |
-| CN mismatch | Ensure server certificate CN matches IP or hostname in URL |
+| Certificate expired | Run `sudo bedrud cert renew` to regenerate (auto-renewal every 24h at 09:00) |
+| CN mismatch | Modern browsers ignore the CN field — SAN is authoritative. Use the installer's built-in cert generation (recommended) or add `-addext 'subjectAltName=...'` to the openssl command |
 | Missing SANs | Modern browsers ignore the CN field. Use the installer's built-in cert generation (recommended) or add `-addext 'subjectAltName=...'` to the openssl command |
 
 ---

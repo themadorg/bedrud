@@ -118,6 +118,8 @@ docker build -t bedrud .
 docker run -d --name bedrud -p 8090:8090 -p 7880:7880 -v bedrud-data:/var/lib/bedrud bedrud
 ```
 
+When server TLS is enabled in Docker (via `SERVER_ENABLE_TLS=true` with mounted certs), the embedded LiveKit process automatically configures TURN/TLS using the server's certificate. For custom LiveKit configuration, mount a LiveKit YAML and set `LIVEKIT_CONFIG_PATH`.
+
 A pre-built image is also available:
 
 ```bash

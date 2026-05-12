@@ -53,6 +53,8 @@ livekit:
   internalHost: "http://127.0.0.1:7880"  # Internal LiveKit URL
   apiKey: "devkey"              # LiveKit API key
   apiSecret: "devsecret"        # LiveKit API secret
+  # configPath: "/etc/bedrud/livekit.yaml"  # Path to LiveKit YAML. Env: LIVEKIT_CONFIG_PATH
+  # When server TLS is enabled, TURN/TLS is auto-configured for embedded mode.
 
 auth:
   jwtSecret: "your-jwt-secret"           # Secret for signing JWT tokens
@@ -76,6 +78,12 @@ cors:
   allowedHeaders: "Origin, Content-Type, Accept, Authorization"
   allowedMethods: "GET, POST, PUT, DELETE, OPTIONS"
   allowCredentials: true
+
+rateLimit:
+  authMaxRequests: 10       # Max auth requests per window (login, register, refresh, passkey). 0 = disable
+  authWindowSecs: 60         # Auth rate limit window in seconds
+  guestMaxRequests: 5        # Max guest join requests per window. 0 = disable
+  guestWindowSecs: 60        # Guest rate limit window in seconds
 ```
 
 ### Key Settings
@@ -99,6 +107,15 @@ The `jwtSecret` is used to sign access and refresh tokens. Change this from the 
 #### CORS
 
 The `allowedOrigins` string (comma-separated) must include the URL where your frontend is served. In development, this is `http://localhost:3000`. In production, set it to your domain (e.g., `https://meet.example.com`).
+
+#### Rate Limiting
+
+Rate limiting protects auth endpoints from brute-force and DoS attacks. Two buckets:
+
+- **Auth endpoints** (login, register, refresh, passkey login/signup) — default: 10 requests per 60 seconds per IP
+- **Guest join** — default: 5 requests per 60 seconds per IP
+
+Omit the `rateLimit` section to keep defaults. Set `authMaxRequests: 0` or `guestMaxRequests: 0` to disable.
 
 ---
 
@@ -212,6 +229,7 @@ export LIVEKIT_API_SECRET=prodsecret
 | `LIVEKIT_INTERNAL_HOST` | `livekit.internalHost` | Internal LiveKit URL |
 | `LIVEKIT_API_KEY` | `livekit.apiKey` | LiveKit API key |
 | `LIVEKIT_API_SECRET` | `livekit.apiSecret` | LiveKit API secret |
+| `LIVEKIT_CONFIG_PATH` | `livekit.configPath` | Path to external LiveKit YAML config |
 | `JWT_SECRET` | `auth.jwtSecret` | Secret for signing JWT tokens |
 | `AUTH_FRONTEND_URL` | `auth.frontendURL` | Frontend URL for OAuth redirects |
 | `CORS_ALLOWED_ORIGINS` | `cors.allowedOrigins` | Comma-separated allowed origins |
@@ -220,6 +238,10 @@ export LIVEKIT_API_SECRET=prodsecret
 | `CORS_ALLOW_CREDENTIALS` | `cors.allowCredentials` | Allow credentials (`true`/`false`) |
 | `CORS_EXPOSE_HEADERS` | `cors.exposeHeaders` | Headers exposed to the browser |
 | `CORS_MAX_AGE` | `cors.maxAge` | Preflight cache duration in seconds |
+| `RATELIMIT_AUTH_MAX` | `rateLimit.authMaxRequests` | Max auth requests per rate limit window |
+| `RATELIMIT_AUTH_WINDOW` | `rateLimit.authWindowSecs` | Auth rate limit window in seconds |
+| `RATELIMIT_GUEST_MAX` | `rateLimit.guestMaxRequests` | Max guest join requests per window |
+| `RATELIMIT_GUEST_WINDOW` | `rateLimit.guestWindowSecs` | Guest rate limit window in seconds |
 
 ---
 

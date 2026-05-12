@@ -108,6 +108,8 @@ For a 5-person meeting with one relayed participant: server handles ~1.5 Mbps ex
 
 **File:** `server/config/livekit.yaml` (dev) or `/etc/bedrud/livekit.yaml` (production)
 
+In embedded mode (default), when server TLS is enabled, TURN/TLS config is automatically generated from the server's TLS certificate — no manual configuration required. For custom TURN settings, provide a LiveKit YAML via `livekit.configPath` or the `LIVEKIT_CONFIG_PATH` environment variable.
+
 ```yaml
 turn:
   enabled: true
