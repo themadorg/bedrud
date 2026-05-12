@@ -11,13 +11,16 @@ import {
   RefreshCw,
   Shield,
   ShieldOff,
+  Trash2,
   UserCheck,
   Users,
   UserX,
   Video,
 } from 'lucide-react'
+import { useState } from 'react'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { api } from '#/lib/api'
+import { useUserStore } from '#/lib/user.store'
 
 export const Route = createFileRoute('/dashboard/admin/users_/$userId')({ component: UserDetailPage })
 
@@ -120,6 +123,9 @@ function UserDetailPage() {
   const { userId } = Route.useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const currentUser = useUserStore((s) => s.user)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [confirmEmail, setConfirmEmail] = useState('')
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'user', userId],
@@ -134,6 +140,14 @@ function UserDetailPage() {
   const toggleAdmin = useMutation({
     mutationFn: (accesses: string[]) => api.put(`/api/admin/users/${userId}/accesses`, { accesses }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'user', userId] }),
+  })
+
+  const deleteUser = useMutation({
+    mutationFn: () => api.delete(`/api/admin/users/${userId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+      navigate({ to: '/dashboard/admin/users' })
+    },
   })
 
   const user = data?.user
@@ -248,6 +262,24 @@ function UserDetailPage() {
                       </>
                     )}
                   </button>
+                  {currentUser?.id !== user.id && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmEmail('')
+                        setDeleteDialogOpen(true)
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-all hover:opacity-80"
+                      style={{
+                        background: '#ef444415',
+                        color: '#f87171',
+                        border: '1px solid #ef444430',
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -472,6 +504,96 @@ function UserDetailPage() {
           ← Back to all users
         </Link>
       </p>
+
+      {/* Delete confirmation dialog */}
+      {deleteDialogOpen && user && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setDeleteDialogOpen(false)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setDeleteDialogOpen(false)
+            }}
+            tabIndex={0}
+            aria-label="Close dialog"
+          />
+          <div
+            className="relative z-10 w-full max-w-md border bg-background p-6 shadow-lg"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div
+                className="flex h-10 w-10 items-center justify-center"
+                style={{ background: '#ef444415', color: '#f87171' }}
+              >
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Delete user</h3>
+                <p className="text-sm text-muted-foreground">This action is permanent and cannot be undone</p>
+              </div>
+            </div>
+
+            <div className="mb-4 p-3 text-sm" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
+              <p className="font-medium text-foreground">{user.name || '—'}</p>
+              <p className="text-xs mt-0.5">{user.email}</p>
+            </div>
+
+            <p className="text-sm text-muted-foreground mb-3">
+              All data associated with this user will be permanently removed including room participation, permissions,
+              and refresh tokens.
+            </p>
+
+            <div className="mb-4">
+              <label className="text-sm font-medium" htmlFor="confirm-email">
+                Type <span className="font-mono">{user.email}</span> to confirm
+              </label>
+              <input
+                id="confirm-email"
+                type="text"
+                value={confirmEmail}
+                onChange={(e) => setConfirmEmail(e.target.value)}
+                placeholder={user.email}
+                className="mt-1.5 h-10 w-full border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                style={{ borderColor: 'var(--border)' }}
+              />
+            </div>
+
+            {deleteUser.isError && (
+              <div
+                className="mb-3 flex items-center gap-2 border px-3 py-2 text-sm"
+                style={{
+                  borderColor: '#ef444430',
+                  background: '#ef444415',
+                  color: '#f87171',
+                }}
+              >
+                {deleteUser.error instanceof Error ? deleteUser.error.message : 'Failed to delete user'}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteDialogOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteUser.mutate()}
+                disabled={confirmEmail !== user.email || deleteUser.isPending}
+                className="px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: '#ef4444' }}
+              >
+                {deleteUser.isPending ? 'Deleting...' : 'Delete permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -184,6 +184,49 @@ func (h *UsersHandler) UpdateUserStatus(c *fiber.Ctx) error {
 	})
 }
 
+// DeleteUser permanently deletes a user
+// @Summary Delete a user
+// @Description Permanently delete a user and all associated data (requires superadmin access). Cannot delete your own account.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID"
+// @Security BearerAuth
+// @Success 200 {object} UserStatusUpdateResponse "User deleted successfully"
+// @Failure 400 {object} ErrorResponse "Cannot delete own account"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 404 {object} ErrorResponse "User not found"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /admin/users/{id} [delete]
+func (h *UsersHandler) DeleteUser(c *fiber.Ctx) error {
+	claims, ok := c.Locals("user").(*auth.Claims)
+	if !ok || claims == nil || !containsAccess(claims.Accesses, "superadmin") {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Insufficient permissions"})
+	}
+
+	userID := c.Params("id")
+
+	if userID == claims.UserID {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Cannot delete your own account. Use the CLI or have another admin perform this action.",
+		})
+	}
+
+	user, err := h.userRepo.GetUserByID(userID)
+	if err != nil || user == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+	}
+
+	if err := h.userRepo.DeleteUser(userID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete user"})
+	}
+
+	return c.JSON(UserStatusUpdateResponse{
+		Message: "User deleted permanently",
+	})
+}
+
 func (h *UsersHandler) GetUserDetail(c *fiber.Ctx) error {
 	userID := c.Params("id")
 	user, err := h.userRepo.GetUserByID(userID)
