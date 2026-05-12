@@ -21,6 +21,7 @@ type InstallConfig struct {
 	ExternalLKURL       string
 	LKDomain            string
 	LKIP                string
+	CertAlgorithm       string
 }
 
 // SetDefaults populates empty fields with their default values.

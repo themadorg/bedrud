@@ -1,6 +1,7 @@
 package install
 
 import (
+	"bedrud/internal/livekit"
 	"bedrud/internal/utils"
 	"errors"
 	"fmt"
@@ -56,32 +57,6 @@ type installConfigYAML struct {
 		AllowedOrigins   string `yaml:"allowedOrigins"`
 		AllowCredentials bool   `yaml:"allowCredentials"`
 	} `yaml:"cors"`
-}
-
-type livekitConfigYAML struct {
-	Port          string            `yaml:"port"`
-	BindAddresses []string          `yaml:"bind_addresses"`
-	Keys          map[string]string `yaml:"keys"`
-	RTC           struct {
-		TCPPort        string `yaml:"tcp_port"`
-		UDPPort        string `yaml:"udp_port,omitempty"`
-		PortRangeStart string `yaml:"port_range_start,omitempty"`
-		PortRangeEnd   string `yaml:"port_range_end,omitempty"`
-		UseExternalIP  bool   `yaml:"use_external_ip"`
-		NodeIP         string `yaml:"node_ip"`
-	} `yaml:"rtc"`
-	TURN struct {
-		Enabled  bool   `yaml:"enabled"`
-		Domain   string `yaml:"domain"`
-		UDPPort  int    `yaml:"udp_port"`
-		TLSPort  int    `yaml:"tls_port,omitempty"`
-		CertFile string `yaml:"cert_file,omitempty"`
-		KeyFile  string `yaml:"key_file,omitempty"`
-	} `yaml:"turn"`
-	Logging struct {
-		JSON  bool   `yaml:"json"`
-		Level string `yaml:"level"`
-	} `yaml:"logging"`
 }
 
 func LinuxInstall(cfg *InstallConfig) error {
@@ -280,7 +255,7 @@ func LinuxInstall(cfg *InstallConfig) error {
 			lkBindAddr = "0.0.0.0"
 		}
 
-		var lkYAML livekitConfigYAML
+		var lkYAML livekit.ConfigYAML
 		lkYAML.Port = cfg.LKPort
 		lkYAML.BindAddresses = []string{lkBindAddr}
 		lkYAML.Keys = map[string]string{apiKey: apiSecret}
@@ -318,14 +293,18 @@ func LinuxInstall(cfg *InstallConfig) error {
 	if cfg.EnableTLS && cfg.CertPath == "" && cfg.KeyPath == "" {
 		cp, kp := "/etc/bedrud/cert.pem", "/etc/bedrud/key.pem"
 		if _, err := os.Stat(cp); os.IsNotExist(err) {
-			hosts := []string{"localhost"}
+			hosts := []string{"localhost", "127.0.0.1", "::1"}
 			if cfg.OverrideIP != "" && cfg.OverrideIP != "127.0.0.1" && cfg.OverrideIP != "localhost" {
 				hosts = append(hosts, cfg.OverrideIP)
 			}
 			if cfg.Domain != "" {
 				hosts = append(hosts, cfg.Domain)
 			}
-			if err := utils.GenerateSelfSignedCert(cp, kp, hosts...); err != nil {
+			algo := utils.KeyAlgorithm(cfg.CertAlgorithm)
+			if algo == "" {
+				algo = utils.KeyEd25519
+			}
+			if err := utils.GenerateSelfSignedCertWithAlgo(cp, kp, algo, hosts...); err != nil {
 				return fmt.Errorf("failed to generate self-signed cert: %w", err)
 			}
 		}
