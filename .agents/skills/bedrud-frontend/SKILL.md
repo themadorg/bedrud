@@ -79,9 +79,9 @@ __root__                          (root layout — QueryClient, theme, auth init
 | 13 | `dashboard/settings/audio.tsx` | `/dashboard/settings/audio` | Leaf | — | — | Noise suppression (Off/Browser/RNNoise/Krisp), echo cancel, AGC, mic test with volume meter, input gain, noise gate, muted beep. Syncs `GET/PUT /api/auth/preferences` |
 | 14 | `dashboard/admin.tsx` | `/dashboard/admin` | Layout+Guard | `beforeLoad`: redirect `/dashboard` if not admin + client `useEffect` check | — | Guard only. Renders `<Outlet />` |
 | 15 | `dashboard/admin/index.tsx` | `/dashboard/admin` | Leaf | — | — | Admin overview. Stat cards, room creation area chart (7d, Recharts), recent signups, room breakdown |
-| 16 | `dashboard/admin/rooms.tsx` | `/dashboard/admin/rooms` | Leaf | — | — | Rooms table: search, sort, inline-editable max participants, force-close |
-| 17 | `dashboard/admin/rooms_.$roomId.tsx` | `/dashboard/admin/rooms/$roomId` | Leaf | — | — | Room detail. Stats, live bitrate chart (3s poll, Recharts), participants table with mute/kick |
-| 18 | `dashboard/admin/users.tsx` | `/dashboard/admin/users` | Leaf | — | — | Users table: search, sort, active/banned toggle, admin promote/demote |
+| 16 | `dashboard/admin/rooms.tsx` | `/dashboard/admin/rooms` | Leaf | — | — | Rooms table: search, sort, pagination, inline-editable max participants, persistent pin indicator, force-close |
+| 17 | `dashboard/admin/rooms_.$roomId.tsx` | `/dashboard/admin/rooms/$roomId` | Leaf | — | — | Room detail. Stats, live bitrate chart (3s poll, Recharts), participants table with mute/kick, persistent toggle |
+| 18 | `dashboard/admin/users.tsx` | `/dashboard/admin/users` | Leaf | — | — | Users table: search, sort, pagination, active/banned toggle, admin promote/demote |
 | 19 | `dashboard/admin/users_.$userId.tsx` | `/dashboard/admin/users/$userId` | Leaf | — | — | User detail. Hero card, promote/demote/ban actions, room activity chart, rooms table |
 | 20 | `dashboard/admin/settings.tsx` | `/dashboard/admin/settings` | Leaf | — | — | System settings. 7 tabs: General (reg mode + invite tokens), Auth (passkeys + OAuth), LiveKit, Server, CORS, Chat uploads, Logging |
 | 21 | `m.$meetId.tsx` | `/m/$meetId` | Leaf | — | — | Live meeting. `LiveKitRoom` + `MeetingProvider` + `BeforeUnloadLock` + `KickDetector` + `AskActionBanner` + `AudioProcessorManager` + `MeetingSoundEffects` + `MeetingHeader` + `MeetingPanels` + `MeetingLayout` (FocusLayout vs ParticipantGrid). Audio constraints from `useAudioPreferencesStore` |

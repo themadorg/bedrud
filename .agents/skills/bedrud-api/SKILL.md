@@ -213,11 +213,11 @@ No secrets exposed.
 
 ### Notes
 
-- Create: auto-generates name if empty (`xxx-xxxx-xxx`). 409 on name conflict. Creator auto-added as approved participant + admin perms. 24h expiry.
+- Create: auto-generates name if empty (`xxx-xxxx-xxx`). 409 on name conflict. Strips `isPersistent` from settings (superadmin-only, set via AdminUpdateRoom). Creator auto-added as approved participant + admin perms. 24h expiry.
 - Join: looks up room by name. Adds participant. Generates LK token with user metadata. Rejects banned users.
 - Guest join: public rooms only. Restricted LK token. `guest-` prefixed identity.
 - Delete: creator or superadmin only.
-- Settings update: partial — only sent fields updated (pointer fields).
+- Settings update: partial — only sent fields updated (pointer fields). Preserves `isPersistent` (only changeable via AdminUpdateRoom).
 - Chat upload: MIME must be png/jpeg/gif/webp. SHA256 content hash filename. Max size from `chatUploadMaxBytes` config.
 
 ---
@@ -309,7 +309,7 @@ All routes: `Protected()` + `RequireAccess(superadmin)`. Prefix: `/api/admin`.
 |--------|------|---------|-----|-----|
 | GET | `/api/admin/rooms` | `roomHandler.AdminListRooms` | query: `page`, `limit` | `{"rooms":[],"total":int,"page":int,"limit":int}` |
 | POST | `/api/admin/rooms/:roomId/close` | `roomHandler.AdminCloseRoom` | — | `{"status":"success"}` |
-| PUT | `/api/admin/rooms/:roomId` | `roomHandler.AdminUpdateRoom` | `{maxParticipants *int}` | `models.Room` |
+| PUT | `/api/admin/rooms/:roomId` | `roomHandler.AdminUpdateRoom` | `{maxParticipants *int, settings *AdminUpdateRoomSettingsInput}` | `models.Room` |
 | POST | `/api/admin/rooms/:roomId/token` | `roomHandler.AdminGenerateToken` | — | 501 `{"error":"not yet implemented"}` |
 | GET | `/api/admin/rooms/:roomId/participants` | `roomHandler.AdminGetRoomParticipants` | — | `{"participants":[...],"room":Room}` |
 | POST | `/api/admin/rooms/:roomId/participants/:identity/kick` | `roomHandler.AdminKickParticipant` | — | `{"status":"success"}` |
@@ -329,6 +329,31 @@ All routes: `Protected()` + `RequireAccess(superadmin)`. Prefix: `/api/admin`.
     ]
 }
 ```
+
+### AdminUpdateRoom Request Body
+
+```go
+{
+    maxParticipants *int                          // optional
+    settings        *AdminUpdateRoomSettingsInput // optional, merge-patched
+}
+
+// AdminUpdateRoomSettingsInput — all fields are *bool for merge semantics
+AdminUpdateRoomSettingsInput {
+    allowChat       *bool
+    allowVideo      *bool
+    allowAudio      *bool
+    requireApproval *bool
+    e2ee            *bool
+    isPersistent    *bool   // superadmin toggle for persistent room
+}
+```
+
+### AdminUpdateRoom Notes
+
+- Partial merge: only sent fields override existing room settings. Unsent fields unchanged.
+- `isPersistent` can only be set via this endpoint (superadmin-only).
+- After settings + maxParticipants update, the room is re-fetched from DB and returned.
 
 ### Admin Close vs Delete
 
@@ -513,6 +538,7 @@ type RoomSettings struct {
     AllowAudio      bool `json:"allowAudio"      default:true`
     RequireApproval bool `json:"requireApproval" default:false`
     E2EE            bool `json:"e2ee"            default:false`
+    IsPersistent    bool `json:"isPersistent"    default:false` // superadmin-only, skips idle cleanup
 }
 ```
 

@@ -103,12 +103,12 @@ Request structs: `CreateRoomRequest{name, maxParticipants, isPublic, mode, setti
 
 | Fn | Method | Route | Purpose |
 |----|--------|-------|---------|
-| `CreateRoom` | POST | `/rooms` | Create in LK + DB. Auto-gen name if empty. 409 on conflict |
+| `CreateRoom` | POST | `/rooms` | Create in LK + DB. Auto-gen name if empty. Strips IsPersistent (superadmin-only). 409 on conflict |
 | `JoinRoom` | POST | `/rooms/join` | Lookup room, add participant, gen LK token with user metadata |
 | `GuestJoinRoom` | POST | `/rooms/guest-join` | Unauth guest join for public rooms. Restricted LK token |
 | `ListRooms` | GET | `/rooms` | User's created rooms |
 | `DeleteRoom` | DELETE | `/rooms/:roomId` | Delete from LK + DB. Creator or superadmin |
-| `UpdateSettings` | PATCH | `/rooms/:roomId/settings` | Partial update: isPublic, maxParticipants, settings |
+| `UpdateSettings` | PATCH | `/rooms/:roomId/settings` | Partial update: isPublic, maxParticipants, settings. Preserves IsPersistent (superadmin-only) |
 | `PromoteParticipant` | POST | `/rooms/:roomId/participants/:identity/promote` | Add "moderator" to LK metadata |
 | `DemoteParticipant` | POST | `/rooms/:roomId/participants/:identity/demote` | Remove "moderator" from metadata |
 | `KickParticipant` | DELETE | `/rooms/:roomId/participants/:identity` | Remove from LK + broadcast "kick" system msg |
@@ -125,7 +125,7 @@ Request structs: `CreateRoomRequest{name, maxParticipants, isPublic, mode, setti
 | `UploadChatImage` | POST | `/rooms/:roomId/chat/upload` | Multipart upload via ChatUploadStore |
 | `AdminListRooms` | GET | `/admin/rooms` | All rooms (DB) |
 | `AdminCloseRoom` | POST | `/admin/rooms/:roomId/close` | Delete from LK, set `IsActive = false` |
-| `AdminUpdateRoom` | PATCH | `/admin/rooms/:roomId` | Update maxParticipants (admin override) |
+| `AdminUpdateRoom` | PATCH | `/admin/rooms/:roomId` | Update maxParticipants + settings merge (superadmin). IsPersistent toggle via settings |
 | `AdminGetRoomParticipants` | GET | `/admin/rooms/:roomId/participants` | Live participants + track stats from LK |
 | `AdminKickParticipant` | DELETE | `/admin/rooms/:roomId/participants/:identity` | Kick (no creator check) |
 | `AdminMuteParticipant` | POST | `/admin/rooms/:roomId/participants/:identity/mute` | Mute audio (admin) |
@@ -225,6 +225,7 @@ RoomSettings {
   AllowAudio      bool   // default true
   RequireApproval bool   // default false
   E2EE            bool   // default false
+  IsPersistent    bool   // default false, skips idle cleanup
 }
 
 RoomParticipant {
@@ -377,7 +378,7 @@ RoomParticipant(1) ↔ (1)RoomPermissions  via (RoomID, UserID)
 | `UpdateParticipantPermissions(roomID, userID, perms)` | Write permission row |
 | `GetParticipantPermissions(roomID, userID)` | Read permission row |
 | `UpdateParticipantStatus(roomID, userID, updates)` | Generic map-based update |
-| `UpdateRoomSettings(roomID, settings)` | Update embedded settings |
+| `UpdateRoomSettings(roomID, settings)` | Atomic map-based update of embedded settings (all 6 fields). Merge-safe — only sent columns updated |
 | `UpdateRoom(room)` | Full save |
 | `DeleteRoom(roomID, userID)` | TX cascade. Checks created_by |
 | `AdminDeleteRoom(roomID)` | Same, no owner check |
@@ -385,7 +386,7 @@ RoomParticipant(1) ↔ (1)RoomPermissions  via (RoomID, UserID)
 | `GetRoomsCreatedByUser(userID)` | User's created rooms |
 | `GetRoomsParticipatedInByUser(userID)` | Rooms user joined |
 | `SetRoomIdle(roomID)` | Mark inactive |
-| `CleanupExpiredRooms()` | Bulk mark expired inactive |
+| `CleanupExpiredRooms()` | Bulk mark expired inactive. Excludes persistent rooms (`settings_is_persistent = false`) |
 | `GetUserByID(userID)` | Fetch user (for participant lookups) |
 | `CountActiveParticipants()` | Distinct count across all rooms |
 
@@ -494,7 +495,7 @@ DTOs: `ErrorResponse`, `RegisterRequest`, `LoginRequest`, `GuestLoginRequest`, `
 ## `internal/scheduler/scheduler.go`
 
 gocron scheduler. Every 1 min: `checkIdleRooms`.
-`checkIdleRooms(roomRepo, cfg, client)` — List active DB rooms → query LK participant counts → mark idle if 0 participants + >5min old.
+`checkIdleRooms(roomRepo, cfg, client)` — List active DB rooms → query LK participant counts → mark idle if 0 participants + >5min old. Skips rooms with `IsPersistent = true`. Logs error on failure, info on success.
 `Initialize(roomRepo, lkCfg)` — Setup + start async.
 `Stop()` — Graceful stop.
 
