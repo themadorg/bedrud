@@ -25,6 +25,15 @@ import (
 
 func boolPtr(b bool) *bool { return &b }
 
+type AdminUpdateRoomSettingsInput struct {
+	AllowChat       *bool `json:"allowChat"`
+	AllowVideo      *bool `json:"allowVideo"`
+	AllowAudio      *bool `json:"allowAudio"`
+	RequireApproval *bool `json:"requireApproval"`
+	E2EE            *bool `json:"e2ee"`
+	IsPersistent    *bool `json:"isPersistent"`
+}
+
 type CreateRoomRequest struct {
 	Name            string              `json:"name"`
 	MaxParticipants int                 `json:"maxParticipants"`
@@ -62,7 +71,7 @@ func NewRoomHandler(lkCfg *config.LiveKitConfig, chatCfg *config.ChatConfig, roo
 	}
 	client := livekit.NewRoomServiceProtobufClient(apiHost, httpClient)
 
-	uploadMax := chatCfg.Uploads.MaxBytes
+	uploadMax := chatCfg.Uploads.MaxBytes.Int64()
 	if uploadMax == 0 {
 		uploadMax = 10 * 1024 * 1024 // 10 MB default
 	}
@@ -118,6 +127,16 @@ func (h *RoomHandler) CreateRoom(c *fiber.Ctx) error {
 	}
 
 	claims := c.Locals("user").(*auth.Claims)
+	isSuperAdmin := false
+	for _, a := range claims.Accesses {
+		if a == string(models.AccessSuperAdmin) {
+			isSuperAdmin = true
+			break
+		}
+	}
+	if !isSuperAdmin {
+		req.Settings.IsPersistent = false
+	}
 	ctx := h.withAuth(c.Context(), &lkauth.VideoGrant{RoomCreate: true})
 	_, err := h.client.CreateRoom(ctx, &livekit.CreateRoomRequest{Name: req.Name, MaxParticipants: uint32(req.MaxParticipants)})
 	if err != nil {
@@ -159,13 +178,13 @@ func (h *RoomHandler) JoinRoom(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "Room not found"})
 	}
 
-		// Re-activate inactive rooms on join - starts a new session.
-		if !room.IsActive {
-			room.IsActive = true
-			if err := h.roomRepo.UpdateRoom(room); err != nil {
-				log.Error().Err(err).Str("room", room.Name).Msg("Failed to re-activate room")
-			}
+	// Re-activate inactive rooms on join - starts a new session.
+	if !room.IsActive {
+		room.IsActive = true
+		if err := h.roomRepo.UpdateRoom(room); err != nil {
+			log.Error().Err(err).Str("room", room.Name).Msg("Failed to re-activate room")
 		}
+	}
 
 	// Enforce participant limit
 	if room.MaxParticipants > 0 {
@@ -810,6 +829,8 @@ func (h *RoomHandler) UpdateSettings(c *fiber.Ctx) error {
 		room.MaxParticipants = *input.MaxParticipants
 	}
 	if input.Settings != nil {
+		// Preserve admin-only field — persistence is only changeable via AdminUpdateRoom.
+		input.Settings.IsPersistent = room.Settings.IsPersistent
 		room.Settings = *input.Settings
 	}
 
@@ -856,7 +877,8 @@ func (h *RoomHandler) AdminCloseRoom(c *fiber.Ctx) error {
 func (h *RoomHandler) AdminUpdateRoom(c *fiber.Ctx) error {
 	roomID := c.Params("roomId")
 	var input struct {
-		MaxParticipants *int `json:"maxParticipants"`
+		MaxParticipants *int                          `json:"maxParticipants"`
+		Settings        *AdminUpdateRoomSettingsInput `json:"settings"`
 	}
 	if err := c.BodyParser(&input); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
@@ -868,13 +890,42 @@ func (h *RoomHandler) AdminUpdateRoom(c *fiber.Ctx) error {
 	if room == nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Room not found"})
 	}
+	if input.Settings != nil {
+		merged := room.Settings
+		if input.Settings.AllowChat != nil {
+			merged.AllowChat = *input.Settings.AllowChat
+		}
+		if input.Settings.AllowVideo != nil {
+			merged.AllowVideo = *input.Settings.AllowVideo
+		}
+		if input.Settings.AllowAudio != nil {
+			merged.AllowAudio = *input.Settings.AllowAudio
+		}
+		if input.Settings.RequireApproval != nil {
+			merged.RequireApproval = *input.Settings.RequireApproval
+		}
+		if input.Settings.E2EE != nil {
+			merged.E2EE = *input.Settings.E2EE
+		}
+		if input.Settings.IsPersistent != nil {
+			merged.IsPersistent = *input.Settings.IsPersistent
+		}
+		if err := h.roomRepo.UpdateRoomSettings(roomID, &merged); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to update room settings"})
+		}
+		room.Settings = merged
+	}
 	if input.MaxParticipants != nil {
 		room.MaxParticipants = *input.MaxParticipants
+		if err := h.roomRepo.UpdateRoom(room); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to update room"})
+		}
 	}
-	if err := h.roomRepo.UpdateRoom(room); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to update room"})
+	updated, err := h.roomRepo.GetRoom(roomID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch updated room"})
 	}
-	return c.JSON(room)
+	return c.JSON(updated)
 }
 
 func (h *RoomHandler) GetOnlineCount(c *fiber.Ctx) error {

@@ -8,6 +8,7 @@ import {
   Mic,
   MicOff,
   Monitor,
+  Pin,
   RefreshCw,
   Users,
   UserX,
@@ -45,7 +46,7 @@ interface RoomInfo {
   isActive: boolean
   maxParticipants: number
   createdAt: string
-  settings?: { allowChat: boolean; allowVideo: boolean; allowAudio: boolean; e2ee: boolean }
+  settings?: { allowChat: boolean; allowVideo: boolean; allowAudio: boolean; e2ee: boolean; isPersistent?: boolean }
 }
 
 function formatBitrate(bps: number) {
@@ -128,6 +129,23 @@ function RoomDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['admin', 'room', roomId, 'participants'] })
       setConfirmKick(null)
     },
+  })
+
+  const togglePersistent = useMutation({
+    mutationFn: (isPersistent: boolean) => {
+      const s = room?.settings
+      if (!s) throw new Error('no room settings')
+      return api.put(`/api/admin/rooms/${roomId}`, {
+        settings: {
+          allowChat: s.allowChat,
+          allowVideo: s.allowVideo,
+          allowAudio: s.allowAudio,
+          e2ee: s.e2ee,
+          isPersistent,
+        },
+      })
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'room', roomId, 'participants'] }),
   })
 
   const mute = useMutation({
@@ -460,7 +478,7 @@ function RoomDetailPage() {
             <p className="text-sm font-semibold">Room configuration</p>
           </div>
           <div
-            className="grid grid-cols-2 sm:grid-cols-4 gap-0 divide-x divide-y"
+            className="grid grid-cols-2 sm:grid-cols-5 gap-0 divide-x divide-y"
             style={{ borderColor: 'var(--border)' }}
           >
             {[
@@ -475,6 +493,24 @@ function RoomDetailPage() {
                 <p className="text-[10px] text-muted-foreground">{enabled ? 'allowed' : 'disabled'}</p>
               </div>
             ))}
+            <button
+              type="button"
+              onClick={() => togglePersistent.mutate(!room.settings!.isPersistent)}
+              disabled={togglePersistent.isPending}
+              className="flex flex-col items-center gap-1 py-4 transition-colors hover:bg-muted/30 disabled:opacity-50"
+              title={
+                room.settings.isPersistent
+                  ? 'Room stays active during idle periods'
+                  : 'Room will be deactivated when idle'
+              }
+            >
+              <Pin
+                className="h-2 w-2"
+                style={{ color: room.settings.isPersistent ? 'var(--primary)' : 'var(--muted-foreground)' }}
+              />
+              <p className="text-xs font-medium">Persistent</p>
+              <p className="text-[10px] text-muted-foreground">{room.settings.isPersistent ? 'on' : 'off'}</p>
+            </button>
           </div>
         </div>
       )}

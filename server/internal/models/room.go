@@ -97,6 +97,7 @@ type RoomSettings struct {
 	AllowAudio      bool `json:"allowAudio" gorm:"not null;default:true"`
 	RequireApproval bool `json:"requireApproval" gorm:"not null;default:false"`
 	E2EE            bool `json:"e2ee" gorm:"not null;default:false"`
+	IsPersistent    bool `json:"isPersistent" gorm:"not null;default:false"`
 }
 
 // RoomParticipant represents a user in a room

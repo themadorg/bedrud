@@ -6,6 +6,7 @@ export interface RoomSettings {
   allowAudio: boolean;
   requireApproval: boolean;
   e2ee: boolean;
+  isPersistent: boolean;
 }
 
 export interface RoomParticipant {

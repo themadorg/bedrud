@@ -1,7 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Activity, ChevronDown, ChevronUp, Globe, Lock, Power, Search } from 'lucide-react'
+import {
+  Activity,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Globe,
+  Lock,
+  Pin,
+  Power,
+  Search,
+} from 'lucide-react'
 import { useState } from 'react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/components/ui/select'
 import { api } from '#/lib/api'
 import { cn } from '@/lib/utils'
 
@@ -18,6 +30,7 @@ interface AdminRoom {
     allowVideo: boolean
     allowAudio: boolean
     e2ee: boolean
+    isPersistent?: boolean
   }
 }
 
@@ -33,16 +46,18 @@ function AdminRoomsPage() {
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
   const [editingLimit, setEditingLimit] = useState<string | null>(null)
   const [limitValue, setLimitValue] = useState(0)
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(50)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'rooms'],
-    queryFn: () => api.get<{ rooms: AdminRoom[] }>('/api/admin/rooms'),
+    queryKey: ['admin', 'rooms', page, limit],
+    queryFn: () => api.get<{ rooms: AdminRoom[]; total: number }>(`/api/admin/rooms?page=${page}&limit=${limit}`),
   })
 
   const closeRoom = useMutation({
     mutationFn: (id: string) => api.delete(`/api/admin/rooms/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] })
+      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'], exact: false })
       setConfirmClose(null)
     },
   })
@@ -50,7 +65,7 @@ function AdminRoomsPage() {
   const updateLimit = useMutation({
     mutationFn: ({ id, max }: { id: string; max: number }) =>
       api.put(`/api/admin/rooms/${id}`, { maxParticipants: max }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'], exact: false }),
   })
 
   function toggleSort(field: SortField) {
@@ -85,7 +100,7 @@ function AdminRoomsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-sm font-semibold">Rooms</h1>
-          <p className="text-xs text-muted-foreground">{data?.rooms.length ?? 0} rooms in this instance</p>
+          <p className="text-xs text-muted-foreground">{data?.total ?? 0} rooms in this instance</p>
         </div>
 
         <div className="flex items-center gap-2 border bg-background px-2.5 py-1.5 w-full sm:w-56">
@@ -147,13 +162,16 @@ function AdminRoomsPage() {
                     key={room.id}
                     className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors"
                   >
-                    <Link
-                      to="/dashboard/admin/rooms/$roomId"
-                      params={{ roomId: room.id }}
-                      className="truncate font-mono text-xs font-medium hover:text-primary transition-colors"
-                    >
-                      {room.name}
-                    </Link>
+                    <div className="flex items-center gap-1.5">
+                      {room.settings?.isPersistent && <Pin className="h-3 w-3 shrink-0 text-primary" />}
+                      <Link
+                        to="/dashboard/admin/rooms/$roomId"
+                        params={{ roomId: room.id }}
+                        className="truncate font-mono text-xs font-medium hover:text-primary transition-colors"
+                      >
+                        {room.name}
+                      </Link>
+                    </div>
 
                     <span
                       className={cn(
@@ -254,6 +272,49 @@ function AdminRoomsPage() {
                 ))
               )}
             </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between border-t bg-muted/30 px-4 py-2">
+          <p className="text-[11px] text-muted-foreground">
+            Page {page} of {Math.max(1, Math.ceil((data?.total ?? 0) / limit))}
+          </p>
+
+          <div className="flex items-center gap-2">
+            <Select
+              value={String(limit)}
+              onValueChange={(v) => {
+                setLimit(+v)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className="h-7 w-[70px] text-[11px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="inline-flex items-center justify-center h-7 w-7 border transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+
+            <button
+              type="button"
+              disabled={page * limit >= (data?.total ?? 0)}
+              onClick={() => setPage((p) => p + 1)}
+              className="inline-flex items-center justify-center h-7 w-7 border transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       </div>

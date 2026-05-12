@@ -29,6 +29,15 @@ livekit:
 
 LiveKit küme kurulumu ve yapılandırması için [LiveKit dokümantasyonuna](https://docs.livekit.io) bakın.
 
+### Gömülü Yapılandırma Oluşturma (Embedded Config Generation)
+
+TLS gömülü modda etkinleştirildiğinde, Bedrud geçici bir LiveKit YAML yapılandırması oluşturur (`/tmp/bedrud-livekit-*.yaml`):
+- TURN etkin, `domain` `server.host`'tan otomatik ayarlanır, `udp_port: 3478`, `tls_port: 5349`, sunucunun TLS sertifikası TURN/TLS için yeniden kullanılır
+- `node_ip` şu sırayla çözülür: `livekit.nodeIP` → `server.host` → giden IP otomatik algılama
+- `bind_addresses` atlanır (LiveKit varsayılan olarak tüm arayüzlere bağlanır)
+
+Geçici dosya, LiveKit işlemi sona erdiğinde temizlenir. Statik bir yapılandırma ile otomatik oluşturmayı atlamak için `livekit.configPath` veya `LIVEKIT_CONFIG_PATH` ayarlayın.
+
 ## Nasıl Çalışır
 
 ### 1. Oda Oluşturma

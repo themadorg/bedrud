@@ -481,14 +481,15 @@ DTOs: `ErrorResponse`, `RegisterRequest`, `LoginRequest`, `GuestLoginRequest`, `
 
 ### `config.go`
 
-`ConfigYAML` — shared LiveKit YAML config struct. Used by both the installer (`internal/install/linux.go`) and the embedded server startup. Fields: `Port`, `BindAddresses`, `Keys`, `RTC` (tcp/udp ports, port range, node_ip), `TURN` (enabled, domain, udp/tls ports, cert/key), `Logging`.
+`ConfigYAML` — shared LiveKit YAML config struct. Used by both the installer (`internal/install/linux.go`) and the embedded server startup. Uses `omitempty` on zero-value fields (`bind_addresses`, `tcp_port`, `udp_port`, `port_range_start/end`, `turn.enabled/domain/udp_port/tls_port/cert_file/key_file`, `logging.json/level`) so they are omitted from marshaled YAML and LiveKit uses its defaults. Fields: `Port`, `BindAddresses`, `Keys`, `RTC` (tcp/udp ports, port range, node_ip), `TURN` (enabled, domain, udp/tls ports, cert/key), `Logging`.
 
 ### `server.go`
 
 `ExportBinary(destPath)` — Write embedded binary with 0755. Remove existing first (avoid ETXTBSY).
 `RunLiveKit(configPath)` — Run synchronously.
-`generateTempConfig(apiKey, apiSecret, port, certFile, keyFile)` — Generate temp YAML with TURN/TLS for embedded mode. Returns temp file path.
-`StartInternalServer(ctx, apiKey, apiSecret, port, cert, key, externalConfig)` — Background goroutine, 3s startup sleep. Skip if `LIVEKIT_MANAGED=true`. When cert/key provided and no external config, generates temp LiveKit YAML with TURN/TLS (port 5349) using server's certificate. Falls back to inline `--port`/`--keys` args if no TLS.
+`ResolveNodeIP(explicitIP, serverHost)` — Resolve LiveKit node IP: use explicit `nodeIP` if set, else parse `server.host` if valid non-loopback IP, else detect outbound IP via UDP dial. Returns "" if all fail.
+`generateTempConfig(apiKey, apiSecret, port, nodeIP, certFile, keyFile, serverHost)` — Generate temp YAML with TURN/TLS for embedded mode. When TLS enabled: sets `TURN.Domain = serverHost`, `TURN.UDPPort = 3478`, `TURN.TLSPort = 5349`. When `nodeIP` set: `UseExternalIP = false`, `NodeIP = nodeIP`. Returns temp file path.
+`StartInternalServer(ctx, apiKey, apiSecret, port, cert, key, externalConfig, nodeIP, serverHost)` — Background goroutine, 3s startup sleep. Skip if `LIVEKIT_MANAGED=true`. When cert/key provided and no external config, generates temp LiveKit YAML with TURN/TLS (port 5349) using server's certificate. Falls back to inline `--port`/`--keys` args if no TLS. Resolves relative cert/key paths at the caller level (server.go).
 
 ---
 

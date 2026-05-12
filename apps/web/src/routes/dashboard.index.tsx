@@ -486,7 +486,12 @@ function DashboardPage() {
           ))}
       </div>
 
-      <CreateRoomDialog open={createOpen} onOpenChange={setCreateOpen} onCreate={handleCreate} />
+      <CreateRoomDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreate={handleCreate}
+        isAdmin={user?.isAdmin}
+      />
       {settingsRoom && (
         <RoomSettingsDialog
           room={settingsRoom}

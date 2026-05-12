@@ -29,6 +29,15 @@ livekit:
 
 有关 LiveKit 集群的设置和配置，请参阅 [LiveKit 文档](https://docs.livekit.io)。
 
+### 嵌入式配置生成 (Embedded Config Generation)
+
+当在嵌入式模式下启用 TLS 时，Bedrud 会生成一个临时的 LiveKit YAML 配置文件（`/tmp/bedrud-livekit-*.yaml`）：
+- 启用 TURN，`domain` 从 `server.host` 自动设置，`udp_port: 3478`，`tls_port: 5349`，服务器 TLS 证书被重复用于 TURN/TLS
+- `node_ip` 通过 `livekit.nodeIP` → `server.host` → 出站 IP 自动检测的优先级解析
+- `bind_addresses` 被省略（LiveKit 默认绑定所有接口）
+
+临时文件在 LiveKit 进程退出时被清理。要使用静态配置绕过自动生成，请设置 `livekit.configPath` 或 `LIVEKIT_CONFIG_PATH`。
+
 ## 工作原理
 
 ### 1. 房间创建

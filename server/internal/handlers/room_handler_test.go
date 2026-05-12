@@ -497,3 +497,240 @@ func TestGuestJoinRoom_PrivateRoomBlocked(t *testing.T) {
 		t.Fatalf("expected 403 for guest joining private room, got %d", resp.StatusCode)
 	}
 }
+
+func TestRoomHandler_AdminUpdateRoom_SettingsIsPersistent(t *testing.T) {
+	app, roomRepo, _ := setupRoomTestApp(t)
+
+	room, _ := roomRepo.CreateRoom("creator-user", "persist-admin-room", false, "standard", &models.RoomSettings{})
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"settings": map[string]interface{}{
+			"allowChat":    true,
+			"allowVideo":   true,
+			"allowAudio":   true,
+			"e2ee":         false,
+			"isPersistent": true,
+		},
+	})
+	req := httptest.NewRequest(http.MethodPut, "/admin/rooms/"+room.ID, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result map[string]interface{}
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	_ = json.Unmarshal(bodyBytes, &result)
+	settings := result["settings"].(map[string]interface{})
+	if settings["isPersistent"] != true {
+		t.Fatalf("expected isPersistent true, got %v", settings["isPersistent"])
+	}
+}
+
+func TestRoomHandler_AdminUpdateRoom_SettingsIsPersistentOff(t *testing.T) {
+	app, roomRepo, _ := setupRoomTestApp(t)
+
+	room, _ := roomRepo.CreateRoom("creator-user", "unpersist-admin-room", false, "standard", &models.RoomSettings{
+		IsPersistent: true,
+	})
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"settings": map[string]interface{}{
+			"allowChat":    true,
+			"allowVideo":   true,
+			"allowAudio":   true,
+			"e2ee":         false,
+			"isPersistent": false,
+		},
+	})
+	req := httptest.NewRequest(http.MethodPut, "/admin/rooms/"+room.ID, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result map[string]interface{}
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	_ = json.Unmarshal(bodyBytes, &result)
+	settings := result["settings"].(map[string]interface{})
+	if settings["isPersistent"] != false {
+		t.Fatalf("expected isPersistent false, got %v", settings["isPersistent"])
+	}
+}
+
+func TestRoomHandler_CreateRoom_StripsIsPersistent(t *testing.T) {
+	_, roomRepo, _ := setupRoomTestApp(t)
+
+	// Verify that direct repo create preserves the flag
+	room, err := roomRepo.CreateRoom("creator-user", "create-persist-direct", false, "standard", &models.RoomSettings{
+		AllowChat:    true,
+		AllowAudio:   true,
+		AllowVideo:   true,
+		IsPersistent: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to create room: %v", err)
+	}
+
+	found, _ := roomRepo.GetRoom(room.ID)
+	if !found.Settings.IsPersistent {
+		t.Fatal("repo CreateRoom should preserve isPersistent when set directly")
+	}
+
+	room2, _ := roomRepo.CreateRoom("creator-user", "create-no-persist", false, "standard", &models.RoomSettings{})
+	found2, _ := roomRepo.GetRoom(room2.ID)
+	if found2.Settings.IsPersistent {
+		t.Fatal("room created without isPersistent should default to false")
+	}
+}
+
+func TestRoomHandler_UpdateSettings_StripsIsPersistent(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	roomRepo := repository.NewRoomRepository(db)
+
+	lkCfg := config.LiveKitConfig{Host: "http://localhost:9999", APIKey: "k", APISecret: "s"}
+	handler := NewRoomHandler(&lkCfg, &config.ChatConfig{}, roomRepo)
+
+	claims := &auth.Claims{UserID: "creator-user", Email: "creator@ex.com", Name: "Creator", Accesses: []string{"user"}}
+
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error { c.Locals("user", claims); return c.Next() })
+	app.Put("/room/:roomId/settings", handler.UpdateSettings)
+
+	db.Create(&models.User{ID: "creator-user", Email: "creator@ex.com", Name: "Creator", Provider: "local", IsActive: true, Accesses: models.StringArray{"user"}})
+
+	room, _ := roomRepo.CreateRoom("creator-user", "strip-test-room", false, "standard", &models.RoomSettings{
+		AllowChat:    true,
+		AllowAudio:   true,
+		AllowVideo:   true,
+		IsPersistent: false,
+	})
+
+	// Room owner tries to set isPersistent via UpdateSettings — should be stripped
+	body, _ := json.Marshal(map[string]interface{}{
+		"settings": map[string]interface{}{
+			"allowChat":    true,
+			"allowAudio":   true,
+			"allowVideo":   true,
+			"isPersistent": true,
+		},
+	})
+	req := httptest.NewRequest(http.MethodPut, "/room/"+room.ID+"/settings", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var result map[string]interface{}
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	_ = json.Unmarshal(bodyBytes, &result)
+	settings := result["settings"].(map[string]interface{})
+	if settings["isPersistent"] == true {
+		t.Fatal("UpdateSettings should strip isPersistent — room owner should not be able to set this flag")
+	}
+}
+
+func TestRoomHandler_AdminUpdateRoom_PartialSettingsMerge(t *testing.T) {
+	app, roomRepo, _ := setupRoomTestApp(t)
+
+	room, _ := roomRepo.CreateRoom("creator-user", "partial-merge-room", false, "standard", &models.RoomSettings{
+		AllowChat:       true,
+		AllowVideo:      true,
+		AllowAudio:      false,
+		RequireApproval: true,
+		E2EE:            false,
+		IsPersistent:    false,
+	})
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"settings": map[string]interface{}{
+			"isPersistent": true,
+		},
+	})
+	req := httptest.NewRequest(http.MethodPut, "/admin/rooms/"+room.ID, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var result map[string]interface{}
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	_ = json.Unmarshal(bodyBytes, &result)
+	settings := result["settings"].(map[string]interface{})
+
+	if settings["isPersistent"] != true {
+		t.Fatalf("expected isPersistent true, got %v", settings["isPersistent"])
+	}
+	if settings["allowChat"] != true {
+		t.Fatalf("expected allowChat true (preserved), got %v", settings["allowChat"])
+	}
+	if settings["allowVideo"] != true {
+		t.Fatalf("expected allowVideo true (preserved), got %v", settings["allowVideo"])
+	}
+	if settings["allowAudio"] != false {
+		t.Fatalf("expected allowAudio false (preserved), got %v", settings["allowAudio"])
+	}
+	if settings["requireApproval"] != true {
+		t.Fatalf("expected requireApproval true (preserved), got %v", settings["requireApproval"])
+	}
+	if settings["e2ee"] != false {
+		t.Fatalf("expected e2ee false (preserved), got %v", settings["e2ee"])
+	}
+}
+
+func TestRoomHandler_AdminUpdateRoom_SettingsAndMaxParticipants(t *testing.T) {
+	app, roomRepo, _ := setupRoomTestApp(t)
+
+	room, _ := roomRepo.CreateRoom("creator-user", "both-update-room", false, "standard", &models.RoomSettings{
+		AllowChat:    false,
+		AllowVideo:   false,
+		AllowAudio:   false,
+		IsPersistent: false,
+	})
+
+	maxP := 42
+	body, _ := json.Marshal(map[string]interface{}{
+		"maxParticipants": maxP,
+		"settings": map[string]interface{}{
+			"allowChat":    true,
+			"allowVideo":   true,
+			"allowAudio":   true,
+			"isPersistent": true,
+		},
+	})
+	req := httptest.NewRequest(http.MethodPut, "/admin/rooms/"+room.ID, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var result map[string]interface{}
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	_ = json.Unmarshal(bodyBytes, &result)
+
+	settings := result["settings"].(map[string]interface{})
+	if settings["isPersistent"] != true {
+		t.Fatalf("expected isPersistent true, got %v", settings["isPersistent"])
+	}
+	if settings["allowChat"] != true {
+		t.Fatalf("expected allowChat true, got %v", settings["allowChat"])
+	}
+
+	maxPResult := result["maxParticipants"]
+	if maxPResult != float64(maxP) {
+		t.Fatalf("expected maxParticipants %d, got %v", maxP, maxPResult)
+	}
+}

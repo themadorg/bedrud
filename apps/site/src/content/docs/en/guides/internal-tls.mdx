@@ -92,7 +92,7 @@ When TLS is enabled, Bedrud also starts an HTTP listener (default port 80) for b
 
 ### TURN/TLS Auto-Configuration
 
-When server TLS is enabled (via the installer or `server.enableTLS: true`), the embedded LiveKit process automatically generates a temporary config with TURN/TLS settings. The server's TLS certificate is reused for TURN/TLS on port 5349. No additional configuration is needed.
+When server TLS is enabled (via the installer or `server.enableTLS: true`), the embedded LiveKit process automatically generates a temporary config with TURN/TLS settings. The server's TLS certificate is reused for TURN/TLS on port 5349. The TURN `domain` is auto-set from `server.host`, UDP port 3478 is configured for TURN/STUN, and relative `certFile`/`keyFile` paths are resolved to absolute paths before being passed to LiveKit. No additional configuration is needed.
 
 For custom TURN settings (separate domain, different cert, port overrides), provide a LiveKit YAML config file via `livekit.configPath` in `config.yaml` or the `LIVEKIT_CONFIG_PATH` environment variable.
 

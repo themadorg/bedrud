@@ -29,6 +29,15 @@ livekit:
 
 LiveKitクラスターのセットアップと設定については、[LiveKitドキュメント](https://docs.livekit.io)を参照してください。
 
+### 組み込み設定生成 (Embedded Config Generation)
+
+TLSが組み込みモードで有効な場合、Bedrudは一時的なLiveKit YAML設定ファイルを生成します（`/tmp/bedrud-livekit-*.yaml`）：
+- TURN有効、`domain`は`server.host`から自動設定、`udp_port: 3478`、`tls_port: 5349`、サーバーのTLS証明書をTURN/TLSに再利用
+- `node_ip`は`livekit.nodeIP` → `server.host` → 発信IP自動検出の順に解決
+- `bind_addresses`は省略（LiveKitはデフォルトですべてのインターフェースにバインド）
+
+一時ファイルはLiveKitプロセス終了時に削除されます。静的設定で自動生成を回避するには、`livekit.configPath`または`LIVEKIT_CONFIG_PATH`を設定してください。
+
 ## 仕組み
 
 ### 1. ルーム作成

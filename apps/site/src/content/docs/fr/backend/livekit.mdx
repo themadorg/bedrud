@@ -29,6 +29,15 @@ Lorsque `embedded` est `false`, Bedrud saute le démarrage du binaire LiveKit in
 
 Pour la configuration et la mise en place du cluster LiveKit, référez-vous à la [documentation LiveKit](https://docs.livekit.io).
 
+### Génération de configuration intégrée (Embedded Config Generation)
+
+Lorsque TLS est activé en mode intégré, Bedrud génère une configuration YAML temporaire pour LiveKit (`/tmp/bedrud-livekit-*.yaml`) avec :
+- TURN activé, `domain` défini automatiquement depuis `server.host`, `udp_port: 3478`, `tls_port: 5349`, et le certificat TLS du serveur réutilisé pour TURN/TLS
+- `node_ip` résolu via `livekit.nodeIP` → `server.host` → détection automatique de l'IP sortante
+- `bind_addresses` omis (LiveKit écoute sur toutes les interfaces par défaut)
+
+Le fichier temporaire est supprimé à la sortie du processus LiveKit. Pour contourner la génération automatique avec une configuration statique, définissez `livekit.configPath` ou `LIVEKIT_CONFIG_PATH`.
+
 ## Comment Cela Fonctionne
 
 ### 1. Création de Salle

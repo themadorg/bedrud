@@ -1,7 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { ChevronDown, ChevronUp, Search, Shield, ShieldOff, UserCheck, UserX } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Search,
+  Shield,
+  ShieldOff,
+  UserCheck,
+  UserX,
+} from 'lucide-react'
 import { useState } from 'react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/components/ui/select'
 import { api } from '#/lib/api'
 import { cn } from '@/lib/utils'
 
@@ -58,22 +69,24 @@ function AdminUsersPage() {
   const [search, setSearch] = useState('')
   const [sortField, setSortField] = useState<SortField>('createdAt')
   const [sortAsc, setSortAsc] = useState(false)
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(50)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'users'],
-    queryFn: () => api.get<{ users: AdminUser[] }>('/api/admin/users'),
+    queryKey: ['admin', 'users', page, limit],
+    queryFn: () => api.get<{ users: AdminUser[]; total: number }>(`/api/admin/users?page=${page}&limit=${limit}`),
   })
 
   const toggleStatus = useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) =>
       api.put(`/api/admin/users/${id}/status`, { active }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'], exact: false }),
   })
 
   const toggleAdmin = useMutation({
     mutationFn: ({ id, accesses }: { id: string; accesses: string[] }) =>
       api.put(`/api/admin/users/${id}/accesses`, { accesses }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'], exact: false }),
   })
 
   function toggleSort(field: SortField) {
@@ -109,7 +122,7 @@ function AdminUsersPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-sm font-semibold">Users</h1>
-          <p className="text-xs text-muted-foreground">{data?.users.length ?? 0} registered accounts</p>
+          <p className="text-xs text-muted-foreground">{data?.total ?? 0} registered accounts</p>
         </div>
 
         <div className="flex items-center gap-2 border bg-background px-2.5 py-1.5 w-full sm:w-56">
@@ -231,6 +244,49 @@ function AdminUsersPage() {
                 })
               )}
             </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between border-t bg-muted/30 px-4 py-2">
+          <p className="text-[11px] text-muted-foreground">
+            Page {page} of {Math.max(1, Math.ceil((data?.total ?? 0) / limit))}
+          </p>
+
+          <div className="flex items-center gap-2">
+            <Select
+              value={String(limit)}
+              onValueChange={(v) => {
+                setLimit(+v)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className="h-7 w-[70px] text-[11px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="inline-flex items-center justify-center h-7 w-7 border transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+
+            <button
+              type="button"
+              disabled={page * limit >= (data?.total ?? 0)}
+              onClick={() => setPage((p) => p + 1)}
+              className="inline-flex items-center justify-center h-7 w-7 border transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       </div>

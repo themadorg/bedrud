@@ -29,6 +29,15 @@ livekit:
 
 لإعداد وتحويم مجموعة LiveKit، راجع [توثيق LiveKit](https://docs.livekit.io).
 
+### إنشاء التهيئة المدمجة (Embedded Config Generation)
+
+عند تفعيل TLS في الوضع المدمج، يُنشئ Bedrud ملف تهيئة YAML مؤقت لـ LiveKit (`/tmp/bedrud-livekit-*.yaml`) مع:
+- تفعيل TURN، و`domain` مضبوط تلقائياً من `server.host`، و`udp_port: 3478`، و`tls_port: 5349`، وشهادة TLS للخادم مُعاد استخدامها لـ TURN/TLS
+- `node_ip` يُحل عبر `livekit.nodeIP` ← `server.host` ← كشف IP الصادر تلقائياً
+- `bind_addresses` محذوفة (LiveKit يربط جميع الواجهات افتراضياً)
+
+يُحذف الملف المؤقت عند خروج عملية LiveKit. لتجاوز الإنشاء التلقائي بتهيئة ثابتة، اضبط `livekit.configPath` أو `LIVEKIT_CONFIG_PATH`.
+
 ## كيف يعمل
 
 ### ١. إنشاء الغرفة

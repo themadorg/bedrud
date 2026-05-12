@@ -652,12 +652,44 @@ func TestRoomRepository_CleanupExpiredRooms_NoExpired(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := NewRoomRepository(db)
 
-	db.Create(&models.User{ID: testUserIDRoom, Email: "u1@ex.com", Name: "U1", Provider: "local", IsActive: true})
+	db.Create(&models.User{ID: testUserIDRoom, Email: "user@ex.com", Name: "U1", Provider: "local", IsActive: true})
 	_, _ = repo.CreateRoom(testUserIDRoom, "future-room", false, "standard", &models.RoomSettings{})
 
 	err := repo.CleanupExpiredRooms()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRoomRepository_CleanupExpiredRooms_PersistentSkipped(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	db.Create(&models.User{ID: testUserIDRoom, Email: "user@ex.com", Name: "U1", Provider: "local", IsActive: true})
+
+	expiredRoom, _ := repo.CreateRoom(testUserIDRoom, "expired-persist-room", false, "standard", &models.RoomSettings{
+		IsPersistent: true,
+	})
+	db.Model(&models.Room{}).Where("id = ?", expiredRoom.ID).Update("expires_at", "2020-01-01 00:00:00")
+
+	normalExpiredRoom, _ := repo.CreateRoom(testUserIDRoom, "expired-normal-room", false, "standard", &models.RoomSettings{
+		IsPersistent: false,
+	})
+	db.Model(&models.Room{}).Where("id = ?", normalExpiredRoom.ID).Update("expires_at", "2020-01-01 00:00:00")
+
+	err := repo.CleanupExpiredRooms()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	persisted, _ := repo.GetRoom(expiredRoom.ID)
+	if !persisted.IsActive {
+		t.Fatal("persistent expired room should NOT be deactivated by CleanupExpiredRooms")
+	}
+
+	normal, _ := repo.GetRoom(normalExpiredRoom.ID)
+	if normal.IsActive {
+		t.Fatal("non-persistent expired room SHOULD be deactivated by CleanupExpiredRooms")
 	}
 }
 

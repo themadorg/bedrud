@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Mic,
   Minus,
+  Pin,
   Plus,
   ShieldCheck,
   UserCheck,
@@ -24,6 +25,7 @@ interface RoomSettings {
   allowAudio: boolean
   requireApproval: boolean
   e2ee: boolean
+  isPersistent: boolean
 }
 
 interface CreateRoomData {
@@ -37,6 +39,7 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreate: (data: CreateRoomData) => Promise<void>
+  isAdmin?: boolean
 }
 
 const DEFAULT_SETTINGS: RoomSettings = {
@@ -45,6 +48,7 @@ const DEFAULT_SETTINGS: RoomSettings = {
   allowAudio: true,
   requireApproval: false,
   e2ee: false,
+  isPersistent: false,
 }
 
 const FEATURES = [
@@ -53,9 +57,10 @@ const FEATURES = [
   { key: 'allowChat' as const, icon: MessageSquare, label: 'Chat' },
   { key: 'e2ee' as const, icon: ShieldCheck, label: 'E2E' },
   { key: 'requireApproval' as const, icon: UserCheck, label: 'Gate' },
+  { key: 'isPersistent' as const, icon: Pin, label: 'Persistent', adminOnly: true },
 ]
 
-export function CreateRoomDialog({ open, onOpenChange, onCreate }: Props) {
+export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Props) {
   const [isLoading, setIsLoading] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -219,7 +224,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate }: Props) {
               Features
             </span>
             <div className="mt-3 flex flex-wrap gap-2">
-              {FEATURES.map(({ key, icon: Icon, label }) => {
+              {FEATURES.filter((f) => !f.adminOnly || isAdmin).map(({ key, icon: Icon, label }) => {
                 const active = settings[key]
                 return (
                   <button

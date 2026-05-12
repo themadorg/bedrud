@@ -51,7 +51,7 @@ func (r *RoomRepository) CreateRoom(createdBy, name string, isPublic bool, mode 
 	var room *models.Room
 
 	err = r.db.Transaction(func(tx *gorm.DB) error {
-		// Create room first
+		now := time.Now()
 		newRoom := &models.Room{
 			ID:        uuid.New().String(),
 			Name:      name,
@@ -61,10 +61,31 @@ func (r *RoomRepository) CreateRoom(createdBy, name string, isPublic bool, mode 
 			IsPublic:  isPublic,
 			Settings:  *settings,
 			Mode:      mode,
-			ExpiresAt: time.Now().Add(24 * time.Hour),
+			ExpiresAt: now.Add(24 * time.Hour),
+			CreatedAt: now,
+			UpdatedAt: now,
 		}
 
-		if err := tx.Create(newRoom).Error; err != nil {
+		if err := tx.Model(&models.Room{}).Create(map[string]interface{}{
+			"ID":                        newRoom.ID,
+			"Name":                      newRoom.Name,
+			"CreatedBy":                 newRoom.CreatedBy,
+			"AdminID":                   newRoom.AdminID,
+			"IsActive":                  newRoom.IsActive,
+			"IsPublic":                  newRoom.IsPublic,
+			"Mode":                      newRoom.Mode,
+			"ExpiresAt":                 newRoom.ExpiresAt,
+			"MaxParticipants":           newRoom.MaxParticipants,
+			"CreatedAt":                 newRoom.CreatedAt,
+			"UpdatedAt":                 newRoom.UpdatedAt,
+			"settings_allow_chat":       newRoom.Settings.AllowChat,
+			"settings_allow_video":      newRoom.Settings.AllowVideo,
+			"settings_allow_audio":      newRoom.Settings.AllowAudio,
+			"settings_require_approval": newRoom.Settings.RequireApproval,
+			"settings_e2_ee":            newRoom.Settings.E2EE,
+			"settings_is_persistent":    newRoom.Settings.IsPersistent,
+		}).Error; err != nil {
+			newRoom = nil
 			return err
 		}
 
@@ -191,10 +212,11 @@ func (r *RoomRepository) GetActiveParticipants(roomID string) ([]models.RoomPart
 	return participants, err
 }
 
-// CleanupExpiredRooms marks rooms as inactive if they've expired
+// CleanupExpiredRooms marks rooms as inactive if they've expired.
+// Persistent rooms are excluded from this cleanup.
 func (r *RoomRepository) CleanupExpiredRooms() error {
 	return r.db.Model(&models.Room{}).
-		Where("expires_at < ? AND is_active = ?", time.Now(), true).
+		Where("expires_at < ? AND is_active = ? AND settings_is_persistent = ?", time.Now(), true, false).
 		Update("is_active", false).Error
 }
 
@@ -261,8 +283,14 @@ func (r *RoomRepository) KickParticipant(roomID, userID string) error {
 func (r *RoomRepository) UpdateRoomSettings(roomID string, settings *models.RoomSettings) error {
 	return r.db.Model(&models.Room{}).
 		Where("id = ?", roomID).
-		Select("Settings").
-		Updates(models.Room{Settings: *settings}).Error
+		Updates(map[string]interface{}{
+			"settings_allow_chat":       settings.AllowChat,
+			"settings_allow_video":      settings.AllowVideo,
+			"settings_allow_audio":      settings.AllowAudio,
+			"settings_require_approval": settings.RequireApproval,
+			"settings_e2_ee":            settings.E2EE,
+			"settings_is_persistent":    settings.IsPersistent,
+		}).Error
 }
 
 // DeleteRoom deletes a room and its related data. Only the creator can delete.

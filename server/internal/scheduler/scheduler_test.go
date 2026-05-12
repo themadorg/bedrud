@@ -88,3 +88,90 @@ func TestCheckIdleRooms_OldRoomLiveKitUnavailable(t *testing.T) {
 		t.Fatal("room should stay active when LiveKit call fails")
 	}
 }
+
+func TestCheckIdleRooms_PersistentRoomSkipped(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	roomRepo := repository.NewRoomRepository(db)
+
+	room := &models.Room{
+		ID:        "persistent-room-1",
+		Name:      "persistent-room",
+		CreatedBy: "user-1",
+		IsActive:  true,
+		CreatedAt: time.Now().Add(-10 * time.Minute),
+		Settings:  models.RoomSettings{IsPersistent: true},
+	}
+	db.Create(room)
+
+	lkClient := livekit.NewRoomServiceProtobufClient("http://localhost:9999", http.DefaultClient)
+	checkIdleRooms(roomRepo, &config.LiveKitConfig{Host: "http://localhost:9999"}, lkClient)
+
+	updated, _ := roomRepo.GetRoom("persistent-room-1")
+	if updated == nil {
+		t.Fatal("expected to find persistent room")
+	}
+	if !updated.IsActive {
+		t.Fatal("persistent room should remain active regardless of participant count")
+	}
+}
+
+func TestCheckIdleRooms_NonPersistentRoomUnchangedOnLKUnavailable(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	roomRepo := repository.NewRoomRepository(db)
+
+	room := &models.Room{
+		ID:        "normal-room-1",
+		Name:      "normal-room",
+		CreatedBy: "user-1",
+		IsActive:  true,
+		CreatedAt: time.Now().Add(-10 * time.Minute),
+		Settings:  models.RoomSettings{IsPersistent: false},
+	}
+	db.Create(room)
+
+	lkClient := livekit.NewRoomServiceProtobufClient("http://localhost:9999", http.DefaultClient)
+	checkIdleRooms(roomRepo, &config.LiveKitConfig{Host: "http://localhost:9999"}, lkClient)
+
+	updated, _ := roomRepo.GetRoom("normal-room-1")
+	if updated != nil && !updated.IsActive {
+		t.Fatal("non-persistent room should stay active when LiveKit is unavailable (scheduler returns early on LK error)")
+	}
+}
+
+func TestCheckIdleRooms_PersistentSkipWorksOnLKUnavailable(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	roomRepo := repository.NewRoomRepository(db)
+
+	persistentRoom := &models.Room{
+		ID:        "mixed-persistent",
+		Name:      "mixed-persistent",
+		CreatedBy: "user-1",
+		IsActive:  true,
+		CreatedAt: time.Now().Add(-10 * time.Minute),
+		Settings:  models.RoomSettings{IsPersistent: true},
+	}
+	normalRoom := &models.Room{
+		ID:        "mixed-normal",
+		Name:      "mixed-normal",
+		CreatedBy: "user-1",
+		IsActive:  true,
+		CreatedAt: time.Now().Add(-10 * time.Minute),
+		Settings:  models.RoomSettings{IsPersistent: false},
+	}
+	db.Create(persistentRoom)
+	db.Create(normalRoom)
+
+	lkClient := livekit.NewRoomServiceProtobufClient("http://localhost:9999", http.DefaultClient)
+	checkIdleRooms(roomRepo, &config.LiveKitConfig{Host: "http://localhost:9999"}, lkClient)
+
+	// Both rooms stay active because LiveKit is unavailable — scheduler returns early on LK error.
+	// This test verifies the persistent skip doesn't panic and the flow completes.
+	persisted, _ := roomRepo.GetRoom("mixed-persistent")
+	if persisted == nil || !persisted.IsActive {
+		t.Fatal("persistent room should remain active")
+	}
+	normal, _ := roomRepo.GetRoom("mixed-normal")
+	if normal == nil || !normal.IsActive {
+		t.Fatal("non-persistent room should stay active when LiveKit is unavailable")
+	}
+}

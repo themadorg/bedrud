@@ -29,6 +29,15 @@ livekit:
 
 برای تنظیم و پیکربندی خوشه LiveKit، به [مستندات LiveKit](https://docs.livekit.io) ببینید.
 
+### تولید پیکربندی جاسازی‌شده (Embedded Config Generation)
+
+وقتی TLS در حالت جاسازی‌شده فعال باشد، Bedrud یک پیکربندی YAML موقت برای LiveKit تولید می‌کند (`/tmp/bedrud-livekit-*.yaml`) با:
+- TURN فعال، `domain` به طور خودکار از `server.host` تنظیم شده، `udp_port: 3478`، `tls_port: 5349`، و گواهی TLS سرور برای TURN/TLS استفاده مجدد می‌شود
+- `node_ip` از طریق `livekit.nodeIP` ← `server.host` ← تشخیص خودکار IP خروجی تعیین می‌شود
+- `bind_addresses` حذف شده (LiveKit به طور پیش‌فرض به همه رابط‌ها متصل می‌شود)
+
+فایل موقت هنگام خروج فرآیند LiveKit پاک می‌شود. برای دور زدن تولید خودکار با یک پیکربندی ثابت، `livekit.configPath` یا `LIVEKIT_CONFIG_PATH` را تنظیم کنید.
+
 ## نحوه کار
 
 ### ۱. ایجاد اتاق

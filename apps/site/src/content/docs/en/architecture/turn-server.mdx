@@ -108,7 +108,7 @@ For a 5-person meeting with one relayed participant: server handles ~1.5 Mbps ex
 
 **File:** `server/config/livekit.yaml` (dev) or `/etc/bedrud/livekit.yaml` (production)
 
-In embedded mode (default), when server TLS is enabled, TURN/TLS config is automatically generated from the server's TLS certificate — no manual configuration required. For custom TURN settings, provide a LiveKit YAML via `livekit.configPath` or the `LIVEKIT_CONFIG_PATH` environment variable.
+In embedded mode (default), when server TLS is enabled, TURN/TLS config is automatically generated from the server's TLS certificate — no manual configuration required. The TURN `domain` is auto-set from `server.host` in the Bedrud config, and `udp_port: 3478` is always configured alongside `tls_port: 5349`. For custom TURN settings, provide a LiveKit YAML via `livekit.configPath` or the `LIVEKIT_CONFIG_PATH` environment variable.
 
 ```yaml
 turn:
@@ -137,16 +137,22 @@ turn:
 | `relay_range_end` | `40000` | End of relay port range. Each relayed participant consumes ports from this range. |
 | `external_tls` | `false` | Set `true` when a Layer 4 load balancer terminates TURN/TLS. LiveKit skips its own TLS on the TURN port. |
 
-### `use_external_ip` Interaction
+### `use_external_ip` / `node_ip` Interaction
 
 In the same `livekit.yaml`, under `rtc:`:
 
 ```yaml
 rtc:
   use_external_ip: true
+  node_ip: 203.0.113.10
 ```
 
-Must be `true` for TURN to work correctly. When `false`, ICE candidates contain internal (private) IP addresses that clients on the internet cannot reach.
+In embedded mode, the node IP resolution follows this priority:
+1. Explicit `livekit.nodeIP` in Bedrud config (sets `node_ip` and `use_external_ip: false`)
+2. `server.host` in Bedrud config (if it's a valid non-loopback IP)
+3. Outbound IP auto-detection (UDP dial) — only when neither of the above is set does `use_external_ip: true` apply
+
+When `use_external_ip: true`, LiveKit uses STUN to discover the public IP. This requires outbound internet access and fails on air-gapped networks. When `node_ip` is explicitly set, `use_external_ip` is `false` and LiveKit uses the provided IP directly — required for LAN deployments without internet.
 
 ---
 

@@ -29,6 +29,15 @@ Cuando `embedded` es `false`, Bedrud omite el inicio del binario LiveKit integra
 
 Para la configuración y despliegue de clústeres de LiveKit, consulta la [documentación de LiveKit](https://docs.livekit.io).
 
+### Generación de Configuración Integrada (Embedded Config Generation)
+
+Cuando TLS está habilitado en modo integrado, Bedrud genera una configuración YAML temporal de LiveKit (`/tmp/bedrud-livekit-*.yaml`) con:
+- TURN habilitado, `domain` auto-configurado desde `server.host`, `udp_port: 3478`, `tls_port: 5349`, y el certificado TLS del servidor reutilizado para TURN/TLS
+- `node_ip` resuelto mediante `livekit.nodeIP` → `server.host` → detección automática de IP saliente
+- `bind_addresses` omitido (LiveKit escucha en todas las interfaces por defecto)
+
+El archivo temporal se elimina cuando el proceso de LiveKit termina. Para omitir la generación automática con una configuración estática, establece `livekit.configPath` o `LIVEKIT_CONFIG_PATH`.
+
 ## Cómo Funciona
 
 ### 1. Creación de Salas
