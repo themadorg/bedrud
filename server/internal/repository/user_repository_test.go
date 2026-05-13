@@ -125,7 +125,11 @@ func TestUserRepository_UpdateRefreshToken(t *testing.T) {
 		t.Fatalf("failed to update refresh token: %v", err)
 	}
 
-	if !repo.MatchRefreshToken("user-1", "new-refresh-token") {
+	matched, err := repo.MatchRefreshToken("user-1", "new-refresh-token")
+	if err != nil {
+		t.Fatalf("MatchRefreshToken failed: %v", err)
+	}
+	if !matched {
 		t.Fatal("expected MatchRefreshToken to return true for the stored token")
 	}
 }
@@ -282,7 +286,11 @@ func TestUserRepository_BlockRefreshToken(t *testing.T) {
 		t.Fatalf("failed to block refresh token: %v", err)
 	}
 
-	if !repo.IsRefreshTokenBlocked("some-token") {
+	blocked, err := repo.IsRefreshTokenBlocked("some-token")
+	if err != nil {
+		t.Fatalf("IsRefreshTokenBlocked failed: %v", err)
+	}
+	if !blocked {
 		t.Fatal("expected token to be blocked")
 	}
 }
@@ -291,7 +299,11 @@ func TestUserRepository_IsRefreshTokenBlocked_NotBlocked(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := NewUserRepository(db)
 
-	if repo.IsRefreshTokenBlocked("nonexistent-token") {
+	blocked, err := repo.IsRefreshTokenBlocked("nonexistent-token")
+	if err != nil {
+		t.Fatalf("IsRefreshTokenBlocked failed: %v", err)
+	}
+	if blocked {
 		t.Fatal("expected token to not be blocked")
 	}
 }
@@ -306,7 +318,11 @@ func TestUserRepository_IsRefreshTokenBlocked_Expired(t *testing.T) {
 	// Block with past expiration
 	_ = repo.BlockRefreshToken("user-1", "expired-token", time.Now().Add(-1*time.Hour))
 
-	if repo.IsRefreshTokenBlocked("expired-token") {
+	blocked, err := repo.IsRefreshTokenBlocked("expired-token")
+	if err != nil {
+		t.Fatalf("IsRefreshTokenBlocked failed: %v", err)
+	}
+	if blocked {
 		t.Fatal("expected expired blocked token to not be considered blocked")
 	}
 }
@@ -365,7 +381,7 @@ func TestUserRepository_DeleteUser_CascadesCleanup(t *testing.T) {
 	_ = repo.CreateUser(user)
 
 	// Create room with this user
-	_, _ = roomRepo.CreateRoom("user-cascade", "test-room", false, "standard", &models.RoomSettings{})
+	_, _ = roomRepo.CreateRoom("user-cascade", "test-room", false, "standard", 0, &models.RoomSettings{})
 
 	// Block a token
 	_ = repo.BlockRefreshToken("user-cascade", "some-token", time.Now().Add(time.Hour))

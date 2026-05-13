@@ -3,9 +3,11 @@ package handlers
 import (
 	"bedrud/internal/auth"
 	"bedrud/internal/repository"
+	"bytes"
 	"encoding/json"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
 )
 
 type PreferencesHandler struct {
@@ -23,6 +25,7 @@ func (h *PreferencesHandler) GetPreferences(c *fiber.Ctx) error {
 
 	prefs, err := h.prefsRepo.GetByUserID(claims.UserID)
 	if err != nil {
+		log.Error().Err(err).Str("userID", claims.UserID).Msg("Failed to get preferences")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get preferences"})
 	}
 	if prefs == nil {
@@ -48,8 +51,14 @@ func (h *PreferencesHandler) UpdatePreferences(c *fiber.Ctx) error {
 	if !json.Valid([]byte(input.PreferencesJSON)) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "preferencesJson must be valid JSON"})
 	}
+	// Ensure it's a JSON object, not a scalar or array
+	inputBytes := bytes.TrimSpace([]byte(input.PreferencesJSON))
+	if len(inputBytes) < 2 || inputBytes[0] != '{' || inputBytes[len(inputBytes)-1] != '}' {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "preferencesJson must be a JSON object"})
+	}
 
 	if err := h.prefsRepo.Upsert(claims.UserID, input.PreferencesJSON); err != nil {
+		log.Error().Err(err).Str("userID", claims.UserID).Msg("Failed to save preferences")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save preferences"})
 	}
 	return c.JSON(fiber.Map{"message": "Preferences updated"})

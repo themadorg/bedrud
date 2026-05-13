@@ -39,8 +39,8 @@ func (r *PasskeyRepository) UpdatePasskeyCounter(credentialID []byte, counter ui
 		Update("counter", counter).Error
 }
 
-func (r *PasskeyRepository) DeletePasskey(passkeyID string) error {
-	return r.db.Delete(&models.Passkey{}, "id = ?", passkeyID).Error
+func (r *PasskeyRepository) DeletePasskey(passkeyID, userID string) error {
+	return r.db.Where("id = ? AND user_id = ?", passkeyID, userID).Delete(&models.Passkey{}).Error
 }
 
 func (r *PasskeyRepository) DeleteByUserID(userID string) error {

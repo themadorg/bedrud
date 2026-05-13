@@ -136,7 +136,7 @@ func TestPasskeyRepository_DeletePasskey(t *testing.T) {
 		Name:         "Delete Me",
 	})
 
-	err := repo.DeletePasskey("pk-to-delete")
+	err := repo.DeletePasskey("pk-to-delete", "user-1")
 	if err != nil {
 		t.Fatalf("failed to delete passkey: %v", err)
 	}

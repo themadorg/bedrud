@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
@@ -15,12 +16,13 @@ import (
 )
 
 type UsersHandler struct {
-	userRepo    *repository.UserRepository
-	roomRepo    *repository.RoomRepository
-	passkeyRepo *repository.PasskeyRepository
-	prefsRepo   *repository.UserPreferencesRepository
-	cleanupSvc  *services.RoomCleanupService
-	wg          sync.WaitGroup
+	userRepo         *repository.UserRepository
+	roomRepo         *repository.RoomRepository
+	passkeyRepo      *repository.PasskeyRepository
+	prefsRepo        *repository.UserPreferencesRepository
+	cleanupSvc       *services.RoomCleanupService
+	wg               sync.WaitGroup
+	deletionInFlight sync.Map
 }
 
 type UserListResponse struct {
@@ -139,6 +141,36 @@ func (h *UsersHandler) UpdateUserAccesses(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
 	}
 
+	// Prevent self-modification
+	if userID == claims.UserID {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot modify your own access levels"})
+	}
+
+	// Validate role values
+	validRoles := map[string]bool{
+		string(models.AccessSuperAdmin): true,
+		string(models.AccessAdmin):      true,
+		string(models.AccessMod):        true,
+		string(models.AccessUser):       true,
+		string(models.AccessGuest):      true,
+	}
+	for _, r := range input.Accesses {
+		if !validRoles[r] {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("Invalid access role: %s", r)})
+		}
+	}
+
+	// Check last-superadmin guard — prevent demoting the only superadmin
+	if !containsAccess(input.Accesses, string(models.AccessSuperAdmin)) {
+		targetUser, err := h.userRepo.GetUserByID(userID)
+		if err == nil && targetUser != nil && containsAccess(targetUser.Accesses, string(models.AccessSuperAdmin)) {
+			superadmins, _ := h.userRepo.GetUsersByAccess(models.AccessSuperAdmin)
+			if len(superadmins) <= 1 {
+				return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Cannot demote the last superadmin"})
+			}
+		}
+	}
+
 	// Atomically update accesses and clear the refresh token so the user gets a
 	// fresh JWT with correct roles on their next login.
 	if err := h.userRepo.UpdateAccessesAndClearToken(userID, input.Accesses); err != nil {
@@ -166,6 +198,10 @@ func (h *UsersHandler) UpdateUserStatus(c *fiber.Ctx) error {
 		})
 	}
 
+	if userID == claims.UserID {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot change your own status"})
+	}
+
 	_, err := h.userRepo.GetUserByID(userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -185,22 +221,24 @@ func (h *UsersHandler) UpdateUserStatus(c *fiber.Ctx) error {
 				"error": "Failed to update user status",
 			})
 		}
+		// Add to in-memory banned set for fast middleware checks
+		auth.BanUser(userID)
 		return c.JSON(UserStatusUpdateResponse{
 			Message: "User status updated successfully",
 		})
 	}
 
 	// Unbanning: only set is_active=true, no token manipulation needed.
-	user, err := h.userRepo.GetUserByID(userID)
-	if err != nil || user == nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
-	}
-	user.IsActive = true
-	if err := h.userRepo.UpdateUser(user); err != nil {
+	if err := h.userRepo.ActivateUser(userID); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to update user status",
 		})
 	}
+	// Remove from in-memory banned set
+	auth.UnbanUser(userID)
 
 	return c.JSON(UserStatusUpdateResponse{
 		Message: "User status updated successfully",
@@ -236,23 +274,60 @@ func (h *UsersHandler) DeleteUser(c *fiber.Ctx) error {
 		})
 	}
 
+	// Idempotency guard — prevent concurrent deletions of the same user
+	if _, loaded := h.deletionInFlight.LoadOrStore(userID, true); loaded {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Deletion already in progress"})
+	}
+
+	// Immediately deactivate the user to prevent further actions
+	if err := h.userRepo.UpdateUserStatusAndClearToken(userID, false); err != nil {
+		h.deletionInFlight.Delete(userID)
+		if err == gorm.ErrRecordNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to deactivate user"})
+	}
+
 	user, err := h.userRepo.GetUserByID(userID)
 	if err != nil || user == nil {
+		h.deletionInFlight.Delete(userID)
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+	}
+
+	// Prevent deleting the last superadmin
+	if containsAccess(user.Accesses, string(models.AccessSuperAdmin)) {
+		superadmins, err := h.userRepo.GetUsersByAccess(models.AccessSuperAdmin)
+		if err != nil {
+			h.deletionInFlight.Delete(userID)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to verify superadmin count"})
+		}
+		if len(superadmins) <= 1 {
+			h.deletionInFlight.Delete(userID)
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Cannot delete the last superadmin"})
+		}
 	}
 
 	rooms, err := h.roomRepo.GetRoomsCreatedByUser(userID)
 	if err != nil {
+		h.deletionInFlight.Delete(userID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch user rooms"})
 	}
 	if rooms == nil {
 		rooms = []models.Room{}
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	h.wg.Add(1)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error().Interface("panic", r).Str("userID", userID).Msg("delete goroutine panicked")
+			}
+		}()
+		defer cancel()
 		defer h.wg.Done()
-		h.runHardDeleteJob(context.Background(), user.Email, userID, rooms)
+		defer h.deletionInFlight.Delete(userID)
+		h.runHardDeleteJob(ctx, user.Email, userID, rooms)
 	}()
 
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
@@ -268,12 +343,6 @@ func (h *UsersHandler) runHardDeleteJob(ctx context.Context, userEmail, userID s
 			Msg("room cleanup had errors, proceeding with user deletion")
 	}
 
-	if err := h.passkeyRepo.DeleteByUserID(userID); err != nil {
-		log.Error().Err(err).Str("userID", userID).Msg("failed to delete passkeys")
-	}
-	if err := h.prefsRepo.DeleteByUserID(userID); err != nil {
-		log.Error().Err(err).Str("userID", userID).Msg("failed to delete user preferences")
-	}
 	if err := h.userRepo.DeleteUser(userID); err != nil {
 		log.Error().Err(err).Str("userID", userID).Msg("failed to delete user")
 		return
@@ -376,8 +445,11 @@ func (h *UsersHandler) GetUserDetail(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
 	}
 
-	rooms, _ := h.roomRepo.GetRoomsCreatedByUser(userID)
-	if rooms == nil {
+	rooms, err := h.roomRepo.GetRoomsCreatedByUser(userID)
+	if err != nil {
+		log.Error().Err(err).Str("userID", userID).Msg("Failed to fetch user rooms")
+		rooms = []models.Room{}
+	} else if rooms == nil {
 		rooms = []models.Room{}
 	}
 
