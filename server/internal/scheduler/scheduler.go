@@ -29,7 +29,7 @@ var keyFile string
 var certHosts []string
 var certMu sync.Mutex
 
-func Initialize(roomRepo *repository.RoomRepository, lkCfg *config.LiveKitConfig, serverCfg *config.ServerConfig) {
+func Initialize(roomRepo *repository.RoomRepository, userRepo *repository.UserRepository, lkCfg *config.LiveKitConfig, serverCfg *config.ServerConfig) {
 	scheduler = gocron.NewScheduler(time.Local)
 
 	certFile = ""
@@ -84,8 +84,24 @@ func Initialize(roomRepo *repository.RoomRepository, lkCfg *config.LiveKitConfig
 	lkClient := livekit.NewRoomServiceProtobufClient(apiHost, httpClient)
 
 	_, _ = scheduler.Every(1).Minute().Do(func() {
+		if err := roomRepo.CleanupExpiredRooms(); err != nil {
+			log.Error().Err(err).Msg("Scheduler: failed to clean up expired rooms")
+		}
 		checkIdleRooms(roomRepo, lkCfg, lkClient)
 	})
+
+	// Weekly cleanup of stale guest users (older than 7 days, no active rooms)
+	if userRepo != nil {
+		_, _ = scheduler.Every(1).Week().At("03:00").Do(func() {
+			cutoff := time.Now().Add(-7 * 24 * time.Hour)
+			deleted, err := userRepo.DeleteGuestUsers(cutoff)
+			if err != nil {
+				log.Error().Err(err).Msg("Scheduler: failed to clean up stale guest users")
+			} else if deleted > 0 {
+				log.Info().Int64("deleted", deleted).Msg("Scheduler: cleaned up stale guest users")
+			}
+		})
+	}
 
 	if certFile != "" {
 		_, _ = scheduler.Every(1).Day().At("09:00").Do(func() {
@@ -109,7 +125,7 @@ func checkIdleRooms(roomRepo *repository.RoomRepository, cfg *config.LiveKitConf
 	if roomRepo == nil {
 		return
 	}
-	rooms, err := roomRepo.GetAllActiveRooms()
+	rooms, err := roomRepo.GetAllActiveRoomsWithLimit(1000)
 	if err != nil || len(rooms) == 0 {
 		return
 	}
@@ -121,13 +137,17 @@ func checkIdleRooms(roomRepo *repository.RoomRepository, cfg *config.LiveKitConf
 		log.Error().Err(err).Msg("Scheduler: failed to generate LiveKit token")
 		return
 	}
-	ctx, _ := twirp.WithHTTPRequestHeaders(context.Background(), http.Header{
+	ctx, err := twirp.WithHTTPRequestHeaders(context.Background(), http.Header{
 		"Authorization": []string{"Bearer " + token},
 	})
+	if err != nil {
+		log.Error().Err(err).Msg("Scheduler: failed to set LiveKit auth headers")
+		return
+	}
 
 	resp, err := client.ListRooms(ctx, &livekit.ListRoomsRequest{})
 	if err != nil {
-		log.Debug().Err(err).Msg("Scheduler: failed to list LiveKit rooms")
+		log.Warn().Err(err).Msg("Scheduler: failed to list LiveKit rooms")
 		return
 	}
 
@@ -153,6 +173,9 @@ func checkIdleRooms(roomRepo *repository.RoomRepository, cfg *config.LiveKitConf
 				log.Error().Err(err).Str("room", room.Name).Msg("Scheduler: failed to set room idle")
 			} else {
 				log.Info().Str("room", room.Name).Msg("Room set to idle (no participants)")
+				if err := roomRepo.DeactivateRoomParticipants(room.ID); err != nil {
+					log.Warn().Err(err).Str("room", room.Name).Msg("Scheduler: failed to deactivate participants")
+				}
 			}
 		}
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // ChatAttachment is the metadata returned after a successful upload.
@@ -48,13 +49,57 @@ var allowedMimeTypes = map[string]string{
 }
 
 // imageDimensions extracts width/height from image bytes without fully decoding.
-// Returns 0,0 for formats that can't be decoded (e.g. WebP without the x/image package).
+// Supports WebP with manual magic byte parsing (Go stdlib doesn't decode WebP).
 func imageDimensions(data []byte) (width, height int) {
+	// Manual WebP detection: RIFF + size + WEBP magic
+	if len(data) >= 12 &&
+		data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F' &&
+		data[8] == 'W' && data[9] == 'E' && data[10] == 'B' && data[11] == 'P' {
+		return webpDimensions(data)
+	}
 	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
 		return 0, 0
 	}
 	return cfg.Width, cfg.Height
+}
+
+// webpDimensions parses WebP image dimensions from RIFF container.
+func webpDimensions(data []byte) (width, height int) {
+	if len(data) < 30 {
+		return 0, 0
+	}
+	chunkType := string(data[12:16])
+	switch chunkType {
+	case "VP8 ": // Lossy WebP
+		// VP8: 4 bytes header, then 3 bytes width, 3 bytes height (13-18)
+		// Width: ((data[14] << 8) | data[13]) & 0x3FFF
+		// Height: ((data[16] << 8) | data[15]) & 0x3FFF
+		if len(data) < 19 {
+			return 0, 0
+		}
+		w := int(data[14])<<8 | int(data[13])
+		h := int(data[16])<<8 | int(data[15])
+		return w & 0x3FFF, h & 0x3FFF
+	case "VP8L": // Lossless WebP
+		// VP8L: 5 bytes signature, then 14 bits width, 14 bits height
+		if len(data) < 21 {
+			return 0, 0
+		}
+		w := int(data[17]) | int(data[18])<<8
+		h := int(data[19]) | int(data[20])<<8
+		return (w & 0x3FFF) + 1, (h & 0x3FFF) + 1
+	case "VP8X": // Extended WebP
+		// VP8X: 8 bytes header, then width (3 bytes), height (3 bytes)
+		// Width/height stored as 24-bit little-endian, each +1
+		if len(data) < 24 {
+			return 0, 0
+		}
+		w := int(data[20]) | int(data[21])<<8 | int(data[22])<<16
+		h := int(data[23]) | int(data[24])<<8 | int(data[25])<<16
+		return (w & 0xFFFFFF) + 1, (h & 0xFFFFFF) + 1
+	}
+	return 0, 0
 }
 
 // sniffMime returns the content type of the data, restricted to allowed image types.
@@ -278,14 +323,16 @@ func (s *s3Store) putObject(key, contentType string, data []byte) error {
 	)
 	req.Header.Set("Authorization", authHeader)
 
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("s3 returned %d: %s", resp.StatusCode, body)
+		_ = body // body is intentionally discarded to avoid leaking it to the client; logged upstream
+		return fmt.Errorf("s3 returned status %d", resp.StatusCode)
 	}
 	return nil
 }
@@ -326,17 +373,21 @@ func (t *ChatUploadTracker) Record(roomID, fileHash, ext string) error {
 }
 
 func (t *ChatUploadTracker) DeleteByRoom(roomID string) error {
-	var uploads []models.ChatUpload
-	if err := t.db.Where("room_id = ?", roomID).Find(&uploads).Error; err != nil {
-		return err
+	var deleted []models.ChatUpload
+	result := t.db.Clauses(clause.Returning{}).Where("room_id = ?", roomID).Delete(&deleted)
+	if result.Error != nil {
+		return result.Error
 	}
-	if len(uploads) == 0 {
+	if result.RowsAffected == 0 {
 		return nil
 	}
-	if err := t.db.Where("room_id = ?", roomID).Delete(&models.ChatUpload{}).Error; err != nil {
-		return err
-	}
-	for _, u := range uploads {
+	for _, u := range deleted {
+		// Only delete the file if no other room references it (cross-room safety)
+		var remaining int64
+		t.db.Model(&models.ChatUpload{}).Where("file_hash = ? AND id != ?", u.FileHash, u.ID).Count(&remaining)
+		if remaining > 0 {
+			continue
+		}
 		path := filepath.Join(t.chatDir, u.FileHash+u.Extension)
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 			log.Warn().Err(err).Str("path", path).Msg("orphan chat upload file on disk")

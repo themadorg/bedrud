@@ -37,7 +37,11 @@ func NewRoomCleanupService(
 }
 
 func (s *RoomCleanupService) lkAuthContext(ctx context.Context) context.Context {
-	return lkutil.AuthContext(ctx, s.apiKey, s.apiSecret, &lkauth.VideoGrant{RoomCreate: true})
+	ctx, err := lkutil.AuthContext(ctx, s.apiKey, s.apiSecret, &lkauth.VideoGrant{RoomCreate: true})
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create LK auth context (cleanup service)")
+	}
+	return ctx
 }
 
 type CascadeDeleteOptions struct {
@@ -75,10 +79,16 @@ func (s *RoomCleanupService) CascadeDeleteRoom(ctx context.Context, room *models
 func (s *RoomCleanupService) SuspendRoom(ctx context.Context, room *models.Room) error {
 	lkCtx := s.lkAuthContext(ctx)
 
-	lkutil.SendSystemMessage(lkCtx, s.lkClient, room.Name, "room_closed", "This room has been suspended by an administrator")
+	lkutil.SendSystemMessage(lkCtx, s.lkClient, room.Name, "room_suspended", "This room has been suspended by an administrator")
 
 	if _, err := s.lkClient.DeleteRoom(lkCtx, &livekit.DeleteRoomRequest{Room: room.Name}); err != nil {
 		log.Warn().Err(err).Str("room", room.Name).Msg("LiveKit DeleteRoom failed during suspend, proceeding")
+	}
+
+	if s.uploadTracker != nil {
+		if err := s.uploadTracker.DeleteByRoom(room.ID); err != nil {
+			log.Warn().Err(err).Str("roomID", room.ID).Msg("failed to clean up chat uploads during suspend")
+		}
 	}
 
 	if err := s.roomRepo.SetRoomIdle(room.ID); err != nil {

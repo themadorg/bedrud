@@ -5,12 +5,12 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
 	lkauth "github.com/livekit/protocol/auth"
 	"github.com/livekit/protocol/livekit"
-	"github.com/rs/zerolog/log"
 	"github.com/twitchtv/twirp"
 )
 
@@ -30,19 +30,22 @@ func NewClient(lkCfg *config.LiveKitConfig) livekit.RoomService {
 	return livekit.NewRoomServiceProtobufClient(apiHost, httpClient)
 }
 
-func AuthContext(ctx context.Context, apiKey, apiSecret string, grants ...*lkauth.VideoGrant) context.Context {
+func AuthContext(ctx context.Context, apiKey, apiSecret string, grants ...*lkauth.VideoGrant) (context.Context, error) {
 	at := lkauth.NewAccessToken(apiKey, apiSecret)
 	for _, g := range grants {
 		at.AddGrant(g) //nolint:staticcheck // AddGrant is deprecated but VideoGrant field is not available in this version of the protocol SDK
 	}
 	token, err := at.ToJWT()
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to generate LiveKit auth token")
+		return ctx, fmt.Errorf("failed to generate LiveKit auth token: %w", err)
 	}
-	ctx, _ = twirp.WithHTTPRequestHeaders(ctx, http.Header{
+	ctx, err = twirp.WithHTTPRequestHeaders(ctx, http.Header{
 		"Authorization": []string{"Bearer " + token},
 	})
-	return ctx
+	if err != nil {
+		return ctx, fmt.Errorf("failed to set LiveKit auth headers: %w", err)
+	}
+	return ctx, nil
 }
 
 type SystemMessage struct {
