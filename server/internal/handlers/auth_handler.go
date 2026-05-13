@@ -4,6 +4,7 @@ import (
 	"bedrud/config"
 	"bedrud/internal/auth"
 	"bedrud/internal/repository"
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -24,14 +25,16 @@ type AuthHandler struct {
 	config          *config.Config
 	settingsRepo    *repository.SettingsRepository
 	inviteTokenRepo *repository.InviteTokenRepository
+	challengeStore  *auth.ChallengeStore
 }
 
-func NewAuthHandler(authService *auth.AuthService, cfg *config.Config, settingsRepo *repository.SettingsRepository, inviteTokenRepo *repository.InviteTokenRepository) *AuthHandler {
+func NewAuthHandler(authService *auth.AuthService, cfg *config.Config, settingsRepo *repository.SettingsRepository, inviteTokenRepo *repository.InviteTokenRepository, challengeStore *auth.ChallengeStore) *AuthHandler {
 	return &AuthHandler{
 		authService:     authService,
 		config:          cfg,
 		settingsRepo:    settingsRepo,
 		inviteTokenRepo: inviteTokenRepo,
+		challengeStore:  challengeStore,
 	}
 }
 
@@ -507,14 +510,7 @@ func (h *AuthHandler) PasskeyRegisterBegin(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	sess, req, err := h.getSession(c)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Session unavailable"})
-	}
-	sess.Values["passkey_register_challenge"] = challenge
-	if err := h.saveSession(c, sess, req); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save session"})
-	}
+	h.challengeStore.Set("passkey_register:"+claims.UserID, challenge, claims.UserID, nil)
 
 	return c.JSON(fiber.Map{
 		"challenge": challenge,
@@ -540,13 +536,9 @@ func (h *AuthHandler) PasskeyRegisterFinish(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
 	}
 
-	sess, req, err := h.getSession(c)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Session unavailable"})
-	}
-	challenge, ok := sess.Values["passkey_register_challenge"].(string)
+	challenge, _, ok := h.challengeStore.GetAndVerify("passkey_register:"+claims.UserID, "")
 	if !ok {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Challenge not found in session"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Challenge not found or expired"})
 	}
 
 	clientData, err := base64.RawURLEncoding.DecodeString(input.ClientDataJSON)
@@ -563,8 +555,7 @@ func (h *AuthHandler) PasskeyRegisterFinish(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	delete(sess.Values, "passkey_register_challenge")
-	_ = h.saveSession(c, sess, req)
+	h.challengeStore.Delete("passkey_register:" + claims.UserID)
 
 	return c.JSON(fiber.Map{"message": "Passkey registered successfully"})
 }
@@ -575,12 +566,21 @@ func (h *AuthHandler) PasskeyLoginBegin(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	challengeID := make([]byte, 16)
+	if _, err := rand.Read(challengeID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to generate challenge ID"})
+	}
+	id := base64.RawURLEncoding.EncodeToString(challengeID)
+
+	h.challengeStore.Set("passkey_login:"+id, challenge, "", nil)
+
 	sess, req, err := h.getSession(c)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Session unavailable"})
 	}
-	sess.Values["passkey_login_challenge"] = challenge
+	sess.Values["passkey_login_challenge_id"] = id
 	if err := h.saveSession(c, sess, req); err != nil {
+		h.challengeStore.Delete("passkey_login:" + id)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save session"})
 	}
 
@@ -605,9 +605,14 @@ func (h *AuthHandler) PasskeyLoginFinish(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Session unavailable"})
 	}
-	challenge, ok := sess.Values["passkey_login_challenge"].(string)
+	challengeID, ok := sess.Values["passkey_login_challenge_id"].(string)
 	if !ok {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Challenge not found in session"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Challenge not found or expired"})
+	}
+
+	challenge, _, ok := h.challengeStore.GetAndVerify("passkey_login:"+challengeID, "")
+	if !ok {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Challenge not found or expired"})
 	}
 
 	credID, err := base64.RawURLEncoding.DecodeString(input.CredentialID)
@@ -632,7 +637,8 @@ func (h *AuthHandler) PasskeyLoginFinish(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	delete(sess.Values, "passkey_login_challenge")
+	h.challengeStore.Delete("passkey_login:" + challengeID)
+	delete(sess.Values, "passkey_login_challenge_id")
 	_ = h.saveSession(c, sess, req)
 
 	setAuthCookies(c, h.config, loginResponse.Token.AccessToken, loginResponse.Token.RefreshToken)
@@ -685,18 +691,30 @@ func (h *AuthHandler) PasskeySignupBegin(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	challengeID := make([]byte, 16)
+	if _, err := rand.Read(challengeID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to generate challenge ID"})
+	}
+	id := base64.RawURLEncoding.EncodeToString(challengeID)
+
+	extra := map[string]string{
+		"email":  input.Email,
+		"name":   input.Name,
+		"userID": userID,
+	}
+	if tokenID, ok := c.Locals("pendingPasskeyInviteToken").(string); ok && tokenID != "" {
+		extra["inviteToken"] = tokenID
+	}
+	h.challengeStore.Set("passkey_signup:"+id, challenge, "", extra)
+
 	sess, req, err := h.getSession(c)
 	if err != nil {
+		h.challengeStore.Delete("passkey_signup:" + id)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Session unavailable"})
 	}
-	sess.Values["signup_challenge"] = challenge
-	sess.Values["signup_email"] = input.Email
-	sess.Values["signup_name"] = input.Name
-	sess.Values["signup_user_id"] = userID
-	if tokenID, ok := c.Locals("pendingPasskeyInviteToken").(string); ok && tokenID != "" {
-		sess.Values["signup_invite_token"] = tokenID
-	}
+	sess.Values["passkey_signup_challenge_id"] = id
 	if err := h.saveSession(c, sess, req); err != nil {
+		h.challengeStore.Delete("passkey_signup:" + id)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save session"})
 	}
 
@@ -727,15 +745,20 @@ func (h *AuthHandler) PasskeySignupFinish(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Session unavailable"})
 	}
-	challenge, ok := sess.Values["signup_challenge"].(string)
+	challengeID, ok := sess.Values["passkey_signup_challenge_id"].(string)
 	if !ok {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Signup session expired or not found"})
 	}
 
-	email, ok2 := sess.Values["signup_email"].(string)
-	name, ok3 := sess.Values["signup_name"].(string)
-	userID, ok4 := sess.Values["signup_user_id"].(string)
-	if !ok2 || !ok3 || !ok4 {
+	challenge, extra, ok := h.challengeStore.GetAndVerify("passkey_signup:"+challengeID, "")
+	if !ok {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Signup session expired or not found"})
+	}
+
+	email := extra["email"]
+	name := extra["name"]
+	userID := extra["userID"]
+	if email == "" || name == "" || userID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Signup session expired or not found"})
 	}
 
@@ -754,7 +777,7 @@ func (h *AuthHandler) PasskeySignupFinish(c *fiber.Ctx) error {
 	}
 
 	// Mark invite token used if passkey signup required one
-	if tokenID, ok := sess.Values["signup_invite_token"].(string); ok && tokenID != "" && h.inviteTokenRepo != nil {
+	if tokenID := extra["inviteToken"]; tokenID != "" && h.inviteTokenRepo != nil {
 		if err := h.inviteTokenRepo.MarkUsed(tokenID, loginResponse.User.ID); err != nil {
 			log.Error().Err(err).Str("tokenID", tokenID).Msg("Failed to mark passkey invite token as used")
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -763,11 +786,8 @@ func (h *AuthHandler) PasskeySignupFinish(c *fiber.Ctx) error {
 		}
 	}
 
-	delete(sess.Values, "signup_challenge")
-	delete(sess.Values, "signup_email")
-	delete(sess.Values, "signup_name")
-	delete(sess.Values, "signup_user_id")
-	delete(sess.Values, "signup_invite_token")
+	h.challengeStore.Delete("passkey_signup:" + challengeID)
+	delete(sess.Values, "passkey_signup_challenge_id")
 	_ = h.saveSession(c, sess, req)
 
 	setAuthCookies(c, h.config, loginResponse.Token.AccessToken, loginResponse.Token.RefreshToken)

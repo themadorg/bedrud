@@ -58,6 +58,7 @@ auth:
   tokenDuration: 24                       # Token 过期时间（小时）
   sessionSecret: "your-session-secret"    # Session cookie 的密钥
   frontendURL: "http://localhost:8090"    # 前端 URL（用于 OAuth 重定向）
+  passkeyChallengeTTL: 5                # Passkey 挑战过期时间（分钟）
 
   # OAuth 提供者（可选）
   google:
@@ -226,6 +227,7 @@ export LIVEKIT_API_SECRET=prodsecret
 | `LIVEKIT_API_SECRET` | `livekit.apiSecret` | LiveKit API secret |
 | `JWT_SECRET` | `auth.jwtSecret` | 签名 JWT token 的密钥 |
 | `AUTH_FRONTEND_URL` | `auth.frontendURL` | OAuth 重定向的前端 URL |
+| `AUTH_PASSKEY_CHALLENGE_TTL` | `auth.passkeyChallengeTTL` | Passkey 挑战过期时间（分钟） |
 | `CORS_ALLOWED_ORIGINS` | `cors.allowedOrigins` | 逗号分隔的允许来源 |
 | `CORS_ALLOWED_HEADERS` | `cors.allowedHeaders` | 允许的请求头 |
 | `CORS_ALLOWED_METHODS` | `cors.allowedMethods` | 允许的 HTTP 方法 |

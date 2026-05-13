@@ -242,7 +242,8 @@ func Run(configPath string) error {
 	lkClient := lkutil.NewClient(&cfg.LiveKit)
 	cleanupSvc := services.NewRoomCleanupService(roomRepo, lkClient, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, uploadTracker)
 	authService := auth.NewAuthService(userRepo, passkeyRepo)
-	authHandler := handlers.NewAuthHandler(authService, cfg, settingsRepo, inviteTokenRepo)
+	challengeStore := auth.NewChallengeStore(cfg.Auth.PasskeyChallengeTTL)
+	authHandler := handlers.NewAuthHandler(authService, cfg, settingsRepo, inviteTokenRepo, challengeStore)
 	roomHandler := handlers.NewRoomHandler(&cfg.LiveKit, &cfg.Chat, roomRepo, uploadTracker, cleanupSvc)
 
 	api.Post("/auth/register", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.Register)

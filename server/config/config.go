@@ -79,13 +79,14 @@ type LiveKitConfig struct {
 }
 
 type AuthConfig struct {
-	JWTSecret     string       `yaml:"jwtSecret"`
-	TokenDuration ConfigInt    `yaml:"tokenDuration"` // in hours
-	Google        OAuth2Config `yaml:"google"`
-	Github        OAuth2Config `yaml:"github"`
-	Twitter       OAuth2Config `yaml:"twitter"`
-	FrontendURL   string       `yaml:"frontendURL"`
-	SessionSecret string       `yaml:"sessionSecret"`
+	JWTSecret           string       `yaml:"jwtSecret"`
+	TokenDuration       ConfigInt    `yaml:"tokenDuration"` // in hours
+	Google              OAuth2Config `yaml:"google"`
+	Github              OAuth2Config `yaml:"github"`
+	Twitter             OAuth2Config `yaml:"twitter"`
+	FrontendURL         string       `yaml:"frontendURL"`
+	SessionSecret       string       `yaml:"sessionSecret"`
+	PasskeyChallengeTTL int          `yaml:"passkeyChallengeTTL"` // minutes, default 5. Env: AUTH_PASSKEY_CHALLENGE_TTL
 }
 
 type OAuth2Config struct {
@@ -297,6 +298,11 @@ func Load(configPath string) (*Config, error) {
 		}
 		if frontendURL := os.Getenv("AUTH_FRONTEND_URL"); frontendURL != "" {
 			config.Auth.FrontendURL = frontendURL
+		}
+		if ttl := os.Getenv("AUTH_PASSKEY_CHALLENGE_TTL"); ttl != "" {
+			if n, err := strconv.Atoi(ttl); err == nil {
+				config.Auth.PasskeyChallengeTTL = n
+			}
 		}
 
 		// CORS environment variable overrides

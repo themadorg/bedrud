@@ -32,6 +32,7 @@ auth:
   jwtSecret: "CHANGE_ME_32_CHAR_RANDOM_STRING"
   sessionSecret: "CHANGE_ME_32_CHAR_RANDOM_STRING"
   tokenDuration: 24
+  passkeyChallengeTTL: 5  # passkey challenge expiry in minutes. Env: AUTH_PASSKEY_CHALLENGE_TTL
   frontendURL: "http://localhost:8090"
   google:
     clientId: "CHANGE_ME_GOOGLE_CLIENT_ID"

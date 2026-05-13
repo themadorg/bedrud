@@ -277,7 +277,8 @@ func run() error {
 	})
 
 	// ------------------------------
-	authHandler := handlers.NewAuthHandler(authService, cfg, settingsRepo, inviteTokenRepo)
+	challengeStore := auth.NewChallengeStore(cfg.Auth.PasskeyChallengeTTL)
+	authHandler := handlers.NewAuthHandler(authService, cfg, settingsRepo, inviteTokenRepo, challengeStore)
 	api.Post("/auth/register", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.Register)
 	api.Post("/auth/login", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.Login)
 	api.Post("/auth/guest-login", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.GuestLogin)

@@ -58,6 +58,7 @@ auth:
   tokenDuration: 24                       # انقضای توکن به ساعت
   sessionSecret: "your-session-secret"    # رمز برای کوکی‌های جلسه
   frontendURL: "http://localhost:8090"    # URL فرانت‌اند (برای تغییر مسیر OAuth)
+  passkeyChallengeTTL: 5                # مدت اعتبار چالش Passkey به دقیقه
 
   # فراهم‌کنندگان OAuth (اختیاری)
   google:
@@ -226,6 +227,7 @@ export LIVEKIT_API_SECRET=prodsecret
 | `LIVEKIT_API_SECRET` | `livekit.apiSecret` | رمز API LiveKit |
 | `JWT_SECRET` | `auth.jwtSecret` | رمز برای امضای توکن‌های JWT |
 | `AUTH_FRONTEND_URL` | `auth.frontendURL` | URL فرانت‌اند برای تغییر مسیر OAuth |
+| `AUTH_PASSKEY_CHALLENGE_TTL` | `auth.passkeyChallengeTTL` | مدت اعتبار چالش Passkey به دقیقه |
 | `CORS_ALLOWED_ORIGINS` | `cors.allowedOrigins` | مبدأهای مجاز با کاما جدا شده |
 | `CORS_ALLOWED_HEADERS` | `cors.allowedHeaders` | هدرهای درخواست مجاز |
 | `CORS_ALLOWED_METHODS` | `cors.allowedMethods` | متدهای HTTP مجاز |

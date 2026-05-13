@@ -37,7 +37,7 @@ func setupAuthTestApp(t *testing.T) (*fiber.App, *auth.AuthService, *config.Conf
 	}
 	// Set global config so Login/GuestLogin (which call config.Get()) don't panic
 	config.SetForTest(cfg)
-	authHandler := NewAuthHandler(authService, cfg, settingsRepo, inviteTokenRepo)
+	authHandler := NewAuthHandler(authService, cfg, settingsRepo, inviteTokenRepo, nil)
 
 	app := fiber.New()
 
@@ -301,7 +301,7 @@ func TestAuthHandler_GetMe_InvalidToken(t *testing.T) {
 func setupAuthTestAppFull(t *testing.T) (*fiber.App, *auth.AuthService, *config.Config) {
 	t.Helper()
 	app, authService, cfg := setupAuthTestApp(t)
-	authHandler := NewAuthHandler(authService, cfg, nil, nil)
+	authHandler := NewAuthHandler(authService, cfg, nil, nil, nil)
 
 	// Helper: add auth-required routes to the existing app
 	app.Post("/api/auth/refresh", authHandler.RefreshToken)
@@ -365,7 +365,7 @@ func TestAuthHandler_RefreshToken_Success(t *testing.T) {
 	_, _ = authService.Register("refresh@example.com", "pass", "Refresh User")
 	loginResp, _ := authService.Login("refresh@example.com", "pass")
 
-	authHandler := NewAuthHandler(authService, cfg, nil, nil)
+	authHandler := NewAuthHandler(authService, cfg, nil, nil, nil)
 	app.Post("/api/auth/refresh", authHandler.RefreshToken)
 
 	body, _ := json.Marshal(map[string]string{
@@ -390,7 +390,7 @@ func TestAuthHandler_RefreshToken_Success(t *testing.T) {
 
 func TestAuthHandler_RefreshToken_InvalidToken(t *testing.T) {
 	app, authService, cfg := setupAuthTestApp(t)
-	authHandler := NewAuthHandler(authService, cfg, nil, nil)
+	authHandler := NewAuthHandler(authService, cfg, nil, nil, nil)
 	app.Post("/api/auth/refresh", authHandler.RefreshToken)
 
 	body, _ := json.Marshal(map[string]string{"refresh_token": "not-a-real-token"})
@@ -405,7 +405,7 @@ func TestAuthHandler_RefreshToken_InvalidToken(t *testing.T) {
 
 func TestAuthHandler_RefreshToken_InvalidBody(t *testing.T) {
 	app, authService, cfg := setupAuthTestApp(t)
-	authHandler := NewAuthHandler(authService, cfg, nil, nil)
+	authHandler := NewAuthHandler(authService, cfg, nil, nil, nil)
 	app.Post("/api/auth/refresh", authHandler.RefreshToken)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", bytes.NewReader([]byte("{invalid")))
