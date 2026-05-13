@@ -139,9 +139,16 @@ func Run(configPath string) error {
 		log.Error().Err(err).Msg("Failed to run database migrations")
 	}
 	roomRepo := repository.NewRoomRepository(database.GetDB())
-	scheduler.Initialize(roomRepo, &cfg.LiveKit, &cfg.Server)
+	userRepo := repository.NewUserRepository(database.GetDB())
+	scheduler.Initialize(roomRepo, userRepo, &cfg.LiveKit, &cfg.Server)
 	defer scheduler.Stop()
 	auth.Init(cfg)
+
+	// Load deactivated users into in-memory ban set for fast middleware checks
+	inactiveUsers, _ := userRepo.GetInactiveUserIDs()
+	if len(inactiveUsers) > 0 {
+		auth.LoadBannedUsersFromDB(inactiveUsers)
+	}
 
 	fiberCfg := fiber.Config{
 		AppName:   "Bedrud API",
@@ -201,10 +208,10 @@ func Run(configPath string) error {
 	}
 	if cfg.Cors.AllowCredentials {
 		if cfg.Cors.AllowedOrigins == "*" || cfg.Cors.AllowedOrigins == "" {
-			log.Warn().Msg("CORS: AllowCredentials is true but AllowedOrigins is wildcard. Refusing to allow all origins with credentials.")
-		} else {
-			corsConfig.AllowOrigins = cfg.Cors.AllowedOrigins
+			log.Error().Msg("CORS: AllowCredentials=true requires explicit AllowedOrigins (not '*'). Refusing to start.")
+			return fmt.Errorf("CORS misconfiguration: allowCredentials=true with wildcard origins is insecure")
 		}
+		corsConfig.AllowOrigins = cfg.Cors.AllowedOrigins
 	} else {
 		if cfg.Cors.AllowedOrigins == "" || cfg.Cors.AllowedOrigins == "*" {
 			corsConfig.AllowOrigins = "*"
@@ -229,7 +236,6 @@ func Run(configPath string) error {
 	app.Get("/health", func(c *fiber.Ctx) error { return c.Redirect("/api/health") })
 	app.Get("/ready", func(c *fiber.Ctx) error { return c.Redirect("/api/ready") })
 
-	userRepo := repository.NewUserRepository(database.GetDB())
 	passkeyRepo := repository.NewPasskeyRepository(database.GetDB())
 	settingsRepo := repository.NewSettingsRepository(database.GetDB())
 	settingsRepo.SetConfig(cfg)
@@ -244,7 +250,7 @@ func Run(configPath string) error {
 	authService := auth.NewAuthService(userRepo, passkeyRepo)
 	challengeStore := auth.NewChallengeStore(cfg.Auth.PasskeyChallengeTTL)
 	authHandler := handlers.NewAuthHandler(authService, cfg, settingsRepo, inviteTokenRepo, challengeStore)
-	roomHandler := handlers.NewRoomHandler(&cfg.LiveKit, &cfg.Chat, roomRepo, uploadTracker, cleanupSvc)
+	roomHandler := handlers.NewRoomHandler(&cfg.LiveKit, &cfg.Chat, roomRepo, settingsRepo, uploadTracker, cleanupSvc)
 
 	api.Post("/auth/register", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.Register)
 	api.Post("/auth/login", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.Login)
@@ -270,7 +276,7 @@ func Run(configPath string) error {
 	api.Post("/auth/passkey/signup/begin", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.PasskeySignupBegin)
 	api.Post("/auth/passkey/signup/finish", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.PasskeySignupFinish)
 
-	api.Post("/room/create", middleware.Protected(), roomHandler.CreateRoom)
+	api.Post("/room/create", middleware.Protected(), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.CreateRoom)
 	api.Post("/room/join", middleware.Protected(), roomHandler.JoinRoom)
 	api.Post("/room/guest-join", middleware.GuestRateLimiter(cfg.RateLimit), roomHandler.GuestJoinRoom)
 	api.Get("/room/list", middleware.Protected(), roomHandler.ListRooms)
@@ -291,14 +297,25 @@ func Run(configPath string) error {
 	api.Post("/room/:roomId/stage/:identity/remove", middleware.Protected(), roomHandler.RemoveFromStage)
 	api.Put("/room/:roomId/settings", middleware.Protected(), roomHandler.UpdateSettings)
 	api.Delete("/room/:roomId", middleware.Protected(), roomHandler.DeleteRoom)
-	api.Post("/room/:roomId/chat/upload", middleware.Protected(), roomHandler.UploadChatImage)
+	api.Post("/room/:roomId/chat/upload", middleware.Protected(), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.UploadChatImage)
 
 	// Serve disk-backed chat image uploads as static files.
 	// Inline (base64) and S3-hosted images are not served from here.
 	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
 		log.Warn().Err(err).Str("dir", uploadDir).Msg("Could not create chat upload dir")
 	}
-	app.Static("/uploads/chat", uploadDir, fiber.Static{Browse: false})
+	// Protected chat upload endpoint with path traversal prevention
+	app.Get("/uploads/chat/*", middleware.Protected(), func(c *fiber.Ctx) error {
+		path := c.Params("*")
+		if path == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "Missing file path"})
+		}
+		resolved := filepath.Join(uploadDir, path)
+		if !strings.HasPrefix(resolved, filepath.Clean(uploadDir)+string(os.PathSeparator)) && resolved != filepath.Clean(uploadDir) {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid path"})
+		}
+		return c.SendFile(resolved)
+	})
 
 	// Admin routes
 	usersHandler := handlers.NewUsersHandler(userRepo, roomRepo, passkeyRepo, prefsRepo, cleanupSvc)
@@ -316,6 +333,7 @@ func Run(configPath string) error {
 	adminGroup.Post("/rooms/:roomId/token", roomHandler.AdminGenerateToken)
 	adminGroup.Delete("/rooms/:roomId", roomHandler.AdminCloseRoom)
 	adminGroup.Post("/rooms/:roomId/suspend", roomHandler.AdminSuspendRoom)
+	adminGroup.Post("/rooms/:roomId/reactivate", roomHandler.AdminReactivateRoom)
 	adminGroup.Put("/rooms/:roomId", roomHandler.AdminUpdateRoom)
 	adminGroup.Get("/online-count", roomHandler.GetOnlineCount)
 	adminGroup.Get("/livekit/stats", roomHandler.AdminLiveKitStats)

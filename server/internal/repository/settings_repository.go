@@ -47,6 +47,10 @@ func (r *SettingsRepository) GetEffectiveSettings() (*models.SystemSettings, err
 }
 
 // mergeFromConfig fills in zero/empty fields from the config file.
+// NOTE: Boolean fields from config can override explicit DB false values (e.g.
+// setting ServerEnableTLS=false in admin settings then config's enableTls:true wins).
+// This is a known limitation — a full design change would track which fields
+// have been explicitly set via admin API vs loaded from config.yaml.
 func mergeFromConfig(s *models.SystemSettings, cfg *config.Config) {
 	// Auth
 	if s.GoogleClientID == "" && cfg.Auth.Google.ClientID != "" {
@@ -179,6 +183,11 @@ func mergeFromConfig(s *models.SystemSettings, cfg *config.Config) {
 	}
 	if s.ChatUploadS3PublicURL == "" {
 		s.ChatUploadS3PublicURL = cfg.Chat.Uploads.S3.PublicBaseURL
+	}
+
+	// Room limits
+	if s.MaxParticipantsLimit == 0 && cfg.Server.MaxParticipantsLimit != 0 {
+		s.MaxParticipantsLimit = cfg.Server.MaxParticipantsLimit
 	}
 
 	// Logger

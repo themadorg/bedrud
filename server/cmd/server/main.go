@@ -35,6 +35,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -208,7 +209,7 @@ func run() error {
 	}
 	inviteTokenRepo := repository.NewInviteTokenRepository(database.GetDB())
 
-	scheduler.Initialize(roomRepo, &cfg.LiveKit, &cfg.Server)
+	scheduler.Initialize(roomRepo, userRepo, &cfg.LiveKit, &cfg.Server)
 	defer scheduler.Stop()
 
 	// Periodically clean up expired blocked refresh tokens from the database.
@@ -254,15 +255,16 @@ func run() error {
 	api.Get("/health", healthCheck)
 	api.Get("/ready", readinessCheck)
 
-	api.Get("/swagger/*", swagger.New(swagger.Config{
-		URL:          "/api/swagger/doc.json",
-		DeepLinking:  true,
-		DocExpansion: "list",
-	}))
+	if os.Getenv("DISABLE_API_DOCS") == "" {
+		api.Get("/swagger/*", swagger.New(swagger.Config{
+			URL:          "/api/swagger/doc.json",
+			DeepLinking:  true,
+			DocExpansion: "list",
+		}))
 
-	api.Get("/scalar", func(c *fiber.Ctx) error {
-		c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
-		return c.SendString(`<!doctype html>
+		api.Get("/scalar", func(c *fiber.Ctx) error {
+			c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
+			return c.SendString(`<!doctype html>
 <html>
 <head>
   <title>Bedrud API — Scalar</title>
@@ -274,7 +276,8 @@ func run() error {
   <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 </body>
 </html>`)
-	})
+		})
+	}
 
 	// ------------------------------
 	challengeStore := auth.NewChallengeStore(cfg.Auth.PasskeyChallengeTTL)
@@ -311,10 +314,10 @@ func run() error {
 	uploadTracker := storage.NewChatUploadTracker(database.GetDB(), uploadDir)
 	lkClient := lkutil.NewClient(&cfg.LiveKit)
 	cleanupSvc := services.NewRoomCleanupService(roomRepo, lkClient, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, uploadTracker)
-	roomHandler := handlers.NewRoomHandler(&cfg.LiveKit, &cfg.Chat, roomRepo, uploadTracker, cleanupSvc)
+	roomHandler := handlers.NewRoomHandler(&cfg.LiveKit, &cfg.Chat, roomRepo, settingsRepo, uploadTracker, cleanupSvc)
 
 	// Room routes
-	api.Post("/room/create", middleware.Protected(), roomHandler.CreateRoom)
+	api.Post("/room/create", middleware.Protected(), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.CreateRoom)
 	api.Post("/room/join", middleware.Protected(), roomHandler.JoinRoom)
 	api.Post("/room/guest-join", middleware.GuestRateLimiter(cfg.RateLimit), roomHandler.GuestJoinRoom)
 	api.Get("/room/list", middleware.Protected(), roomHandler.ListRooms)
@@ -335,13 +338,19 @@ func run() error {
 	api.Post("/room/:roomId/stage/:identity/remove", middleware.Protected(), roomHandler.RemoveFromStage)
 	api.Put("/room/:roomId/settings", middleware.Protected(), roomHandler.UpdateSettings)
 	api.Delete("/room/:roomId", middleware.Protected(), roomHandler.DeleteRoom)
-	api.Post("/room/:roomId/chat/upload", middleware.Protected(), roomHandler.UploadChatImage)
+	api.Post("/room/:roomId/chat/upload", middleware.Protected(), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.UploadChatImage)
 
 	// Serve disk-backed chat image uploads.
 	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
 		log.Warn().Err(err).Str("dir", uploadDir).Msg("Could not create chat upload dir")
 	}
-	app.Static("/uploads/chat", uploadDir, fiber.Static{Browse: false})
+	app.Get("/uploads/chat/*", middleware.Protected(), func(c *fiber.Ctx) error {
+		path := c.Params("*")
+		if strings.Contains(path, "..") {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid path"})
+		}
+		return c.SendFile(filepath.Join(uploadDir, path))
+	})
 
 	// Initialize handlers
 	usersHandler := handlers.NewUsersHandler(userRepo, roomRepo, passkeyRepo, prefsRepo, cleanupSvc)
@@ -362,6 +371,7 @@ func run() error {
 	adminGroup.Post("/rooms/:roomId/token", roomHandler.AdminGenerateToken)
 	adminGroup.Delete("/rooms/:roomId", roomHandler.AdminCloseRoom)
 	adminGroup.Post("/rooms/:roomId/suspend", roomHandler.AdminSuspendRoom)
+	adminGroup.Post("/rooms/:roomId/reactivate", roomHandler.AdminReactivateRoom)
 	adminGroup.Put("/rooms/:roomId", roomHandler.AdminUpdateRoom)
 	adminGroup.Get("/online-count", roomHandler.GetOnlineCount)
 	adminGroup.Get("/livekit/stats", roomHandler.AdminLiveKitStats)
