@@ -8,11 +8,16 @@ import (
 	"bedrud/internal/repository"
 	"bedrud/internal/services"
 	"bedrud/internal/storage"
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"strings"
 	"time"
 
@@ -55,9 +60,10 @@ type RoomHandler struct {
 	uploadMax     int64
 	uploadTracker *storage.ChatUploadTracker
 	cleanupSvc    *services.RoomCleanupService
+	settingsRepo  *repository.SettingsRepository
 }
 
-func NewRoomHandler(lkCfg *config.LiveKitConfig, chatCfg *config.ChatConfig, roomRepo *repository.RoomRepository, uploadTracker *storage.ChatUploadTracker, cleanupSvc *services.RoomCleanupService) *RoomHandler {
+func NewRoomHandler(lkCfg *config.LiveKitConfig, chatCfg *config.ChatConfig, roomRepo *repository.RoomRepository, settingsRepo *repository.SettingsRepository, uploadTracker *storage.ChatUploadTracker, cleanupSvc *services.RoomCleanupService) *RoomHandler {
 	client := lkutil.NewClient(lkCfg)
 
 	uploadMax := chatCfg.Uploads.MaxBytes.Int64()
@@ -75,11 +81,27 @@ func NewRoomHandler(lkCfg *config.LiveKitConfig, chatCfg *config.ChatConfig, roo
 		uploadMax:     uploadMax,
 		uploadTracker: uploadTracker,
 		cleanupSvc:    cleanupSvc,
+		settingsRepo:  settingsRepo,
 	}
 }
 
+func (h *RoomHandler) maxParticipantsLimit() int {
+	if h.settingsRepo == nil {
+		return 1000
+	}
+	s, err := h.settingsRepo.GetEffectiveSettings()
+	if err != nil || s.MaxParticipantsLimit <= 0 {
+		return 1000
+	}
+	return s.MaxParticipantsLimit
+}
+
 func (h *RoomHandler) withAuth(ctx context.Context, grants ...*lkauth.VideoGrant) context.Context {
-	return lkutil.AuthContext(ctx, h.apiKey, h.apiSecret, grants...)
+	ctx, err := lkutil.AuthContext(ctx, h.apiKey, h.apiSecret, grants...)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create LK auth context")
+	}
+	return ctx
 }
 
 func (h *RoomHandler) CreateRoom(c *fiber.Ctx) error {
@@ -106,6 +128,23 @@ func (h *RoomHandler) CreateRoom(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	// Validate MaxParticipants
+	if req.MaxParticipants < 0 {
+		req.MaxParticipants = 0
+	}
+	limit := h.maxParticipantsLimit()
+	if req.MaxParticipants > limit {
+		return c.Status(400).JSON(fiber.Map{"error": fmt.Sprintf("maxParticipants must be at most %d", limit)})
+	}
+
+	// Validate mode
+	validModes := map[string]bool{"standard": true, "webinar": true, "broadcast": true}
+	if req.Mode == "" {
+		req.Mode = "standard"
+	} else if !validModes[req.Mode] {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid room mode"})
+	}
+
 	claims := c.Locals("user").(*auth.Claims)
 	isSuperAdmin := false
 	for _, a := range claims.Accesses {
@@ -123,8 +162,12 @@ func (h *RoomHandler) CreateRoom(c *fiber.Ctx) error {
 		log.Error().Err(err).Str("room", req.Name).Msg("LiveKit CreateRoom failed")
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to create media room"})
 	}
-	room, err := h.roomRepo.CreateRoom(claims.UserID, req.Name, req.IsPublic, req.Mode, &req.Settings)
+	room, err := h.roomRepo.CreateRoom(claims.UserID, req.Name, req.IsPublic, req.Mode, req.MaxParticipants, &req.Settings)
 	if err != nil {
+		// Clean up orphaned LiveKit room on DB failure
+		if _, delErr := h.client.DeleteRoom(ctx, &livekit.DeleteRoomRequest{Room: req.Name}); delErr != nil {
+			log.Warn().Err(delErr).Str("room", req.Name).Msg("Failed to clean up orphaned LK room")
+		}
 		// Map specific errors to appropriate HTTP status codes
 		if errors.Is(err, models.ErrRoomNameTaken) {
 			return c.Status(409).JSON(fiber.Map{"error": err.Error()})
@@ -158,36 +201,21 @@ func (h *RoomHandler) JoinRoom(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "Room not found"})
 	}
 
-	// Re-activate inactive rooms on join - starts a new session.
+	// Enforce room active state — suspended rooms cannot be rejoined
 	if !room.IsActive {
-		room.IsActive = true
-		if err := h.roomRepo.UpdateRoom(room); err != nil {
-			log.Error().Err(err).Str("room", room.Name).Msg("Failed to re-activate room")
-		}
+		return c.Status(fiber.StatusGone).JSON(fiber.Map{"error": "room is no longer active"})
 	}
 
-	// Enforce participant limit
-	if room.MaxParticipants > 0 {
-		count, err := h.roomRepo.GetParticipantCount(room.ID)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to check capacity"})
-		}
-		if count >= room.MaxParticipants {
+	// Enforce participant limit (atomic capacity check inside transaction)
+	if err := h.roomRepo.AddParticipantWithCapacityCheck(room.ID, claims.UserID, room.MaxParticipants); err != nil {
+		if err.Error() == "room is full" {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "room is full"})
 		}
-	}
-
-	banned, err := h.roomRepo.IsParticipantBanned(room.ID, claims.UserID)
-	if err != nil {
-		log.Error().Err(err).Str("roomID", room.ID).Str("userID", claims.UserID).Msg("Failed to check ban status")
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to check ban status"})
-	}
-	if banned {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "you are banned from this room"})
-	}
-
-	if err := h.roomRepo.AddParticipant(room.ID, claims.UserID); err != nil {
+		if err.Error() == "user is banned from this room" {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "you are banned from this room"})
+		}
 		log.Error().Err(err).Str("roomID", room.ID).Str("userID", claims.UserID).Msg("AddParticipant failed")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to join room"})
 	}
 
 	at := lkauth.NewAccessToken(h.apiKey, h.apiSecret)
@@ -228,6 +256,9 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 	if req.GuestName == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "Guest name is required"})
 	}
+	if len(req.GuestName) > 50 {
+		return c.Status(400).JSON(fiber.Map{"error": "Guest name too long (max 50 characters)"})
+	}
 
 	room, err := h.roomRepo.GetRoomByName(req.RoomName)
 	if err != nil {
@@ -246,27 +277,19 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusGone).JSON(fiber.Map{"error": "room is no longer active"})
 	}
 
-	// Enforce participant limit
-	if room.MaxParticipants > 0 {
-		count, err := h.roomRepo.GetParticipantCount(room.ID)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to check capacity"})
-		}
-		if count >= room.MaxParticipants {
+	guestID := "guest-" + generateShortID()
+	// Note: Guest ban checking with random IDs is inherently ineffective —
+	// each guest visit generates a new ID. IP-based tracking or signed
+	// guest cookies would be needed for real guest ban enforcement.
+
+	// Atomic capacity check + participant tracking
+	if err := h.roomRepo.AddParticipantWithCapacityCheck(room.ID, guestID, room.MaxParticipants); err != nil {
+		if err.Error() == "room is full" {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "room is full"})
 		}
+		log.Warn().Err(err).Str("roomID", room.ID).Str("guestID", guestID).Msg("Failed to track guest participant")
 	}
 
-	banned, err := h.roomRepo.IsParticipantBanned(room.ID, req.GuestName)
-	if err != nil {
-		log.Error().Err(err).Str("roomID", room.ID).Str("guestName", req.GuestName).Msg("Failed to check guest ban status")
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to check ban status"})
-	}
-	if banned {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "you are banned from this room"})
-	}
-
-	guestID := "guest-" + generateShortID()
 	at := lkauth.NewAccessToken(h.apiKey, h.apiSecret)
 	at.AddGrant(&lkauth.VideoGrant{ //nolint:staticcheck // AddGrant is deprecated but VideoGrant field is not available in this version of the protocol SDK
 		RoomJoin:             true,
@@ -292,13 +315,23 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 
 func generateShortID() string {
 	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+	const charLen = len(chars) // 36
+	const maxValid = 256 - (256 % charLen) // 252, rejection threshold
+
 	b := make([]byte, 8)
 	if _, err := rand.Read(b); err != nil {
-		// fallback: use timestamp hex
 		return fmt.Sprintf("%x", time.Now().UnixNano())[:8]
 	}
 	for i, v := range b {
-		b[i] = chars[int(v)%len(chars)]
+		// Rejection sampling: retry biased values (4 of 256)
+		for int(v) >= maxValid {
+			if _, err := rand.Read(b[i : i+1]); err != nil {
+				v = byte(int(v) % charLen)
+				break
+			}
+			v = b[i]
+		}
+		b[i] = chars[int(v)%charLen]
 	}
 	return string(b)
 }
@@ -361,7 +394,7 @@ func (h *RoomHandler) resolveRoom(c *fiber.Ctx, roomID string) (*models.Room, st
 		return nil, "", err
 	}
 	if room == nil {
-		_ = c.SendStatus(404)
+		_ = c.Status(404).JSON(fiber.Map{"error": "Room not found"})
 		return nil, "", fmt.Errorf("room not found")
 	}
 	adminId := room.AdminID
@@ -402,10 +435,13 @@ func (h *RoomHandler) PromoteParticipant(c *fiber.Ctx) error {
 		Room: room.Name, Identity: identity, Metadata: string(newMeta),
 	})
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		log.Error().Err(err).Msg("LK UpdateParticipant failed (promote)")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update participant"})
 	}
 	// Persist room-scoped moderator flag in DB so isRoomModerator checks work.
-	_ = h.roomRepo.SetRoomModerator(room.ID, identity, true)
+	if err := h.roomRepo.SetRoomModerator(room.ID, identity, true); err != nil {
+		log.Error().Err(err).Msg("Failed to persist moderator flag")
+	}
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
@@ -441,10 +477,13 @@ func (h *RoomHandler) DemoteParticipant(c *fiber.Ctx) error {
 		Room: room.Name, Identity: identity, Metadata: string(newMeta),
 	})
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		log.Error().Err(err).Msg("LK UpdateParticipant failed (demote)")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update participant"})
 	}
 	// Clear room-scoped moderator flag in DB.
-	_ = h.roomRepo.SetRoomModerator(room.ID, identity, false)
+	if err := h.roomRepo.SetRoomModerator(room.ID, identity, false); err != nil {
+		log.Error().Err(err).Msg("Failed to clear moderator flag")
+	}
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
@@ -457,6 +496,12 @@ func (h *RoomHandler) BlockChat(c *fiber.Ctx) error {
 	}
 	if !isRoomModerator(claims, adminId, room.ID, h.roomRepo) {
 		return c.Status(403).JSON(fiber.Map{"error": "not authorized for this room"})
+	}
+	if identity == claims.UserID {
+		return c.Status(400).JSON(fiber.Map{"error": "Cannot perform this action on yourself"})
+	}
+	if identity == adminId {
+		return c.Status(403).JSON(fiber.Map{"error": "Cannot target the room admin"})
 	}
 	ctx := h.withAuth(c.Context(), &lkauth.VideoGrant{RoomAdmin: true, Room: room.Name})
 	p, err := h.client.GetParticipant(ctx, &livekit.RoomParticipantIdentity{Room: room.Name, Identity: identity})
@@ -473,7 +518,8 @@ func (h *RoomHandler) BlockChat(c *fiber.Ctx) error {
 		Room: room.Name, Identity: identity, Metadata: string(newMeta),
 	})
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		log.Error().Err(err).Msg("LK UpdateParticipant failed (block chat)")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update participant"})
 	}
 	return c.JSON(fiber.Map{"status": "success"})
 }
@@ -487,6 +533,12 @@ func (h *RoomHandler) DeafenParticipant(c *fiber.Ctx) error {
 	}
 	if !isRoomModerator(claims, adminId, room.ID, h.roomRepo) {
 		return c.Status(403).JSON(fiber.Map{"error": "not authorized for this room"})
+	}
+	if identity == claims.UserID {
+		return c.Status(400).JSON(fiber.Map{"error": "Cannot perform this action on yourself"})
+	}
+	if identity == adminId {
+		return c.Status(403).JSON(fiber.Map{"error": "Cannot target the room admin"})
 	}
 	ctx := h.withAuth(c.Context(), &lkauth.VideoGrant{RoomAdmin: true, Room: room.Name})
 	h.sendTargetedSystemMessage(ctx, room.Name, "deafen", claims.UserID, identity)
@@ -502,6 +554,12 @@ func (h *RoomHandler) UndeafenParticipant(c *fiber.Ctx) error {
 	}
 	if !isRoomModerator(claims, adminId, room.ID, h.roomRepo) {
 		return c.Status(403).JSON(fiber.Map{"error": "not authorized for this room"})
+	}
+	if identity == claims.UserID {
+		return c.Status(400).JSON(fiber.Map{"error": "Cannot perform this action on yourself"})
+	}
+	if identity == adminId {
+		return c.Status(403).JSON(fiber.Map{"error": "Cannot target the room admin"})
 	}
 	ctx := h.withAuth(c.Context(), &lkauth.VideoGrant{RoomAdmin: true, Room: room.Name})
 	h.sendTargetedSystemMessage(ctx, room.Name, "undeafen", claims.UserID, identity)
@@ -520,6 +578,12 @@ func (h *RoomHandler) AskParticipantAction(c *fiber.Ctx) error {
 	}
 	if !isRoomModerator(claims, adminId, room.ID, h.roomRepo) {
 		return c.Status(403).JSON(fiber.Map{"error": "not authorized for this room"})
+	}
+	if identity == claims.UserID {
+		return c.Status(400).JSON(fiber.Map{"error": "Cannot perform this action on yourself"})
+	}
+	if identity == adminId {
+		return c.Status(403).JSON(fiber.Map{"error": "Cannot target the room admin"})
 	}
 	event := "ask_" + action
 	ctx := h.withAuth(c.Context(), &lkauth.VideoGrant{RoomAdmin: true, Room: room.Name})
@@ -553,6 +617,12 @@ func (h *RoomHandler) StopScreenShare(c *fiber.Ctx) error {
 	if !isRoomModerator(claims, adminId, room.ID, h.roomRepo) {
 		return c.Status(403).JSON(fiber.Map{"error": "not authorized for this room"})
 	}
+	if identity == claims.UserID {
+		return c.Status(400).JSON(fiber.Map{"error": "Cannot perform this action on yourself"})
+	}
+	if identity == adminId {
+		return c.Status(403).JSON(fiber.Map{"error": "Cannot target the room admin"})
+	}
 	ctx := h.withAuth(c.Context(), &lkauth.VideoGrant{RoomAdmin: true, Room: room.Name})
 	p, err := h.client.GetParticipant(ctx, &livekit.RoomParticipantIdentity{Room: room.Name, Identity: identity})
 	if err != nil {
@@ -560,9 +630,11 @@ func (h *RoomHandler) StopScreenShare(c *fiber.Ctx) error {
 	}
 	for _, track := range p.Tracks {
 		if track.Source == livekit.TrackSource_SCREEN_SHARE || track.Source == livekit.TrackSource_SCREEN_SHARE_AUDIO {
-			_, _ = h.client.MutePublishedTrack(ctx, &livekit.MuteRoomTrackRequest{
+			if _, err := h.client.MutePublishedTrack(ctx, &livekit.MuteRoomTrackRequest{
 				Room: room.Name, Identity: identity, TrackSid: track.Sid, Muted: true,
-			})
+			}); err != nil {
+				log.Warn().Err(err).Str("room", room.Name).Str("identity", identity).Str("track", track.Sid).Msg("Failed to mute screen share track")
+			}
 		}
 	}
 	return c.JSON(fiber.Map{"status": "success"})
@@ -626,12 +698,22 @@ func (h *RoomHandler) KickParticipant(c *fiber.Ctx) error {
 	if claims.UserID != adminId && !containsAccess(claims.Accesses, "superadmin") {
 		return c.Status(403).JSON(fiber.Map{"error": "Insufficient permissions"})
 	}
+	// Prevent self-targeting
+	if identity == claims.UserID {
+		return c.Status(400).JSON(fiber.Map{"error": "Cannot perform this action on yourself"})
+	}
+	// Prevent targeting the room admin
+	if identity == adminId {
+		return c.Status(403).JSON(fiber.Map{"error": "Cannot kick the room admin"})
+	}
 	ctx := h.withAuth(c.Context(), &lkauth.VideoGrant{RoomAdmin: true, Room: room.Name})
 	_, err = h.client.RemoveParticipant(ctx, &livekit.RoomParticipantIdentity{Room: room.Name, Identity: identity})
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		log.Error().Err(err).Msg("LK RemoveParticipant failed (kick)")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to remove participant"})
 	}
 	h.sendSystemMessage(ctx, room.Name, "kick", claims.UserID, identity)
+	_ = h.roomRepo.RemoveParticipant(room.ID, identity)
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
@@ -681,6 +763,14 @@ func (h *RoomHandler) MuteParticipant(c *fiber.Ctx) error {
 	if claims.UserID != adminId && !containsAccess(claims.Accesses, "superadmin") {
 		return c.Status(403).JSON(fiber.Map{"error": "Insufficient permissions"})
 	}
+	// Prevent self-targeting
+	if identity == claims.UserID {
+		return c.Status(400).JSON(fiber.Map{"error": "Cannot perform this action on yourself"})
+	}
+	// Prevent targeting the room admin
+	if identity == adminId {
+		return c.Status(403).JSON(fiber.Map{"error": "Cannot mute the room admin"})
+	}
 	ctx := h.withAuth(c.Context(), &lkauth.VideoGrant{RoomAdmin: true, Room: room.Name})
 	p, err := h.client.GetParticipant(ctx, &livekit.RoomParticipantIdentity{Room: room.Name, Identity: identity})
 	if err != nil {
@@ -688,9 +778,11 @@ func (h *RoomHandler) MuteParticipant(c *fiber.Ctx) error {
 	}
 	for _, track := range p.Tracks {
 		if track.Type == livekit.TrackType_AUDIO {
-			_, _ = h.client.MutePublishedTrack(ctx, &livekit.MuteRoomTrackRequest{
+			if _, err := h.client.MutePublishedTrack(ctx, &livekit.MuteRoomTrackRequest{
 				Room: room.Name, Identity: identity, TrackSid: track.Sid, Muted: true,
-			})
+			}); err != nil {
+				log.Warn().Err(err).Str("room", room.Name).Str("identity", identity).Str("track", track.Sid).Msg("Failed to mute audio track")
+			}
 		}
 	}
 	return c.JSON(fiber.Map{"status": "success"})
@@ -714,14 +806,25 @@ func (h *RoomHandler) BanParticipant(c *fiber.Ctx) error {
 	if claims.UserID != adminId && !containsAccess(claims.Accesses, "superadmin") {
 		return c.Status(403).JSON(fiber.Map{"error": "Insufficient permissions"})
 	}
+	// Prevent self-targeting
+	if identity == claims.UserID {
+		return c.Status(400).JSON(fiber.Map{"error": "Cannot perform this action on yourself"})
+	}
+	// Prevent targeting the room admin
+	if identity == adminId {
+		return c.Status(403).JSON(fiber.Map{"error": "Cannot ban the room admin"})
+	}
 	ctx := h.withAuth(c.Context(), &lkauth.VideoGrant{RoomAdmin: true, Room: room.Name})
 	var removeErr error
 	_, removeErr = h.client.RemoveParticipant(ctx, &livekit.RoomParticipantIdentity{Room: room.Name, Identity: identity})
 	if removeErr != nil {
-		return c.Status(500).JSON(fiber.Map{"error": removeErr.Error()})
+		log.Error().Err(removeErr).Msg("LK RemoveParticipant failed (ban)")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to remove participant"})
 	}
 	h.sendSystemMessage(ctx, room.Name, "ban", claims.UserID, identity)
-	_ = h.roomRepo.KickParticipant(room.ID, identity)
+	if err := h.roomRepo.KickParticipant(room.ID, identity); err != nil {
+		log.Warn().Err(err).Str("roomID", room.ID).Str("identity", identity).Msg("Failed to update ban in DB")
+	}
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
@@ -751,9 +854,11 @@ func (h *RoomHandler) DisableParticipantVideo(c *fiber.Ctx) error {
 	}
 	for _, track := range p.Tracks {
 		if track.Type == livekit.TrackType_VIDEO && track.Source == livekit.TrackSource_CAMERA {
-			_, _ = h.client.MutePublishedTrack(ctx, &livekit.MuteRoomTrackRequest{
+			if _, err := h.client.MutePublishedTrack(ctx, &livekit.MuteRoomTrackRequest{
 				Room: room.Name, Identity: identity, TrackSid: track.Sid, Muted: true,
-			})
+			}); err != nil {
+				log.Warn().Err(err).Str("room", room.Name).Str("identity", identity).Str("track", track.Sid).Msg("Failed to mute camera track")
+			}
 		}
 	}
 	return c.JSON(fiber.Map{"status": "success"})
@@ -799,6 +904,10 @@ func (h *RoomHandler) UpdateSettings(c *fiber.Ctx) error {
 		room.IsPublic = *input.IsPublic
 	}
 	if input.MaxParticipants != nil {
+		limit := h.maxParticipantsLimit()
+		if *input.MaxParticipants < 0 || *input.MaxParticipants > limit {
+			return c.Status(400).JSON(fiber.Map{"error": fmt.Sprintf("maxParticipants must be between 0 and %d", limit)})
+		}
 		room.MaxParticipants = *input.MaxParticipants
 	}
 	if input.Settings != nil {
@@ -810,6 +919,16 @@ func (h *RoomHandler) UpdateSettings(c *fiber.Ctx) error {
 	if err := h.roomRepo.UpdateRoom(room); err != nil {
 		log.Error().Err(err).Str("roomId", roomID).Msg("Failed to update room settings")
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to update room settings"})
+	}
+
+	// Sync MaxParticipants to LiveKit
+	if input.MaxParticipants != nil {
+		ctx := h.withAuth(c.Context(), &lkauth.VideoGrant{RoomAdmin: true, Room: room.Name})
+		if _, err := h.client.CreateRoom(ctx, &livekit.CreateRoomRequest{
+			Name: room.Name, MaxParticipants: uint32(*input.MaxParticipants),
+		}); err != nil {
+			log.Warn().Err(err).Msg("Failed to sync MaxParticipants to LiveKit")
+		}
 	}
 
 	return c.JSON(room)
@@ -868,6 +987,34 @@ func (h *RoomHandler) AdminSuspendRoom(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
+func (h *RoomHandler) AdminReactivateRoom(c *fiber.Ctx) error {
+	roomID := c.Params("roomId")
+	room, err := h.roomRepo.GetRoom(roomID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch room"})
+	}
+	if room == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Room not found"})
+	}
+	if room.IsActive {
+		return c.Status(400).JSON(fiber.Map{"error": "Room is already active"})
+	}
+	room.IsActive = true
+	room.ExpiresAt = time.Now().Add(24 * time.Hour)
+	if err := h.roomRepo.UpdateRoom(room); err != nil {
+		log.Error().Err(err).Str("roomId", roomID).Msg("Failed to reactivate room")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to reactivate room"})
+	}
+	// Also recreate the LiveKit room
+	ctx := h.withAuth(c.Context(), &lkauth.VideoGrant{RoomCreate: true})
+	if _, err := h.client.CreateRoom(ctx, &livekit.CreateRoomRequest{
+		Name: room.Name, MaxParticipants: uint32(room.MaxParticipants),
+	}); err != nil {
+		log.Warn().Err(err).Str("room", room.Name).Msg("Failed to recreate LiveKit room during reactivation")
+	}
+	return c.JSON(room)
+}
+
 func (h *RoomHandler) AdminUpdateRoom(c *fiber.Ctx) error {
 	roomID := c.Params("roomId")
 	var input struct {
@@ -877,6 +1024,13 @@ func (h *RoomHandler) AdminUpdateRoom(c *fiber.Ctx) error {
 	if err := c.BodyParser(&input); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
 	}
+
+	// Input validation
+	limit := h.maxParticipantsLimit()
+	if input.MaxParticipants != nil && (*input.MaxParticipants < 1 || *input.MaxParticipants > limit) {
+		return c.Status(400).JSON(fiber.Map{"error": fmt.Sprintf("maxParticipants must be between 1 and %d", limit)})
+	}
+
 	room, err := h.roomRepo.GetRoom(roomID)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch room"})
@@ -884,6 +1038,8 @@ func (h *RoomHandler) AdminUpdateRoom(c *fiber.Ctx) error {
 	if room == nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Room not found"})
 	}
+
+	// Apply all changes in-memory, then single atomic write
 	if input.Settings != nil {
 		merged := room.Settings
 		if input.Settings.AllowChat != nil {
@@ -904,17 +1060,28 @@ func (h *RoomHandler) AdminUpdateRoom(c *fiber.Ctx) error {
 		if input.Settings.IsPersistent != nil {
 			merged.IsPersistent = *input.Settings.IsPersistent
 		}
-		if err := h.roomRepo.UpdateRoomSettings(roomID, &merged); err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to update room settings"})
-		}
 		room.Settings = merged
 	}
 	if input.MaxParticipants != nil {
 		room.MaxParticipants = *input.MaxParticipants
+	}
+	// Single atomic write — eliminates two-write race
+	if input.Settings != nil || input.MaxParticipants != nil {
 		if err := h.roomRepo.UpdateRoom(room); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to update room"})
 		}
 	}
+
+	// Sync MaxParticipants to LiveKit
+	if input.MaxParticipants != nil {
+		ctx := h.withAuth(c.Context(), &lkauth.VideoGrant{RoomAdmin: true, Room: room.Name})
+		if _, err := h.client.CreateRoom(ctx, &livekit.CreateRoomRequest{
+			Name: room.Name, MaxParticipants: uint32(*input.MaxParticipants),
+		}); err != nil {
+			log.Warn().Err(err).Msg("Failed to sync MaxParticipants to LiveKit (admin)")
+		}
+	}
+
 	updated, err := h.roomRepo.GetRoom(roomID)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch updated room"})
@@ -1035,10 +1202,27 @@ func (h *RoomHandler) AdminGetRoomParticipants(c *fiber.Ctx) error {
 // based on config (disk / inline base64 / s3) and returns the attachment metadata.
 func (h *RoomHandler) UploadChatImage(c *fiber.Ctx) error {
 	roomID := c.Params("roomId")
+	claims := c.Locals("user").(*auth.Claims)
+
 	// Verify the room exists.
 	room, err := h.roomRepo.GetRoom(roomID)
 	if err != nil || room == nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Room not found"})
+	}
+
+	// Check participant status
+	isParticipant, err := h.roomRepo.IsParticipant(room.ID, claims.UserID)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to check participant status")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to verify access"})
+	}
+	if !isParticipant {
+		return c.Status(403).JSON(fiber.Map{"error": "Not a participant in this room"})
+	}
+
+	// Check if chat is allowed
+	if !room.Settings.AllowChat {
+		return c.Status(403).JSON(fiber.Map{"error": "Chat is disabled for this room"})
 	}
 
 	file, err := c.FormFile("file")
@@ -1060,6 +1244,15 @@ func (h *RoomHandler) UploadChatImage(c *fiber.Ctx) error {
 	if _, err := f.Read(data); err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to read upload"})
 	}
+
+	// Validate image dimensions
+	if cfg, _, err := image.DecodeConfig(bytes.NewReader(data)); err == nil {
+		const maxDim = 8192
+		if cfg.Width > maxDim || cfg.Height > maxDim {
+			return c.Status(400).JSON(fiber.Map{"error": fmt.Sprintf("Image dimensions too large (max %dx%d)", maxDim, maxDim)})
+		}
+	}
+	// If DecodeConfig fails, it's potentially not an image; let the storage backend decide
 
 	attachment, err := h.uploadStore.Store(data)
 	if err != nil {
@@ -1098,9 +1291,11 @@ func (h *RoomHandler) AdminKickParticipant(c *fiber.Ctx) error {
 	ctx := h.withAuth(c.Context(), &lkauth.VideoGrant{RoomAdmin: true, Room: room.Name})
 	_, err := h.client.RemoveParticipant(ctx, &livekit.RoomParticipantIdentity{Room: room.Name, Identity: identity})
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		log.Error().Err(err).Msg("LK RemoveParticipant failed (admin kick)")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to remove participant"})
 	}
 	h.sendSystemMessage(ctx, room.Name, "kick", claims.UserID, identity)
+	_ = h.roomRepo.RemoveParticipant(room.ID, identity)
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
@@ -1121,12 +1316,14 @@ func (h *RoomHandler) AdminMuteParticipant(c *fiber.Ctx) error {
 	}
 	for _, track := range p.Tracks {
 		if track.Type == livekit.TrackType_AUDIO {
-			_, _ = h.client.MutePublishedTrack(ctx, &livekit.MuteRoomTrackRequest{
+			if _, err := h.client.MutePublishedTrack(ctx, &livekit.MuteRoomTrackRequest{
 				Room:     room.Name,
 				Identity: identity,
 				TrackSid: track.Sid,
 				Muted:    true,
-			})
+			}); err != nil {
+				log.Warn().Err(err).Str("room", room.Name).Str("identity", identity).Str("track", track.Sid).Msg("Failed to mute audio track (admin)")
+			}
 		}
 	}
 	return c.JSON(fiber.Map{"status": "success"})
