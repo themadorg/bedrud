@@ -8,6 +8,7 @@ import {
   Search,
   Shield,
   ShieldOff,
+  User,
   UserCheck,
   UserX,
 } from 'lucide-react'
@@ -208,7 +209,19 @@ function AdminUsersPage() {
                           {user.name}
                         </Link>
                       </div>
-                      <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+                      <p
+                        className="truncate text-xs text-muted-foreground"
+                        title={user.provider === 'guest' ? user.email : undefined}
+                      >
+                        {user.provider === 'guest' ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <User className="h-3 w-3 shrink-0 opacity-50" />
+                            <span>Guest</span>
+                          </span>
+                        ) : (
+                          user.email
+                        )}
+                      </p>
                       <div className="hidden sm:block">
                         <ProviderBadge provider={user.provider} />
                       </div>
