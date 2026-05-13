@@ -165,6 +165,17 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		})
 	}
 
+	// Mark invite token as used BEFORE creating user (TOCTOU guard)
+	var pendingTokenID string
+	if tokID, ok := c.Locals("pendingInviteToken").(string); ok && tokID != "" && h.inviteTokenRepo != nil {
+		if err := h.inviteTokenRepo.MarkUsed(tokID, ""); err != nil {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": "Invite token already used or invalid",
+			})
+		}
+		pendingTokenID = tokID
+	}
+
 	user, err := h.authService.Register(input.Email, input.Password, input.Name)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -192,13 +203,10 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		})
 	}
 
-	// Mark invite token as used if one was validated
-	if tokenID, ok := c.Locals("pendingInviteToken").(string); ok && tokenID != "" && h.inviteTokenRepo != nil {
-		if err := h.inviteTokenRepo.MarkUsed(tokenID, user.ID); err != nil {
-			log.Error().Err(err).Str("tokenID", tokenID).Msg("Failed to mark invite token as used")
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Registration succeeded but failed to record token usage",
-			})
+	// Update used_by on invite token with the actual user ID
+	if pendingTokenID != "" && h.inviteTokenRepo != nil {
+		if err := h.inviteTokenRepo.MarkUsed(pendingTokenID, user.ID); err != nil {
+			log.Warn().Err(err).Str("tokenID", pendingTokenID).Msg("Failed to update used_by on invite token")
 		}
 	}
 
@@ -263,6 +271,21 @@ func (h *AuthHandler) GuestLogin(c *fiber.Ctx) error {
 			"error": "Name is required",
 		})
 	}
+	if len(input.Name) < 2 || len(input.Name) > 50 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Name must be between 2 and 50 characters",
+		})
+	}
+
+	// Check registration settings
+	if h.settingsRepo != nil {
+		settings, _ := h.settingsRepo.GetSettings()
+		if settings != nil && !settings.RegistrationEnabled {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Registration is currently disabled",
+			})
+		}
+	}
 
 	loginResponse, err := h.authService.GuestLogin(input.Name)
 	if err != nil {
@@ -314,17 +337,25 @@ func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 		})
 	}
 
-	// Block the old refresh token to prevent replay
-	if err := h.authService.BlockRefreshToken(claims.UserID, input.RefreshToken); err != nil {
-		log.Error().Err(err).Msg("Failed to block old refresh token during rotation")
+	// Re-fetch user from DB for current accesses (may have changed since token was issued)
+	user, err := h.authService.GetUserByID(claims.UserID)
+	if err != nil || user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not found",
+		})
+	}
+	if !user.IsActive {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "Account is deactivated",
+		})
 	}
 
-	// Generate new token pair
+	// Generate new token pair with fresh user data
 	accessToken, refreshToken, err := auth.GenerateTokenPair(
-		claims.UserID,
-		claims.Email,
-		claims.Name,
-		claims.Accesses,
+		user.ID,
+		user.Email,
+		user.Name,
+		user.Accesses,
 		h.config,
 	)
 	if err != nil {
@@ -333,10 +364,11 @@ func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 		})
 	}
 
-	// Update refresh token in database
-	if err := h.authService.UpdateRefreshToken(claims.UserID, refreshToken); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to update refresh token",
+	// Atomically rotate the refresh token — only succeeds if the old token
+	// hasn't already been rotated (prevents token reuse race condition).
+	if err := h.authService.RotateRefreshToken(user.ID, input.RefreshToken, refreshToken); err != nil {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+			"error": "Refresh token has already been rotated",
 		})
 	}
 
@@ -411,16 +443,12 @@ type LogoutRequest struct {
 // Logout handles user logout
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	var input LogoutRequest
-	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid input - expected JSON with refresh_token field",
-		})
-	}
+	_ = c.BodyParser(&input) // non-fatal — fallback to cookie below
 
 	// Get user from context (set by auth middleware)
 	claims := c.Locals("user").(*auth.Claims)
 
-	// Fallback to cookie when body omits the token
+	// Fallback to cookie when body is empty or parse fails
 	if input.RefreshToken == "" {
 		input.RefreshToken = c.Cookies("refresh_token")
 	}
@@ -657,6 +685,14 @@ func (h *AuthHandler) PasskeySignupBegin(c *fiber.Ctx) error {
 
 	if input.Email == "" || input.Name == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Email and Name are required"})
+	}
+
+	if _, err := mail.ParseAddress(input.Email); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid email format"})
+	}
+
+	if len(input.Name) < 2 || len(input.Name) > 100 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Name must be between 2 and 100 characters"})
 	}
 
 	// Check registration settings (mirrors Register())

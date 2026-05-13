@@ -63,6 +63,20 @@ func (r *responseWriter) WriteHeader(statusCode int) {
 // @Router /auth/{provider}/login [get]
 func BeginAuthHandler(c *fiber.Ctx) error {
 	provider := c.Params("provider")
+
+	// Validate provider against configured OAuth providers
+	valid := false
+	for _, p := range auth.ConfiguredProviders() {
+		if p == provider {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		log.Warn().Str("provider", provider).Msg("Invalid OAuth provider requested")
+		return c.Status(400).JSON(fiber.Map{"error": "Unsupported OAuth provider"})
+	}
+
 	log.Debug().Str("provider", provider).Msg("BeginAuthHandler called with provider")
 
 	// Create a proper http.Request with all necessary fields.
@@ -229,20 +243,53 @@ func (h *AuthHandler) CallbackHandler(c *fiber.Ctx) error {
 
 	// Create or update user in database
 	userRepo := repository.NewUserRepository(database.GetDB())
-	dbUser := &models.User{
-		ID:        gothUser.UserID,
-		Email:     gothUser.Email,
-		Name:      gothUser.Name,
-		Provider:  gothUser.Provider,
-		AvatarURL: gothUser.AvatarURL,
-		Accesses:  []string{string(models.AccessUser)}, // Add default access
-	}
+	var dbUser *models.User
 
-	if err := userRepo.CreateOrUpdateUser(dbUser); err != nil {
-		log.Error().Err(err).Msg("Failed to create/update user")
-		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
-			Error: "Failed to process user data",
-		})
+	// Check if user already exists to preserve their accesses and check isActive
+	existingUser, _ := userRepo.GetUserByEmailAndProvider(gothUser.Email, gothUser.Provider)
+
+	if existingUser != nil {
+		// Existing user — check if deactivated
+		if !existingUser.IsActive {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Account is deactivated"})
+		}
+		// Update profile fields only, preserve accesses
+		existingUser.Name = gothUser.Name
+		existingUser.AvatarURL = gothUser.AvatarURL
+		if err := userRepo.UpdateUser(existingUser); err != nil {
+			log.Error().Err(err).Msg("Failed to update OAuth user")
+			return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+				Error: "Failed to process user data",
+			})
+		}
+		dbUser = existingUser
+	} else {
+		// New user — check invite-only mode before creating account
+		if h.settingsRepo != nil {
+			settings, _ := h.settingsRepo.GetSettings()
+			if settings != nil && settings.TokenRegistrationOnly {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"error": "Registration requires an invite token",
+				})
+			}
+		}
+
+		// New user — create with default access
+		dbUser = &models.User{
+			ID:        gothUser.UserID,
+			Email:     gothUser.Email,
+			Name:      gothUser.Name,
+			Provider:  gothUser.Provider,
+			AvatarURL: gothUser.AvatarURL,
+			Accesses:  []string{string(models.AccessUser)},
+			IsActive:  true,
+		}
+		if err := userRepo.CreateOrUpdateUser(dbUser); err != nil {
+			log.Error().Err(err).Msg("Failed to create/update user")
+			return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+				Error: "Failed to process user data",
+			})
+		}
 	}
 
 	// Generate token pair (access + refresh)

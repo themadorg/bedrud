@@ -524,12 +524,13 @@ func TestAuthHandler_Logout_InvalidBody(t *testing.T) {
 	user, _ := authService.Register("logoutbad@example.com", "pass", "Logout Bad")
 	token, _ := auth.GenerateToken(user.ID, user.Email, user.Name, "local", user.Accesses, cfg)
 
+	// Invalid body is non-fatal — handler falls back to cookies and clears them
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", bytes.NewReader([]byte("{invalid")))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, _ := app.Test(req, -1)
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("expected %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected %d, got %d", http.StatusOK, resp.StatusCode)
 	}
 }
