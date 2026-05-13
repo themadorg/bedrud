@@ -97,7 +97,7 @@ Helpers: `setAuthCookies` (HttpOnly, secure/sameSite/domain from config), `clear
 
 ### `room.go` — Room lifecycle + participant moderation (biggest file)
 
-`RoomHandler` struct: `roomRepo`, `livekitHost`, `apiKey`, `apiSecret`, `livekit.RoomService` client, `storage.ChatUploadStore`, `uploadMax`.
+`RoomHandler` struct: `roomRepo`, `livekitHost`, `apiKey`, `apiSecret`, `livekit.RoomService` client (via `lkutil.NewClient`), `uploadTracker *storage.ChatUploadTracker`, `storage.ChatUploadStore`, `uploadMax`.
 
 Request structs: `CreateRoomRequest{name, maxParticipants, isPublic, mode, settings}`, `JoinRoomRequest{roomName}`, `GuestJoinRoomRequest{roomName, guestName}`.
 
@@ -124,7 +124,8 @@ Request structs: `CreateRoomRequest{name, maxParticipants, isPublic, mode, setti
 | `GetParticipantInfo` | GET | `/rooms/:roomId/participants/:identity` | Identity, name, state, tracks from LK. Self/admin/mod |
 | `UploadChatImage` | POST | `/rooms/:roomId/chat/upload` | Multipart upload via ChatUploadStore |
 | `AdminListRooms` | GET | `/admin/rooms` | All rooms (DB) |
-| `AdminCloseRoom` | POST | `/admin/rooms/:roomId/close` | Delete from LK, set `IsActive = false` |
+| `AdminCloseRoom` | DELETE | `/admin/rooms/:roomId` | Delete from LK, set `IsActive = false` |
+| `AdminSuspendRoom` | POST | `/admin/rooms/:roomId/suspend` | Close LK room, set `IsActive = false`, preserve DB record |
 | `AdminUpdateRoom` | PATCH | `/admin/rooms/:roomId` | Update maxParticipants + settings merge (superadmin). IsPersistent toggle via settings |
 | `AdminGetRoomParticipants` | GET | `/admin/rooms/:roomId/participants` | Live participants + track stats from LK |
 | `AdminKickParticipant` | DELETE | `/admin/rooms/:roomId/participants/:identity` | Kick (no creator check) |
@@ -134,11 +135,12 @@ Request structs: `CreateRoomRequest{name, maxParticipants, isPublic, mode, setti
 | `BringToStage` | POST | `/rooms/:roomId/participants/:identity/bring-to-stage` | Stub |
 | `RemoveFromStage` | POST | `/rooms/:roomId/participants/:identity/remove-from-stage` | Stub |
 
-Internal helpers: `withAuth` (inject LK token), `resolveRoom` (load by ID + derive adminId), `sendSystemMessage`, `sendTargetedSystemMessage`, `generateShortID`, `containsAccess`, `boolPtr`.
+Internal helpers: `withAuth` (inject LK token via `lkutil.AuthContext`), `resolveRoom` (load by ID + derive adminId), `sendSystemMessage` (via `lkutil.SendSystemMessage`), `sendTargetedSystemMessage`, `generateShortID`, `containsAccess`, `boolPtr`.  
+Chat upload tracking: `UploadChatImage` calls `uploadTracker.Record()` only for disk-backed uploads (skips S3/inline). Room close/delete cleans up via `AdminDeleteRoom` + tracker.
 
 ### `users.go` — Admin user management
 
-`UsersHandler` struct: `userRepo`, `roomRepo`.
+`UsersHandler` struct: `userRepo`, `roomRepo`, `passkeyRepo`, `prefsRepo`, `uploadTracker *storage.ChatUploadTracker`, `client livekit.RoomService` (via lkutil), `apiKey`, `apiSecret`, `wg sync.WaitGroup`.
 
 | Fn | Method | Route | Purpose |
 |----|--------|-------|---------|
@@ -146,8 +148,11 @@ Internal helpers: `withAuth` (inject LK token), `resolveRoom` (load by ID + deri
 | `UpdateUserAccesses` | PUT | `/admin/users/:id/accesses` | Replace entire Accesses slice |
 | `UpdateUserStatus` | PUT | `/admin/users/:id/status` | Set `IsActive` |
 | `GetUserDetail` | GET | `/admin/users/:id` | User details + their rooms |
+| `DeleteUser` | DELETE | `/admin/users/:id` | 202 Accepted. 3-phase async delete: stop LK rooms → hard-delete rooms from DB + chat upload cleanup → delete passkeys/preferences/user. Self-deletion guard (400) |
+| `Shutdown` | — | — | `wg.Wait()` for graceful shutdown of in-flight delete goroutines |
 
-DTOs: `UserListResponse`, `UserDetails{ID, Email, Name, Provider, IsActive, IsAdmin, Accesses, CreatedAt}`, `UserStatusUpdateRequest{active}`, `UserStatusUpdateResponse{message}`.
+DTOs: `UserListResponse`, `UserDetails{ID, Email, Name, Provider, IsActive, IsAdmin, Accesses, CreatedAt}`, `UserStatusUpdateRequest{active}`, `UserStatusUpdateResponse{message}`.  
+Constructor: `NewUsersHandler(userRepo, roomRepo, passkeyRepo, prefsRepo, uploadTracker, lkCfg)` — creates LiveKit client via `lkutil.NewClient`.
 
 ### `admin_handler.go` — System settings + invite tokens
 
@@ -324,6 +329,20 @@ UserPreferences {
 }
 ```
 
+### `chat_upload.go`
+
+```
+ChatUpload {
+  ID        string     // PK
+  RoomID    string     // FK → rooms.id, ON DELETE CASCADE (Postgres)
+  FileHash  string     // SHA-256 hex of file content
+  Extension string     // file extension with dot (e.g. ".png")
+  CreatedAt time.Time
+}
+```
+
+Only disk-backend uploads (`./data/uploads/chat/`) are tracked. S3 and inline uploads are skipped.
+
 ### Model relationships
 
 ```
@@ -334,6 +353,7 @@ User(1) → (N)RoomParticipant      via UserID (FK)
 User(1) → (N)RoomPermissions      via UserID (FK)
 Room(1) → (N)RoomParticipant      via RoomID (FK)
 Room(1) → (N)RoomPermissions      via RoomID (FK)
+Room(1) → (N)ChatUpload           via RoomID (FK)
 RoomParticipant(1) ↔ (1)RoomPermissions  via (RoomID, UserID)
 ```
 
@@ -359,7 +379,7 @@ RoomParticipant(1) ↔ (1)RoomPermissions  via (RoomID, UserID)
 | `UpdateUserAccesses(userID, accesses)` | Replace role array |
 | `GetUsersByAccess(access)` | Find by role. PG `ANY()` for text[] |
 | `GetAllUsers()` | Return all users |
-| `DeleteUser(userID)` | Cascade: participants → permissions → blocked tokens → user |
+| `DeleteUser(userID)` | Transactional cascade: passkeys → preferences → participants → permissions → blocked tokens → user |
 
 ### `room_repository.go` — `RoomRepository{*gorm.DB}`
 
@@ -381,7 +401,7 @@ RoomParticipant(1) ↔ (1)RoomPermissions  via (RoomID, UserID)
 | `UpdateRoomSettings(roomID, settings)` | Atomic map-based update of embedded settings (all 6 fields). Merge-safe — only sent columns updated |
 | `UpdateRoom(room)` | Full save |
 | `DeleteRoom(roomID, userID)` | TX cascade. Checks created_by |
-| `AdminDeleteRoom(roomID)` | Same, no owner check |
+| `AdminDeleteRoom(roomID)` | Same, no owner check. Also deletes `chat_uploads` rows inside the transaction |
 | `GetAllRooms()` / `GetAllActiveRooms()` | List rooms |
 | `GetRoomsCreatedByUser(userID)` | User's created rooms |
 | `GetRoomsParticipatedInByUser(userID)` | Rooms user joined |
@@ -392,7 +412,7 @@ RoomParticipant(1) ↔ (1)RoomPermissions  via (RoomID, UserID)
 
 ### `passkey_repository.go` — `PasskeyRepository{*gorm.DB}`
 
-`CreatePasskey`, `GetPasskeyByCredentialID`, `GetPasskeysByUserID`, `UpdatePasskeyCounter`, `DeletePasskey`.
+`CreatePasskey`, `GetPasskeyByCredentialID`, `GetPasskeysByUserID`, `UpdatePasskeyCounter`, `DeletePasskey`, `DeleteByUserID(userID)`.
 
 ### `settings_repository.go` — `SettingsRepository{*gorm.DB}`
 
@@ -407,6 +427,7 @@ RoomParticipant(1) ↔ (1)RoomPermissions  via (RoomID, UserID)
 
 `GetByUserID(userID)` — `nil, nil` if not found.
 `Upsert(userID, prefsJSON)` — `ON CONFLICT ... UPDATE ALL`.
+`DeleteByUserID(userID)` — Delete preferences row.
 
 ---
 
@@ -469,7 +490,8 @@ DTOs: `ErrorResponse`, `RegisterRequest`, `LoginRequest`, `GuestLoginRequest`, `
 
 ### `migrations.go`
 
-`RunMigrations()` — AutoMigrate: User, BlockedRefreshToken, Room, RoomParticipant, RoomPermissions, Passkey, SystemSettings, InviteToken, UserPreferences. Raw SQL FK: `fk_room_permissions_participant`.
+`RunMigrations()` — AutoMigrate: User, BlockedRefreshToken, Room, RoomParticipant, RoomPermissions, Passkey, SystemSettings, InviteToken, UserPreferences, ChatUpload.  
+Raw SQL FK constraints: `fk_room_permissions_participant`, `fk_chat_uploads_room` (Postgres: `ON DELETE CASCADE`).
 
 ---
 
@@ -544,12 +566,24 @@ Validation: MIME must be png/jpeg/gif/webp. SHA256 content hash filename.
 
 ---
 
+## `internal/lkutil/lkutil.go` — Shared LiveKit Helpers
+
+Cross-cutting package used by `handlers/users.go`, `handlers/room.go`, and `usercli/usercli.go`.
+
+| Export | Signature | Purpose |
+|--------|-----------|---------|
+| `NewClient(lkCfg)` | `func(*config.LiveKitConfig) livekit.RoomService` | Create LiveKit RoomService protobuf client. Respects `InternalHost` / `Host`, handles `SkipTLSVerify` |
+| `AuthContext(ctx, apiKey, apiSecret, grants...)` | `func(context.Context, string, string, ...*lkauth.VideoGrant) context.Context` | Inject Bearer token into twirp context |
+| `SendSystemMessage(ctx, client, roomName, event, message)` | `func(context.Context, livekit.RoomService, string, string, string)` | Send typed system data message over LiveKit data channel (topic `"system"`, kind `RELIABLE`) |
+
+---
+
 ## `internal/usercli/usercli.go`
 
 `PromoteUser(configPath, email)` — Add `superadmin` to Accesses.
 `DemoteUser(configPath, email)` — Remove `superadmin`.
 `CreateUser(configPath, email, password, name)` — bcrypt hash, insert.
-`DeleteUser(configPath, email)` — Remove by email.
+`DeleteUser(configPath, email)` — Full cleanup: loads config, inits DB + migrations, fetches user + their created rooms. For each room: sends "room deleted" system message via `lkutil`, deletes from LiveKit, hard-deletes from DB via `AdminDeleteRoom`, cleans up chat upload files via `ChatUploadTracker.DeleteByRoom`. Then deletes passkeys (`PasskeyRepository.DeleteByUserID`), preferences (`UserPreferencesRepository.DeleteByUserID`), and user (`UserRepository.DeleteUser`). Aborts if any DB room deletion fails.
 `withUser(configPath, email, fn)` — Load config + init DB + lookup user → call fn.
 
 ---
@@ -559,12 +593,15 @@ Validation: MIME must be png/jpeg/gif/webp. SHA256 content hash filename.
 ```
 cmd/bedrud → server → handlers → repository → models
                    ↘            → auth → repository
+                   ↘            → lkutil (shared LiveKit client + auth + system messages)
                    ↘ middleware → auth
                    ↘ scheduler → repository + livekit
-                   ↘ storage (standalone)
+                   ↘ storage (standalone; ChatUploadTracker depends on db + models)
                    ↘ utils (standalone)
                    ↘ install → utils
-                   ↘ usercli → repository
+                   ↘ usercli → repository + lkutil
                    ↘ database → models (via migrations)
 cmd/server → (same wiring, direct in main.go)
+                   ↘ handlers/users → lkutil + storage (ChatUploadTracker)
+                   ↘ handlers/room → lkutil + storage (ChatUploadTracker)
 ```

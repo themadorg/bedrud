@@ -388,13 +388,13 @@ Add: `cd apps/web && bunx shadcn@latest add <name>`.
 
 **Data channel protocol:** `RoomEvent.DataReceived` for topics `"chat"` and `"system"`.
 
-**System events:** `kick`, `ban`, `ask_unmute`, `ask_camera`, `spotlight`, `deafen`, `undeafen`.
+**System events:** `kick`, `ban`, `ask_unmute`, `ask_camera`, `spotlight`, `deafen`, `undeafen`, `room_deleted`, `room_ended`, `room_closed`.
 
 **Chat types:**
 ```
 ChatMessage: { id, timestamp, senderName, senderIdentity, message, attachments: ChatAttachment[], isLocal }
 ChatAttachment: { kind: 'image', url, mime, w, h, size }
-SystemMessage: { type: 'system', event: 'kick'|'ban'|'ask_unmute'|'ask_camera'|'spotlight'|'deafen'|'undeafen', actor, target, ts }
+SystemMessage: { type: 'system', event: SystemEventName, actor?, target?, message?, deletedIdentity?, ts }
 ```
 
 ---

@@ -277,12 +277,19 @@ All require `Protected()`. All use path params `:roomId` + `:identity`.
 
 All routes: `Protected()` + `RequireAccess(superadmin)`. Prefix: `/api/admin`.
 
-| Method | Path | Handler | Req | Res |
-|--------|------|---------|-----|-----|
-| GET | `/api/admin/users` | `usersHandler.ListUsers` | query: `page`, `limit` | `{"users":[UserDetails],"total":int,"page":int,"limit":int}` |
-| GET | `/api/admin/users/:id` | `usersHandler.GetUserDetail` | — | `{"user":UserDetails,"rooms":[Room]}` |
-| PUT | `/api/admin/users/:id/status` | `usersHandler.UpdateUserStatus` | `{active: bool}` | `{"message":"User status updated successfully"}` |
-| PUT | `/api/admin/users/:id/accesses` | `usersHandler.UpdateUserAccesses` | `{accesses: []string}` | `{"message":"User accesses updated"}` |
+| Method | Path | Handler | Req | Res | Status |
+|--------|------|---------|-----|-----|--------|
+| GET | `/api/admin/users` | `usersHandler.ListUsers` | query: `page`, `limit` | `{"users":[UserDetails],"total":int,"page":int,"limit":int}` | 200 |
+| GET | `/api/admin/users/:id` | `usersHandler.GetUserDetail` | — | `{"user":UserDetails,"rooms":[Room]}` | 200 |
+| PUT | `/api/admin/users/:id/status` | `usersHandler.UpdateUserStatus` | `{active: bool}` | `{"message":"User status updated successfully"}` | 200 |
+| PUT | `/api/admin/users/:id/accesses` | `usersHandler.UpdateUserAccesses` | `{accesses: []string}` | `{"message":"User accesses updated"}` | 200 |
+| DELETE | `/api/admin/users/:id` | `usersHandler.DeleteUser` | — | `202 {"message":"User deletion started","rooms":N}` (async 3-phase, 202 Accepted) | 202 / 400 / 403 / 404 / 500 |
+
+### DeleteUser Notes
+- **Self-deletion guard**: 400 if the requesting superadmin targets their own ID.
+- **3-phase async goroutine**: Phase 1 (notify + stop LiveKit rooms, best-effort) → Phase 2 (hard-delete rooms from DB + chat upload cleanup, critical — abort on failure) → Phase 3 (delete passkeys, preferences, user record in transaction).
+- **202 Accepted**: Returns immediately. Rooms stopped and participants see "This room has been deleted by an administrator".
+- **Partial failure**: LiveKit failures are non-fatal (rooms auto-expire). DB room deletion failures abort the entire deletion (user stays intact).
 
 ### UserDetails DTO
 
@@ -358,7 +365,8 @@ AdminUpdateRoomSettingsInput {
 ### Admin Close vs Delete
 
 - `close`: removes from LK, sets `IsActive = false` in DB. Room record preserved.
-- No admin delete endpoint — close is the admin equivalent.
+- `DELETE /admin/rooms/:roomId` (normal delete): creator or superadmin. Removes from LK + DB.
+- `DELETE /api/admin/users/:id` (hard delete user): superadmin-only. 3-phase async: closes all user's rooms (LK + DB + chat upload files), then deletes user + passkeys + preferences.
 
 ---
 
@@ -691,6 +699,10 @@ type ChatAttachment struct {
 | InviteToken model | `internal/models/invite_token.go` |
 | UserPreferences model | `internal/models/user_preferences.go` |
 | ChatAttachment DTO | `internal/storage/chat_upload.go` |
+| ChatUploadTracker (Record + DeleteByRoom) | `internal/storage/chat_upload.go` |
+| ChatUpload model | `internal/models/chat_upload.go` |
+| Shared LiveKit helpers (NewClient, AuthContext, SendSystemMessage) | `internal/lkutil/lkutil.go` |
+| User handler (DeleteUser, Shutdown) | `internal/handlers/users.go` |
 
 ---
 

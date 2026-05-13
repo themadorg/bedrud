@@ -17,12 +17,13 @@ bedrud/
 │   │   ├── handlers/     HTTP route handlers (auth, rooms, users, admin, prefs)
 │   │   ├── install/      Debian systemd installer
 │   │   ├── livekit/      Embedded LK binary (embed.FS + subprocess mgmt)
+│   │   ├── lkutil/       Shared LiveKit helpers (NewClient, AuthContext, SendSystemMessage)
 │   │   ├── middleware/    JWT auth + RBAC middleware
-│   │   ├── models/       GORM models (User, Room, Passkey, Settings, etc.)
+│   │   ├── models/       GORM models (User, Room, Passkey, ChatUpload, Settings, etc.)
 │   │   ├── repository/   Data access layer (6 repos)
 │   │   ├── scheduler/    Background idle-room cleanup (gocron)
 │   │   ├── server/       Bootstrap: Run() wires all subsystems
-│   │   ├── storage/      Chat image upload (disk/inline/S3)
+│   │   ├── storage/      Chat image upload (disk/inline/S3) + ChatUploadTracker (Record/DeleteByRoom)
 │   │   ├── templates/    HTML templates (login, index)
 │   │   ├── usercli/      CLI user management (promote/demote/create/delete)
 │   │   └── utils/        Self-signed TLS cert generation
