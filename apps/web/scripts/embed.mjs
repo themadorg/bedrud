@@ -57,6 +57,8 @@ writeFileSync(resolve(targetDir, 'index.html'), shell, 'utf8')
 const shellHtml = generateShell(shell)
 writeFileSync(resolve(targetDir, 'shell.html'), shellHtml, 'utf8')
 
+writeFileSync(resolve(targetDir, '.gitkeep'), '', 'utf8')
+
 console.log('✅ server/frontend/ updated — restart `go run ./cmd/server` to pick up changes.')
 
 // ─────────────────────────────────────────────────────────────────────────────
