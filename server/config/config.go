@@ -41,10 +41,14 @@ type ServerConfig struct {
 	// behind Cloudflare, nginx, or any reverse proxy that terminates TLS.
 	BehindProxy bool `yaml:"behindProxy"`
 	// CertAlgorithm selects the key algorithm for self-signed certificate generation.
-	// Supported: "ed25519" (default), "ecdsa256", "rsa2048", "rsa4096".
+	// Supported: "ed25519" (default), "ecdsa256", "rsa2048", or "rsa4096".
 	// Renewal auto-detects and preserves the existing cert's algorithm.
 	// Env: SERVER_CERT_ALGORITHM
 	CertAlgorithm string `yaml:"certAlgorithm" env:"SERVER_CERT_ALGORITHM"`
+	// MaxParticipantsLimit is the hard ceiling for room maxParticipants.
+	// 0 means use internal default (1000).
+	// Env: SERVER_MAX_PARTICIPANTS_LIMIT
+	MaxParticipantsLimit int `yaml:"maxParticipantsLimit" env:"SERVER_MAX_PARTICIPANTS_LIMIT"`
 }
 
 type DatabaseConfig struct {
@@ -148,6 +152,8 @@ type RateLimitConfig struct {
 	AuthWindowSecs   *int `yaml:"authWindowSecs"`
 	GuestMaxRequests *int `yaml:"guestMaxRequests"`
 	GuestWindowSecs  *int `yaml:"guestWindowSecs"`
+	APIMaxRequests   *int `yaml:"apiMaxRequests"`
+	APIWindowSecs    *int `yaml:"apiWindowSecs"`
 }
 
 // ConfigInt accepts YAML int or quoted-string numeric values.

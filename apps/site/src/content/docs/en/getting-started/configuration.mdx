@@ -39,6 +39,7 @@ server:
   port: 8090                    # HTTPS port (or HTTP if TLS disabled)
   httpPort: ""                  # HTTP listener when TLS enabled. Default: "80". Unprivileged: "8080". Empty = disabled.
   host: "localhost"             # Bind address
+  maxParticipantsLimit: 1000    # Hard ceiling for room capacity (0 = unlimited). Env: SERVER_MAX_PARTICIPANTS_LIMIT
 
 database:
   type: "sqlite"                # Database type: sqlite or postgres
@@ -233,6 +234,7 @@ export LIVEKIT_API_SECRET=prodsecret
 | `LIVEKIT_CONFIG_PATH` | `livekit.configPath` | Path to external LiveKit YAML config |
 | `LIVEKIT_NODE_IP` | `livekit.nodeIP` | Explicit node IP for embedded LiveKit RTC (disables STUN) |
 | `SERVER_CERT_ALGORITHM` | `server.certAlgorithm` | Key algorithm for cert generation: `ed25519`, `ecdsa256`, `rsa2048`, `rsa4096` |
+| `SERVER_MAX_PARTICIPANTS_LIMIT` | `server.maxParticipantsLimit` | Hard ceiling for room capacity (default 1000) |
 | `JWT_SECRET` | `auth.jwtSecret` | Secret for signing JWT tokens |
 | `AUTH_FRONTEND_URL` | `auth.frontendURL` | Frontend URL for OAuth redirects |
 | `AUTH_PASSKEY_CHALLENGE_TTL` | `auth.passkeyChallengeTTL` | Passkey challenge expiry in minutes |

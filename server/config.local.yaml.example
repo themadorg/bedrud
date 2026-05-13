@@ -11,6 +11,9 @@ server:
   # renewal auto-detects and preserves the existing cert's algorithm.
   # Env: SERVER_CERT_ALGORITHM
   certAlgorithm: "ed25519"
+  # maxParticipantsLimit sets the hard ceiling for room capacity (default: 1000, 0 = unlimited).
+  # Env: SERVER_MAX_PARTICIPANTS_LIMIT
+  maxParticipantsLimit: 1000
 
 database:
   type: "sqlite"
