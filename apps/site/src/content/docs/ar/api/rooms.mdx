@@ -275,6 +275,7 @@ POST /api/room/:roomId/video/:identity/off
 | 400 | `"room name must contain only lowercase letters, numbers, and hyphens"` | الاسم يحتوي على أحرف خاصة (`#`، `@`، `_`، إلخ) |
 | 400 | `"room name must be at least 3 characters"` | الاسم قصير جدًا |
 | 400 | `"room name must be at most 63 characters"` | الاسم طويل جدًا |
+| 403 | `"Room limit reached (max N active rooms)"` | تم الوصول إلى حد الغرفة |
 | 409 | `"a room with this name already exists"` | اسم مكرر |
 | 500 | `"Failed to create media room"` | خطأ في خادم LiveKit |
 | 500 | `"Failed to create room"` | خطأ في قاعدة البيانات |
@@ -285,10 +286,11 @@ POST /api/room/:roomId/video/:identity/off
 |--------|---------|
 | 400 | طلب غير صالح (بيانات مفقودة/غير صالحة) |
 | 401 | غير مُصدَّق |
-| 403 | غير مُصرَّح (مستخدم غير مشرف يحاول تنفيذ إجراء مشرف) |
+| 403 | غير مُصرَّح (مستخدم غير مشرف يحاول تنفيذ إجراء مشرف) أو تم الوصول إلى حد الغرفة |
 | 404 | الغرفة غير موجودة |
 | 409 | تعارض (مورد مكرر) |
 | 500 | خطأ داخلي في الخادم |
+| 507 | تجاوز حصة التخزين (حد التحميل أو الحد العام) |
 
 ---
 

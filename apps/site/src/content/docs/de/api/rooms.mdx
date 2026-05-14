@@ -274,6 +274,7 @@ Alle Fehler folgen einem einheitlichen Format:
 | 400 | `"room name must contain only lowercase letters, numbers, and hyphens"` | Name enthält Sonderzeichen (`#`, `@`, `_` usw.) |
 | 400 | `"room name must be at least 3 characters"` | Name zu kurz |
 | 400 | `"room name must be at most 63 characters"` | Name zu lang |
+| 403 | `"Room limit reached (max N active rooms)"` | Raumlimit erreicht |
 | 409 | `"a room with this name already exists"` | Doppelter Name |
 | 500 | `"Failed to create media room"` | LiveKit-Serverfehler |
 | 500 | `"Failed to create room"` | Datenbankfehler |
@@ -284,10 +285,11 @@ Alle Fehler folgen einem einheitlichen Format:
 |--------|---------|
 | 400 | Ungültige Anfrage (fehlende/ungültige Daten) |
 | 401 | Nicht authentifiziert |
-| 403 | Nicht autorisiert (Nicht-Admin versucht Admin-Aktion) |
+| 403 | Nicht autorisiert (Nicht-Admin versucht Admin-Aktion) oder Raumlimit erreicht |
 | 404 | Raum nicht gefunden |
 | 409 | Konflikt (doppelte Ressource) |
 | 500 | Interner Serverfehler |
+| 507 | Speicherkontingent überschritten (Upload-Limit oder globaler Schwellenwert) |
 
 ---
 

@@ -274,6 +274,7 @@ POST /api/room/:roomId/video/:identity/off
 | 400 | `"room name must contain only lowercase letters, numbers, and hyphens"` | 名称包含特殊字符（`#`、`@`、`_` 等） |
 | 400 | `"room name must be at least 3 characters"` | 名称过短 |
 | 400 | `"room name must be at most 63 characters"` | 名称过长 |
+| 403 | `"Room limit reached (max N active rooms)"` | 已达到房间限制 |
 | 409 | `"a room with this name already exists"` | 名称重复 |
 | 500 | `"Failed to create media room"` | LiveKit 服务器错误 |
 | 500 | `"Failed to create room"` | 数据库错误 |
@@ -284,10 +285,11 @@ POST /api/room/:roomId/video/:identity/off
 |--------|---------|
 | 400 | 请求错误（缺少或无效的数据） |
 | 401 | 未认证 |
-| 403 | 无权限（非管理员尝试管理员操作） |
+| 403 | 无权限（非管理员尝试管理员操作）或已达到房间限制 |
 | 404 | 房间未找到 |
 | 409 | 冲突（资源重复） |
 | 500 | 服务器内部错误 |
+| 507 | 存储配额超限（上传限制或全局阈值） |
 
 ---
 

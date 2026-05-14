@@ -275,6 +275,7 @@ Toutes les erreurs suivent un format cohérent :
 | 400 | `"room name must contain only lowercase letters, numbers, and hyphens"` | Le nom contient des caractères spéciaux (`#`, `@`, `_`, etc.) |
 | 400 | `"room name must be at least 3 characters"` | Nom trop court |
 | 400 | `"room name must be at most 63 characters"` | Nom trop long |
+| 403 | `"Room limit reached (max N active rooms)"` | Limite de salle atteinte |
 | 409 | `"a room with this name already exists"` | Nom en double |
 | 500 | `"Failed to create media room"` | Erreur du serveur LiveKit |
 | 500 | `"Failed to create room"` | Erreur de base de données |
@@ -285,10 +286,11 @@ Toutes les erreurs suivent un format cohérent :
 |--------|--------------|
 | 400 | Mauvaise requête (données manquantes/invalides) |
 | 401 | Non authentifié |
-| 403 | Non autorisé (non-admin tentant une action d'admin) |
+| 403 | Non autorisé (non-admin tentant une action d'admin) ou limite de salle atteinte |
 | 404 | Salle non trouvée |
 | 409 | Conflit (ressource en double) |
 | 500 | Erreur interne du serveur |
+| 507 | Quota de stockage dépassé (limite d'upload ou seuil global) |
 
 ---
 

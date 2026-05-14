@@ -275,6 +275,7 @@ Todos los errores siguen un formato consistente:
 | 400 | `"room name must contain only lowercase letters, numbers, and hyphens"` | El nombre contiene caracteres especiales (`#`, `@`, `_`, etc.) |
 | 400 | `"room name must be at least 3 characters"` | Nombre demasiado corto |
 | 400 | `"room name must be at most 63 characters"` | Nombre demasiado largo |
+| 403 | `"Room limit reached (max N active rooms)"` | Límite de sala alcanzado |
 | 409 | `"a room with this name already exists"` | Nombre duplicado |
 | 500 | `"Failed to create media room"` | Error del servidor de LiveKit |
 | 500 | `"Failed to create room"` | Error de base de datos |
@@ -285,10 +286,11 @@ Todos los errores siguen un formato consistente:
 |--------|-------------|
 | 400 | Solicitud incorrecta (datos faltantes/inválidos) |
 | 401 | No autenticado |
-| 403 | No autorizado (no-admin intentando acción de admin) |
+| 403 | No autorizado (no-admin intentando acción de admin) o límite de sala alcanzado |
 | 404 | Sala no encontrada |
 | 409 | Conflicto (recurso duplicado) |
 | 500 | Error interno del servidor |
+| 507 | Cuota de almacenamiento excedida (límite de carga o umbral global) |
 
 ---
 

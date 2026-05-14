@@ -274,6 +274,7 @@ POST /api/room/:roomId/video/:identity/off
 | 400 | `"room name must contain only lowercase letters, numbers, and hyphens"` | نام شامل کاراکترهای خاص است (`#`، `@`، `_` و غیره) |
 | 400 | `"room name must be at least 3 characters"` | نام خیلی کوتاه است |
 | 400 | `"room name must be at most 63 characters"` | نام خیلی طولانی است |
+| 403 | `"Room limit reached (max N active rooms)"` | محدودیت اتاق رسیده است |
 | 409 | `"a room with this name already exists"` | نام تکراری است |
 | 500 | `"Failed to create media room"` | خطای سرور LiveKit |
 | 500 | `"Failed to create room"` | خطای دیتابیس |
@@ -284,10 +285,11 @@ POST /api/room/:roomId/video/:identity/off
 |--------|---------|
 | 400 | درخواست نامعتبر (داده‌های گم‌شده/نامعتبر) |
 | 401 | احراز هویت نشده |
-| 403 | مجاز نیست (غیرمدیر در تلاش برای انجام عملکرد مدیر) |
+| 403 | مجاز نیست (غیرمدیر در تلاش برای انجام عملکرد مدیر) یا محدودیت اتاق رسیده است |
 | 404 | اتاق یافت نشد |
 | 409 | تضاد (منبع تکراری) |
 | 500 | خطای داخلی سرور |
+| 507 | سهمیه ذخیره‌سازی بیش از حد (محدودیت آپلود یا آستانه جهانی) |
 
 ---
 

@@ -39,6 +39,7 @@ server:
   port: 8090                    # HTTP ポート
   host: "localhost"             # バインドアドレス
   maxParticipantsLimit: 1000    # Hard ceiling for room capacity (0 = unlimited). Env: SERVER_MAX_PARTICIPANTS_LIMIT
+  maxRoomsPerUser: 100          # Max active rooms per user (0 = unlimited). Env: SERVER_MAX_ROOMS_PER_USER
 
 database:
   type: "sqlite"                # データベースタイプ: sqlite または postgres
@@ -83,6 +84,12 @@ rateLimit:
   authWindowSecs: 60         # Auth rate limit window in seconds
   guestMaxRequests: 5        # Max guest join requests per window. 0 = disable
   guestWindowSecs: 60        # Guest rate limit window in seconds
+
+chat:
+  maxUploadBytesPerUser: 524288000       # Per-user upload quota (500 MB). 0 = unlimited. Env: CHAT_MAX_UPLOAD_BYTES_PER_USER
+  globalDiskThresholdBytes: 0            # Global storage ceiling across all users. 0 = unlimited. Env: CHAT_GLOBAL_DISK_THRESHOLD_BYTES
+  maxMessageCount: 10000                 # Max chat messages kept per room (0 = unlimited). Env: CHAT_MAX_MESSAGE_COUNT
+  messageTTLHours: 2160                  # Purge messages older than this in hours (0 = forever). 2160 = 90 days. Env: CHAT_MESSAGE_TTL_HOURS
 ```
 
 ### 主要設定
@@ -115,6 +122,17 @@ database:
 - **ゲスト参加** — デフォルト: IPあたり60秒に5リクエスト
 
 `rateLimit`セクションを省略するとデフォルト値が適用されます。`authMaxRequests: 0` または `guestMaxRequests: 0` を設定すると無効化できます。
+
+#### Chat History
+
+Bedrud applies advisory retention limits to in-room chat messages. Since LiveKit — the real-time media layer — does not persist data channel messages server-side, these limits are enforced on the client:
+
+- **`maxMessageCount`** — caps the number of chat messages held in memory and sessionStorage per room. When exceeded, the oldest messages are trimmed. Default: 10000. Set to `0` for unlimited.
+- **`messageTTLHours`** — messages older than this threshold are purged from the local cache. Default: 2160 (90 days). Set to `0` to keep messages indefinitely.
+
+<Callout type="info">
+  Chat messages in Bedrud are transmitted exclusively through LiveKit data channels and are not stored on the server. The retention limits above control how many messages the frontend keeps in memory and sessionStorage. A dedicated chat history service (with server-side persistence) would be needed for true history across sessions — this is tracked as a future enhancement.
+</Callout>
 
 ---
 
@@ -243,6 +261,11 @@ export LIVEKIT_API_SECRET=prodsecret
 | `LIVEKIT_NODE_IP` | `livekit.nodeIP` | Explicit node IP for embedded LiveKit RTC (disables STUN) |
 | `SERVER_CERT_ALGORITHM` | `server.certAlgorithm` | Key algorithm for cert generation: `ed25519`, `ecdsa256`, `rsa2048`, `rsa4096` |
 | `SERVER_MAX_PARTICIPANTS_LIMIT` | `server.maxParticipantsLimit` | Hard ceiling for room capacity (default 1000) |
+| `SERVER_MAX_ROOMS_PER_USER` | `server.maxRoomsPerUser` | Max active rooms per user (default 100, 0 = unlimited) |
+| `CHAT_MAX_UPLOAD_BYTES_PER_USER` | `chat.maxUploadBytesPerUser` | Per-user upload quota in bytes (default 524288000, 0 = unlimited) |
+| `CHAT_GLOBAL_DISK_THRESHOLD_BYTES` | `chat.globalDiskThresholdBytes` | Global upload storage ceiling in bytes (default 0 = unlimited) |
+| `CHAT_MAX_MESSAGE_COUNT` | `chat.maxMessageCount` | Max chat messages kept per room (default 10000, 0 = unlimited) |
+| `CHAT_MESSAGE_TTL_HOURS` | `chat.messageTTLHours` | Max age of chat messages in hours (default 2160 = 90 days, 0 = forever) |
 
 ---
 

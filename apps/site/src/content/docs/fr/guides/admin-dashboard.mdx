@@ -143,7 +143,7 @@ La page de détail à `/dashboard/admin/rooms/:roomId` offre une visibilité app
 
 ## Paramètres système
 
-La page des paramètres à `/dashboard/admin/settings` est organisée en 7 onglets. Cliquez sur « Enregistrer les modifications » après avoir modifié un onglet (l'onglet Général s'enregistre automatiquement lors des changements de mode d'inscription).
+La page des paramètres à `/dashboard/admin/settings` est organisée en 9 onglets. Cliquez sur « Enregistrer les modifications » après avoir modifié un onglet (l'onglet Général s'enregistre automatiquement lors des changements de mode d'inscription).
 
 ### Onglet Général
 
@@ -198,6 +198,19 @@ Chaque fournisseur a sa propre carte de configuration. Activez un fournisseur en
 - **Méthodes autorisées :** Liste séparée par des virgules des méthodes HTTP autorisées
 - **Autoriser les identifiants :** Bascule pour inclure les identifiants dans les requêtes cross-origin
 - **Âge maximum :** Durée de mise en cache des réponses preflight CORS (en secondes)
+
+### Onglet Limites des salles
+
+Contrôle le nombre de salles actives qu'un utilisateur peut créer :
+
+- **Salles max par utilisateur :** Nombre maximum de salles actives qu'un utilisateur non superadmin peut créer (défaut : 100, 0 = illimité). Les superadmins contournent cette limite.
+
+### Onglet Quotas de téléchargement
+
+Contrôle les limites de stockage pour les téléchargements d'images du chat :
+
+- **Octets max par utilisateur :** Quota de stockage par utilisateur dans toutes les salles (défaut : 524288000 = 500 Mo, 0 = illimité). Les superadmins contournent cette limite.
+- **Seuil de disque global :** Plafond de stockage total pour tous les utilisateurs. Lorsqu'il est dépassé, tous les téléchargements sont refusés jusqu'à ce qu'un administrateur libère de l'espace (défaut : 0 = illimité). Cette limite s'applique à tout le monde, y compris les superadmins.
 
 ### Onglet Téléchargements du chat
 

@@ -143,7 +143,7 @@ Her kullanıcı satırı hızlı eylem düğmeleri içerir:
 
 ## Sistem Ayarları
 
-`/dashboard/admin/settings` adresindeki ayarlar sayfası 7 sekme halinde düzenlenmiştir. Herhangi bir sekmeyi değiştirdikten sonra "Değişiklikleri kaydet"e tıklayın (Genel sekmesi, kayıt modu değişikliklerinde otomatik kaydeder).
+`/dashboard/admin/settings` adresindeki ayarlar sayfası 9 sekme halinde düzenlenmiştir. Herhangi bir sekmeyi değiştirdikten sonra "Değişiklikleri kaydet"e tıklayın (Genel sekmesi, kayıt modu değişikliklerinde otomatik kaydeder).
 
 ### Genel Sekmesi
 
@@ -198,6 +198,19 @@ Her sağlayıcının kendi yapılandırma kartı vardır. Üç alanı da doldura
 - **İzin Verilen Yöntemler:** Virgülle ayrılmış izin verilen HTTP yöntemleri listesi
 - **Kimlik Bilgilerine İzin Ver:** Çapraz köken isteklerinde kimlik bilgilerini dahil etmek için aç/kapat
 - **Maks. Yaş:** CORS ön kontrol yanıtları için önbellek süresi (saniye)
+
+### Oda Limitleri Sekmesi
+
+Tek bir kullanıcının oluşturabileceği aktif oda sayısını kontrol eder:
+
+- **Kullanıcı Başına Maks. Oda:** Superadmin olmayan bir kullanıcının oluşturabileceği maksimum aktif oda sayısı (varsayılan: 100, 0 = sınırsız). Superadmin'ler bu sınırı atlar.
+
+### Yükleme Kotaları Sekmesi
+
+Sohbet resim yüklemeleri için depolama limitlerini kontrol eder:
+
+- **Kullanıcı Başına Maks. Yükleme Baytı:** Tüm odalardaki kullanıcı başına depolama kotası (varsayılan: 524288000 = 500 MB, 0 = sınırsız). Superadmin'ler bu sınırı atlar.
+- **Küresel Disk Eşiği:** Tüm kullanıcılar arasında toplam depolama sınırı. Aşıldığında, bir yönetici alan boşaltana kadar tüm yüklemeler reddedilir (varsayılan: 0 = sınırsız). Bu sınır, superadmin'ler dahil herkes için geçerlidir.
 
 ### Sohbet Yüklemeleri Sekmesi
 

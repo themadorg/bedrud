@@ -274,6 +274,7 @@ POST /api/room/:roomId/video/:identity/off
 | 400 | `"room name must contain only lowercase letters, numbers, and hyphens"` | 名前に特殊文字が含まれている（`#`、`@`、`_` など） |
 | 400 | `"room name must be at least 3 characters"` | 名前が短すぎます |
 | 400 | `"room name must be at most 63 characters"` | 名前が長すぎます |
+| 403 | `"Room limit reached (max N active rooms)"` | ルーム制限に達しました |
 | 409 | `"a room with this name already exists"` | 名前が重複しています |
 | 500 | `"Failed to create media room"` | LiveKitサーバーエラー |
 | 500 | `"Failed to create room"` | データベースエラー |
@@ -284,10 +285,11 @@ POST /api/room/:roomId/video/:identity/off
 |--------|---------|
 | 400 | 不正なリクエスト（データの不足または無効） |
 | 401 | 未認証 |
-| 403 | 権限なし（非管理者が管理者操作を試行） |
+| 403 | 権限なし（非管理者が管理者操作を試行）またはルーム制限に達しました |
 | 404 | ルームが見つかりません |
 | 409 | 競合（リソースの重複） |
 | 500 | サーバー内部エラー |
+| 507 | ストレージ割り当て超過（アップロード制限またはグローバルしきい値） |
 
 ---
 

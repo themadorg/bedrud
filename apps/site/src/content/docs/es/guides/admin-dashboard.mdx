@@ -143,7 +143,7 @@ La página de detalle en `/dashboard/admin/rooms/:roomId` proporciona visibilida
 
 ## Configuración del Sistema
 
-La página de configuración en `/dashboard/admin/settings` está organizada en 7 pestañas. Haga clic en "Guardar cambios" después de modificar cualquier pestaña (la pestaña General se guarda automáticamente al cambiar el modo de registro).
+La página de configuración en `/dashboard/admin/settings` está organizada en 9 pestañas. Haga clic en "Guardar cambios" después de modificar cualquier pestaña (la pestaña General se guarda automáticamente al cambiar el modo de registro).
 
 ### Pestaña General
 
@@ -198,6 +198,19 @@ Cada proveedor tiene su propia tarjeta de configuración. Habilite un proveedor 
 - **Métodos Permitidos:** Lista separada por comas de métodos HTTP permitidos
 - **Permitir Credenciales:** Alternar para incluir credenciales en solicitudes de origen cruzado
 - **Edad Máxima:** Duración de caché para respuestas preflight CORS (segundos)
+
+### Pestaña de Límites de Salas
+
+Controla cuántas salas activas puede crear un solo usuario:
+
+- **Máx. de Salas por Usuario:** Número máximo de salas activas que un usuario no superadmin puede crear (predeterminado: 100, 0 = ilimitado). Los superadmins omiten este límite.
+
+### Pestaña de Cuotas de Carga
+
+Controla los límites de almacenamiento para las imágenes cargadas en el chat:
+
+- **Máx. de Bytes de Carga por Usuario:** Cuota de almacenamiento por usuario en todas las salas (predeterminado: 524288000 = 500 MB, 0 = ilimitado). Los superadmins omiten este límite.
+- **Umbral de Disco Global:** Límite total de almacenamiento para todos los usuarios. Cuando se excede, todas las cargas se rechazan hasta que un administrador libere espacio (predeterminado: 0 = ilimitado). Este límite aplica a todos, incluidos los superadmins.
 
 ### Pestaña de Carga de Chat
 

@@ -199,6 +199,19 @@ Each provider has its own configuration card. Enable a provider by filling in al
 - **Allow Credentials:** Toggle to include credentials in cross-origin requests
 - **Max Age:** Cache duration for CORS preflight responses (seconds)
 
+### Room Limits Tab
+
+Controls how many rooms a single user can create:
+
+- **Max Rooms Per User:** Maximum number of active rooms a non-superadmin user can create (default: 100, 0 = unlimited). Superadmins bypass this limit.
+
+### Upload Quotas Tab
+
+Controls storage limits for chat image uploads:
+
+- **Max Upload Bytes Per User:** Per-user storage quota across all rooms (default: 524288000 = 500 MB, 0 = unlimited). Superadmins bypass this limit.
+- **Global Disk Threshold:** Total storage ceiling across all users. When exceeded, all uploads are rejected until an admin frees space (default: 0 = unlimited). This limit applies to everyone, including superadmins.
+
 ### Chat Uploads Tab
 
 Configure how chat image uploads are stored:

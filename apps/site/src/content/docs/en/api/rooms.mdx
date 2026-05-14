@@ -275,6 +275,7 @@ All errors follow a consistent format:
 | 400 | `"room name must contain only lowercase letters, numbers, and hyphens"` | Name contains special characters (`#`, `@`, `_`, etc.) |
 | 400 | `"room name must be at least 3 characters"` | Name too short |
 | 400 | `"room name must be at most 63 characters"` | Name too long |
+| 403 | `"Room limit reached (max N active rooms)"` | User has reached their active room limit |
 | 409 | `"a room with this name already exists"` | Duplicate name |
 | 500 | `"Failed to create media room"` | LiveKit server error |
 | 500 | `"Failed to create room"` | Database error |
@@ -285,10 +286,11 @@ All errors follow a consistent format:
 |--------|---------|
 | 400 | Bad request (missing/invalid data) |
 | 401 | Not authenticated |
-| 403 | Not authorized (non-admin trying admin action) |
+| 403 | Not authorized (non-admin trying admin action) or room limit reached |
 | 404 | Room not found |
 | 409 | Conflict (duplicate resource) |
 | 500 | Internal server error |
+| 507 | Storage quota exceeded (chat upload limit or global threshold) |
 
 ---
 

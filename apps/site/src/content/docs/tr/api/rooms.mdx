@@ -275,6 +275,7 @@ Tüm hatalar tutarlı bir format izler:
 | 400 | `"room name must contain only lowercase letters, numbers, and hyphens"` | İsim özel karakterler içeriyor (`#`, `@`, `_` vb.) |
 | 400 | `"room name must be at least 3 characters"` | İsim çok kısa |
 | 400 | `"room name must be at most 63 characters"` | İsim çok uzun |
+| 403 | `"Room limit reached (max N active rooms)"` | Oda sınırına ulaşıldı |
 | 409 | `"a room with this name already exists"` | Yinelenen isim |
 | 500 | `"Failed to create media room"` | LiveKit sunucu hatası |
 | 500 | `"Failed to create room"` | Veritabanı hatası |
@@ -285,10 +286,11 @@ Tüm hatalar tutarlı bir format izler:
 |-------|--------|
 | 400 | Hatalı istek (eksik/geçersiz veri) |
 | 401 | Kimlik doğrulaması yapılmamış |
-| 403 | Yetkisiz (yönetici olmayan, yönetici eylemi deniyor) |
+| 403 | Yetkisiz (yönetici olmayan, yönetici eylemi deniyor) veya oda sınırına ulaşıldı |
 | 404 | Oda bulunamadı |
 | 409 | Çakışma (yinelenen kaynak) |
 | 500 | İç sunucu hatası |
+| 507 | Depolama kotası aşıldı (yükleme limiti veya küresel eşik) |
 
 ---
 

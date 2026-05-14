@@ -49,7 +49,8 @@ export default defineConfig({
     "/contributors": "/en/contributors",
     "/changelog": "/en/changelog",
     "/demo": "/en/demo",
-    "/github": "https://github.com/themadorg/bedrud?utm_source=app&utm_medium=footer",
+    "/github":
+      "https://github.com/themadorg/bedrud?utm_source=app&utm_medium=footer",
   },
   integrations: [
     icon({

@@ -143,7 +143,7 @@ Die Detailseite unter `/dashboard/admin/rooms/:roomId` bietet tiefe Einblicke in
 
 ## Systemeinstellungen
 
-Die Einstellungsseite unter `/dashboard/admin/settings` ist in 7 Tabs unterteilt. Klicken Sie auf „Änderungen speichern", nachdem Sie einen Tab bearbeitet haben (der Allgemein-Tab speichert bei Änderungen des Registrierungsmodus automatisch).
+Die Einstellungsseite unter `/dashboard/admin/settings` ist in 9 Tabs unterteilt. Klicken Sie auf „Änderungen speichern", nachdem Sie einen Tab bearbeitet haben (der Allgemein-Tab speichert bei Änderungen des Registrierungsmodus automatisch).
 
 ### Allgemein-Tab
 
@@ -198,6 +198,19 @@ Jeder Provider hat eine eigene Konfigurationskarte. Aktivieren Sie einen Provide
 - **Erlaubte Methoden:** Kommagetrennte Liste der erlaubten HTTP-Methoden
 - **Anmeldeinformationen zulassen:** Umschalter für Anmeldeinformationen in Cross-Origin-Anfragen
 - **Max-Age:** Cache-Dauer für CORS-Preflight-Antworten (Sekunden)
+
+### Raumlimits-Tab
+
+Steuert, wie viele aktive Räume ein einzelner Benutzer erstellen kann:
+
+- **Max. Räume pro Benutzer:** Maximale Anzahl aktiver Räume, die ein Nicht-Superadmin-Benutzer erstellen kann (Standard: 100, 0 = unbegrenzt). Superadmins umgehen dieses Limit.
+
+### Upload-Kontingente-Tab
+
+Steuert Speicherlimits für Chat-Bild-Uploads:
+
+- **Max. Upload-Bytes pro Benutzer:** Speicherkontingent pro Benutzer über alle Räume hinweg (Standard: 524288000 = 500 MB, 0 = unbegrenzt). Superadmins umgehen dieses Limit.
+- **Globaler Datenträgerschwellenwert:** Gesamtspeichergrenze über alle Benutzer hinweg. Bei Überschreitung werden alle Uploads abgelehnt, bis ein Administrator Speicher freigibt (Standard: 0 = unbegrenzt). Dieses Limit gilt für alle, einschließlich Superadmins.
 
 ### Chat-Uploads-Tab
 
