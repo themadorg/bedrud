@@ -34,6 +34,7 @@ interface JoinResponse {
   token: string
   livekitHost: string
   adminId: string
+  sessionStartedAt?: number
 }
 
 export const Route = createFileRoute('/m/$meetId')({
@@ -503,7 +504,7 @@ function MeetingPage() {
               style={{ background: 'linear-gradient(to top, rgba(7,7,15,0.6) 0%, transparent 100%)' }}
             />
 
-            <MeetingHeader meetId={meetId} />
+            <MeetingHeader meetId={meetId} sessionStartedAt={sessionStartedAt} />
 
             {/* Side panels */}
             <MeetingPanels navigate={() => navigate({ to: '/dashboard' })} />

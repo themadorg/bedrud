@@ -73,7 +73,6 @@
   <string name="meeting_state_kickedTitle">You were removed</string>
   <string name="meeting_state_kickedMessage">A moderator removed you from this meeting.</string>
   <string name="meeting_button_backToDashboard">Back to Dashboard</string>
-  <string name="meeting_badge_live">LIVE</string>
   <string name="meeting_chat_uploading">Uploading…</string>
   <string name="meeting_chat_placeholder">Type a message…</string>
   <string name="meeting_chat_sharedImage">Shared image</string>

@@ -73,7 +73,6 @@
   <string name="meeting_state_kickedTitle">退出されました</string>
   <string name="meeting_state_kickedMessage">モデレーターがこのミーティングから退出させました。</string>
   <string name="meeting_button_backToDashboard">ダッシュボードに戻る</string>
-  <string name="meeting_badge_live">ライブ</string>
   <string name="meeting_chat_uploading">アップロード中…</string>
   <string name="meeting_chat_placeholder">メッセージを入力…</string>
   <string name="meeting_chat_sharedImage">共有画像</string>

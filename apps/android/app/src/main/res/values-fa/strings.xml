@@ -71,7 +71,6 @@
   <string name="meeting_state_kickedTitle">شما اخراج شدید</string>
   <string name="meeting_state_kickedMessage">یک مدیر شما را از این جلسه اخراج کرد.</string>
   <string name="meeting_button_backToDashboard">بازگشت به داشبورد</string>
-  <string name="meeting_badge_live">زنده</string>
   <string name="meeting_chat_uploading">در حال آپلود…</string>
   <string name="meeting_chat_placeholder">پیامی تایپ کنید…</string>
   <string name="meeting_chat_sharedImage">تصویر اشتراکی</string>

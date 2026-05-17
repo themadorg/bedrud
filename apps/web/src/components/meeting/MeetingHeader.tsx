@@ -1,27 +1,45 @@
 import { useConnectionState } from '@livekit/components-react'
 import { ConnectionState } from 'livekit-client'
-import { Radio } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { cn } from '#/lib/utils'
 
 interface MeetingHeaderProps {
   meetId: string
+  /** Epoch ms when the LiveKit session was created on the server. 0/undefined means this user is the first joiner — fall back to local connect time. */
+  sessionStartedAt?: number
 }
 
-/** Top-of-screen header showing live indicator, room name, clock, and connection status. */
-export function MeetingHeader({ meetId }: MeetingHeaderProps) {
+function formatElapsed(ms: number): string {
+  const secs = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  const s = secs % 60
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
+}
+
+export function MeetingHeader({ meetId, sessionStartedAt }: MeetingHeaderProps) {
   const state = useConnectionState()
-  const [time, setTime] = useState(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+  const isConnected = state === ConnectionState.Connected
+  const connectedAtRef = useRef<number | null>(null)
+  const [elapsed, setElapsed] = useState('0:00')
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
-    }, 10_000)
-    return () => clearInterval(id)
-  }, [])
+    if (isConnected && connectedAtRef.current == null) {
+      connectedAtRef.current = Date.now()
+    }
+  }, [isConnected])
 
-  const isConnected = state === ConnectionState.Connected
+  useEffect(() => {
+    const tick = () => {
+      const start = sessionStartedAt && sessionStartedAt > 0 ? sessionStartedAt : connectedAtRef.current
+      if (start != null) setElapsed(formatElapsed(Date.now() - start))
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [sessionStartedAt])
 
   return (
     <header className="absolute left-0 right-0 top-0 z-20 flex items-center justify-center px-4 pointer-events-none h-[calc(56px+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)]">

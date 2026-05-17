@@ -321,7 +321,8 @@ fun MeetingScreen(
                                 MeetingHeaderHUD(
                                     roomName = roomName,
                                     participantCount = participants.size,
-                                    connectionState = connectionState
+                                    connectionState = connectionState,
+                                    sessionStartedAt = roomInfo?.sessionStartedAt ?: 0L
                                 )
 
                                 val columns = when {
@@ -1018,19 +1019,26 @@ private fun KickedScreen(onBack: () -> Unit) {
 private fun MeetingHeaderHUD(
     roomName: String,
     participantCount: Int,
-    connectionState: ConnectionState
+    connectionState: ConnectionState,
+    sessionStartedAt: Long
 ) {
-    var clockText by remember { mutableStateOf(java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))) }
-    DisposableEffect(Unit) {
-        val handler = android.os.Handler(android.os.Looper.getMainLooper())
-        val runnable = object : Runnable {
-            override fun run() {
-                clockText = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
-                handler.postDelayed(this, 60_000L)
-            }
+    var connectedAtMs by remember { mutableStateOf<Long?>(null) }
+    var elapsedText by remember { mutableStateOf("0:00") }
+    LaunchedEffect(connectionState) {
+        if (connectionState == ConnectionState.CONNECTED && connectedAtMs == null) {
+            connectedAtMs = System.currentTimeMillis()
         }
-        handler.postDelayed(runnable, 60_000L)
-        onDispose { handler.removeCallbacks(runnable) }
+    }
+    val startMs: Long? = if (sessionStartedAt > 0L) sessionStartedAt else connectedAtMs
+    LaunchedEffect(startMs) {
+        while (startMs != null) {
+            val secs = ((System.currentTimeMillis() - startMs) / 1000L).coerceAtLeast(0L)
+            val h = secs / 3600
+            val m = (secs % 3600) / 60
+            val s = secs % 60
+            elapsedText = if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+            kotlinx.coroutines.delay(1000L)
+        }
     }
 
     Row(
@@ -1040,16 +1048,6 @@ private fun MeetingHeaderHUD(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // LIVE badge
-        Box(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp))
-                .padding(horizontal = 6.dp, vertical = 2.dp)
-        ) {
-            Text(text = stringResource(R.string.meeting_badge_live), style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer)
-        }
-
         // Room name (monospace)
         Text(
             text = roomName,
@@ -1073,9 +1071,12 @@ private fun MeetingHeaderHUD(
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
-        // Clock
-        Text(clockText, style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // Elapsed call duration
+        Text(
+            elapsedText,
+            style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         // Connection state dot
         Box(

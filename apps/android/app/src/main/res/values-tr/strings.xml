@@ -73,7 +73,6 @@
   <string name="meeting_state_kickedTitle">Kaldırıldınız</string>
   <string name="meeting_state_kickedMessage">Bir moderatör sizi bu toplantıdan kaldırdı.</string>
   <string name="meeting_button_backToDashboard">Panoya Dön</string>
-  <string name="meeting_badge_live">CANLI</string>
   <string name="meeting_chat_uploading">Yükleniyor…</string>
   <string name="meeting_chat_placeholder">Bir mesaj yazın…</string>
   <string name="meeting_chat_sharedImage">Paylaşılan görsel</string>
