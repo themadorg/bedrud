@@ -7,6 +7,7 @@ import { getPublicSettings, type PublicSettings } from '#/lib/use-public-setting
 import { useUserStore } from '#/lib/user.store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export const Route = createFileRoute('/auth/register')({ component: RegisterPage })
 
@@ -81,6 +82,7 @@ function RegisterPage() {
         email: res.user.email,
         name: res.user.name,
         provider: res.user.provider,
+        isSuperAdmin: false,
         isAdmin: false,
         accesses: res.user.accesses ?? [],
         avatarUrl: res.user.avatarUrl,
@@ -137,9 +139,7 @@ function RegisterPage() {
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {/* Name */}
         <div className="space-y-1.5">
-          <label htmlFor="reg-name" className="text-sm font-medium">
-            Full name
-          </label>
+          <Label htmlFor="reg-name">Full name</Label>
           <Input
             id="reg-name"
             name="name"
@@ -153,9 +153,7 @@ function RegisterPage() {
 
         {/* Email */}
         <div className="space-y-1.5">
-          <label htmlFor="reg-email" className="text-sm font-medium">
-            Email
-          </label>
+          <Label htmlFor="reg-email">Email</Label>
           <Input
             id="reg-email"
             name="email"
@@ -169,9 +167,7 @@ function RegisterPage() {
 
         {/* Password */}
         <div className="space-y-1.5">
-          <label htmlFor="reg-password" className="text-sm font-medium">
-            Password
-          </label>
+          <Label htmlFor="reg-password">Password</Label>
           <div className="relative">
             <Input
               id="reg-password"
@@ -182,24 +178,24 @@ function RegisterPage() {
               className="pr-10"
               onChange={() => clearField('password')}
             />
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
               tabIndex={-1}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+            </Button>
           </div>
           {fieldErrors.password && <p className="text-xs text-destructive">{fieldErrors.password}</p>}
         </div>
 
         {/* Confirm */}
         <div className="space-y-1.5">
-          <label htmlFor="reg-confirm" className="text-sm font-medium">
-            Confirm password
-          </label>
+          <Label htmlFor="reg-confirm">Confirm password</Label>
           <Input
             id="reg-confirm"
             name="confirm"
@@ -214,10 +210,10 @@ function RegisterPage() {
         {/* Invite token — only shown when required by admin settings */}
         {requiresToken && (
           <div className="space-y-1.5">
-            <label htmlFor="reg-invite" className="text-sm font-medium flex items-center gap-1.5">
+            <Label htmlFor="reg-invite" className="flex items-center gap-1.5">
               <KeyRound className="h-3.5 w-3.5" style={{ color: 'var(--accent-500)' }} />
               Invite token <span className="text-destructive">*</span>
-            </label>
+            </Label>
             <Input
               id="reg-invite"
               name="inviteToken"

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useRouterState } from '@tanstack/react-router'
 import { Camera, Lock, Mic, User } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export const Route = createFileRoute('/dashboard/settings')({
   component: SettingsLayout,
@@ -17,6 +17,11 @@ function SettingsLayout() {
   const { location } = useRouterState()
   const path = location.pathname
 
+  const activeTab =
+    TABS.find((t) =>
+      t.isIndex ? path === '/dashboard/settings' || path === '/dashboard/settings/' : path.startsWith(t.to),
+    )?.to ?? TABS[0].to
+
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="flex items-center justify-between">
@@ -24,26 +29,18 @@ function SettingsLayout() {
       </div>
 
       {/* Tab strip */}
-      <div className="flex gap-px bg-muted p-0.5 w-fit">
-        {TABS.map(({ to, label, icon: Icon, isIndex }) => {
-          const active = isIndex
-            ? path === '/dashboard/settings' || path === '/dashboard/settings/'
-            : path.startsWith(to)
-          return (
-            <Link
-              key={to}
-              to={to}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors',
-                active ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <Icon className="h-3.5 w-3.5 shrink-0" />
-              {label}
-            </Link>
-          )
-        })}
-      </div>
+      <Tabs value={activeTab}>
+        <TabsList>
+          {TABS.map(({ to, label, icon: Icon }) => (
+            <TabsTrigger key={to} value={to} asChild>
+              <Link to={to}>
+                <Icon className="h-3.5 w-3.5 mr-1.5" />
+                {label}
+              </Link>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
       <Outlet />
     </div>

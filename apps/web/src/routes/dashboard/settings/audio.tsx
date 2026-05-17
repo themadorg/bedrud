@@ -5,6 +5,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '#/lib/api'
 import { type NoiseSuppressionMode, useAudioPreferencesStore } from '#/lib/audio-preferences.store'
 import { AudioProcessorService } from '#/lib/audio-processor.service'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 
@@ -270,9 +273,6 @@ function AudioPage() {
         ? 'saved'
         : 'idle'
 
-  const gainPct = (inputGain / 300) * 100
-  const gatePct = noiseGate
-
   return (
     <div className="border bg-card/50">
       {/* ── Row 1: Mode chips + WebRTC toggles ── */}
@@ -283,13 +283,14 @@ function AudioPage() {
             const active = mode === value
             const disabled = value === 'krisp' && !krispSupported
             return (
-              <button
+              <Button
                 type="button"
                 key={value}
+                variant={active ? 'default' : 'secondary'}
                 onClick={() => !disabled && setMode(value)}
                 disabled={disabled}
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                  'rounded-full px-3 py-1.5 text-xs font-medium',
                   active
                     ? 'border-primary/30 bg-primary/10 text-primary'
                     : 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -298,7 +299,7 @@ function AudioPage() {
               >
                 <Icon className="h-3 w-3" />
                 {label}
-              </button>
+              </Button>
             )
           })}
         </div>
@@ -321,34 +322,30 @@ function AudioPage() {
       {/* ── Row 2: Device + Test button ── */}
       <div className="flex flex-wrap items-center gap-3 border-b px-5 py-3">
         {mic.devices.length > 0 && (
-          <select
-            value={mic.deviceId}
-            onChange={(e) => mic.setDeviceId(e.target.value)}
-            disabled={mic.testing}
-            className={cn(
-              'min-w-0 flex-1 border border-input bg-background px-3 py-1.5 text-xs outline-none',
-              mic.testing && 'opacity-50 cursor-not-allowed',
-            )}
-          >
-            {mic.devices.map((d, i) => (
-              <option key={d.deviceId} value={d.deviceId}>
-                {d.label || `Microphone ${i + 1}`}
-              </option>
-            ))}
-          </select>
+          <Select value={mic.deviceId} onValueChange={(v) => mic.setDeviceId(v)} disabled={mic.testing}>
+            <SelectTrigger className={cn('min-w-0 flex-1 text-xs', mic.testing && 'opacity-50')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {mic.devices.map((d, i) => (
+                <SelectItem key={d.deviceId} value={d.deviceId} className="text-xs">
+                  {d.label || `Microphone ${i + 1}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
 
-        <button
+        <Button
           type="button"
+          variant={mic.testing ? 'destructive' : 'default'}
+          size="sm"
           onClick={mic.testing ? mic.stop : mic.start}
-          className={cn(
-            'inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors',
-            mic.testing ? 'bg-destructive/10 text-destructive' : 'bg-primary text-primary-foreground',
-          )}
+          className="shrink-0 gap-1.5"
         >
           {mic.testing ? <MicOff className="h-3 w-3" /> : <Mic className="h-3 w-3" />}
           {mic.testing ? 'Stop' : 'Test mic'}
-        </button>
+        </Button>
 
         {mic.testing && <span className="text-[11px] text-muted-foreground/60">Headphones recommended</span>}
         {mic.error && <span className="text-[11px] text-destructive">{mic.error}</span>}
@@ -371,18 +368,7 @@ function AudioPage() {
             <span className="text-xs font-medium">Gain</span>
             <span className="font-mono text-xs font-semibold tabular-nums text-primary">{inputGain}%</span>
           </div>
-          <input
-            type="range"
-            min={0}
-            max={300}
-            step={1}
-            value={inputGain}
-            onChange={(e) => setInputGain(Number(e.target.value))}
-            className="w-full h-1.5 rounded-full appearance-none cursor-pointer outline-none"
-            style={{
-              background: `linear-gradient(to right, var(--primary) ${gainPct}%, var(--muted) ${gainPct}%)`,
-            }}
-          />
+          <Slider min={0} max={300} step={1} value={[inputGain]} onValueChange={(v) => setInputGain(v[0])} />
           <p className="text-[11px] text-muted-foreground/50">100% = unity gain</p>
         </div>
 
@@ -392,18 +378,7 @@ function AudioPage() {
             <span className="text-xs font-medium">Noise gate</span>
             <span className="font-mono text-xs font-semibold tabular-nums text-primary">{noiseGate}%</span>
           </div>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={noiseGate}
-            onChange={(e) => setNoiseGate(Number(e.target.value))}
-            className="w-full h-1.5 rounded-full appearance-none cursor-pointer outline-none"
-            style={{
-              background: `linear-gradient(to right, var(--primary) ${gatePct}%, var(--muted) ${gatePct}%)`,
-            }}
-          />
+          <Slider min={0} max={100} step={1} value={[noiseGate]} onValueChange={(v) => setNoiseGate(v[0])} />
           <p className="text-[11px] text-muted-foreground/50">0% = disabled</p>
         </div>
       </div>
@@ -418,19 +393,20 @@ function AudioPage() {
         {mutedBeepEnabled && (
           <div className="flex items-center gap-1 border-l pl-4">
             {BEEP_INTERVALS.map(({ value, label }) => (
-              <button
+              <Button
                 type="button"
                 key={value}
+                variant={mutedBeepInterval === value ? 'default' : 'secondary'}
                 onClick={() => setMutedBeepInterval(value)}
                 className={cn(
-                  'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                  'rounded-full px-3 py-1.5 text-xs font-medium',
                   mutedBeepInterval === value
                     ? 'border-primary/30 bg-primary/10 text-primary'
                     : 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',
                 )}
               >
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
         )}

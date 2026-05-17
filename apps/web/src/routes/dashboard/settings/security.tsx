@@ -3,7 +3,10 @@ import { AlertCircle, Check, Loader2, Lock, LogIn } from 'lucide-react'
 import React, { useState } from 'react'
 import { api } from '#/lib/api'
 import { useUserStore } from '#/lib/user.store'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/dashboard/settings/security')({
@@ -69,12 +72,12 @@ function SecurityPage() {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       {/* Password section */}
-      <div className="border bg-card/50">
-        <div className="border-b px-5 py-3">
-          <p className="text-sm font-semibold">Password</p>
-          <p className="text-xs text-muted-foreground">Change your account password</p>
-        </div>
-        <div className="p-5">
+      <Card>
+        <CardHeader className="border-b px-5 py-3">
+          <CardTitle className="text-sm font-semibold">Password</CardTitle>
+          <CardDescription className="text-xs text-muted-foreground">Change your account password</CardDescription>
+        </CardHeader>
+        <CardContent className="p-5">
           {isOAuthOnly ? (
             <div className="flex items-start gap-2.5 border px-3 py-3 text-xs">
               <LogIn className="h-3.5 w-3.5 shrink-0 mt-0.5 text-muted-foreground" />
@@ -86,9 +89,9 @@ function SecurityPage() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="space-y-1.5">
-                <label htmlFor="currentPassword" className="text-xs font-medium text-muted-foreground">
+                <Label htmlFor="currentPassword" className="text-xs font-medium text-muted-foreground">
                   Current password
-                </label>
+                </Label>
                 <Input
                   id="currentPassword"
                   name="currentPassword"
@@ -100,9 +103,9 @@ function SecurityPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label htmlFor="newPassword" className="text-xs font-medium text-muted-foreground">
+                <Label htmlFor="newPassword" className="text-xs font-medium text-muted-foreground">
                   New password
-                </label>
+                </Label>
                 <Input
                   id="newPassword"
                   name="newPassword"
@@ -114,9 +117,9 @@ function SecurityPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label htmlFor="confirmPassword" className="text-xs font-medium text-muted-foreground">
+                <Label htmlFor="confirmPassword" className="text-xs font-medium text-muted-foreground">
                   Confirm new password
-                </label>
+                </Label>
                 <Input
                   id="confirmPassword"
                   name="confirmPassword"
@@ -128,26 +131,22 @@ function SecurityPage() {
                 />
               </div>
               {status && <Alert {...status} />}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="inline-flex items-center gap-1.5 bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
+              <Button type="submit" variant="default" size="sm" disabled={isLoading} className="gap-1.5">
                 {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Lock className="h-3 w-3" />}
                 Update password
-              </button>
+              </Button>
             </form>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Security info */}
-      <div className="border bg-card/50">
-        <div className="border-b px-5 py-3">
-          <p className="text-sm font-semibold">Security info</p>
-          <p className="text-xs text-muted-foreground">Your authentication details</p>
-        </div>
-        <div className="divide-y p-5">
+      <Card>
+        <CardHeader className="border-b px-5 py-3">
+          <CardTitle className="text-sm font-semibold">Security info</CardTitle>
+          <CardDescription className="text-xs text-muted-foreground">Your authentication details</CardDescription>
+        </CardHeader>
+        <CardContent className="divide-y p-5">
           <div className="flex items-center justify-between py-3 first:pt-0">
             <span className="text-xs text-muted-foreground">Auth method</span>
             <span className="text-xs font-medium capitalize">{user?.provider ?? '—'}</span>
@@ -160,8 +159,8 @@ function SecurityPage() {
             <span className="text-xs text-muted-foreground">Two-factor auth</span>
             <span className="text-xs font-medium text-muted-foreground">Not available</span>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

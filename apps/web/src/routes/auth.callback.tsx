@@ -38,7 +38,8 @@ function OAuthCallback() {
           name: me.name,
           provider: me.provider,
           avatarUrl: me.avatarUrl,
-          isAdmin: me.accesses?.includes('superadmin') ?? false,
+          isSuperAdmin: me.accesses?.includes('superadmin') ?? false,
+          isAdmin: (me.accesses?.includes('admin') || me.accesses?.includes('superadmin')) ?? false,
           accesses: me.accesses ?? [],
         }
         setUser(user)

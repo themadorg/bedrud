@@ -9,6 +9,8 @@ import { base64ToBuffer, bufferToBase64 } from '#/lib/webauthn'
 import { OAuthButtons } from '@/components/auth/OAuthButtons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
 
 export const Route = createFileRoute('/auth/login')({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -50,7 +52,8 @@ function LoginPage() {
       email: res.user.email,
       name: res.user.name,
       provider: res.user.provider,
-      isAdmin: res.user.accesses?.includes('superadmin') ?? false,
+      isSuperAdmin: res.user.accesses?.includes('superadmin') ?? false,
+      isAdmin: (res.user.accesses?.includes('admin') || res.user.accesses?.includes('superadmin')) ?? false,
       accesses: res.user.accesses ?? [],
       avatarUrl: res.user.avatarUrl,
     })
@@ -129,9 +132,7 @@ function LoginPage() {
       {/* Email/password form */}
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <div className="space-y-1.5">
-          <label htmlFor="email" className="text-sm font-medium">
-            Email
-          </label>
+          <Label htmlFor="email">Email</Label>
           <Input
             id="email"
             name="email"
@@ -146,9 +147,7 @@ function LoginPage() {
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label htmlFor="password" className="text-sm font-medium">
-              Password
-            </label>
+            <Label htmlFor="password">Password</Label>
           </div>
           <div className="relative">
             <Input
@@ -160,15 +159,17 @@ function LoginPage() {
               className="pr-10"
               onChange={() => setFieldErrors((p) => ({ ...p, password: undefined }))}
             />
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
               tabIndex={-1}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+            </Button>
           </div>
           {fieldErrors.password && <p className="text-xs text-destructive">{fieldErrors.password}</p>}
         </div>
@@ -187,12 +188,10 @@ function LoginPage() {
       {/* Divider — only if alt auth methods exist */}
       {hasAltAuth && (
         <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center">
+          <Separator />
+          <span className="absolute inset-0 flex items-center justify-center">
             <span className="bg-background px-3 text-xs text-muted-foreground">or continue with</span>
-          </div>
+          </span>
         </div>
       )}
 

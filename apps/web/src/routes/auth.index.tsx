@@ -6,6 +6,8 @@ import { useAuthStore } from '#/lib/auth.store'
 import { useUserStore } from '#/lib/user.store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
 
 export const Route = createFileRoute('/auth/')({ component: GuestPage })
 
@@ -39,6 +41,7 @@ function GuestPage() {
         email: res.user.email,
         name: res.user.name,
         provider: res.user.provider,
+        isSuperAdmin: false,
         isAdmin: false,
         accesses: res.user.accesses ?? [],
         avatarUrl: res.user.avatarUrl,
@@ -65,9 +68,7 @@ function GuestPage() {
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
-          <label htmlFor="guest-name" className="text-sm font-medium">
-            Display name
-          </label>
+          <Label htmlFor="guest-name">Display name</Label>
           <Input
             id="guest-name"
             placeholder="What should we call you?"
@@ -98,12 +99,10 @@ function GuestPage() {
 
       {/* Divider */}
       <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t" />
-        </div>
-        <div className="relative flex justify-center">
+        <Separator />
+        <span className="absolute inset-0 flex items-center justify-center">
           <span className="bg-background px-3 text-xs text-muted-foreground">have an account?</span>
-        </div>
+        </span>
       </div>
 
       {/* Auth links */}

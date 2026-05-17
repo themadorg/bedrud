@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouterState } from '@tanstack/react-router'
-import { LayoutDashboard, LogOut, Menu, Radio, Settings, Shield, Users, Video } from 'lucide-react'
+import { Activity, LayoutDashboard, LogOut, Menu, Radio, Settings, Shield, Users, Video } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '#/lib/api'
 import { useAuthStore } from '#/lib/auth.store'
@@ -8,6 +8,7 @@ import type { User } from '#/lib/user.store'
 import { useUserStore } from '#/lib/user.store'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,7 +38,8 @@ export const Route = createFileRoute('/dashboard')({
       email: u.email,
       name: u.name,
       provider: u.provider,
-      isAdmin: u.accesses?.includes('superadmin') ?? false,
+      isSuperAdmin: u.accesses?.includes('superadmin') ?? false,
+      isAdmin: (u.accesses?.includes('admin') || u.accesses?.includes('superadmin')) ?? false,
       accesses: u.accesses ?? [],
       avatarUrl: u.avatarUrl,
     })
@@ -53,6 +55,7 @@ const USER_NAV = [
 
 const ADMIN_NAV = [
   { to: '/dashboard/admin' as const, label: 'Overview', icon: Shield, exact: true },
+  { to: '/dashboard/admin/queue' as const, label: 'Queue', icon: Activity },
   { to: '/dashboard/admin/users' as const, label: 'Users', icon: Users },
   { to: '/dashboard/admin/rooms' as const, label: 'Rooms', icon: Video },
   { to: '/dashboard/admin/settings' as const, label: 'Settings', icon: Settings },
@@ -141,14 +144,16 @@ function SidebarContent({
             <p className="truncate text-xs font-medium">{user?.name ?? '…'}</p>
             <p className="truncate text-[10px] text-muted-foreground">{user?.email ?? ''}</p>
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             type="button"
             onClick={onLogout}
-            className="rounded p-1 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+            className="h-6 w-6 rounded p-1 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
             title="Sign out"
           >
             <LogOut className="h-3 w-3" />
-          </button>
+          </Button>
         </div>
       </div>
     </>
@@ -174,14 +179,16 @@ function MobileNav({ user, onLogout }: { user: User | null; onLogout: () => void
 
   return (
     <>
-      <button
+      <Button
+        variant="ghost"
+        size="icon"
         type="button"
         onClick={() => setOpen(true)}
-        className="lg:hidden p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        className="lg:hidden"
         aria-label="Open navigation"
       >
         <Menu className="h-4 w-4" />
-      </button>
+      </Button>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="left" className="w-52 p-0 flex flex-col">
@@ -223,17 +230,14 @@ function TopBar({ user, onLogout }: { user: User | null; onLogout: () => void })
         <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
-            >
+            <Button variant="ghost" size="icon" type="button" className="rounded-full h-auto w-auto p-0">
               <Avatar className="h-6 w-6">
                 {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
                 <AvatarFallback className="bg-primary text-[9px] font-semibold text-primary-foreground">
                   {initials}
                 </AvatarFallback>
               </Avatar>
-            </button>
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <div className="px-2 py-1.5">
@@ -297,7 +301,8 @@ function DashboardLayout() {
           email: u.email,
           name: u.name,
           provider: u.provider,
-          isAdmin: u.accesses?.includes('superadmin') ?? false,
+          isSuperAdmin: u.accesses?.includes('superadmin') ?? false,
+          isAdmin: (u.accesses?.includes('admin') || u.accesses?.includes('superadmin')) ?? false,
           accesses: u.accesses ?? [],
           avatarUrl: u.avatarUrl,
         })

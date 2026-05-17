@@ -3,7 +3,16 @@ import { AlertCircle, ArrowRight, Radio } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '#/lib/api'
 import { useAuthStore } from '#/lib/auth.store'
+import { useUserStore } from '#/lib/user.store'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
+
+interface AuthResponse {
+  user: { id: string; email: string; name: string; provider: string; accesses: string[] | null; avatarUrl?: string }
+  tokens: { accessToken: string; refreshToken: string }
+}
 
 export const Route = createFileRoute('/')({
   beforeLoad: async () => {
@@ -16,6 +25,8 @@ export const Route = createFileRoute('/')({
 
 function JoinForm() {
   const navigate = useNavigate()
+  const setTokens = useAuthStore((s) => s.setTokens)
+  const setUser = useUserStore((s) => s.setUser)
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
@@ -27,22 +38,44 @@ function JoinForm() {
     setError(null)
     setChecking(true)
     try {
-      await api.post('/api/room/guest-join', { roomName: slug, guestName: '\x00' })
+      const guestName = `Guest-${Math.random().toString(36).slice(2, 6)}`
+      const res = await api.post<AuthResponse>('/api/auth/guest-login', { name: guestName })
+      setTokens(res.tokens, 'ephemeral')
+      setUser({
+        id: res.user.id,
+        email: res.user.email,
+        name: res.user.name,
+        provider: res.user.provider,
+        isSuperAdmin: false,
+        isAdmin: false,
+        accesses: res.user.accesses ?? [],
+        avatarUrl: res.user.avatarUrl,
+      })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      if (msg.startsWith('404')) {
-        setChecking(false)
-        const jsonPart = msg.slice(msg.indexOf(':') + 1).trim()
-        let friendlyMsg = 'Room not found'
-        try {
-          const parsed = JSON.parse(jsonPart) as { error?: string; message?: string }
-          friendlyMsg = parsed.error ?? parsed.message ?? friendlyMsg
-        } catch {
-          /* use default */
-        }
-        setError(friendlyMsg)
-        return
+      const status = parseInt(msg.substring(0, 3), 10)
+      const jsonPart = msg.includes(':') ? msg.slice(msg.indexOf(':') + 1).trim() : ''
+      let parsed: { error?: string; message?: string } = {}
+      try {
+        parsed = JSON.parse(jsonPart)
+      } catch {
+        /* ignore */
       }
+      switch (status) {
+        case 404:
+          setError(parsed.error ?? parsed.message ?? 'Room not found')
+          break
+        case 403:
+          setError(parsed.error?.includes('full') ? 'Room is full' : 'This room is private')
+          break
+        case 410:
+          setError('Room is no longer active')
+          break
+        default:
+          setError(parsed.error ?? parsed.message ?? 'Failed to join room')
+      }
+      setChecking(false)
+      return
     }
     setChecking(false)
     navigate({ to: '/m/$meetId', params: { meetId: slug } })
@@ -57,7 +90,7 @@ function JoinForm() {
         <span className="hidden font-mono text-sm text-muted-foreground/30 select-none whitespace-nowrap sm:block">
           {typeof window !== 'undefined' ? window.location.host : ''}/m/
         </span>
-        <input
+        <Input
           value={code}
           onChange={(e) => {
             setCode(e.target.value)
@@ -66,13 +99,9 @@ function JoinForm() {
           placeholder="your-room"
           autoComplete="off"
           spellCheck={false}
-          className="h-10 flex-1 bg-transparent pl-2 pr-1 font-mono text-sm outline-none placeholder:text-muted-foreground/30 sm:pl-1"
+          className="h-10 flex-1 pl-2 pr-1 font-mono text-sm sm:pl-1 border-none focus-visible:ring-0"
         />
-        <button
-          type="submit"
-          disabled={!code.trim() || checking}
-          className="inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-30"
-        >
+        <Button type="submit" size="sm" disabled={!code.trim() || checking} className="shrink-0 h-7 gap-1">
           {checking ? (
             '…'
           ) : (
@@ -80,7 +109,7 @@ function JoinForm() {
               <span>Join</span> <ArrowRight className="h-3 w-3" />
             </>
           )}
-        </button>
+        </Button>
       </form>
       {error && (
         <div className="flex items-center gap-2 border-l-2 border-destructive bg-destructive/5 px-3 py-2 text-xs text-destructive">
@@ -95,15 +124,11 @@ function JoinForm() {
 function HomePage() {
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
-      {/* Background glow */}
+      {/* Background glow — single radial per DESIGN.md rule */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <div
-          className="hero-blob-a absolute -right-24 -top-24 h-[500px] w-[500px] rounded-full opacity-[0.12] dark:opacity-[0.06] blur-[100px]"
+          className="absolute -right-24 -top-24 h-[500px] w-[500px] rounded-full opacity-[0.12] dark:opacity-[0.06] blur-[100px]"
           style={{ background: 'var(--spotlight-a)' }}
-        />
-        <div
-          className="hero-blob-b absolute -left-20 top-1/3 h-[400px] w-[400px] rounded-full opacity-[0.08] dark:opacity-[0.04] blur-[80px]"
-          style={{ background: 'var(--spotlight-b)' }}
         />
       </div>
 
@@ -117,7 +142,7 @@ function HomePage() {
         </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <span className="hidden h-3 w-px bg-border sm:block" />
+          <Separator orientation="vertical" className="hidden h-3 sm:block" />
           <Link
             to="/auth/login"
             search={{ redirect: undefined }}
@@ -142,9 +167,7 @@ function HomePage() {
             <h1 className="text-3xl font-bold leading-tight tracking-tight sm:text-4xl md:text-5xl">
               Talk to people,
               <br />
-              <span className="bg-gradient-to-r from-primary-700 via-primary-500 to-teal-500 bg-clip-text text-transparent dark:from-primary-300 dark:via-primary-400 dark:to-teal-400">
-                not the platform.
-              </span>
+              <span className="text-primary">not the platform.</span>
             </h1>
             <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
               Self-hosted voice rooms. Share a link, start talking. No account needed to join.
@@ -174,7 +197,7 @@ function HomePage() {
       {/* ── Footer ───────────────────────────────────────────────────────── */}
       <footer className="relative z-10 flex items-center gap-4 border-t px-6 py-3 text-xs text-muted-foreground sm:px-10">
         <span>&copy; {new Date().getFullYear()} Bedrud</span>
-        <span className="h-3 w-px bg-border" />
+        <Separator orientation="vertical" className="h-3" />
         <a
           href="https://bedrud.org/en/docs/getting-started/quickstart/?utm_source=app&utm_medium=footer"
           target="_blank"

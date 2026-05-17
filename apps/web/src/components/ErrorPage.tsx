@@ -1,5 +1,9 @@
 import { Link } from '@tanstack/react-router'
-import { AlertTriangle, ArrowLeft, Home, Radio, Server, WifiOff } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Home, Radio, RefreshCw, Server, WifiOff } from 'lucide-react'
+
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
 /**
@@ -47,6 +51,7 @@ interface ErrorPageProps {
   error?: string
   showHome?: boolean
   showBack?: boolean
+  onRetry?: () => void
   className?: string
 }
 
@@ -88,6 +93,7 @@ export function ErrorPage({
   error,
   showHome = true,
   showBack = true,
+  onRetry,
   className,
 }: ErrorPageProps) {
   const config = VARIANT_CONFIG[variant]
@@ -121,9 +127,9 @@ export function ErrorPage({
 
         {/* Error code badge */}
         {(variant === 'not-found' || parsed?.code) && (
-          <span className="border bg-background px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <Badge variant="outline" className="font-mono text-[10px] font-semibold uppercase tracking-widest">
             {parsed?.code ?? 404}
-          </span>
+          </Badge>
         )}
 
         {/* Text */}
@@ -134,22 +140,24 @@ export function ErrorPage({
 
         {/* Parsed error detail */}
         {parsed?.message && !friendly && (
-          <div className="max-w-md border bg-background px-4 py-3">
+          <Card className="max-w-md px-4 py-3">
             <p className="break-words text-xs text-muted-foreground/80">{parsed.message}</p>
-          </div>
+          </Card>
         )}
 
         {/* Actions */}
         <div className="flex items-center gap-3 pt-2">
+          {onRetry && (
+            <Button variant="default" size="sm" onClick={onRetry}>
+              <RefreshCw className="h-3.5 w-3.5" />
+              Retry
+            </Button>
+          )}
           {showBack && (
-            <button
-              type="button"
-              onClick={() => window.history.back()}
-              className="inline-flex h-9 items-center gap-2 border bg-background px-4 text-sm font-medium transition-colors hover:bg-accent"
-            >
+            <Button variant="outline" size="sm" onClick={() => window.history.back()}>
               <ArrowLeft className="h-3.5 w-3.5" />
               Go back
-            </button>
+            </Button>
           )}
           {showHome && (
             <Link

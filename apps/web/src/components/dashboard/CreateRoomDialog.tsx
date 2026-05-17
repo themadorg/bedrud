@@ -1,4 +1,3 @@
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import {
   AlertCircle,
   ArrowRight,
@@ -15,7 +14,12 @@ import {
   Video,
 } from 'lucide-react'
 import { useState } from 'react'
+
+import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { getErrorMessage } from '@/lib/errors'
 import { cn } from '@/lib/utils'
 
@@ -106,20 +110,18 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="gap-0 overflow-hidden border p-0 max-w-[calc(100vw-2rem)] sm:max-w-md">
-        <VisuallyHidden>
-          <DialogTitle>Create Room</DialogTitle>
-          <DialogDescription>Configure and create a new room</DialogDescription>
-        </VisuallyHidden>
+        <DialogTitle className="sr-only">Create Room</DialogTitle>
+        <DialogDescription className="sr-only">Configure and create a new room</DialogDescription>
         <form onSubmit={handleSubmit}>
           {/* ── Name section ── */}
           <div className="px-6 pt-6 pb-5">
-            <label
+            <Label
               htmlFor="room-name"
               className="text-[10px] tracking-widest uppercase font-semibold text-muted-foreground/50"
             >
               Name
-            </label>
-            <input
+            </Label>
+            <Input
               id="room-name"
               value={name}
               onChange={(e) => {
@@ -133,7 +135,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
               autoComplete="off"
               spellCheck={false}
               autoFocus
-              className="mt-2 w-full bg-transparent font-mono text-xl font-semibold tracking-tight outline-none placeholder:text-muted-foreground/30"
+              className="mt-2 font-mono text-xl font-semibold tracking-tight placeholder:text-muted-foreground/30 px-0"
             />
             <p className="mt-1.5 font-mono text-[11px] text-muted-foreground/50">
               {window.location.host}/m/{displaySlug}
@@ -146,46 +148,49 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
           {/* ── Access section ── */}
           <div className="border-t px-6 py-5">
             <span className="text-[10px] tracking-widest uppercase font-semibold text-muted-foreground/50">Access</span>
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              {/* Private card */}
-              <button
-                type="button"
-                onClick={() => setIsPublic(false)}
-                className={cn(
-                  'flex flex-col items-start gap-1 border p-3 text-left transition-colors',
-                  !isPublic
-                    ? 'border-primary bg-primary/5'
-                    : 'border bg-background text-muted-foreground hover:border-foreground/20',
-                )}
+            <div className="mt-3">
+              <RadioGroup
+                value={isPublic ? 'public' : 'private'}
+                onValueChange={(v) => setIsPublic(v === 'public')}
+                className="grid grid-cols-2 gap-3"
               >
-                <div className="flex items-center gap-2">
-                  <Lock className={cn('h-4 w-4', !isPublic ? 'text-primary' : 'text-muted-foreground/60')} />
-                  <span className={cn('text-sm font-medium', !isPublic ? 'text-primary' : 'text-muted-foreground')}>
-                    Private
-                  </span>
-                </div>
-                <span className="text-[11px] text-muted-foreground/60">Invite only</span>
-              </button>
-
-              {/* Public card */}
-              <button
-                type="button"
-                onClick={() => setIsPublic(true)}
-                className={cn(
-                  'flex flex-col items-start gap-1 border p-3 text-left transition-colors',
-                  isPublic
-                    ? 'border-primary bg-primary/5'
-                    : 'border bg-background text-muted-foreground hover:border-foreground/20',
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <Globe className={cn('h-4 w-4', isPublic ? 'text-primary' : 'text-muted-foreground/60')} />
-                  <span className={cn('text-sm font-medium', isPublic ? 'text-primary' : 'text-muted-foreground')}>
-                    Public
-                  </span>
-                </div>
-                <span className="text-[11px] text-muted-foreground/60">Anyone with link</span>
-              </button>
+                {/* biome-ignore lint/a11y/noLabelWithoutControl: RadioGroupItem renders native radio button */}
+                <label
+                  className={cn(
+                    'flex flex-col items-start gap-1 border p-3 text-left transition-colors cursor-pointer',
+                    !isPublic
+                      ? 'border-primary bg-primary/5'
+                      : 'border bg-background text-muted-foreground hover:border-foreground/20',
+                  )}
+                >
+                  <RadioGroupItem value="private" className="sr-only" />
+                  <div className="flex items-center gap-2">
+                    <Lock className={cn('h-4 w-4', !isPublic ? 'text-primary' : 'text-muted-foreground/60')} />
+                    <span className={cn('text-sm font-medium', !isPublic ? 'text-primary' : 'text-muted-foreground')}>
+                      Private
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground/60">Invite only</span>
+                </label>
+                {/* biome-ignore lint/a11y/noLabelWithoutControl: RadioGroupItem renders native radio button */}
+                <label
+                  className={cn(
+                    'flex flex-col items-start gap-1 border p-3 text-left transition-colors cursor-pointer',
+                    isPublic
+                      ? 'border-primary bg-primary/5'
+                      : 'border bg-background text-muted-foreground hover:border-foreground/20',
+                  )}
+                >
+                  <RadioGroupItem value="public" className="sr-only" />
+                  <div className="flex items-center gap-2">
+                    <Globe className={cn('h-4 w-4', isPublic ? 'text-primary' : 'text-muted-foreground/60')} />
+                    <span className={cn('text-sm font-medium', isPublic ? 'text-primary' : 'text-muted-foreground')}>
+                      Public
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground/60">Anyone with link</span>
+                </label>
+              </RadioGroup>
             </div>
           </div>
 
@@ -199,23 +204,25 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
                 <p className="mt-0.5 text-[11px] text-muted-foreground/60">{maxParticipants} seats</p>
               </div>
               <div className="flex items-center gap-1">
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
+                  size="icon"
                   onClick={() => setMaxParticipants((p) => Math.max(2, p - 5))}
-                  className="flex h-9 w-9 items-center justify-center border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  className="h-9 w-9"
                 >
                   <Minus className="h-3.5 w-3.5" />
-                </button>
+                </Button>
                 <span className="w-10 text-center font-mono text-base font-semibold tabular-nums">
                   {maxParticipants}
                 </span>
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
+                  size="icon"
                   onClick={() => setMaxParticipants((p) => Math.min(500, p + 5))}
-                  className="flex h-9 w-9 items-center justify-center border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  className="h-9 w-9"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -229,20 +236,21 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
               {FEATURES.filter((f) => !f.adminOnly || isAdmin).map(({ key, icon: Icon, label }) => {
                 const active = settings[key]
                 return (
-                  <button
+                  <Button
                     key={key}
                     type="button"
+                    variant={active ? 'default' : 'outline'}
                     onClick={() => toggle(key)}
                     className={cn(
-                      'inline-flex items-center gap-2 border px-3.5 py-2 text-xs font-medium transition-colors',
+                      'gap-2 px-3.5 py-2 text-xs font-medium',
                       active
                         ? 'border-primary/30 bg-primary/10 text-primary'
-                        : 'border bg-background text-muted-foreground hover:border-foreground/20 hover:text-foreground',
+                        : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
                     <Icon className="h-3.5 w-3.5" />
                     {label}
-                  </button>
+                  </Button>
                 )
               })}
             </div>
@@ -258,11 +266,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
 
           {/* ── Action ── */}
           <div className="border-t px-6 py-4">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="flex h-10 w-full items-center justify-center gap-2 bg-primary text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
+            <Button type="submit" disabled={isLoading} className="w-full">
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" /> Creating...
@@ -272,7 +276,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
                   Create & join <ArrowRight className="h-4 w-4" />
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </form>
       </DialogContent>

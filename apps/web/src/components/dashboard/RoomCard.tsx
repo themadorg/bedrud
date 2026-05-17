@@ -14,7 +14,10 @@ import {
   Video,
 } from 'lucide-react'
 import { useState } from 'react'
-import { cn } from '@/lib/utils'
+
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface Room {
   id: string
@@ -54,31 +57,34 @@ export function RoomCard({ room, onJoin, onDelete, onSettings }: Props) {
   }
 
   return (
-    <div className="group flex h-full flex-col border bg-card/90 p-4 transition-all hover:-translate-y-0.5 hover:border-primary/20">
+    <Card className="group flex h-full flex-col p-4 transition-all hover:-translate-y-0.5 hover:border-primary/20">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {room.isActive && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+              <Badge
+                variant="outline"
+                className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 gap-1"
+              >
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                 Live
-              </span>
+              </Badge>
             )}
-            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <Badge variant="outline" className="gap-1">
               {room.isPublic ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
               {room.isPublic ? 'Public' : 'Private'}
-            </span>
+            </Badge>
             {room.settings.e2ee && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-primary">
+              <Badge className="gap-1">
                 <ShieldCheck className="h-3 w-3" />
                 Encrypted
-              </span>
+              </Badge>
             )}
             {room.settings.requireApproval && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              <Badge variant="outline" className="gap-1">
                 <UserCheck className="h-3 w-3" />
                 Approval
-              </span>
+              </Badge>
             )}
           </div>
 
@@ -88,18 +94,18 @@ export function RoomCard({ room, onJoin, onDelete, onSettings }: Props) {
           </p>
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="icon"
           onClick={copyLink}
-          className="flex h-10 w-10 shrink-0 items-center justify-center border bg-background transition-colors hover:bg-accent"
           aria-label="Copy link"
           title={copied ? 'Copied!' : 'Copy invite link'}
         >
           {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4 text-muted-foreground" />}
-        </button>
+        </Button>
       </div>
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+      <CardContent className="mt-4 grid gap-2 p-0 sm:grid-cols-2">
         <div className="border bg-background/70 p-3">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Capacity</p>
           <p className="mt-2 flex items-center gap-2 text-sm font-medium">
@@ -114,64 +120,47 @@ export function RoomCard({ room, onJoin, onDelete, onSettings }: Props) {
             {room.isPublic ? 'Anyone with the link can join.' : 'Only invited participants can enter.'}
           </p>
         </div>
-      </div>
+      </CardContent>
 
-      <div className="mt-4 border bg-background/70 p-3">
+      <CardContent className="mt-4 border bg-background/70 p-3">
         <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Enabled</p>
         <div className="mt-2 flex flex-wrap gap-2">
           {capabilities.length > 0 ? (
             capabilities.map(({ icon: Icon, label }) => (
-              <span
-                key={label}
-                className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground"
-              >
+              <Badge key={label} variant="outline" className="gap-1">
                 <Icon className="h-3.5 w-3.5" />
                 {label}
-              </span>
+              </Badge>
             ))
           ) : (
-            <span className="text-xs text-muted-foreground">No participant features enabled.</span>
+            <p className="text-xs text-muted-foreground">No participant features enabled.</p>
           )}
         </div>
-      </div>
+      </CardContent>
 
       <div className="mt-4 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onJoin}
-          className={cn(
-            'flex h-10 flex-1 items-center justify-center gap-2 px-3 text-sm font-medium transition-opacity hover:opacity-90',
-            room.isActive
-              ? 'bg-primary text-primary-foreground'
-              : 'border border-input bg-background text-foreground hover:bg-accent',
-          )}
-        >
+        <Button variant={room.isActive ? 'default' : 'outline'} onClick={onJoin} className="flex-1">
           {room.isActive ? 'Join live room' : 'Open room'}
           <ArrowRight className="h-4 w-4" />
-        </button>
+        </Button>
 
         {onSettings && (
-          <button
-            type="button"
-            onClick={onSettings}
-            className="flex h-10 w-10 shrink-0 items-center justify-center border bg-background transition-colors hover:bg-accent"
-            aria-label="Room settings"
-            title="Room settings"
-          >
+          <Button variant="outline" size="icon" onClick={onSettings} aria-label="Room settings" title="Room settings">
             <Settings2 className="h-4 w-4 text-muted-foreground" />
-          </button>
+          </Button>
         )}
 
         {onDelete && !confirmDelete && (
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="icon"
             onClick={() => setConfirmDelete(true)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center border border-destructive/30 bg-destructive/10 transition-colors hover:bg-destructive/15"
+            className="border-destructive/30 bg-destructive/10 hover:bg-destructive/15"
             aria-label="Delete room"
             title="Delete room"
           >
             <Trash2 className="h-4 w-4 text-destructive" />
-          </button>
+          </Button>
         )}
       </div>
 
@@ -182,26 +171,22 @@ export function RoomCard({ room, onJoin, onDelete, onSettings }: Props) {
             <p className="text-xs text-destructive/80">This removes the room from the dashboard.</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(false)}
-              className="border border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-            >
+            <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
               Cancel
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
               onClick={() => {
                 onDelete()
                 setConfirmDelete(false)
               }}
-              className="bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground transition-opacity hover:opacity-90"
             >
               Delete
-            </button>
+            </Button>
           </div>
         </div>
       )}
-    </div>
+    </Card>
   )
 }
