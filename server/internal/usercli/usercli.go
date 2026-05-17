@@ -17,41 +17,66 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func PromoteUser(configPath, email string) error {
+func PromoteUser(configPath, email, role string) error {
 	return withUser(configPath, email, func(repo *repository.UserRepository, user *models.User) error {
-		for _, a := range user.Accesses {
-			if a == string(models.AccessSuperAdmin) {
-				fmt.Printf("User %q already has superadmin access.\n", email)
-				return nil
-			}
-		}
-		user.Accesses = append(user.Accesses, string(models.AccessSuperAdmin))
-		if err := repo.UpdateUserAccesses(user.ID, []string(user.Accesses)); err != nil {
+		roleAccesses := roleAccessSlice(role)
+		if err := repo.UpdateUserAccesses(user.ID, roleAccesses); err != nil {
 			return fmt.Errorf("failed to update accesses: %w", err)
 		}
-		fmt.Printf("✓ User %q is now a superadmin.\n", email)
+		fmt.Printf("✓ User %q role set to %s (accesses: %v).\n", email, role, roleAccesses)
 		return nil
 	})
 }
 
-func DemoteUser(configPath, email string) error {
+func DemoteUser(configPath, email, role string) error {
 	return withUser(configPath, email, func(repo *repository.UserRepository, user *models.User) error {
+		if role == "" {
+			role = "superadmin"
+		}
 		filtered := user.Accesses[:0]
 		for _, a := range user.Accesses {
-			if a != string(models.AccessSuperAdmin) {
+			if a != role {
 				filtered = append(filtered, a)
 			}
 		}
 		if len(filtered) == len(user.Accesses) {
-			fmt.Printf("User %q does not have superadmin access.\n", email)
+			fmt.Printf("User %q does not have %q access.\n", email, role)
 			return nil
+		}
+		// Ensure at least "user" access remains
+		hasUser := false
+		for _, a := range filtered {
+			if a == "user" {
+				hasUser = true
+				break
+			}
+		}
+		if !hasUser && len(filtered) == 0 {
+			filtered = append(filtered, "user")
 		}
 		if err := repo.UpdateUserAccesses(user.ID, []string(filtered)); err != nil {
 			return fmt.Errorf("failed to update accesses: %w", err)
 		}
-		fmt.Printf("✓ Removed superadmin from %q.\n", email)
+		fmt.Printf("✓ Removed %q from %q. Current accesses: %v\n", role, email, filtered)
 		return nil
 	})
+}
+
+func roleAccessSlice(role string) []string {
+	switch role {
+	case "superadmin":
+		return []string{"superadmin", "user"}
+	case "admin":
+		return []string{"admin", "user"}
+	case "moderator":
+		return []string{"moderator", "user"}
+	case "user":
+		return []string{"user"}
+	case "guest":
+		return []string{"guest"}
+	default:
+		return []string{"user"}
+	}
 }
 
 func CreateUser(configPath, email, password, name string) error {

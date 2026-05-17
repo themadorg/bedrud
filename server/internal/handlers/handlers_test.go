@@ -572,6 +572,142 @@ func TestUsersHandler_SetUserPassword_Forbidden(t *testing.T) {
 	}
 }
 
+func TestUsersHandler_ListUserSessions_Found(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	uRepo := repository.NewUserRepository(db)
+	rRepo := repository.NewRoomRepository(db)
+	pkRepo := repository.NewPasskeyRepository(db)
+	prRepo := repository.NewUserPreferencesRepository(db)
+	ut := storage.NewChatUploadTracker(db, t.TempDir(), nil)
+	cleanupSvc := testCleanupSvc(t, rRepo, ut)
+	h := testUsersHandler(uRepo, rRepo, pkRepo, prRepo, cleanupSvc)
+
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user", &auth.Claims{UserID: "admin", Accesses: []string{"superadmin"}})
+		return c.Next()
+	})
+	app.Get("/admin/users/:id/sessions", h.ListUserSessions)
+
+	_ = uRepo.CreateUser(&models.User{ID: "session-user", Email: "sess@ex.com", Name: "Session", Provider: "local", IsActive: true})
+	room, _ := rRepo.CreateRoom("session-user", "session-room", false, "standard", 0, &models.RoomSettings{})
+	_ = rRepo.AddParticipant(room.ID, "session-user")
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/users/session-user/sessions?page=1&limit=20", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var result map[string]interface{}
+	_ = json.Unmarshal(body, &result)
+	if result["sessions"] == nil {
+		t.Fatal("expected 'sessions' field")
+	}
+	if result["total"] == nil {
+		t.Fatal("expected 'total' field")
+	}
+	sessions := result["sessions"].([]interface{})
+	if len(sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(sessions))
+	}
+	s := sessions[0].(map[string]interface{})
+	if s["roomName"] != "session-room" {
+		t.Fatalf("expected roomName 'session-room', got %v", s["roomName"])
+	}
+	if s["isActive"] != true {
+		t.Fatal("expected isActive true")
+	}
+}
+
+func TestUsersHandler_ListUserSessions_NotFound(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	uRepo := repository.NewUserRepository(db)
+	rRepo := repository.NewRoomRepository(db)
+	pkRepo := repository.NewPasskeyRepository(db)
+	prRepo := repository.NewUserPreferencesRepository(db)
+	ut := storage.NewChatUploadTracker(db, t.TempDir(), nil)
+	cleanupSvc := testCleanupSvc(t, rRepo, ut)
+	h := testUsersHandler(uRepo, rRepo, pkRepo, prRepo, cleanupSvc)
+
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user", &auth.Claims{UserID: "admin", Accesses: []string{"superadmin"}})
+		return c.Next()
+	})
+	app.Get("/admin/users/:id/sessions", h.ListUserSessions)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/users/nonexistent/sessions", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestUsersHandler_ListUserSessions_Empty(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	uRepo := repository.NewUserRepository(db)
+	rRepo := repository.NewRoomRepository(db)
+	pkRepo := repository.NewPasskeyRepository(db)
+	prRepo := repository.NewUserPreferencesRepository(db)
+	ut := storage.NewChatUploadTracker(db, t.TempDir(), nil)
+	cleanupSvc := testCleanupSvc(t, rRepo, ut)
+	h := testUsersHandler(uRepo, rRepo, pkRepo, prRepo, cleanupSvc)
+
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user", &auth.Claims{UserID: "admin", Accesses: []string{"superadmin"}})
+		return c.Next()
+	})
+	app.Get("/admin/users/:id/sessions", h.ListUserSessions)
+
+	_ = uRepo.CreateUser(&models.User{ID: "alone-user", Email: "alone@ex.com", Name: "Alone", Provider: "local", IsActive: true})
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/users/alone-user/sessions", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var result map[string]interface{}
+	_ = json.Unmarshal(body, &result)
+	sessions := result["sessions"].([]interface{})
+	if len(sessions) != 0 {
+		t.Fatalf("expected 0 sessions, got %d", len(sessions))
+	}
+}
+
+func TestUsersHandler_ListUserSessions_Forbidden(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	uRepo := repository.NewUserRepository(db)
+	rRepo := repository.NewRoomRepository(db)
+	pkRepo := repository.NewPasskeyRepository(db)
+	prRepo := repository.NewUserPreferencesRepository(db)
+	ut := storage.NewChatUploadTracker(db, t.TempDir(), nil)
+	cleanupSvc := testCleanupSvc(t, rRepo, ut)
+	h := testUsersHandler(uRepo, rRepo, pkRepo, prRepo, cleanupSvc)
+
+	app := fiber.New()
+	// Non-superadmin claims
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user", &auth.Claims{UserID: "moderator", Accesses: []string{"moderator"}})
+		return c.Next()
+	})
+	app.Get("/admin/users/:id/sessions", h.ListUserSessions)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/users/any-user/sessions", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", resp.StatusCode)
+	}
+}
+
 func TestUserDetails_Structure(t *testing.T) {
 	d := UserDetails{
 		ID:        "u1",

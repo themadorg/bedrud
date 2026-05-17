@@ -105,7 +105,7 @@ func webpDimensions(data []byte) (width, height int) {
 
 // sniffMime returns the content type of the data, restricted to allowed image types.
 // Returns an error if the type is not a permitted image format.
-func sniffMime(data []byte) (string, error) {
+func SniffMime(data []byte) (string, error) {
 	// WebP detection: RIFF....WEBP (http.DetectContentType does not detect WebP)
 	if len(data) >= 12 &&
 		data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F' &&
@@ -166,7 +166,7 @@ func NewChatUploadStore(cfg *config.ChatUploadConfig) ChatUploadStore {
 type diskStore struct{ dir string }
 
 func (s *diskStore) Store(data []byte) (*ChatAttachment, error) {
-	mime, err := sniffMime(data)
+	mime, err := SniffMime(data)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +201,7 @@ func (s *diskStore) Store(data []byte) (*ChatAttachment, error) {
 type inlineStore struct{}
 
 func (s *inlineStore) Store(data []byte) (*ChatAttachment, error) {
-	mime, err := sniffMime(data)
+	mime, err := SniffMime(data)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +253,7 @@ func (s *s3Store) Store(data []byte) (*ChatAttachment, error) {
 		return (&inlineStore{}).Store(data)
 	}
 
-	mime, err := sniffMime(data)
+	mime, err := SniffMime(data)
 	if err != nil {
 		return nil, err
 	}

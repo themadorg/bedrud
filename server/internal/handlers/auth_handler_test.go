@@ -250,6 +250,33 @@ func TestAuthHandler_GuestLogin_InvalidBody(t *testing.T) {
 	}
 }
 
+func TestAuthHandler_GuestLogin_NullByteName(t *testing.T) {
+	app, _, _ := setupAuthTestApp(t)
+
+	body, _ := json.Marshal(map[string]string{"name": "\x00"})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/guest-login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected %d for null byte name, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+func TestAuthHandler_GuestLogin_NullByteTooShort(t *testing.T) {
+	app, _, _ := setupAuthTestApp(t)
+
+	// "\x00a" has raw length 2, but after sanitization becomes "a" (length 1, below min 2)
+	body, _ := json.Marshal(map[string]string{"name": "\x00a"})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/guest-login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected %d for null-byte-padded short name, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
 func TestAuthHandler_GetMe_Success(t *testing.T) {
 	app, authService, cfg := setupAuthTestApp(t)
 

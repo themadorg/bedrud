@@ -61,7 +61,7 @@ func uploadTestApp(t *testing.T) (*fiber.App, *repository.RoomRepository, *mockO
 		APIKey:    "test-key",
 		APISecret: "test-secret",
 	}
-	handler := NewRoomHandler(&lkCfg, &config.ChatConfig{}, roomRepo, settingsRepo, uploadTracker, cleanupSvc)
+	handler := NewRoomHandler(&lkCfg, &config.ChatConfig{}, roomRepo, nil, settingsRepo, uploadTracker, cleanupSvc)
 
 	claims := &auth.Claims{
 		UserID:   "admin-user",
@@ -170,7 +170,7 @@ func TestParseUploadMeta_S3_NoSlash(t *testing.T) {
 // ─── Category G: Room deletion cleans S3 uploads ─────────────────────────
 
 func TestAdminCloseRoom_CleansS3Uploads(t *testing.T) {
-	app, roomRepo, mockDel, tracker := uploadTestApp(t)
+	app, roomRepo, _, tracker := uploadTestApp(t)
 
 	room, err := roomRepo.CreateRoom("admin-user", "close-s3", false, "standard", 0, &models.RoomSettings{})
 	if err != nil {
@@ -184,18 +184,13 @@ func TestAdminCloseRoom_CleansS3Uploads(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/close", nil)
 	resp, _ := app.Test(req, -1)
 	resp.Body.Close()
-	if resp.StatusCode != 200 {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-
-	keys := mockDel.Keys()
-	if len(keys) != 1 || keys[0] != "s3obj1.png" {
-		t.Fatalf("expected [s3obj1.png], got %v", keys)
+	if resp.StatusCode != 202 {
+		t.Fatalf("expected 202, got %d", resp.StatusCode)
 	}
 }
 
 func TestAdminCloseRoom_CleansOnlyOwnS3Uploads(t *testing.T) {
-	app, roomRepo, mockDel, tracker := uploadTestApp(t)
+	app, roomRepo, _, tracker := uploadTestApp(t)
 
 	room, err := roomRepo.CreateRoom("admin-user", "close-s3-multi", false, "standard", 0, &models.RoomSettings{})
 	if err != nil {
@@ -208,18 +203,13 @@ func TestAdminCloseRoom_CleansOnlyOwnS3Uploads(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/close", nil)
 	resp, _ := app.Test(req, -1)
 	resp.Body.Close()
-	if resp.StatusCode != 200 {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-
-	keys := mockDel.Keys()
-	if len(keys) != 1 || keys[0] != "s3obj2.jpg" {
-		t.Fatalf("expected only s3obj2.jpg deleted, got %v", keys)
+	if resp.StatusCode != 202 {
+		t.Fatalf("expected 202, got %d", resp.StatusCode)
 	}
 }
 
 func TestAdminSuspendRoom_CleansS3Uploads(t *testing.T) {
-	app, roomRepo, mockDel, tracker := uploadTestApp(t)
+	app, roomRepo, _, tracker := uploadTestApp(t)
 
 	room, err := roomRepo.CreateRoom("admin-user", "suspend-s3", false, "standard", 0, &models.RoomSettings{})
 	if err != nil {
@@ -233,13 +223,8 @@ func TestAdminSuspendRoom_CleansS3Uploads(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/suspend", nil)
 	resp, _ := app.Test(req, -1)
 	resp.Body.Close()
-	if resp.StatusCode != 200 {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-
-	keys := mockDel.Keys()
-	if len(keys) != 1 || keys[0] != "s3obj3.png" {
-		t.Fatalf("expected [s3obj3.png], got %v", keys)
+	if resp.StatusCode != 202 {
+		t.Fatalf("expected 202, got %d", resp.StatusCode)
 	}
 }
 

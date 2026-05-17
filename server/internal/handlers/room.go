@@ -3,8 +3,10 @@ package handlers
 import (
 	"bedrud/config"
 	"bedrud/internal/auth"
+	"bedrud/internal/database"
 	"bedrud/internal/lkutil"
 	"bedrud/internal/models"
+	"bedrud/internal/queue"
 	"bedrud/internal/repository"
 	"bedrud/internal/services"
 	"bedrud/internal/storage"
@@ -12,6 +14,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -21,6 +24,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -29,6 +33,15 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/rs/zerolog/log"
 )
+
+// livekitTokenTTL is the validity duration for LiveKit access tokens.
+// LK server auto-refreshes tokens for connected clients (10-min TTL),
+// so this TTL primarily controls:
+//
+//	(a) initial connection gating,
+//	(b) reconnection window after network interruption when auto-refresh is unavailable,
+//	(c) self-hosted token revocation window (kicked users can't rejoin after TTL).
+const livekitTokenTTL = 2 * time.Hour
 
 func boolPtr(b bool) *bool { return &b }
 
@@ -54,19 +67,23 @@ type JoinRoomRequest struct {
 }
 
 type RoomHandler struct {
-	roomRepo      *repository.RoomRepository
-	livekitHost   string
-	apiKey        string
-	apiSecret     string
-	client        livekit.RoomService
-	uploadStore   storage.ChatUploadStore
-	uploadMax     int64
-	uploadTracker *storage.ChatUploadTracker
-	cleanupSvc    *services.RoomCleanupService
-	settingsRepo  *repository.SettingsRepository
+	roomRepo         *repository.RoomRepository
+	userRepo         *repository.UserRepository
+	livekitHost      string
+	apiKey           string
+	apiSecret        string
+	client           livekit.RoomService
+	uploadStore      storage.ChatUploadStore
+	uploadMax        int64
+	uploadTracker    *storage.ChatUploadTracker
+	cleanupSvc       *services.RoomCleanupService
+	settingsRepo     *repository.SettingsRepository
+	deletionInFlight sync.Map
+	uploadBackend    string
+	inlineMaxBytes   int64
 }
 
-func NewRoomHandler(lkCfg *config.LiveKitConfig, chatCfg *config.ChatConfig, roomRepo *repository.RoomRepository, settingsRepo *repository.SettingsRepository, uploadTracker *storage.ChatUploadTracker, cleanupSvc *services.RoomCleanupService) *RoomHandler {
+func NewRoomHandler(lkCfg *config.LiveKitConfig, chatCfg *config.ChatConfig, roomRepo *repository.RoomRepository, userRepo *repository.UserRepository, settingsRepo *repository.SettingsRepository, uploadTracker *storage.ChatUploadTracker, cleanupSvc *services.RoomCleanupService) *RoomHandler {
 	client := lkutil.NewClient(lkCfg)
 
 	uploadMax := chatCfg.Uploads.MaxBytes.Int64()
@@ -74,17 +91,25 @@ func NewRoomHandler(lkCfg *config.LiveKitConfig, chatCfg *config.ChatConfig, roo
 		uploadMax = 10 * 1024 * 1024
 	}
 
+	inlineMaxBytes := chatCfg.Uploads.InlineMaxBytes.Int64()
+	if inlineMaxBytes == 0 {
+		inlineMaxBytes = 512_000 // 500 KB default
+	}
+
 	return &RoomHandler{
-		roomRepo:      roomRepo,
-		livekitHost:   lkCfg.Host,
-		apiKey:        lkCfg.APIKey,
-		apiSecret:     lkCfg.APISecret,
-		client:        client,
-		uploadStore:   storage.NewChatUploadStore(&chatCfg.Uploads),
-		uploadMax:     uploadMax,
-		uploadTracker: uploadTracker,
-		cleanupSvc:    cleanupSvc,
-		settingsRepo:  settingsRepo,
+		roomRepo:       roomRepo,
+		userRepo:       userRepo,
+		livekitHost:    lkCfg.Host,
+		apiKey:         lkCfg.APIKey,
+		apiSecret:      lkCfg.APISecret,
+		client:         client,
+		uploadStore:    storage.NewChatUploadStore(&chatCfg.Uploads),
+		uploadMax:      uploadMax,
+		uploadTracker:  uploadTracker,
+		cleanupSvc:     cleanupSvc,
+		settingsRepo:   settingsRepo,
+		uploadBackend:  chatCfg.Uploads.Backend,
+		inlineMaxBytes: inlineMaxBytes,
 	}
 }
 
@@ -283,6 +308,10 @@ type GuestJoinRoomRequest struct {
 	GuestName string `json:"guestName"`
 }
 
+type RefreshLiveKitTokenRequest struct {
+	RoomName string `json:"roomName"`
+}
+
 func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 	var req GuestJoinRoomRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -290,20 +319,22 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 	}
 	req.RoomName = strings.ToLower(strings.TrimSpace(req.RoomName))
 	req.GuestName = strings.TrimSpace(req.GuestName)
-	if req.GuestName == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "Guest name is required"})
-	}
-	if len(req.GuestName) > 50 {
-		return c.Status(400).JSON(fiber.Map{"error": "Guest name too long (max 50 characters)"})
-	}
 
 	// Sanitize guest name: strip control characters and HTML special chars
+	// Must run before validation to prevent null byte and control char bypass
 	req.GuestName = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || r == '<' || r == '>' || r == '&' || r == '"' || r == '\'' {
 			return -1
 		}
 		return r
 	}, req.GuestName)
+
+	if req.GuestName == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Guest name is required"})
+	}
+	if len(req.GuestName) > 50 {
+		return c.Status(400).JSON(fiber.Map{"error": "Guest name too long (max 50 characters)"})
+	}
 
 	room, err := h.roomRepo.GetRoomByName(req.RoomName)
 	if err != nil {
@@ -356,6 +387,60 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 		"id": room.ID, "name": room.Name, "token": token, "adminId": adminId,
 		"livekitHost": h.livekitHost,
 	})
+}
+
+func (h *RoomHandler) RefreshLiveKitToken(c *fiber.Ctx) error {
+	var req RefreshLiveKitTokenRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid body"})
+	}
+	req.RoomName = strings.ToLower(strings.TrimSpace(req.RoomName))
+	if req.RoomName == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "roomName required"})
+	}
+
+	claims := c.Locals("user").(*auth.Claims)
+
+	room, err := h.roomRepo.GetRoomByName(req.RoomName)
+	if err != nil {
+		log.Error().Err(err).Str("room", req.RoomName).Msg("Failed to look up room")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to look up room"})
+	}
+	if room == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Room not found"})
+	}
+	if !room.IsActive {
+		return c.Status(fiber.StatusGone).JSON(fiber.Map{"error": "room is no longer active"})
+	}
+
+	// Enforce private room access — only creator or approved participants can refresh
+	if !room.IsPublic && room.CreatedBy != claims.UserID {
+		isParticipant, err := h.roomRepo.IsParticipant(room.ID, claims.UserID)
+		if err != nil {
+			log.Error().Err(err).Str("roomID", room.ID).Str("userID", claims.UserID).Msg("Failed to check room access")
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to check room access"})
+		}
+		if !isParticipant {
+			banned, err := h.roomRepo.IsParticipantBanned(room.ID, claims.UserID)
+			if err == nil && banned {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "you are banned from this room"})
+			}
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "This room is private"})
+		}
+	}
+
+	at := lkauth.NewAccessToken(h.apiKey, h.apiSecret)
+	at.AddGrant(&lkauth.VideoGrant{RoomJoin: true, Room: req.RoomName, CanUpdateOwnMetadata: boolPtr(false)}).SetIdentity(claims.UserID).SetName(claims.Name).SetValidFor(livekitTokenTTL) //nolint:staticcheck
+	if meta, err := json.Marshal(map[string]interface{}{"accesses": claims.Accesses}); err == nil {
+		at.SetMetadata(string(meta))
+	}
+	token, err := at.ToJWT()
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to sign LiveKit refresh token")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to generate token"})
+	}
+
+	return c.JSON(fiber.Map{"token": token})
 }
 
 func generateShortID() string {
@@ -762,6 +847,19 @@ func (h *RoomHandler) KickParticipant(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
+// @Summary Delete room
+// @Description Delete a room you created. Enqueues room deletion and returns immediately.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Security BearerAuth
+// @Success 202 {object} map[string]interface{} "Deletion queued"
+// @Failure 403 {object} ErrorResponse "Not the room creator"
+// @Failure 404 {object} ErrorResponse "Room not found"
+// @Failure 409 {object} ErrorResponse "Deletion already in progress"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /room/{roomId} [delete]
 func (h *RoomHandler) DeleteRoom(c *fiber.Ctx) error {
 	roomID := c.Params("roomId")
 	claims := c.Locals("user").(*auth.Claims)
@@ -778,16 +876,23 @@ func (h *RoomHandler) DeleteRoom(c *fiber.Ctx) error {
 		return c.Status(403).JSON(fiber.Map{"error": "Only the room creator can delete this room"})
 	}
 
-	opts := services.CascadeDeleteOptions{
+	if _, loaded := h.deletionInFlight.LoadOrStore(roomID, true); loaded {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Deletion already in progress"})
+	}
+
+	payload := queue.RoomDeletePayload{
+		RoomID:        roomID,
 		SystemEvent:   "room_ended",
 		SystemMessage: "The meeting has been ended by the creator",
 	}
-	if err := h.cleanupSvc.CascadeDeleteRoom(c.Context(), room, opts); err != nil {
-		log.Error().Err(err).Str("roomId", roomID).Msg("Failed to delete room")
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete room"})
+	if err := queue.Enqueue(context.Background(), database.GetDB(), "room_delete", payload,
+		queue.WithPriority(1), queue.WithMaxAttempts(3)); err != nil {
+		h.deletionInFlight.Delete(roomID)
+		log.Error().Err(err).Str("roomId", roomID).Msg("Failed to enqueue room deletion")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to queue deletion"})
 	}
 
-	return c.JSON(fiber.Map{"status": "success"})
+	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"message": "Room deletion queued"})
 }
 
 func (h *RoomHandler) MuteParticipant(c *fiber.Ctx) error {
@@ -980,19 +1085,196 @@ func (h *RoomHandler) UpdateSettings(c *fiber.Ctx) error {
 }
 
 func (h *RoomHandler) AdminListRooms(c *fiber.Ctx) error {
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 50)
-	rooms, total, err := h.roomRepo.GetAllRoomsPaginated(repository.PaginationParams{Page: page, Limit: limit})
+	p := repository.RoomFilterParams{
+		Page:   c.QueryInt("page", 1),
+		Limit:  c.QueryInt("limit", 50),
+		Search: c.Query("q"),
+	}
+
+	// Parse multi-value visibility
+	if vis := c.Query("visibility"); vis != "" {
+		p.Visibility = strings.Split(vis, ",")
+		for _, v := range p.Visibility {
+			if v != "public" && v != "private" {
+				return c.Status(400).JSON(fiber.Map{"error": "Invalid visibility: " + v})
+			}
+		}
+	}
+
+	// Parse status
+	if st := c.Query("status"); st != "" {
+		p.Status = strings.Split(st, ",")
+		for _, v := range p.Status {
+			if v != "active" && v != "suspended" {
+				return c.Status(400).JSON(fiber.Map{"error": "Invalid status: " + v})
+			}
+		}
+	}
+
+	// Parse occupancy (filters on actual participant count)
+	p.Occupancy = c.Query("occupancy")
+	if p.Occupancy != "" {
+		validOcc := map[string]bool{"empty": true, "1-5": true, "6-20": true, "20+": true}
+		if !validOcc[p.Occupancy] {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid occupancy filter"})
+		}
+	}
+
+	// Parse capacity (legacy, on max_participants)
+	if p.Occupancy == "" {
+		p.Capacity = c.Query("capacity")
+		if p.Capacity != "" {
+			validCaps := map[string]bool{"empty": true, "1-5": true, "6-20": true, "20+": true}
+			if !validCaps[p.Capacity] {
+				return c.Status(400).JSON(fiber.Map{"error": "Invalid capacity filter"})
+			}
+		}
+	}
+
+	// Parse created
+	p.Created = c.Query("created")
+	if p.Created != "" {
+		validDurations := map[string]bool{"today": true, "7d": true, "30d": true}
+		if !validDurations[p.Created] {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid created filter"})
+		}
+	}
+
+	// Parse new filters
+	p.Owner = c.Query("owner")
+	p.DateFrom = c.Query("dateFrom")
+	p.DateTo = c.Query("dateTo")
+	p.LastActivityFrom = c.Query("lastActivityFrom")
+	p.LastActivityTo = c.Query("lastActivityTo")
+
+	// Parse sort/order
+	p.Sort = c.Query("sort", "createdAt")
+	p.Order = c.Query("order", "desc")
+	validSorts := map[string]bool{
+		"name": true, "createdAt": true, "maxParticipants": true,
+		"participantsCount": true, "lastActivityAt": true, "createdBy": true,
+	}
+	if !validSorts[p.Sort] {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid sort field"})
+	}
+	if p.Order != "asc" && p.Order != "desc" {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid order, must be asc or desc"})
+	}
+
+	// Clamp limit
+	if p.Limit <= 0 || p.Limit > 100 {
+		p.Limit = 50
+	}
+
+	rooms, total, err := h.roomRepo.GetAllRoomsFiltered(p)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch rooms"})
 	}
-	return c.JSON(fiber.Map{"rooms": rooms, "total": total, "page": page, "limit": limit})
+
+	// Enrich with computed fields (participants count, owner names, last activity)
+	enriched, err := h.roomRepo.EnrichAdminRoomDetails(rooms)
+	if err != nil {
+		// Non-fatal — log and return basic rooms
+		return c.JSON(fiber.Map{"rooms": rooms, "total": total, "page": p.Page, "limit": p.Limit})
+	}
+
+	return c.JSON(fiber.Map{"rooms": enriched, "total": total, "page": p.Page, "limit": p.Limit})
+}
+
+// GetAdminStats returns aggregate system statistics for the admin dashboard KPI strip.
+func (h *RoomHandler) GetAdminStats(c *fiber.Ctx) error {
+	now := time.Now()
+	dayAgo := now.Add(-24 * time.Hour)
+	weekAgo := now.Add(-7 * 24 * time.Hour)
+
+	totalRooms, err := h.roomRepo.CountRooms()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count rooms"})
+	}
+
+	activeRooms, err := h.roomRepo.CountActiveRooms()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count active rooms"})
+	}
+
+	privateRooms, err := h.roomRepo.CountPrivateRooms()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count private rooms"})
+	}
+
+	publicRooms, err := h.roomRepo.CountPublicRooms()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count public rooms"})
+	}
+
+	emptyRooms, err := h.roomRepo.CountEmptyRooms()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count empty rooms"})
+	}
+
+	roomsLast24h, err := h.roomRepo.CountRoomsSince(dayAgo)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count rooms since"})
+	}
+
+	roomsLast7d, err := h.roomRepo.CountRoomsSince(weekAgo)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count rooms since"})
+	}
+
+	avgUsersPerRoom, err := h.roomRepo.AvgParticipantsPerRoom()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to compute avg participants"})
+	}
+
+	onlineUsers, err := h.roomRepo.CountActiveParticipants()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count active participants"})
+	}
+
+	totalUsers, err := h.userRepo.CountUsers()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count users"})
+	}
+
+	staleRooms, err := h.roomRepo.CountStaleRooms(48)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to count stale rooms"})
+	}
+
+	return c.JSON(fiber.Map{
+		"totalRooms":        totalRooms,
+		"activeRooms":       activeRooms,
+		"privateRooms":      privateRooms,
+		"publicRooms":       publicRooms,
+		"emptyRooms":        emptyRooms,
+		"flaggedRooms":      0,
+		"pendingActions":    0,
+		"roomsLast24h":      roomsLast24h,
+		"roomsLast7d":       roomsLast7d,
+		"avgUsersPerRoom":   avgUsersPerRoom,
+		"onlineUsers":       onlineUsers,
+		"totalUsers":        totalUsers,
+		"staleRooms":        staleRooms,
+		"moderationFlags":   0,
+	})
 }
 
 func (h *RoomHandler) AdminGenerateToken(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{"error": "not yet implemented"})
 }
 
+// @Summary Close room (admin)
+// @Description Permanently delete a room by ID. Enqueues room deletion and returns immediately.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Security BearerAuth
+// @Success 202 {object} map[string]interface{} "Deletion queued"
+// @Failure 404 {object} ErrorResponse "Room not found"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /admin/rooms/{roomId}/close [post]
 func (h *RoomHandler) AdminCloseRoom(c *fiber.Ctx) error {
 	roomID := c.Params("roomId")
 	room, err := h.roomRepo.GetRoom(roomID)
@@ -1002,17 +1284,38 @@ func (h *RoomHandler) AdminCloseRoom(c *fiber.Ctx) error {
 	if room == nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Room not found"})
 	}
-	opts := services.CascadeDeleteOptions{
+
+	if _, loaded := h.deletionInFlight.LoadOrStore(roomID, true); loaded {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Deletion already in progress"})
+	}
+
+	payload := queue.RoomDeletePayload{
+		RoomID:        roomID,
 		SystemEvent:   "room_closed",
 		SystemMessage: "This room has been closed by an administrator",
 	}
-	if err := h.cleanupSvc.CascadeDeleteRoom(c.Context(), room, opts); err != nil {
-		log.Error().Err(err).Str("roomId", roomID).Msg("Failed to close room")
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to close room"})
+	if err := queue.Enqueue(context.Background(), database.GetDB(), "room_delete", payload,
+		queue.WithPriority(1), queue.WithMaxAttempts(3)); err != nil {
+		h.deletionInFlight.Delete(roomID)
+		log.Error().Err(err).Str("roomId", roomID).Msg("Failed to enqueue room deletion")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to queue deletion"})
 	}
-	return c.JSON(fiber.Map{"status": "success"})
+
+	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"message": "Room close queued"})
 }
 
+// @Summary Suspend room (admin)
+// @Description Suspend a room, ending all active calls but preserving room data. Enqueues suspension and returns immediately.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Security BearerAuth
+// @Success 202 {object} map[string]interface{} "Suspension queued"
+// @Failure 400 {object} ErrorResponse "Room already inactive"
+// @Failure 404 {object} ErrorResponse "Room not found"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /admin/rooms/{roomId}/suspend [post]
 func (h *RoomHandler) AdminSuspendRoom(c *fiber.Ctx) error {
 	roomID := c.Params("roomId")
 	room, err := h.roomRepo.GetRoom(roomID)
@@ -1025,11 +1328,17 @@ func (h *RoomHandler) AdminSuspendRoom(c *fiber.Ctx) error {
 	if !room.IsActive {
 		return c.Status(400).JSON(fiber.Map{"error": "Room is not active"})
 	}
-	if err := h.cleanupSvc.SuspendRoom(c.Context(), room); err != nil {
-		log.Error().Err(err).Str("roomId", roomID).Msg("Failed to suspend room")
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to suspend room"})
+
+	payload := queue.RoomSuspendPayload{
+		RoomID: roomID,
 	}
-	return c.JSON(fiber.Map{"status": "success"})
+	if err := queue.Enqueue(context.Background(), database.GetDB(), "room_suspend", payload,
+		queue.WithPriority(2), queue.WithMaxAttempts(3)); err != nil {
+		log.Error().Err(err).Str("roomId", roomID).Msg("Failed to enqueue room suspension")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to queue suspension"})
+	}
+
+	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"message": "Room suspension queued"})
 }
 
 func (h *RoomHandler) AdminReactivateRoom(c *fiber.Ctx) error {
@@ -1337,6 +1646,38 @@ func (h *RoomHandler) UploadChatImage(c *fiber.Ctx) error {
 	}
 	// If DecodeConfig fails, it's potentially not an image; let the storage backend decide
 
+	// For S3 backend with files above the inline threshold, enqueue async upload
+	// instead of blocking the HTTP request on an S3 PUT.
+	if h.uploadBackend == "s3" && int64(len(data)) > h.inlineMaxBytes {
+		// Determine MIME type for the payload
+		mime, err := storage.SniffMime(data)
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+		}
+
+		payload := queue.ChatUploadS3Payload{
+			Data:     base64.StdEncoding.EncodeToString(data),
+			RoomID:   roomID,
+			MimeType: mime,
+			UserID:   claims.UserID,
+		}
+		if err := queue.Enqueue(context.Background(), database.GetDB(), "chat_upload_s3", payload); err != nil {
+			log.Error().Err(err).Str("roomID", roomID).Msg("Failed to enqueue chat upload")
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to queue upload"})
+		}
+
+		log.Info().Str("roomID", roomID).Str("userID", claims.UserID).
+			Int("bytes", len(data)).Str("mime", mime).
+			Msg("chat upload enqueued for async S3 upload")
+		return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
+			"status":   "upload_queued",
+			"job_type": "chat_upload_s3",
+			"size":     len(data),
+			"mime":     mime,
+		})
+	}
+
+	// Sync path for disk/hybrid/inline or small S3 files
 	attachment, err := h.uploadStore.Store(data)
 	if err != nil {
 		log.Warn().Err(err).Str("roomId", roomID).Msg("Chat image upload failed")
@@ -1403,6 +1744,87 @@ func (h *RoomHandler) AdminMuteParticipant(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
+// ListRoomEvents returns paginated room events.
+// @Summary List room events
+// @Description Get a paginated list of room activity events (room created, user joined) (requires superadmin access)
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(50)
+// @Param q query string false "Search by room name or user name"
+// @Param type query string false "Comma-separated event types: room_created,room_joined"
+// @Param dateFrom query string false "Start date (YYYY-MM-DD)"
+// @Param dateTo query string false "End date (YYYY-MM-DD)"
+// @Param order query string false "Sort direction: asc, desc" default(desc)
+// @Success 200 {object} map[string]interface{} "{events, total, page, limit}"
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /admin/rooms/events [get]
+func (h *RoomHandler) ListRoomEvents(c *fiber.Ctx) error {
+	p := repository.RoomEventsFilterParams{
+		Page:   c.QueryInt("page", 1),
+		Limit:  c.QueryInt("limit", 50),
+		Search: c.Query("q"),
+	}
+
+	// Parse event types
+	if types := c.Query("type"); types != "" {
+		p.Types = strings.Split(types, ",")
+		validTypes := map[string]bool{"room_created": true, "room_joined": true}
+		for _, v := range p.Types {
+			if !validTypes[v] {
+				return c.Status(400).JSON(fiber.Map{"error": "Invalid event type: " + v})
+			}
+		}
+	}
+
+	// Date range — validate format
+	p.DateFrom = c.Query("dateFrom")
+	p.DateTo = c.Query("dateTo")
+	if p.DateFrom != "" {
+		if _, err := time.Parse("2006-01-02", p.DateFrom); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid dateFrom format, expected YYYY-MM-DD"})
+		}
+	}
+	if p.DateTo != "" {
+		if _, err := time.Parse("2006-01-02", p.DateTo); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid dateTo format, expected YYYY-MM-DD"})
+		}
+	}
+
+	// Order
+	p.Order = c.Query("order", "desc")
+	if p.Order != "asc" && p.Order != "desc" {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid order, must be asc or desc"})
+	}
+
+	// Clamp limit
+	if p.Limit <= 0 || p.Limit > 100 {
+		p.Limit = 50
+	}
+
+	// Clamp page
+	if p.Page <= 0 {
+		p.Page = 1
+	}
+
+	events, total, err := h.roomRepo.GetRoomEventsFiltered(p)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch room events"})
+	}
+
+	return c.JSON(fiber.Map{
+		"events": events,
+		"total":  total,
+		"page":   p.Page,
+		"limit":  p.Limit,
+	})
+}
+
 // detectUploadBackend classifies a chat upload URL into a storage backend type.
 // Used to populate ChatUpload.StorageBackend for cleanup routing.
 func detectUploadBackend(url string) string {
@@ -1433,6 +1855,135 @@ func mimeExtension(mime string) string {
 // parseUploadMeta extracts the content hash, file extension, and storage backend
 // from a chat upload result. For inline uploads, hash is computed from data
 // since the URL doesn't contain a filename.
+// BulkSuspendRooms enqueues suspension for multiple rooms.
+// Reports per-ID errors: "room not found", "already suspended", or queue failures.
+// @Summary Bulk suspend rooms
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param request body BulkIDsRequest true "Room IDs to suspend"
+// @Success 202 {object} BulkResult
+// @Router /admin/rooms/bulk/suspend [post]
+func (h *RoomHandler) BulkSuspendRooms(c *fiber.Ctx) error {
+	var req BulkIDsRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
+	}
+	if len(req.IDs) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "No room IDs provided"})
+	}
+	if len(req.IDs) > 500 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Maximum 500 rooms per request"})
+	}
+
+	rooms, err := h.roomRepo.GetRoomsByIDs(req.IDs)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch rooms"})
+	}
+
+	roomByID := make(map[string]*models.Room, len(rooms))
+	for _, r := range rooms {
+		roomByID[r.ID] = &r
+	}
+
+	results := make(map[string]BulkItemResult, len(req.IDs))
+	processed := 0
+	failed := 0
+
+	for _, id := range req.IDs {
+		r, found := roomByID[id]
+		if !found {
+			results[id] = BulkItemResult{Success: false, Error: "room not found"}
+			failed++
+			continue
+		}
+		if !r.IsActive {
+			results[id] = BulkItemResult{Success: true, Name: r.Name}
+			processed++
+			continue
+		}
+		payload := queue.RoomSuspendPayload{RoomID: r.ID}
+		if err := queue.Enqueue(context.Background(), database.GetDB(), "room_suspend", payload,
+			queue.WithPriority(2), queue.WithMaxAttempts(3)); err != nil {
+			results[id] = BulkItemResult{Success: false, Name: r.Name, Error: err.Error()}
+			failed++
+		} else {
+			results[id] = BulkItemResult{Success: true, Name: r.Name}
+			processed++
+		}
+	}
+
+	return c.Status(fiber.StatusAccepted).JSON(BulkResult{
+		Results:        results,
+		TotalProcessed: processed,
+		TotalFailed:    failed,
+	})
+}
+
+// BulkCloseRooms enqueues deletion for multiple rooms.
+// Reports per-ID errors: "room not found" or queue failures.
+// @Summary Bulk close rooms
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param request body BulkIDsRequest true "Room IDs to close"
+// @Success 202 {object} BulkResult
+// @Router /admin/rooms/bulk/close [post]
+func (h *RoomHandler) BulkCloseRooms(c *fiber.Ctx) error {
+	var req BulkIDsRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
+	}
+	if len(req.IDs) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "No room IDs provided"})
+	}
+	if len(req.IDs) > 500 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Maximum 500 rooms per request"})
+	}
+
+	rooms, err := h.roomRepo.GetRoomsByIDs(req.IDs)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch rooms"})
+	}
+
+	roomByID := make(map[string]*models.Room, len(rooms))
+	for _, r := range rooms {
+		roomByID[r.ID] = &r
+	}
+
+	results := make(map[string]BulkItemResult, len(req.IDs))
+	processed := 0
+	failed := 0
+
+	for _, id := range req.IDs {
+		r, found := roomByID[id]
+		if !found {
+			results[id] = BulkItemResult{Success: false, Error: "room not found"}
+			failed++
+			continue
+		}
+		payload := queue.RoomDeletePayload{
+			RoomID:        r.ID,
+			SystemEvent:   "room_ended",
+			SystemMessage: "Room closed by administrator",
+		}
+		if err := queue.Enqueue(context.Background(), database.GetDB(), "room_delete", payload,
+			queue.WithPriority(1), queue.WithMaxAttempts(3)); err != nil {
+			results[id] = BulkItemResult{Success: false, Name: r.Name, Error: err.Error()}
+			failed++
+		} else {
+			results[id] = BulkItemResult{Success: true, Name: r.Name}
+			processed++
+		}
+	}
+
+	return c.Status(fiber.StatusAccepted).JSON(BulkResult{
+		Results:        results,
+		TotalProcessed: processed,
+		TotalFailed:    failed,
+	})
+}
+
 func parseUploadMeta(url, mime string, data []byte) (hash, ext, backend string) {
 	backend = detectUploadBackend(url)
 	switch backend {
