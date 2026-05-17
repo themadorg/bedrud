@@ -32,6 +32,7 @@ interface JoinResponse {
   token: string
   livekitHost: string
   adminId: string
+  sessionStartedAt?: number
 }
 
 export const Route = createFileRoute('/m/$meetId')({
@@ -352,7 +353,7 @@ function MeetingPage() {
     )
   }
 
-  const { id, token, livekitHost: wsUrl, name: roomName, adminId } = joinData
+  const { id, token, livekitHost: wsUrl, name: roomName, adminId, sessionStartedAt } = joinData
 
   if (wasKicked) {
     return <ErrorPage variant="kicked" showBack={false} />
@@ -450,7 +451,7 @@ function MeetingPage() {
               }}
             />
 
-            <MeetingHeader meetId={meetId} />
+            <MeetingHeader meetId={meetId} sessionStartedAt={sessionStartedAt} />
 
             {/* Side panels */}
             <MeetingPanels navigate={() => navigate({ to: '/dashboard' })} />

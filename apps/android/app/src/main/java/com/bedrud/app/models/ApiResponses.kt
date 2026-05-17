@@ -104,7 +104,9 @@ data class JoinRoomResponse(
     @SerializedName("expiresAt")
     val expiresAt: String,
     val settings: RoomSettings,
-    val mode: String
+    val mode: String,
+    @SerializedName("sessionStartedAt")
+    val sessionStartedAt: Long = 0L
 )
 
 data class UserRoomResponse(

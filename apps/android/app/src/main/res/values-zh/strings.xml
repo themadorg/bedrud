@@ -73,7 +73,6 @@
   <string name="meeting_state_kickedTitle">您已被移出</string>
   <string name="meeting_state_kickedMessage">管理员已将您移出此会议。</string>
   <string name="meeting_button_backToDashboard">返回仪表盘</string>
-  <string name="meeting_badge_live">直播</string>
   <string name="meeting_chat_uploading">上传中…</string>
   <string name="meeting_chat_placeholder">输入消息…</string>
   <string name="meeting_chat_sharedImage">分享的图片</string>

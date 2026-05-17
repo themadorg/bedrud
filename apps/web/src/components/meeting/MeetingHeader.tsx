@@ -1,25 +1,43 @@
 import { useConnectionState } from '@livekit/components-react'
 import { ConnectionState } from 'livekit-client'
-import { Radio } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface MeetingHeaderProps {
   meetId: string
+  /** Epoch ms when the LiveKit session was created on the server. 0/undefined means this user is the first joiner — fall back to local connect time. */
+  sessionStartedAt?: number
 }
 
-/** Top-of-screen header showing live indicator, room name, clock, and connection status. */
-export function MeetingHeader({ meetId }: MeetingHeaderProps) {
+function formatElapsed(ms: number): string {
+  const secs = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  const s = secs % 60
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
+}
+
+export function MeetingHeader({ meetId, sessionStartedAt }: MeetingHeaderProps) {
   const state = useConnectionState()
-  const [time, setTime] = useState(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+  const isConnected = state === ConnectionState.Connected
+  const connectedAtRef = useRef<number | null>(null)
+  const [elapsed, setElapsed] = useState('0:00')
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
-    }, 10_000)
-    return () => clearInterval(id)
-  }, [])
+    if (isConnected && connectedAtRef.current == null) {
+      connectedAtRef.current = Date.now()
+    }
+  }, [isConnected])
 
-  const isConnected = state === ConnectionState.Connected
+  useEffect(() => {
+    const tick = () => {
+      const start = sessionStartedAt && sessionStartedAt > 0 ? sessionStartedAt : connectedAtRef.current
+      if (start != null) setElapsed(formatElapsed(Date.now() - start))
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [sessionStartedAt])
 
   return (
     <header
@@ -31,26 +49,9 @@ export function MeetingHeader({ meetId }: MeetingHeaderProps) {
       }}
     >
       <div className="flex items-center gap-2.5" style={{ pointerEvents: 'auto' }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 5,
-            background: 'color-mix(in oklab, var(--accent-400) 20%, transparent)',
-            border: '1px solid color-mix(in oklab, var(--accent-400) 40%, transparent)',
-            borderRadius: 7,
-            padding: '3px 9px',
-          }}
-        >
-          <Radio size={11} style={{ color: 'var(--accent-400)' }} />
-          <span style={{ color: 'var(--accent-300)', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em' }}>
-            LIVE
-          </span>
-        </div>
-        <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13 }}>·</span>
         <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12, fontFamily: 'monospace' }}>{meetId}</span>
         <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13 }}>·</span>
-        <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11, fontFamily: 'monospace' }}>{time}</span>
+        <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11, fontFamily: 'monospace' }}>{elapsed}</span>
         <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13 }}>·</span>
         <div
           style={{
