@@ -10,20 +10,42 @@ import com.bedrud.app.core.api.TokenAuthenticator
 import com.bedrud.app.core.auth.AuthManager
 import com.bedrud.app.core.auth.PasskeyManager
 import com.bedrud.app.core.livekit.RoomManager
+import com.bedrud.app.core.ssl.CertificateInfo
+import com.bedrud.app.core.ssl.CertificateManager
+import com.bedrud.app.core.ssl.CertificateStore
 import com.bedrud.app.models.HealthResponse
+import com.bedrud.app.models.Instance
 import com.google.gson.GsonBuilder
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.X509TrustManager
+
+sealed class CheckHealthResult {
+    data class Trusted(val health: HealthResponse) : CheckHealthResult()
+    data class Captured(val health: HealthResponse, val certInfo: CertificateInfo, val tempCertId: String) : CheckHealthResult()
+    data class Error(val message: String) : CheckHealthResult()
+}
+
+sealed class RenewalResult {
+    data class Captured(val info: CertificateInfo, val tempCertId: String) : RenewalResult()
+    data class Error(val message: String) : RenewalResult()
+}
 
 class InstanceManager(
     private val application: Application,
-    val store: InstanceStore
+    val store: InstanceStore,
+    private val certificateStore: CertificateStore
 ) {
     private val _authManager = MutableStateFlow<AuthManager?>(null)
     val authManager: StateFlow<AuthManager?> = _authManager.asStateFlow()
@@ -42,6 +64,11 @@ class InstanceManager(
 
     private val _adminApi = MutableStateFlow<AdminApi?>(null)
     val adminApi: StateFlow<AdminApi?> = _adminApi.asStateFlow()
+
+    private val pendingCerts = ConcurrentHashMap<String, java.security.cert.X509Certificate>()
+
+    private val _certificateNeedRenewal = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val certificateNeedRenewal: SharedFlow<Unit> = _certificateNeedRenewal.asSharedFlow()
 
     init {
         rebuild()
@@ -62,11 +89,24 @@ class InstanceManager(
         val am = AuthManager(application, instance.id)
         val factory = ApiClientFactory(baseURL)
 
-        val interceptor = AuthInterceptor(am)
-        val authenticator = TokenAuthenticator(am, baseURL) {
-            _authApi.value ?: error("AuthApi not yet initialized — token refresh attempted before setup completed")
+        var sslSocketFactory: SSLSocketFactory? = null
+        var x509TrustManager: X509TrustManager? = null
+        certificateStore.getCertificate(instance.id)?.let { cert ->
+            if (CertificateInfo.fromCertificate(cert).isExpired()) {
+                _certificateNeedRenewal.tryEmit(Unit)
+            }
+            sslSocketFactory = CertificateManager.createPinnedSSLSocketFactory(cert)
+            x509TrustManager = CertificateManager.createPinnedTrustManager(cert)
         }
-        val okHttp = factory.createOkHttpClient(interceptor, authenticator)
+
+        val interceptor = AuthInterceptor(am)
+        val authenticator = TokenAuthenticator(
+            am, baseURL,
+            { _authApi.value ?: error("AuthApi not yet initialized — token refresh attempted before setup completed") },
+            sslSocketFactory,
+            x509TrustManager
+        )
+        val okHttp = factory.createOkHttpClient(interceptor, authenticator, sslSocketFactory, x509TrustManager)
         val retrofit = factory.createRetrofit(okHttp)
 
         val auth: AuthApi = factory.createApi(retrofit)
@@ -93,6 +133,7 @@ class InstanceManager(
             _authManager.value?.logout()
         }
         store.removeInstance(id)
+        certificateStore.removeCertificate(id)
         rebuild()
     }
 
@@ -118,12 +159,118 @@ class InstanceManager(
         }
     }
 
-    suspend fun addInstance(serverURL: String, displayName: String) {
-        checkHealth(serverURL)
-        val instance = com.bedrud.app.models.Instance(
+    suspend fun checkHealthWithCapture(serverURL: String): CheckHealthResult {
+        val baseURL = if (serverURL.endsWith("/")) "${serverURL}api" else "$serverURL/api"
+        val (capturingSslFactory, capturingTM) = CertificateManager.createCapturingSSLSocketFactory()
+
+        val client = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .sslSocketFactory(capturingSslFactory, capturingTM)
+            .hostnameVerifier(okhttp3.internal.tls.OkHostnameVerifier)
+            .build()
+
+        val gson = GsonBuilder().setLenient().create()
+        val retrofit = Retrofit.Builder()
+            .baseUrl(baseURL.trimEnd('/') + "/")
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+
+        val api = retrofit.create(HealthApi::class.java)
+        val response = try {
+            api.health()
+        } catch (e: Exception) {
+            return CheckHealthResult.Error("Could not reach server: ${e.message}")
+        }
+
+        if (!response.isSuccessful) {
+            return CheckHealthResult.Error("Server returned ${response.code()}")
+        }
+
+        val health = response.body() ?: HealthResponse()
+        val capturedCert = capturingTM.getCapturedCertificate()
+
+        if (capturedCert != null) {
+            val certInfo = CertificateInfo.fromCertificate(capturedCert)
+            val tempId = java.util.UUID.randomUUID().toString()
+            pendingCerts[tempId] = capturedCert
+            return CheckHealthResult.Captured(health, certInfo, tempId)
+        }
+
+        return CheckHealthResult.Trusted(health)
+    }
+
+    fun discardPendingCertificate(tempCertId: String) {
+        pendingCerts.remove(tempCertId)
+    }
+
+    fun onSslError() {
+        _certificateNeedRenewal.tryEmit(Unit)
+    }
+
+    suspend fun beginCertificateRenewal(): RenewalResult {
+        val instance = store.activeInstance ?: return RenewalResult.Error("No active instance")
+        val serverURL = instance.serverURL
+        val baseURL = if (serverURL.endsWith("/")) "${serverURL}api" else "$serverURL/api"
+        val (capturingSslFactory, capturingTM) = CertificateManager.createCapturingSSLSocketFactory()
+
+        val client = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .sslSocketFactory(capturingSslFactory, capturingTM)
+            .hostnameVerifier(okhttp3.internal.tls.OkHostnameVerifier)
+            .build()
+
+        val gson = GsonBuilder().setLenient().create()
+        val retrofit = Retrofit.Builder()
+            .baseUrl(baseURL.trimEnd('/') + "/")
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+
+        val api = retrofit.create(HealthApi::class.java)
+        try {
+            api.health()
+        } catch (_: Exception) {
+        }
+
+        val capturedCert = capturingTM.getCapturedCertificate()
+            ?: return RenewalResult.Error("Could not capture server certificate")
+
+        val certInfo = CertificateInfo.fromCertificate(capturedCert)
+        val tempId = java.util.UUID.randomUUID().toString()
+        pendingCerts[tempId] = capturedCert
+        return RenewalResult.Captured(certInfo, tempId)
+    }
+
+    fun confirmRenewal(tempCertId: String) {
+        val instanceId = store.activeInstanceId.value ?: return
+        pendingCerts.remove(tempCertId)?.let { cert ->
+            certificateStore.saveCertificate(instanceId, cert)
+        }
+        rebuild()
+    }
+
+    fun cancelRenewal(tempCertId: String) {
+        pendingCerts.remove(tempCertId)
+    }
+
+    suspend fun addInstance(serverURL: String, displayName: String, trustCertId: String? = null) {
+        if (trustCertId == null) {
+            checkHealth(serverURL)
+        }
+        val instance = Instance(
             serverURL = serverURL,
             displayName = displayName
         )
+
+        trustCertId?.let { id ->
+            pendingCerts.remove(id)?.let { cert ->
+                certificateStore.saveCertificate(instance.id, cert)
+            }
+        }
+
         store.addInstance(instance)
         store.setActive(instance.id)
         rebuild()

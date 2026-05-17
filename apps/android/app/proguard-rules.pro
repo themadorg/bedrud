@@ -14,3 +14,7 @@
 
 # Keep Credential Manager classes
 -keep class androidx.credentials.** { *; }
+
+# Keep custom SSL/TrustManager classes
+-keep class com.bedrud.app.core.ssl.** { *; }
+-keep class javax.net.ssl.** { *; }
