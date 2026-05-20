@@ -589,3 +589,157 @@ func TestUserRepository_CountUsersSinceFiltered(t *testing.T) {
 		t.Fatalf("expected 0 recent non-guest users, got %d", recentNoGuest)
 	}
 }
+
+func TestUserRepository_DeleteUnverifiedUsers_DeletesEligible(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewUserRepository(db)
+
+	// Create an old unverified user — eligible for deletion
+	oldUnverified := &models.User{
+		ID:       "del-eligible-1",
+		Email:    "old@test.com",
+		Password: "hash",
+		Name:     "Old",
+		Provider: "local",
+	}
+	if err := db.Create(oldUnverified).Error; err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+	// Backdate updated_at so it looks old
+	past := time.Now().Add(-72 * time.Hour)
+	db.Model(oldUnverified).Update("updated_at", past)
+
+	// Create a verified user — should NOT be deleted
+	now := time.Now()
+	verified := &models.User{
+		ID:              "del-verified-1",
+		Email:           "verified@test.com",
+		Password:        "hash",
+		Name:            "Verified",
+		Provider:        "local",
+		EmailVerifiedAt: &now,
+	}
+	if err := db.Create(verified).Error; err != nil {
+		t.Fatalf("failed to create verified user: %v", err)
+	}
+
+	// Create a recently changed user (EmailVerifiedAt=nil, updated_at recent)
+	recentChanged := &models.User{
+		ID:       "del-changed-1",
+		Email:    "changed@test.com",
+		Password: "hash",
+		Name:     "Changed",
+		Provider: "local",
+	}
+	if err := db.Create(recentChanged).Error; err != nil {
+		t.Fatalf("failed to create changed user: %v", err)
+	}
+	// Backdate created_at to old, but keep updated_at recent (like ChangeEmail did)
+	db.Model(recentChanged).Update("created_at", past)
+
+	cutoff := time.Now().Add(-24 * time.Hour)
+	deleted, err := repo.DeleteUnverifiedUsers(cutoff)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Only oldUnverified should be deleted (old updated_at + nil EmailVerifiedAt)
+	if deleted != 1 {
+		t.Fatalf("expected 1 deleted, got %d", deleted)
+	}
+
+	// Verify oldUnverified is gone (GetUserByID returns nil, nil for not found)
+	deletedUser, err := repo.GetUserByID(oldUnverified.ID)
+	if err != nil {
+		t.Fatalf("unexpected error checking deleted user: %v", err)
+	}
+	if deletedUser != nil {
+		t.Fatal("expected oldUnverified to be deleted")
+	}
+
+	// Verify verified user still exists
+	v, err := repo.GetUserByID(verified.ID)
+	if err != nil || v == nil {
+		t.Fatal("expected verified user to remain")
+	}
+
+	// Verify recently changed user still exists
+	c, err := repo.GetUserByID(recentChanged.ID)
+	if err != nil || c == nil {
+		t.Fatal("expected recently changed user to remain")
+	}
+}
+
+func TestUserRepository_DeleteUnverifiedUsers_NoEligible(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewUserRepository(db)
+
+	// Create a verified user only
+	now := time.Now()
+	verified := &models.User{
+		ID:              "del-only-1",
+		Email:           "only@test.com",
+		Password:        "hash",
+		Name:            "Only",
+		Provider:        "local",
+		EmailVerifiedAt: &now,
+	}
+	if err := db.Create(verified).Error; err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	cutoff := time.Now().Add(-1 * time.Hour)
+	deleted, err := repo.DeleteUnverifiedUsers(cutoff)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if deleted != 0 {
+		t.Fatalf("expected 0 deleted, got %d", deleted)
+	}
+}
+
+func TestUserRepository_DeleteUnverifiedUsers_PasskeyProvider(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewUserRepository(db)
+
+	// Create old unverified passkey user — eligible
+	passkeyUser := &models.User{
+		ID:       "del-passkey-1",
+		Email:    "passkey@test.com",
+		Name:     "Passkey",
+		Provider: "passkey",
+	}
+	if err := db.Create(passkeyUser).Error; err != nil {
+		t.Fatalf("failed to create passkey user: %v", err)
+	}
+	past := time.Now().Add(-72 * time.Hour)
+	db.Model(passkeyUser).Update("updated_at", past)
+
+	// Create old unverified OAuth user — NOT eligible (different provider)
+	oauthUser := &models.User{
+		ID:       "del-oauth-1",
+		Email:    "oauth@test.com",
+		Name:     "OAuth",
+		Provider: "google",
+	}
+	if err := db.Create(oauthUser).Error; err != nil {
+		t.Fatalf("failed to create oauth user: %v", err)
+	}
+	db.Model(oauthUser).Update("updated_at", past)
+
+	cutoff := time.Now().Add(-24 * time.Hour)
+	deleted, err := repo.DeleteUnverifiedUsers(cutoff)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if deleted != 1 {
+		t.Fatalf("expected 1 deleted (passkey), got %d", deleted)
+	}
+
+	// Verify OAuth user still exists
+	o, err := repo.GetUserByID(oauthUser.ID)
+	if err != nil || o == nil {
+		t.Fatal("expected OAuth user to remain")
+	}
+}
