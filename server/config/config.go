@@ -12,13 +12,15 @@ import (
 )
 
 type Config struct {
-	Server    ServerConfig    `yaml:"server"`
-	Database  DatabaseConfig  `yaml:"database"`
-	LiveKit   LiveKitConfig   `yaml:"livekit"`
-	Auth      AuthConfig      `yaml:"auth"`
-	Logger    LoggerConfig    `yaml:"logger"`
-	Cors      CorsConfig      `yaml:"cors"`
-	Chat      ChatConfig      `yaml:"chat"`
+	Server   ServerConfig   `yaml:"server"`
+	Database DatabaseConfig `yaml:"database"`
+	LiveKit  LiveKitConfig  `yaml:"livekit"`
+	Auth     AuthConfig     `yaml:"auth"`
+	Logger   LoggerConfig   `yaml:"logger"`
+	Cors     CorsConfig     `yaml:"cors"`
+	Chat     ChatConfig     `yaml:"chat"`
+	// TODO oncoming feature
+	Recording RecordingConfig `yaml:"recording"`
 	RateLimit RateLimitConfig `yaml:"rateLimit"`
 	Queue     QueueConfig     `yaml:"queue"`
 	Email     EmailConfig     `yaml:"email"`
@@ -97,6 +99,23 @@ type AuthConfig struct {
 	FrontendURL         string       `yaml:"frontendURL"`
 	SessionSecret       string       `yaml:"sessionSecret"`
 	PasskeyChallengeTTL int          `yaml:"passkeyChallengeTTL"` // minutes, default 5. Env: AUTH_PASSKEY_CHALLENGE_TTL
+	// RequireEmailVerification gates all local registration + login behind email verification.
+	// When true, users must verify their email before they can access the app.
+	// Default: false (backward compatible). Env: AUTH_REQUIRE_EMAIL_VERIFICATION
+	RequireEmailVerification bool `yaml:"requireEmailVerification" env:"AUTH_REQUIRE_EMAIL_VERIFICATION"`
+	// VerificationEmailCooldownMins is the minimum time between verification email resends.
+	// Default: 2 minutes. Env: AUTH_VERIFICATION_COOLDOWN_MINS
+	VerificationEmailCooldownMins int `yaml:"verificationEmailCooldownMins" env:"AUTH_VERIFICATION_COOLDOWN_MINS"`
+	// VerificationTokenTTLHours controls how long verification links remain valid.
+	// Default: 24 hours. Env: AUTH_VERIFICATION_TOKEN_TTL_HOURS
+	VerificationTokenTTLHours int `yaml:"verificationTokenTTLHours" env:"AUTH_VERIFICATION_TOKEN_TTL_HOURS"`
+	// UnverifiedAccountTTLHours controls automatic deletion of local/passkey accounts
+	// that registered but never verified their email. 0 = disabled. Default: 48 hours.
+	// Env: AUTH_UNVERIFIED_ACCOUNT_TTL_HOURS
+	UnverifiedAccountTTLHours int `yaml:"unverifiedAccountTTLHours" env:"AUTH_UNVERIFIED_ACCOUNT_TTL_HOURS"`
+	// ResetTokenTTLHours controls how long password reset links remain valid.
+	// 0 means use default (1 hour). Env: AUTH_RESET_TOKEN_TTL_HOURS
+	ResetTokenTTLHours int `yaml:"resetTokenTTLHours" env:"AUTH_RESET_TOKEN_TTL_HOURS"`
 }
 
 type OAuth2Config struct {
@@ -166,6 +185,24 @@ type ChatUploadS3Config struct {
 	PublicBaseURL string `yaml:"publicBaseUrl"`
 }
 
+// TODO oncoming feature
+// RecordingConfig controls recording storage.
+type RecordingConfig struct {
+	// MaxFileSizeMB caps each recording file. 0 = unlimited. Default 2048.
+	MaxFileSizeMB int `yaml:"maxFileSizeMB"`
+	// StorageDir is the directory for disk-backed recordings. Default: ./data/recordings
+	StorageDir string `yaml:"storageDir"`
+	// MaxRecordingsPerRoom caps total recordings per room. 0 = unlimited.
+	// Applied to non-persistent rooms to prevent recording spam.
+	MaxRecordingsPerRoom int `yaml:"maxRecordingsPerRoom"`
+	// RetentionHours controls how long completed recordings are kept after room archive.
+	// 0 = keep forever. Default: 720 (30 days). Env: RECORDING_RETENTION_HOURS
+	RetentionHours int `yaml:"retentionHours" env:"RECORDING_RETENTION_HOURS"`
+	// CleanupIntervalHours controls how often the scheduler checks for expired recordings.
+	// 0 = disabled. Default: 24 (daily). Env: RECORDING_CLEANUP_INTERVAL_HOURS
+	CleanupIntervalHours int `yaml:"cleanupIntervalHours" env:"RECORDING_CLEANUP_INTERVAL_HOURS"`
+}
+
 // QueueConfig controls the internal job queue worker.
 type QueueConfig struct {
 	PollInterval ConfigInt `yaml:"pollInterval"` // ms between polls, default 500. Env: QUEUE_POLL_INTERVAL
@@ -173,27 +210,42 @@ type QueueConfig struct {
 	Concurrency  int       `yaml:"concurrency"`  // worker goroutines, default 1. Env: QUEUE_CONCURRENCY
 }
 
-// EmailConfig controls SMTP settings for transactional email sending.
+// EmailConfig controls SMTP settings and email template configuration.
 type EmailConfig struct {
-	SMTPHost      string `yaml:"smtpHost"`      // Env: EMAIL_SMTP_HOST
-	SMTPPort      int    `yaml:"smtpPort"`      // Env: EMAIL_SMTP_PORT
-	Username      string `yaml:"username"`      // Env: EMAIL_USERNAME
-	Password      string `yaml:"password"`      // Env: EMAIL_PASSWORD
-	FromAddress   string `yaml:"fromAddress"`   // Env: EMAIL_FROM_ADDRESS
-	FromName      string `yaml:"fromName"`      // Env: EMAIL_FROM_NAME
-	TLSSkipVerify bool   `yaml:"tlsSkipVerify"` // Skip TLS cert validation. Env: EMAIL_TLS_SKIP_VERIFY
-	SMTPSMode     bool   `yaml:"smtpsMode"`     // Direct TLS (SMTPS, port 465). Env: EMAIL_SMTPS_MODE
+	SMTPHost      string              `yaml:"smtpHost"`      // Env: EMAIL_SMTP_HOST
+	SMTPPort      int                 `yaml:"smtpPort"`      // Env: EMAIL_SMTP_PORT
+	Username      string              `yaml:"username"`      // Env: EMAIL_USERNAME
+	Password      string              `yaml:"password"`      // Env: EMAIL_PASSWORD
+	FromAddress   string              `yaml:"fromAddress"`   // Env: EMAIL_FROM_ADDRESS
+	FromName      string              `yaml:"fromName"`      // Env: EMAIL_FROM_NAME
+	TLSSkipVerify bool                `yaml:"tlsSkipVerify"` // Skip TLS cert validation. Env: EMAIL_TLS_SKIP_VERIFY
+	SMTPSMode     bool                `yaml:"smtpsMode"`     // Direct TLS (SMTPS, port 465). Env: EMAIL_SMTPS_MODE
+	Templates     EmailTemplateConfig `yaml:"templates"`     // Email branding and per-template overrides
+}
+
+// EmailTemplateConfig controls email branding and per-template text overrides.
+// Values can be overridden per-instance via the admin panel SystemSettings.
+type EmailTemplateConfig struct {
+	InstanceName  string            `yaml:"instanceName"` // Default "Bedrud"
+	SupportEmail  string            `yaml:"supportEmail"`
+	InstanceURL   string            `yaml:"instanceUrl"`
+	HeaderBgColor string            `yaml:"headerBgColor"` // Hex color, default "#1a1a2e"
+	ButtonBgColor string            `yaml:"buttonBgColor"` // Hex color, default "#e11d48"
+	SubjectLines  map[string]string `yaml:"subjectLines"`  // Per-template subject override
+	PreheaderText map[string]string `yaml:"preheaderText"` // Per-template preheader text
 }
 
 // RateLimitConfig controls rate limiting for auth and guest endpoints.
 // Nil fields = use defaults. Set to 0 to disable.
 type RateLimitConfig struct {
-	AuthMaxRequests  *int `yaml:"authMaxRequests"`
-	AuthWindowSecs   *int `yaml:"authWindowSecs"`
-	GuestMaxRequests *int `yaml:"guestMaxRequests"`
-	GuestWindowSecs  *int `yaml:"guestWindowSecs"`
-	APIMaxRequests   *int `yaml:"apiMaxRequests"`
-	APIWindowSecs    *int `yaml:"apiWindowSecs"`
+	AuthMaxRequests       *int `yaml:"authMaxRequests"`
+	AuthWindowSecs        *int `yaml:"authWindowSecs"`
+	AuthResendMaxRequests *int `yaml:"authResendMaxRequests"` // separate limit for verification resend. Env: RATELIMIT_AUTH_RESEND_MAX
+	AuthResendWindowSecs  *int `yaml:"authResendWindowSecs"`  // Env: RATELIMIT_AUTH_RESEND_WINDOW
+	GuestMaxRequests      *int `yaml:"guestMaxRequests"`
+	GuestWindowSecs       *int `yaml:"guestWindowSecs"`
+	APIMaxRequests        *int `yaml:"apiMaxRequests"`
+	APIWindowSecs         *int `yaml:"apiWindowSecs"`
 }
 
 // ConfigInt accepts YAML int or quoted-string numeric values.
@@ -355,6 +407,19 @@ func Load(configPath string) (*Config, error) {
 				config.Auth.PasskeyChallengeTTL = n
 			}
 		}
+		if v := os.Getenv("AUTH_REQUIRE_EMAIL_VERIFICATION"); v == "true" || v == "1" {
+			config.Auth.RequireEmailVerification = true
+		}
+		if v := os.Getenv("AUTH_VERIFICATION_COOLDOWN_MINS"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil {
+				config.Auth.VerificationEmailCooldownMins = n
+			}
+		}
+		if v := os.Getenv("AUTH_RESET_TOKEN_TTL_HOURS"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil {
+				config.Auth.ResetTokenTTLHours = n
+			}
+		}
 
 		// CORS environment variable overrides
 		if corsAllowedOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); corsAllowedOrigins != "" {
@@ -423,6 +488,16 @@ func Load(configPath string) (*Config, error) {
 				config.RateLimit.GuestWindowSecs = &i
 			}
 		}
+		if v := os.Getenv("RATELIMIT_AUTH_RESEND_MAX"); v != "" {
+			if i, err := strconv.Atoi(v); err == nil {
+				config.RateLimit.AuthResendMaxRequests = &i
+			}
+		}
+		if v := os.Getenv("RATELIMIT_AUTH_RESEND_WINDOW"); v != "" {
+			if i, err := strconv.Atoi(v); err == nil {
+				config.RateLimit.AuthResendWindowSecs = &i
+			}
+		}
 
 		// API rate limit environment variable overrides
 		if v := os.Getenv("RATELIMIT_API_MAX"); v != "" {
@@ -480,16 +555,34 @@ func Load(configPath string) (*Config, error) {
 		if v := os.Getenv("EMAIL_SMTPS_MODE"); v == "true" || v == "1" {
 			config.Email.SMTPSMode = true
 		}
+
+		// Recording retention environment variable overrides
+		if v := os.Getenv("RECORDING_RETENTION_HOURS"); v != "" {
+			if i, err := strconv.Atoi(v); err == nil {
+				config.Recording.RetentionHours = i
+			}
+		}
+		if v := os.Getenv("RECORDING_CLEANUP_INTERVAL_HOURS"); v != "" {
+			if i, err := strconv.Atoi(v); err == nil {
+				config.Recording.CleanupIntervalHours = i
+			}
+		}
 	})
 
 	return config, loadErr
 }
 
-// Get returns the loaded configuration
+// Get returns the loaded configuration.
+// Panics if config not loaded. Use GetSafe() for cases where config may not be initialized.
 func Get() *Config {
 	if config == nil {
 		panic("Config not loaded")
 	}
+	return config
+}
+
+// GetSafe returns the loaded configuration or nil if Load() hasn't been called.
+func GetSafe() *Config {
 	return config
 }
 

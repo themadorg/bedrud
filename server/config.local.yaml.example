@@ -45,6 +45,20 @@ auth:
   sessionSecret: "CHANGE_ME_32_CHAR_RANDOM_STRING"
   tokenDuration: 24
   passkeyChallengeTTL: 5  # passkey challenge expiry in minutes. Env: AUTH_PASSKEY_CHALLENGE_TTL
+  # requireEmailVerification gates all local registration + login behind email verification.
+  # Users must verify their email before accessing the app. Requires SMTP configuration.
+  # Default: false (backward compatible). Env: AUTH_REQUIRE_EMAIL_VERIFICATION
+  requireEmailVerification: false
+  # verificationEmailCooldownMins controls min time between verification email resends.
+  # Default: 2 minutes. Env: AUTH_VERIFICATION_COOLDOWN_MINS
+  verificationEmailCooldownMins: 2
+  # verificationTokenTTLHours controls how long verification links remain valid.
+  # Default: 24 hours. Env: AUTH_VERIFICATION_TOKEN_TTL_HOURS
+  verificationTokenTTLHours: 24
+  # unverifiedAccountTTLHours controls automatic deletion of local/passkey accounts
+  # that registered but never verified. 0 = disabled. Default: 48 hours.
+  # Env: AUTH_UNVERIFIED_ACCOUNT_TTL_HOURS
+  unverifiedAccountTTLHours: 48
   frontendURL: "http://localhost:8090"
   google:
     clientId: "CHANGE_ME_GOOGLE_CLIENT_ID"
@@ -81,6 +95,13 @@ queue:
   pollInterval: 500    # ms between polls. Env: QUEUE_POLL_INTERVAL
   maxAttempts: 3       # retries before failed. Env: QUEUE_MAX_ATTEMPTS
   concurrency: 1       # worker goroutines. Env: QUEUE_CONCURRENCY
+
+recording:
+  maxFileSizeMB: 2048          # Max file per recording (MB). 0 = unlimited
+  storageDir: "./data/recordings" # Disk storage path
+  maxRecordingsPerRoom: 0      # Limit per room. 0 = unlimited
+  retentionHours: 720          # Keep recordings after room end (hours, 0=forever). Default 720 (30d). Env: RECORDING_RETENTION_HOURS
+  cleanupIntervalHours: 24     # Scheduler check interval (hours, 0=disabled). Default 24. Env: RECORDING_CLEANUP_INTERVAL_HOURS
 
 email:
   smtpHost: ""         # e.g. smtp.sendgrid.net. Env: EMAIL_SMTP_HOST
