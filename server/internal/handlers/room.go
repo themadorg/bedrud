@@ -23,6 +23,7 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -69,6 +70,8 @@ type JoinRoomRequest struct {
 type RoomHandler struct {
 	roomRepo         *repository.RoomRepository
 	userRepo         *repository.UserRepository
+	recordingRepo    *repository.RecordingRepository
+	webhookRepo      *repository.WebhookRepository
 	livekitHost      string
 	apiKey           string
 	apiSecret        string
@@ -83,9 +86,18 @@ type RoomHandler struct {
 	inlineMaxBytes   int64
 }
 
-func NewRoomHandler(lkCfg *config.LiveKitConfig, chatCfg *config.ChatConfig, roomRepo *repository.RoomRepository, userRepo *repository.UserRepository, settingsRepo *repository.SettingsRepository, uploadTracker *storage.ChatUploadTracker, cleanupSvc *services.RoomCleanupService) *RoomHandler {
-	client := lkutil.NewClient(lkCfg)
-
+func NewRoomHandler(
+	client livekit.RoomService,
+	lkCfg *config.LiveKitConfig,
+	chatCfg *config.ChatConfig,
+	roomRepo *repository.RoomRepository,
+	userRepo *repository.UserRepository,
+	recordingRepo *repository.RecordingRepository,
+	settingsRepo *repository.SettingsRepository,
+	webhookRepo *repository.WebhookRepository,
+	uploadTracker *storage.ChatUploadTracker,
+	cleanupSvc *services.RoomCleanupService,
+) *RoomHandler {
 	uploadMax := chatCfg.Uploads.MaxBytes.Int64()
 	if uploadMax == 0 {
 		uploadMax = 10 * 1024 * 1024
@@ -99,9 +111,11 @@ func NewRoomHandler(lkCfg *config.LiveKitConfig, chatCfg *config.ChatConfig, roo
 	return &RoomHandler{
 		roomRepo:       roomRepo,
 		userRepo:       userRepo,
+		webhookRepo:    webhookRepo,
 		livekitHost:    lkCfg.Host,
 		apiKey:         lkCfg.APIKey,
 		apiSecret:      lkCfg.APISecret,
+		recordingRepo:  recordingRepo,
 		client:         client,
 		uploadStore:    storage.NewChatUploadStore(&chatCfg.Uploads),
 		uploadMax:      uploadMax,
@@ -132,11 +146,29 @@ func (h *RoomHandler) withAuth(ctx context.Context, grants ...*lkauth.VideoGrant
 	return ctx
 }
 
+// CreateRoom creates a new meeting room.
+// POST /api/room/create
+//
+// @Summary Create room
+// @Description Create a new meeting room with optional settings.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param request body CreateRoomRequest true "Room creation parameters"
+// @Success 201 {object} map[string]interface{} "{id, name, token, ...}"
+// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Email not verified"
+// @Failure 500 {object} ErrorResponse "Failed to create room"
+// @Router /room/create [post]
 func (h *RoomHandler) CreateRoom(c *fiber.Ctx) error {
 	var req CreateRoomRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
+
+	// Default room settings: recordings enabled, other settings from request or zero
+	req.Settings.RecordingsAllowed = true
 
 	// Normalize: trim whitespace, lowercase
 	req.Name = strings.TrimSpace(strings.ToLower(req.Name))
@@ -225,6 +257,10 @@ func (h *RoomHandler) CreateRoom(c *fiber.Ctx) error {
 		log.Error().Err(err).Msg("Database CreateRoom failed")
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to create room"})
 	}
+
+	// Dispatch webhook: room.created
+	h.dispatchRoomEvent(c.Context(), models.EventRoomCreated, room.ID, room.Name, claims.UserID)
+
 	return c.JSON(fiber.Map{
 		"id": room.ID, "name": room.Name, "createdBy": room.CreatedBy, "isActive": room.IsActive,
 		"isPublic": room.IsPublic, "maxParticipants": room.MaxParticipants, "settings": room.Settings,
@@ -232,6 +268,22 @@ func (h *RoomHandler) CreateRoom(c *fiber.Ctx) error {
 	})
 }
 
+// JoinRoom allows an authenticated user to join an existing room.
+// POST /api/room/join
+//
+// @Summary Join room
+// @Description Join an existing room as an authenticated user.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param request body JoinRoomRequest true "Room name"
+// @Success 200 {object} map[string]interface{} "{id, name, token, adminId, livekitHost}"
+// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Email not verified"
+// @Failure 404 {object} ErrorResponse "Room not found"
+// @Failure 500 {object} ErrorResponse "Failed to join room"
+// @Router /room/join [post]
 func (h *RoomHandler) JoinRoom(c *fiber.Ctx) error {
 	var req JoinRoomRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -248,8 +300,18 @@ func (h *RoomHandler) JoinRoom(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "Room not found"})
 	}
 
-	// Enforce room active state — suspended rooms cannot be rejoined
+	// Enforce room active state — suspended/archived rooms cannot be rejoined.
+	// If the room is archived and the current user created it, return a special
+	// response so the frontend can offer to recreate with the same slug.
 	if !room.IsActive {
+		if room.CreatedBy == claims.UserID {
+			return c.Status(200).JSON(fiber.Map{
+				"status":   "archived_owned",
+				"name":     room.Name,
+				"mode":     room.Mode,
+				"settings": room.Settings,
+			})
+		}
 		return c.Status(fiber.StatusGone).JSON(fiber.Map{"error": "room is no longer active"})
 	}
 
@@ -280,6 +342,9 @@ func (h *RoomHandler) JoinRoom(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to join room"})
 	}
 
+	// Dispatch webhook: participant.joined
+	h.dispatchRoomEvent(c.Context(), models.EventParticipantJoined, room.ID, room.Name, claims.UserID)
+
 	at := lkauth.NewAccessToken(h.apiKey, h.apiSecret)
 	at.AddGrant(&lkauth.VideoGrant{RoomJoin: true, Room: req.RoomName, CanUpdateOwnMetadata: boolPtr(false)}).SetIdentity(claims.UserID).SetName(claims.Name).SetValidFor(time.Hour) //nolint:staticcheck // AddGrant is deprecated but VideoGrant field is not available in this version of the protocol SDK
 	if meta, err := json.Marshal(map[string]interface{}{"accesses": claims.Accesses}); err == nil {
@@ -296,10 +361,21 @@ func (h *RoomHandler) JoinRoom(c *fiber.Ctx) error {
 		adminId = room.CreatedBy
 	}
 
+	activeRecordingID := ""
+	if h.recordingRepo != nil {
+		active, err := h.recordingRepo.HasActiveRecording(room.ID)
+		if err == nil && active {
+			if rec, err := h.recordingRepo.GetActiveByRoom(room.ID); err == nil && rec != nil {
+				activeRecordingID = rec.ID
+			}
+		}
+	}
+
 	return c.JSON(fiber.Map{
 		"id": room.ID, "name": room.Name, "token": token, "createdBy": room.CreatedBy, "adminId": adminId, "isActive": room.IsActive,
 		"isPublic": room.IsPublic, "maxParticipants": room.MaxParticipants, "expiresAt": room.ExpiresAt,
 		"settings": room.Settings, "livekitHost": h.livekitHost, "mode": room.Mode,
+		"activeRecordingId": activeRecordingID,
 	})
 }
 
@@ -312,6 +388,20 @@ type RefreshLiveKitTokenRequest struct {
 	RoomName string `json:"roomName"`
 }
 
+// GuestJoinRoom allows a guest to join a room without authentication.
+// POST /api/room/guest-join
+//
+// @Summary Guest join room
+// @Description Join a room as a guest without creating an account.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param request body GuestJoinRoomRequest true "Guest name and room name"
+// @Success 200 {object} map[string]interface{} "{id, name, token, adminId, livekitHost}"
+// @Failure 400 {object} ErrorResponse "Invalid request or guest name required"
+// @Failure 404 {object} ErrorResponse "Room not found"
+// @Failure 500 {object} ErrorResponse "Failed to join room"
+// @Router /room/guest-join [post]
 func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 	var req GuestJoinRoomRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -334,6 +424,16 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 	}
 	if len(req.GuestName) > 50 {
 		return c.Status(400).JSON(fiber.Map{"error": "Guest name too long (max 50 characters)"})
+	}
+
+	// Check guest login settings
+	if h.settingsRepo != nil {
+		settings, _ := h.settingsRepo.GetSettings()
+		if settings != nil && !settings.GuestLoginEnabled {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Guest login is currently disabled",
+			})
+		}
 	}
 
 	room, err := h.roomRepo.GetRoomByName(req.RoomName)
@@ -364,6 +464,9 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "room is full"})
 		}
 		log.Warn().Err(err).Str("roomID", room.ID).Str("guestID", guestID).Msg("Failed to track guest participant")
+	} else {
+		// Dispatch webhook: participant.joined
+		h.dispatchRoomEvent(c.Context(), models.EventParticipantJoined, room.ID, room.Name, guestID)
 	}
 
 	at := lkauth.NewAccessToken(h.apiKey, h.apiSecret)
@@ -383,12 +486,38 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 		adminId = room.CreatedBy
 	}
 
+	activeRecordingID := ""
+	if h.recordingRepo != nil {
+		active, err := h.recordingRepo.HasActiveRecording(room.ID)
+		if err == nil && active {
+			if rec, err := h.recordingRepo.GetActiveByRoom(room.ID); err == nil && rec != nil {
+				activeRecordingID = rec.ID
+			}
+		}
+	}
+
 	return c.JSON(fiber.Map{
 		"id": room.ID, "name": room.Name, "token": token, "adminId": adminId,
-		"livekitHost": h.livekitHost,
+		"livekitHost":       h.livekitHost,
+		"activeRecordingId": activeRecordingID,
 	})
 }
 
+// RefreshLiveKitToken generates a new LiveKit token for an existing room session.
+// POST /api/room/refresh-token
+//
+// @Summary Refresh LiveKit token
+// @Description Generate a new LiveKit token for an existing room session.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param request body RefreshLiveKitTokenRequest true "Room name"
+// @Success 200 {object} map[string]interface{} "{token}"
+// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 404 {object} ErrorResponse "Room not found"
+// @Failure 500 {object} ErrorResponse "Failed to refresh token"
+// @Router /room/refresh-token [post]
 func (h *RoomHandler) RefreshLiveKitToken(c *fiber.Ctx) error {
 	var req RefreshLiveKitTokenRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -466,9 +595,21 @@ func generateShortID() string {
 	return string(b)
 }
 
+// ListRooms returns rooms created by the authenticated user.
+// GET /api/room/list
+//
+// @Summary List rooms
+// @Description List all rooms created by the authenticated user.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Success 200 {array} models.Room "List of rooms"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 500 {object} ErrorResponse "Failed to list rooms"
+// @Router /room/list [get]
 func (h *RoomHandler) ListRooms(c *fiber.Ctx) error {
 	claims := c.Locals("user").(*auth.Claims)
-	rooms, err := h.roomRepo.GetRoomsCreatedByUser(claims.UserID)
+	rooms, err := h.roomRepo.GetLatestRoomsCreatedByUser(claims.UserID)
 	if err != nil {
 		log.Error().Err(err).Str("userID", claims.UserID).Msg("Failed to list rooms")
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to list rooms"})
@@ -477,6 +618,70 @@ func (h *RoomHandler) ListRooms(c *fiber.Ctx) error {
 		rooms = []models.Room{}
 	}
 	return c.JSON(rooms)
+}
+
+// ListArchivedRooms returns archived rooms for the current user with recording counts.
+// GET /api/room/archived
+//
+// @Summary List archived rooms
+// @Description List archived/deleted rooms belonging to the authenticated user, with recording counts.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(50)
+// @Success 200 {object} map[string]interface{} "{rooms, total, page, limit}"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 500 {object} ErrorResponse "Failed to list archived rooms"
+// @Router /room/archived [get]
+func (h *RoomHandler) ListArchivedRooms(c *fiber.Ctx) error {
+	claims := c.Locals("user").(*auth.Claims)
+
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	rooms, total, err := h.roomRepo.GetArchivedRoomsByUserPaginated(claims.UserID, page, limit)
+	if err != nil {
+		log.Error().Err(err).Str("userID", claims.UserID).Msg("Failed to list archived rooms")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to list archived rooms"})
+	}
+
+	type ArchivedRoomDetail struct {
+		ID             string    `json:"id"`
+		Name           string    `json:"name"`
+		CreatedAt      time.Time `json:"createdAt"`
+		DeletedAt      time.Time `json:"deletedAt"`
+		RecordingCount int       `json:"recordingCount"`
+	}
+
+	enriched := make([]ArchivedRoomDetail, 0, len(rooms))
+	for _, room := range rooms {
+		// TODO oncoming feature: recording count from recordingRepo
+		count, _ := h.recordingRepo.CountByRoom(room.ID)
+		detail := ArchivedRoomDetail{
+			ID:             room.ID,
+			Name:           room.Name,
+			CreatedAt:      room.CreatedAt,
+			RecordingCount: int(count),
+		}
+		if room.DeletedAt != nil {
+			detail.DeletedAt = *room.DeletedAt
+		}
+		enriched = append(enriched, detail)
+	}
+
+	return c.JSON(fiber.Map{
+		"rooms": enriched,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
 }
 
 func (h *RoomHandler) sendSystemMessage(ctx context.Context, roomName, event, actor, target string) {
@@ -534,6 +739,23 @@ func (h *RoomHandler) resolveRoom(c *fiber.Ctx, roomID string) (*models.Room, st
 	return room, adminId, nil
 }
 
+// PromoteParticipant promotes a participant to moderator.
+// POST /api/room/:roomId/promote/:identity
+//
+// @Summary Promote participant
+// @Description Promote a participant to moderator. Room admin or superadmin only.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 200 {object} map[string]string "{status: success}"
+// @Failure 400 {object} ErrorResponse "Cannot target yourself"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Insufficient permissions"
+// @Failure 404 {object} ErrorResponse "Participant not found"
+// @Failure 500 {object} ErrorResponse "Failed to update participant"
+// @Router /room/{roomId}/promote/{identity} [post]
 func (h *RoomHandler) PromoteParticipant(c *fiber.Ctx) error {
 	roomID, identity := c.Params("roomId"), c.Params("identity")
 	claims := c.Locals("user").(*auth.Claims)
@@ -575,6 +797,23 @@ func (h *RoomHandler) PromoteParticipant(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
+// DemoteParticipant demotes a moderator back to participant.
+// POST /api/room/:roomId/demote/:identity
+//
+// @Summary Demote participant
+// @Description Demote a moderator back to regular participant. Room admin or superadmin only.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 200 {object} map[string]string "{status: success}"
+// @Failure 400 {object} ErrorResponse "Cannot target yourself"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Insufficient permissions"
+// @Failure 404 {object} ErrorResponse "Participant not found"
+// @Failure 500 {object} ErrorResponse "Failed to update participant"
+// @Router /room/{roomId}/demote/{identity} [post]
 func (h *RoomHandler) DemoteParticipant(c *fiber.Ctx) error {
 	roomID, identity := c.Params("roomId"), c.Params("identity")
 	claims := c.Locals("user").(*auth.Claims)
@@ -617,6 +856,23 @@ func (h *RoomHandler) DemoteParticipant(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
+// BlockChat blocks a participant from sending chat messages.
+// POST /api/room/:roomId/chat/:identity/block
+//
+// @Summary Block participant chat
+// @Description Block a participant from sending chat messages. Moderator access required.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 200 {object} map[string]string "{status: success}"
+// @Failure 400 {object} ErrorResponse "Cannot target yourself"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Not authorized"
+// @Failure 404 {object} ErrorResponse "Participant not found"
+// @Failure 500 {object} ErrorResponse "Failed to update participant"
+// @Router /room/{roomId}/chat/{identity}/block [post]
 func (h *RoomHandler) BlockChat(c *fiber.Ctx) error {
 	roomID, identity := c.Params("roomId"), c.Params("identity")
 	claims := c.Locals("user").(*auth.Claims)
@@ -654,6 +910,22 @@ func (h *RoomHandler) BlockChat(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
+// DeafenParticipant deafens a participant.
+// POST /api/room/:roomId/deafen/:identity
+//
+// @Summary Deafen participant
+// @Description Deafen a participant in the room. Moderator access required.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 200 {object} map[string]string "{status: success}"
+// @Failure 400 {object} ErrorResponse "Cannot target yourself"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Not authorized"
+// @Failure 500 {object} ErrorResponse "Failed"
+// @Router /room/{roomId}/deafen/{identity} [post]
 func (h *RoomHandler) DeafenParticipant(c *fiber.Ctx) error {
 	roomID, identity := c.Params("roomId"), c.Params("identity")
 	claims := c.Locals("user").(*auth.Claims)
@@ -675,6 +947,22 @@ func (h *RoomHandler) DeafenParticipant(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
+// UndeafenParticipant undeafens a participant.
+// POST /api/room/:roomId/undeafen/:identity
+//
+// @Summary Undeafen participant
+// @Description Undeafen a participant in the room. Moderator access required.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 200 {object} map[string]string "{status: success}"
+// @Failure 400 {object} ErrorResponse "Cannot target yourself"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Not authorized"
+// @Failure 500 {object} ErrorResponse "Failed"
+// @Router /room/{roomId}/undeafen/{identity} [post]
 func (h *RoomHandler) UndeafenParticipant(c *fiber.Ctx) error {
 	roomID, identity := c.Params("roomId"), c.Params("identity")
 	claims := c.Locals("user").(*auth.Claims)
@@ -696,6 +984,23 @@ func (h *RoomHandler) UndeafenParticipant(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
+// AskParticipantAction asks a participant to unmute or turn on camera.
+// POST /api/room/:roomId/ask/:identity/:action
+//
+// @Summary Ask participant action
+// @Description Ask a participant to unmute or enable camera. Action must be "unmute" or "camera". Moderator access required.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Param action path string true "Action: unmute or camera"
+// @Success 200 {object} map[string]string "{status: success}"
+// @Failure 400 {object} ErrorResponse "Unknown action or cannot target yourself"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Not authorized"
+// @Failure 500 {object} ErrorResponse "Failed"
+// @Router /room/{roomId}/ask/{identity}/{action} [post]
 func (h *RoomHandler) AskParticipantAction(c *fiber.Ctx) error {
 	roomID, identity, action := c.Params("roomId"), c.Params("identity"), c.Params("action")
 	if action != "unmute" && action != "camera" {
@@ -721,6 +1026,21 @@ func (h *RoomHandler) AskParticipantAction(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
+// SpotlightParticipant spotlights a participant for all room members.
+// POST /api/room/:roomId/spotlight/:identity
+//
+// @Summary Spotlight participant
+// @Description Spotlight (pin) a participant for all room members. Moderator access required.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 200 {object} map[string]string "{status: success}"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Not authorized"
+// @Failure 500 {object} ErrorResponse "Failed"
+// @Router /room/{roomId}/spotlight/{identity} [post]
 func (h *RoomHandler) SpotlightParticipant(c *fiber.Ctx) error {
 	roomID, identity := c.Params("roomId"), c.Params("identity")
 	claims := c.Locals("user").(*auth.Claims)
@@ -737,6 +1057,23 @@ func (h *RoomHandler) SpotlightParticipant(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
+// StopScreenShare stops a participant's screen share.
+// POST /api/room/:roomId/screenshare/:identity/stop
+//
+// @Summary Stop screen share
+// @Description Force-stop a participant's screen sharing. Moderator access required.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 200 {object} map[string]string "{status: success}"
+// @Failure 400 {object} ErrorResponse "Cannot target yourself"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Not authorized"
+// @Failure 404 {object} ErrorResponse "Participant not found"
+// @Failure 500 {object} ErrorResponse "Failed"
+// @Router /room/{roomId}/screenshare/{identity}/stop [post]
 func (h *RoomHandler) StopScreenShare(c *fiber.Ctx) error {
 	roomID, identity := c.Params("roomId"), c.Params("identity")
 	claims := c.Locals("user").(*auth.Claims)
@@ -770,6 +1107,22 @@ func (h *RoomHandler) StopScreenShare(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
+// GetParticipantInfo returns detailed participant info including tracks.
+// GET /api/room/:roomId/participant/:identity/info
+//
+// @Summary Get participant info
+// @Description Get detailed participant info including track status. Self-access or moderator access required.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 200 {object} map[string]interface{} "{identity, name, state, joinedAt, tracks}"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Not authorized"
+// @Failure 404 {object} ErrorResponse "Participant not found"
+// @Failure 500 {object} ErrorResponse "Failed"
+// @Router /room/{roomId}/participant/{identity}/info [get]
 func (h *RoomHandler) GetParticipantInfo(c *fiber.Ctx) error {
 	roomID, identity := c.Params("roomId"), c.Params("identity")
 	claims := c.Locals("user").(*auth.Claims)
@@ -810,6 +1163,23 @@ func (h *RoomHandler) GetParticipantInfo(c *fiber.Ctx) error {
 	})
 }
 
+// KickParticipant kicks a participant from the room.
+// POST /api/room/:roomId/kick/:identity
+//
+// @Summary Kick participant
+// @Description Kick a participant from the room. Room admin or superadmin only.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 200 {object} map[string]string "{status: success}"
+// @Failure 400 {object} ErrorResponse "Cannot target yourself"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Insufficient permissions"
+// @Failure 404 {object} ErrorResponse "Participant not found"
+// @Failure 500 {object} ErrorResponse "Failed to remove participant"
+// @Router /room/{roomId}/kick/{identity} [post]
 func (h *RoomHandler) KickParticipant(c *fiber.Ctx) error {
 	roomID, identity := c.Params("roomId"), c.Params("identity")
 	claims := c.Locals("user").(*auth.Claims)
@@ -884,6 +1254,7 @@ func (h *RoomHandler) DeleteRoom(c *fiber.Ctx) error {
 		RoomID:        roomID,
 		SystemEvent:   "room_ended",
 		SystemMessage: "The meeting has been ended by the creator",
+		Purge:         false, // archive — recordings preserved
 	}
 	if err := queue.Enqueue(context.Background(), database.GetDB(), "room_delete", payload,
 		queue.WithPriority(1), queue.WithMaxAttempts(3)); err != nil {
@@ -892,9 +1263,29 @@ func (h *RoomHandler) DeleteRoom(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to queue deletion"})
 	}
 
+	// Dispatch webhook: room.ended
+	h.dispatchRoomEvent(c.Context(), models.EventRoomEnded, roomID, room.Name, claims.UserID)
+
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"message": "Room deletion queued"})
 }
 
+// MuteParticipant mutes a participant's audio.
+// POST /api/room/:roomId/mute/:identity
+//
+// @Summary Mute participant
+// @Description Mute a participant's audio tracks. Room admin or superadmin only.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 200 {object} map[string]string "{status: success}"
+// @Failure 400 {object} ErrorResponse "Cannot target yourself"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Cannot mute the room admin or insufficient permissions"
+// @Failure 404 {object} ErrorResponse "Participant not found"
+// @Failure 500 {object} ErrorResponse "Failed to mute"
+// @Router /room/{roomId}/mute/{identity} [post]
 func (h *RoomHandler) MuteParticipant(c *fiber.Ctx) error {
 	roomID, identity := c.Params("roomId"), c.Params("identity")
 	claims := c.Locals("user").(*auth.Claims)
@@ -938,6 +1329,23 @@ func (h *RoomHandler) MuteParticipant(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "success"})
 }
 
+// BanParticipant bans a participant from the room.
+// POST /api/room/:roomId/ban/:identity
+//
+// @Summary Ban participant
+// @Description Ban a participant from the room. Room admin or superadmin only.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 200 {object} map[string]string "{status: success}"
+// @Failure 400 {object} ErrorResponse "Cannot target yourself"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Cannot ban the room admin or insufficient permissions"
+// @Failure 404 {object} ErrorResponse "Participant not found"
+// @Failure 500 {object} ErrorResponse "Failed to ban"
+// @Router /room/{roomId}/ban/{identity} [post]
 func (h *RoomHandler) BanParticipant(c *fiber.Ctx) error {
 	roomID, identity := c.Params("roomId"), c.Params("identity")
 	claims := c.Locals("user").(*auth.Claims)
@@ -987,6 +1395,23 @@ func containsAccess(accesses []string, target string) bool {
 	return false
 }
 
+// DisableParticipantVideo disables a participant's video.
+// POST /api/room/:roomId/video/:identity/off
+//
+// @Summary Disable participant video
+// @Description Disable a participant's video tracks. Moderator access required.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 200 {object} map[string]string "{status: success}"
+// @Failure 400 {object} ErrorResponse "Cannot target yourself"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Not authorized"
+// @Failure 404 {object} ErrorResponse "Participant not found"
+// @Failure 500 {object} ErrorResponse "Failed to disable video"
+// @Router /room/{roomId}/video/{identity}/off [post]
 func (h *RoomHandler) DisableParticipantVideo(c *fiber.Ctx) error {
 	roomID, identity := c.Params("roomId"), c.Params("identity")
 	claims := c.Locals("user").(*auth.Claims)
@@ -1013,13 +1438,56 @@ func (h *RoomHandler) DisableParticipantVideo(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{"status": "success"})
 }
+
+// BringToStage brings a participant to the stage. Not yet implemented.
+// POST /api/room/:roomId/stage/:identity/bring
+//
+// @Summary Bring to stage
+// @Description Bring a participant to the stage. Not yet implemented.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 501 {object} map[string]string "{error: not yet implemented}"
+// @Router /room/{roomId}/stage/{identity}/bring [post]
 func (h *RoomHandler) BringToStage(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{"error": "not yet implemented"})
 }
+
+// RemoveFromStage removes a participant from the stage. Not yet implemented.
+// POST /api/room/:roomId/stage/:identity/remove
+//
+// @Summary Remove from stage
+// @Description Remove a participant from the stage. Not yet implemented.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 501 {object} map[string]string "{error: not yet implemented}"
+// @Router /room/{roomId}/stage/{identity}/remove [post]
 func (h *RoomHandler) RemoveFromStage(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{"error": "not yet implemented"})
 }
 
+// UpdateSettings updates room settings.
+// PUT /api/room/:roomId/settings
+//
+// @Summary Update room settings
+// @Description Update room settings (isPublic, maxParticipants, recordings, etc.). Room creator or superadmin only.
+// @Tags rooms
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param request body object true "Room settings to update"
+// @Success 200 {object} map[string]interface{} "{message: settings updated}"
+// @Failure 400 {object} ErrorResponse "Invalid body"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Not the room creator"
+// @Failure 404 {object} ErrorResponse "Room not found"
+// @Failure 500 {object} ErrorResponse "Failed to update settings"
+// @Router /room/{roomId}/settings [put]
 func (h *RoomHandler) UpdateSettings(c *fiber.Ctx) error {
 	roomID := c.Params("roomId")
 	claims := c.Locals("user").(*auth.Claims)
@@ -1084,6 +1552,29 @@ func (h *RoomHandler) UpdateSettings(c *fiber.Ctx) error {
 	return c.JSON(room)
 }
 
+// AdminListRooms lists all rooms with filtering and pagination.
+// GET /api/admin/rooms
+//
+// @Summary Admin list rooms
+// @Description List all rooms with filters (search, status, visibility, occupancy, date range). Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(50) maximum(100)
+// @Param search query string false "Search by room name or ID"
+// @Param status query string false "Comma-separated: active, suspended, archived"
+// @Param visibility query string false "Comma-separated: public, private"
+// @Param occupancy query string false "Filter by participant count: empty, 1-5, 6-20, 20+"
+// @Param createdBy query string false "Filter by creator user ID"
+// @Param sort query string false "Sort field: name, createdAt, maxParticipants, participantsCount, lastActivityAt, createdBy" default(createdAt)
+// @Param order query string false "Sort direction: asc, desc" default(desc)
+// @Success 200 {object} map[string]interface{} "{rooms, total, page, limit}"
+// @Failure 400 {object} ErrorResponse "Invalid filter"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 500 {object} ErrorResponse "Failed to list rooms"
+// @Router /admin/rooms [get]
 func (h *RoomHandler) AdminListRooms(c *fiber.Ctx) error {
 	p := repository.RoomFilterParams{
 		Page:   c.QueryInt("page", 1),
@@ -1104,8 +1595,9 @@ func (h *RoomHandler) AdminListRooms(c *fiber.Ctx) error {
 	// Parse status
 	if st := c.Query("status"); st != "" {
 		p.Status = strings.Split(st, ",")
+		validStatuses := map[string]bool{"active": true, "suspended": true, "archived": true}
 		for _, v := range p.Status {
-			if v != "active" && v != "suspended" {
+			if !validStatuses[v] {
 				return c.Status(400).JSON(fiber.Map{"error": "Invalid status: " + v})
 			}
 		}
@@ -1166,6 +1658,11 @@ func (h *RoomHandler) AdminListRooms(c *fiber.Ctx) error {
 		p.Limit = 50
 	}
 
+	// Clamp page
+	if p.Page <= 0 {
+		p.Page = 1
+	}
+
 	rooms, total, err := h.roomRepo.GetAllRoomsFiltered(p)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch rooms"})
@@ -1182,6 +1679,18 @@ func (h *RoomHandler) AdminListRooms(c *fiber.Ctx) error {
 }
 
 // GetAdminStats returns aggregate system statistics for the admin dashboard KPI strip.
+// GET /api/admin/stats
+//
+// @Summary Admin dashboard stats
+// @Description Aggregate system statistics for admin dashboard KPI strip (total users, rooms, active now, etc.). Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Dashboard stats"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 500 {object} ErrorResponse "Failed"
+// @Router /admin/stats [get]
 func (h *RoomHandler) GetAdminStats(c *fiber.Ctx) error {
 	now := time.Now()
 	dayAgo := now.Add(-24 * time.Hour)
@@ -1243,23 +1752,34 @@ func (h *RoomHandler) GetAdminStats(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"totalRooms":        totalRooms,
-		"activeRooms":       activeRooms,
-		"privateRooms":      privateRooms,
-		"publicRooms":       publicRooms,
-		"emptyRooms":        emptyRooms,
-		"flaggedRooms":      0,
-		"pendingActions":    0,
-		"roomsLast24h":      roomsLast24h,
-		"roomsLast7d":       roomsLast7d,
-		"avgUsersPerRoom":   avgUsersPerRoom,
-		"onlineUsers":       onlineUsers,
-		"totalUsers":        totalUsers,
-		"staleRooms":        staleRooms,
-		"moderationFlags":   0,
+		"totalRooms":      totalRooms,
+		"activeRooms":     activeRooms,
+		"privateRooms":    privateRooms,
+		"publicRooms":     publicRooms,
+		"emptyRooms":      emptyRooms,
+		"flaggedRooms":    0,
+		"pendingActions":  0,
+		"roomsLast24h":    roomsLast24h,
+		"roomsLast7d":     roomsLast7d,
+		"avgUsersPerRoom": avgUsersPerRoom,
+		"onlineUsers":     onlineUsers,
+		"totalUsers":      totalUsers,
+		"staleRooms":      staleRooms,
+		"moderationFlags": 0,
 	})
 }
 
+// AdminGenerateToken generates a room token. Not yet implemented.
+// POST /api/admin/rooms/:roomId/token
+//
+// @Summary Admin generate token (NYI)
+// @Description Generate a LiveKit token for a room. Not yet implemented.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Success 501 {object} map[string]string "{error: not yet implemented}"
+// @Router /admin/rooms/{roomId}/token [post]
 func (h *RoomHandler) AdminGenerateToken(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{"error": "not yet implemented"})
 }
@@ -1272,9 +1792,10 @@ func (h *RoomHandler) AdminGenerateToken(c *fiber.Ctx) error {
 // @Param roomId path string true "Room ID"
 // @Security BearerAuth
 // @Success 202 {object} map[string]interface{} "Deletion queued"
+// @Failure 400 {object} ErrorResponse "Room already inactive"
 // @Failure 404 {object} ErrorResponse "Room not found"
 // @Failure 500 {object} ErrorResponse "Internal server error"
-// @Router /admin/rooms/{roomId}/close [post]
+// @Router /admin/rooms/{roomId} [delete]
 func (h *RoomHandler) AdminCloseRoom(c *fiber.Ctx) error {
 	roomID := c.Params("roomId")
 	room, err := h.roomRepo.GetRoom(roomID)
@@ -1293,6 +1814,7 @@ func (h *RoomHandler) AdminCloseRoom(c *fiber.Ctx) error {
 		RoomID:        roomID,
 		SystemEvent:   "room_closed",
 		SystemMessage: "This room has been closed by an administrator",
+		Purge:         true, // admin close = full wipe
 	}
 	if err := queue.Enqueue(context.Background(), database.GetDB(), "room_delete", payload,
 		queue.WithPriority(1), queue.WithMaxAttempts(3)); err != nil {
@@ -1341,6 +1863,22 @@ func (h *RoomHandler) AdminSuspendRoom(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"message": "Room suspension queued"})
 }
 
+// AdminReactivateRoom reactivates a suspended room.
+// POST /api/admin/rooms/:roomId/reactivate
+//
+// @Summary Reactivate room
+// @Description Reactivate a suspended room. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Success 200 {object} models.Room "Reactivated room"
+// @Failure 400 {object} ErrorResponse "Room not suspended"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 404 {object} ErrorResponse "Room not found"
+// @Failure 500 {object} ErrorResponse "Failed to reactivate"
+// @Router /admin/rooms/{roomId}/reactivate [post]
 func (h *RoomHandler) AdminReactivateRoom(c *fiber.Ctx) error {
 	roomID := c.Params("roomId")
 	room, err := h.roomRepo.GetRoom(roomID)
@@ -1369,6 +1907,23 @@ func (h *RoomHandler) AdminReactivateRoom(c *fiber.Ctx) error {
 	return c.JSON(room)
 }
 
+// AdminUpdateRoom updates room properties from admin panel.
+// PUT /api/admin/rooms/:roomId
+//
+// @Summary Admin update room
+// @Description Update room name or settings. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param request body object true "Room update fields"
+// @Success 200 {object} map[string]interface{} "{message: room updated}"
+// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 404 {object} ErrorResponse "Room not found"
+// @Failure 500 {object} ErrorResponse "Failed to update room"
+// @Router /admin/rooms/{roomId} [put]
 func (h *RoomHandler) AdminUpdateRoom(c *fiber.Ctx) error {
 	roomID := c.Params("roomId")
 	var input struct {
@@ -1443,6 +1998,19 @@ func (h *RoomHandler) AdminUpdateRoom(c *fiber.Ctx) error {
 	return c.JSON(updated)
 }
 
+// GetOnlineCount returns total online participants and publishers across all rooms.
+// GET /api/admin/online-count
+//
+// @Summary Get online count
+// @Description Get total online participants and publishers across all active LiveKit rooms. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "{totalParticipants, totalPublishers, activeRooms, rooms}"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 500 {object} ErrorResponse "Failed"
+// @Router /admin/online-count [get]
 func (h *RoomHandler) GetOnlineCount(c *fiber.Ctx) error {
 	count, err := h.roomRepo.CountActiveParticipants()
 	if err != nil {
@@ -1452,6 +2020,19 @@ func (h *RoomHandler) GetOnlineCount(c *fiber.Ctx) error {
 }
 
 // AdminLiveKitStats returns aggregate stats from the LiveKit server.
+// AdminLiveKitStats returns LiveKit server stats.
+// GET /api/admin/livekit/stats
+//
+// @Summary LiveKit stats
+// @Description Get LiveKit server statistics. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "{totalParticipants, totalPublishers, activeRooms, rooms}"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 500 {object} ErrorResponse "Failed"
+// @Router /admin/livekit/stats [get]
 func (h *RoomHandler) AdminLiveKitStats(c *fiber.Ctx) error {
 	ctx := h.withAuth(c.Context(), &lkauth.VideoGrant{RoomList: true})
 	resp, err := h.client.ListRooms(ctx, &livekit.ListRoomsRequest{})
@@ -1486,6 +2067,20 @@ func (h *RoomHandler) AdminLiveKitStats(c *fiber.Ctx) error {
 }
 
 // AdminGetRoomParticipants fetches live participant data from LiveKit for a specific room.
+// GET /api/admin/rooms/:roomId/participants
+//
+// @Summary Get room participants
+// @Description Get live participant data from LiveKit for a specific room. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Success 200 {object} map[string]interface{} "{participants, room}"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 404 {object} ErrorResponse "Room not found"
+// @Failure 500 {object} ErrorResponse "Failed"
+// @Router /admin/rooms/{roomId}/participants [get]
 func (h *RoomHandler) AdminGetRoomParticipants(c *fiber.Ctx) error {
 	roomID := c.Params("roomId")
 	room, err := h.roomRepo.GetRoom(roomID)
@@ -1554,6 +2149,23 @@ func (h *RoomHandler) AdminGetRoomParticipants(c *fiber.Ctx) error {
 // UploadChatImage accepts a multipart image upload for in-room chat.
 // Any authenticated participant may upload. The server selects the storage backend
 // based on config (disk / inline base64 / s3) and returns the attachment metadata.
+// POST /api/room/:roomId/chat/upload
+//
+// @Summary Upload chat image
+// @Description Upload an image for in-room chat. Authenticated room participants only.
+// @Tags rooms
+// @Accept multipart/form-data
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param file formData file true "Image file to upload"
+// @Success 200 {object} map[string]interface{} "{url, filename, size, ...}"
+// @Failure 400 {object} ErrorResponse "Upload error"
+// @Failure 401 {object} ErrorResponse "Not authenticated"
+// @Failure 403 {object} ErrorResponse "Not a participant"
+// @Failure 404 {object} ErrorResponse "Room not found"
+// @Failure 413 {object} ErrorResponse "File too large"
+// @Failure 500 {object} ErrorResponse "Failed to upload"
+// @Router /room/{roomId}/chat/upload [post]
 func (h *RoomHandler) UploadChatImage(c *fiber.Ctx) error {
 	roomID := c.Params("roomId")
 	claims := c.Locals("user").(*auth.Claims)
@@ -1695,6 +2307,22 @@ func (h *RoomHandler) UploadChatImage(c *fiber.Ctx) error {
 }
 
 // AdminKickParticipant removes any participant from a room (no creator check).
+// AdminKickParticipant kicks a participant from a room (admin).
+// POST /api/admin/rooms/:roomId/participants/:identity/kick
+//
+// @Summary Admin kick participant
+// @Description Kick a participant from a room. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 200 {object} map[string]string "{status: success}"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 404 {object} ErrorResponse "Room or participant not found"
+// @Failure 500 {object} ErrorResponse "Failed"
+// @Router /admin/rooms/{roomId}/participants/{identity}/kick [post]
 func (h *RoomHandler) AdminKickParticipant(c *fiber.Ctx) error {
 	roomID := c.Params("roomId")
 	identity := c.Params("identity")
@@ -1715,6 +2343,22 @@ func (h *RoomHandler) AdminKickParticipant(c *fiber.Ctx) error {
 }
 
 // AdminMuteParticipant mutes all audio tracks for a participant.
+// AdminMuteParticipant mutes a participant in a room (admin).
+// POST /api/admin/rooms/:roomId/participants/:identity/mute
+//
+// @Summary Admin mute participant
+// @Description Mute a participant in a room. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 200 {object} map[string]string "{status: success}"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 404 {object} ErrorResponse "Room or participant not found"
+// @Failure 500 {object} ErrorResponse "Failed"
+// @Router /admin/rooms/{roomId}/participants/{identity}/mute [post]
 func (h *RoomHandler) AdminMuteParticipant(c *fiber.Ctx) error {
 	roomID := c.Params("roomId")
 	identity := c.Params("identity")
@@ -1966,6 +2610,7 @@ func (h *RoomHandler) BulkCloseRooms(c *fiber.Ctx) error {
 			RoomID:        r.ID,
 			SystemEvent:   "room_ended",
 			SystemMessage: "Room closed by administrator",
+			Purge:         true, // admin bulk close = full wipe
 		}
 		if err := queue.Enqueue(context.Background(), database.GetDB(), "room_delete", payload,
 			queue.WithPriority(1), queue.WithMaxAttempts(3)); err != nil {
@@ -2008,5 +2653,42 @@ func parseUploadMeta(url, mime string, data []byte) (hash, ext, backend string) 
 			return hex.EncodeToString(h[:]), mimeExtension(mime), backend
 		}
 		return "", mimeExtension(mime), backend
+	}
+}
+
+// dispatchRoomEvent enqueues a webhook dispatch for room lifecycle events.
+// Active webhooks subscribed to the event are fetched, and for each one,
+// a dispatch_webhook job is enqueued with the room data and webhook secret.
+func (h *RoomHandler) dispatchRoomEvent(ctx context.Context, event, roomID, roomName, userID string) {
+	if h.webhookRepo == nil {
+		return
+	}
+
+	webhooks, err := h.webhookRepo.ListActive(event)
+	if err != nil {
+		log.Warn().Err(err).Str("event", event).Msg("Failed to list active webhooks for event")
+		return
+	}
+	if len(webhooks) == 0 {
+		return
+	}
+
+	body := map[string]any{
+		"roomId":   roomID,
+		"roomName": roomName,
+		"userId":   userID,
+	}
+
+	for _, wh := range webhooks {
+		payload := queue.WebhookPayload{
+			URL:    wh.URL,
+			Event:  event,
+			Body:   body,
+			Secret: wh.Secret,
+		}
+		if err := queue.Enqueue(ctx, database.GetDB(), "dispatch_webhook", payload); err != nil {
+			log.Warn().Err(err).Str("url", wh.URL).Str("event", event).
+				Msg("Failed to enqueue webhook dispatch")
+		}
 	}
 }

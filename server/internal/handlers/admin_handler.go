@@ -7,13 +7,16 @@ import (
 	"bedrud/internal/utils"
 	"bytes"
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"net/mail"
+	"net/smtp"
 	"net/url"
 	"strconv"
 	"strings"
@@ -179,7 +182,56 @@ func validateSettings(s *models.SystemSettings) error {
 		}
 	}
 
+	// Email branding — validate hex colors
+	if s.EmailHeaderBg != "" && !isValidHexColor(s.EmailHeaderBg) {
+		return fmt.Errorf("emailHeaderBg must be a valid hex color (#rrggbb)")
+	}
+	if s.EmailButtonBg != "" && !isValidHexColor(s.EmailButtonBg) {
+		return fmt.Errorf("emailButtonBg must be a valid hex color (#rrggbb)")
+	}
+
+	// Email branding — validate instance URL if set
+	if s.EmailInstanceURL != "" {
+		parsed, err := url.Parse(s.EmailInstanceURL)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			return fmt.Errorf("emailInstanceUrl: must be a valid absolute URL")
+		}
+		if parsed.Scheme != "http" && parsed.Scheme != "https" {
+			return fmt.Errorf("emailInstanceUrl: unsupported URL scheme %q, must be http/https", parsed.Scheme)
+		}
+	}
+
+	// Email branding — validate support email if set
+	if s.EmailSupportEmail != "" {
+		if _, err := mail.ParseAddress(s.EmailSupportEmail); err != nil {
+			return fmt.Errorf("emailSupportEmail: invalid email format")
+		}
+	}
+
+	// Email password minimum length
+	if s.EmailPassword != "" && len(s.EmailPassword) < 4 {
+		return fmt.Errorf("emailPassword must be at least 4 characters")
+	}
+
+	// SMTP port validation
+	if s.EmailSMTPPort != 0 && (s.EmailSMTPPort < 1 || s.EmailSMTPPort > 65535) {
+		return fmt.Errorf("emailSmtpPort must be between 1 and 65535, or 0 for config default")
+	}
+
 	return nil
+}
+
+// isValidHexColor checks that a string is a valid 6-character hex color with # prefix.
+func isValidHexColor(s string) bool {
+	if len(s) != 7 || s[0] != '#' {
+		return false
+	}
+	for _, c := range s[1:] {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
 }
 
 const maskedSecret = "••••••••"
@@ -187,12 +239,33 @@ const maskedSecret = "••••••••"
 type AdminHandler struct {
 	settingsRepo    *repository.SettingsRepository
 	inviteTokenRepo *repository.InviteTokenRepository
+	webhookRepo     *repository.WebhookRepository
+	// TODO oncoming feature
+	recordingRepo *repository.RecordingRepository
 }
 
-func NewAdminHandler(sr *repository.SettingsRepository, itr *repository.InviteTokenRepository) *AdminHandler {
-	return &AdminHandler{settingsRepo: sr, inviteTokenRepo: itr}
+func NewAdminHandler(
+	sr *repository.SettingsRepository,
+	itr *repository.InviteTokenRepository,
+	wr *repository.WebhookRepository,
+	rr *repository.RecordingRepository,
+) *AdminHandler {
+	return &AdminHandler{settingsRepo: sr, inviteTokenRepo: itr, webhookRepo: wr, recordingRepo: rr}
 }
 
+// GetSettings returns effective system settings with secrets masked.
+// GET /api/admin/settings
+//
+// @Summary Get system settings
+// @Description Get effective system settings. Superadmin access required. Secret fields are masked.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Success 200 {object} models.SystemSettings "Settings with masked secrets"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 500 {object} ErrorResponse "Failed to fetch settings"
+// @Router /admin/settings [get]
 func (h *AdminHandler) GetSettings(c *fiber.Ctx) error {
 	s, err := h.settingsRepo.GetEffectiveSettings()
 	if err != nil {
@@ -203,22 +276,55 @@ func (h *AdminHandler) GetSettings(c *fiber.Ctx) error {
 }
 
 // GetPublicSettings returns only the fields relevant to anonymous visitors (no auth required).
+// GET /api/auth/settings
+//
+// @Summary Get public settings
+// @Description Get public settings visible to unauthenticated visitors (registration, OAuth providers, etc.)
+// @Tags system
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Public settings"
+// @Failure 500 {object} ErrorResponse "Failed to fetch settings"
+// @Router /auth/settings [get]
 func (h *AdminHandler) GetPublicSettings(c *fiber.Ctx) error {
 	s, err := h.settingsRepo.GetEffectiveSettings()
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to fetch public settings")
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch settings"})
 	}
+	requireEmailVerify := false
+	if cfg := config.GetSafe(); cfg != nil {
+		requireEmailVerify = cfg.Auth.RequireEmailVerification
+	}
 	return c.JSON(fiber.Map{
-		"registrationEnabled":   s.RegistrationEnabled,
-		"tokenRegistrationOnly": s.TokenRegistrationOnly,
-		"passkeysEnabled":       s.PasskeysEnabled,
-		"oauthProviders":        auth.ConfiguredProviders(),
-		"chatMaxMessageCount":   s.ChatMaxMessageCount,
-		"chatMessageTTLHours":   s.ChatMessageTTLHours,
+		"serverName":               s.ServerName,
+		"registrationEnabled":      s.RegistrationEnabled,
+		"tokenRegistrationOnly":    s.TokenRegistrationOnly,
+		"guestLoginEnabled":        s.GuestLoginEnabled,
+		"passkeysEnabled":          s.PasskeysEnabled,
+		"oauthProviders":           auth.ConfiguredProviders(),
+		"requireEmailVerification": requireEmailVerify,
+		"chatMaxMessageCount":      s.ChatMaxMessageCount,
+		"chatMessageTTLHours":      s.ChatMessageTTLHours,
+		"recordingsEnabled":        s.RecordingsEnabled,
 	})
 }
 
+// UpdateSettings applies partial updates to system settings.
+// PUT /api/admin/settings
+//
+// @Summary Update system settings
+// @Description Update system settings via partial JSON merge. Superadmin access required. Secrets sent as "••••••••" are preserved.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param request body object true "Partial settings JSON"
+// @Success 200 {object} models.SystemSettings "Updated settings with masked secrets"
+// @Failure 400 {object} ErrorResponse "Validation error"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 500 {object} ErrorResponse "Failed to save settings"
+// @Router /admin/settings [put]
 func (h *AdminHandler) UpdateSettings(c *fiber.Ctx) error {
 	// Get existing settings first (to use as base for partial updates)
 	existing, err := h.settingsRepo.GetSettings()
@@ -271,7 +377,8 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 		// Secrets — handle masked placeholder
 		case "googleClientSecret", "githubClientSecret", "twitterClientSecret",
 			"jwtSecret", "sessionSecret", "livekitApiSecret",
-			"chatUploadS3AccessKey", "chatUploadS3SecretKey":
+			"chatUploadS3AccessKey", "chatUploadS3SecretKey",
+			"emailPassword":
 			var s string
 			if err := json.Unmarshal(val, &s); err != nil {
 				return fmt.Errorf("%s: expected a string, got %s", key, describeJSONType(val))
@@ -296,6 +403,8 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 					existing.ChatUploadS3AccessKey = s
 				case "chatUploadS3SecretKey":
 					existing.ChatUploadS3SecretKey = s
+				case "emailPassword":
+					existing.EmailPassword = s
 				}
 			}
 
@@ -309,7 +418,15 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 			"corsAllowedOrigins", "corsAllowedHeaders", "corsAllowedMethods",
 			"chatUploadBackend", "chatUploadDiskDir",
 			"chatUploadS3Endpoint", "chatUploadS3Bucket", "chatUploadS3Region",
-			"chatUploadS3PublicUrl", "logLevel":
+			"chatUploadS3PublicUrl", "logLevel",
+			"serverName",
+			"emailInstanceName", "emailSupportEmail", "emailInstanceUrl",
+			"emailHeaderBg", "emailButtonBg",
+			"emailSubjectVerify", "emailSubjectWelcome",
+			"emailSubjectReset", "emailSubjectChanged", "emailSubjectInvite",
+			"emailPreheaderVerify", "emailPreheaderWelcome",
+			"emailPreheaderReset", "emailPreheaderChanged", "emailPreheaderInvite",
+			"emailSmtpHost", "emailUsername", "emailFromAddress", "emailFromName":
 			var s string
 			if err := json.Unmarshal(val, &s); err != nil {
 				return fmt.Errorf("%s: expected a string, got %s", key, describeJSONType(val))
@@ -365,12 +482,54 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 				existing.ChatUploadS3PublicURL = s
 			case "logLevel":
 				existing.LogLevel = s
+			case "serverName":
+				existing.ServerName = s
+			case "emailInstanceName":
+				existing.EmailInstanceName = s
+			case "emailSupportEmail":
+				existing.EmailSupportEmail = s
+			case "emailInstanceUrl":
+				existing.EmailInstanceURL = s
+			case "emailHeaderBg":
+				existing.EmailHeaderBg = s
+			case "emailButtonBg":
+				existing.EmailButtonBg = s
+			case "emailSubjectVerify":
+				existing.EmailSubjectVerify = s
+			case "emailSubjectWelcome":
+				existing.EmailSubjectWelcome = s
+			case "emailSubjectReset":
+				existing.EmailSubjectReset = s
+			case "emailSubjectChanged":
+				existing.EmailSubjectChanged = s
+			case "emailSubjectInvite":
+				existing.EmailSubjectInvite = s
+			case "emailPreheaderVerify":
+				existing.EmailPreheaderVerify = s
+			case "emailPreheaderWelcome":
+				existing.EmailPreheaderWelcome = s
+			case "emailPreheaderReset":
+				existing.EmailPreheaderReset = s
+			case "emailPreheaderChanged":
+				existing.EmailPreheaderChanged = s
+			case "emailPreheaderInvite":
+				existing.EmailPreheaderInvite = s
+			case "emailSmtpHost":
+				existing.EmailSMTPHost = s
+			case "emailUsername":
+				existing.EmailUsername = s
+			case "emailFromAddress":
+				existing.EmailFromAddress = s
+			case "emailFromName":
+				existing.EmailFromName = s
 			}
 
 		// Bool fields
 		case "registrationEnabled", "tokenRegistrationOnly", "passkeysEnabled",
 			"serverEnableTls", "serverUseAcme", "behindProxy",
-			"livekitExternal", "corsAllowCredentials":
+			"livekitExternal", "corsAllowCredentials", "guestLoginEnabled",
+			"recordingsEnabled",
+			"emailTlsSkipVerify", "emailSmtpsMode":
 			var b bool
 			if err := json.Unmarshal(val, &b); err != nil {
 				return fmt.Errorf("%s: expected a boolean, got %s", key, describeJSONType(val))
@@ -392,12 +551,22 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 				existing.LiveKitExternal = b
 			case "corsAllowCredentials":
 				existing.CORSAllowCredentials = b
+			case "guestLoginEnabled":
+				existing.GuestLoginEnabled = b
+			case "recordingsEnabled":
+				existing.RecordingsEnabled = b
+			case "emailTlsSkipVerify":
+				existing.EmailTLSSkipVerify = b
+			case "emailSmtpsMode":
+				existing.EmailSMTPSMode = b
 			}
 
 		// Int fields
 		case "corsMaxAge", "tokenDuration",
 			"maxParticipantsLimit", "maxRoomsPerUser",
-			"chatMaxMessageCount", "chatMessageTTLHours":
+			"chatMaxMessageCount", "chatMessageTTLHours",
+			"recordingMaxDurationMins", "recordingMaxFileSizeMB",
+			"emailSmtpPort":
 			var i int
 			if err := json.Unmarshal(val, &i); err != nil {
 				return fmt.Errorf("%s: expected an integer, got %s", key, describeJSONType(val))
@@ -415,6 +584,12 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 				existing.ChatMaxMessageCount = i
 			case "chatMessageTTLHours":
 				existing.ChatMessageTTLHours = i
+			case "recordingMaxDurationMins":
+				existing.RecordingMaxDurationMins = i
+			case "recordingMaxFileSizeMB":
+				existing.RecordingMaxFileSizeMB = i
+			case "emailSmtpPort":
+				existing.EmailSMTPPort = i
 			}
 
 		// Int64 fields
@@ -457,6 +632,9 @@ func describeJSONType(raw json.RawMessage) string {
 	case 'n':
 		return "null"
 	default:
+		if bytes.ContainsAny(raw, ".eE") {
+			return "a float (expected integer)"
+		}
 		return "a number"
 	}
 }
@@ -488,9 +666,27 @@ func maskSettings(s *models.SystemSettings) *models.SystemSettings {
 	if cp.ChatUploadS3SecretKey != "" {
 		cp.ChatUploadS3SecretKey = maskedSecret
 	}
+	if cp.EmailPassword != "" {
+		cp.EmailPassword = maskedSecret
+	}
 	return &cp
 }
 
+// ListInviteTokens returns paginated invite tokens.
+// GET /api/admin/invite-tokens
+//
+// @Summary List invite tokens
+// @Description Get paginated list of registration invite tokens. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(50)
+// @Success 200 {object} map[string]interface{} "{tokens, total}"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 500 {object} ErrorResponse "Failed to fetch tokens"
+// @Router /admin/invite-tokens [get]
 func (h *AdminHandler) ListInviteTokens(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 50)
@@ -513,6 +709,21 @@ func (h *AdminHandler) ListInviteTokens(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"tokens": out, "total": total})
 }
 
+// CreateInviteToken creates a new registration invite token.
+// POST /api/admin/invite-tokens
+//
+// @Summary Create invite token
+// @Description Create a new registration invite token. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param request body object true "{email?: string, expiresInHours?: int}"
+// @Success 201 {object} models.InviteToken "Created token"
+// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 500 {object} ErrorResponse "Failed to create token"
+// @Router /admin/invite-tokens [post]
 func (h *AdminHandler) CreateInviteToken(c *fiber.Ctx) error {
 	claims := c.Locals("user").(*auth.Claims)
 	var input struct {
@@ -553,20 +764,199 @@ func (h *AdminHandler) CreateInviteToken(c *fiber.Ctx) error {
 	return c.Status(201).JSON(token)
 }
 
+// SendTestEmail sends a synchronous test email to verify SMTP configuration end-to-end.
+// POST /api/admin/settings/send-test-email
+//
+// @Summary Send test email
+// @Description Send a synchronous test email to verify SMTP configuration. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param request body object true "{to: string} - recipient email"
+// @Success 200 {object} map[string]interface{} "Test email sent"
+// @Failure 400 {object} ErrorResponse "Invalid request or SMTP error"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 408 {object} ErrorResponse "SMTP connection timed out"
+// @Failure 500 {object} ErrorResponse "Failed to load settings"
+// @Router /admin/settings/send-test-email [post]
+func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
+	var input struct {
+		To string `json:"to"`
+	}
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+	if input.To == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "to field is required"})
+	}
+	if _, err := mail.ParseAddress(input.To); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid email format"})
+	}
+
+	effective, err := h.settingsRepo.GetEffectiveSettings()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to load settings"})
+	}
+
+	// Build SMTP config from effective settings with fallback to config.yaml
+	smtpHost := effective.EmailSMTPHost
+	smtpPort := effective.EmailSMTPPort
+	username := effective.EmailUsername
+	password := effective.EmailPassword
+	fromAddr := effective.EmailFromAddress
+	fromName := effective.EmailFromName
+	tlsSkip := effective.EmailTLSSkipVerify
+	smtpsMode := effective.EmailSMTPSMode
+
+	// Double-check: if still empty, try config.yaml directly
+	if smtpHost == "" || smtpPort == 0 {
+		if cfg := config.GetSafe(); cfg != nil {
+			if smtpHost == "" {
+				smtpHost = cfg.Email.SMTPHost
+			}
+			if smtpPort == 0 {
+				smtpPort = cfg.Email.SMTPPort
+			}
+			if username == "" {
+				username = cfg.Email.Username
+			}
+			if password == "" {
+				password = cfg.Email.Password
+			}
+			if fromAddr == "" {
+				fromAddr = cfg.Email.FromAddress
+			}
+			if fromName == "" {
+				fromName = cfg.Email.FromName
+			}
+			if !tlsSkip && cfg.Email.TLSSkipVerify {
+				tlsSkip = cfg.Email.TLSSkipVerify
+			}
+			if !smtpsMode && cfg.Email.SMTPSMode {
+				smtpsMode = cfg.Email.SMTPSMode
+			}
+		}
+	}
+
+	if smtpHost == "" || smtpPort == 0 {
+		return c.Status(400).JSON(fiber.Map{"error": "SMTP not configured — set host and port in settings"})
+	}
+
+	if fromAddr == "" {
+		fromAddr = "noreply@bedrud"
+	}
+	if fromName == "" {
+		fromName = effective.EmailInstanceName
+		if fromName == "" {
+			fromName = "Bedrud"
+		}
+	}
+
+	instanceName := effective.EmailInstanceName
+	if instanceName == "" {
+		instanceName = "Bedrud"
+	}
+	now := time.Now().UTC().Format(time.RFC1123Z)
+
+	subject := fmt.Sprintf("Test Email from %s", instanceName)
+	bodyHTML := buildTestEmailHTML(instanceName, effective.EmailButtonBg, effective.EmailHeaderBg)
+	bodyPlain := fmt.Sprintf(
+		"This is a test email from %s.\nSent at: %s\nIf you see this, SMTP is working.\n",
+		instanceName, now,
+	)
+
+	addr := net.JoinHostPort(smtpHost, fmt.Sprint(smtpPort))
+	var auth smtp.Auth
+	if username != "" {
+		auth = smtp.PlainAuth("", username, password, smtpHost)
+	}
+
+	msg := utils.BuildMessage(fromName, fromAddr, input.To, subject, bodyHTML, bodyPlain)
+
+	ctx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				errCh <- fmt.Errorf("panic in SendSMTP: %v", r)
+			}
+		}()
+		errCh <- utils.SendSMTP(addr, auth, fromAddr, []string{input.To}, []byte(msg), smtpHost, tlsSkip, smtpsMode)
+	}()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			log.Error().Err(err).Str("to", input.To).Msg("Test email send failed")
+			return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+		}
+		log.Info().Str("to", input.To).Msg("Test email sent successfully")
+		return c.JSON(fiber.Map{"status": "ok", "message": fmt.Sprintf("Test email sent to %s", input.To)})
+	case <-ctx.Done():
+		return c.Status(408).JSON(fiber.Map{"error": "SMTP connection timed out after 30s"})
+	}
+}
+
+func buildTestEmailHTML(instanceName, buttonBg, headerBg string) string {
+	if headerBg == "" {
+		headerBg = "#1a1a2e"
+	}
+	if buttonBg == "" {
+		buttonBg = "#e11d48"
+	}
+	now := time.Now().UTC().Format(time.RFC1123Z)
+	return fmt.Sprintf(`
+<!DOCTYPE html><html><body style="margin:0;padding:0;font-family:sans-serif;">
+<div style="background:%s;padding:24px;text-align:center;">
+  <h1 style="color:#fff;margin:0;">%s — Test Email</h1>
+</div>
+<div style="padding:32px;color:#333;line-height:1.7;">
+  <p>If you see this, your SMTP configuration is working correctly.</p>
+  <p style="color:#666;font-size:14px;">Sent at %s</p>
+</div>
+<div style="background:#f5f5f5;padding:16px;text-align:center;font-size:12px;color:#666;">
+  <p>This is an automated test email from %s. No action required.</p>
+</div>
+</body></html>`, headerBg, instanceName, now, instanceName)
+}
+
 // ValidateSettingsConnectivity runs runtime checks against external services
 // using the provided settings subset. Returns per-check status without saving.
+// POST /api/admin/settings/validate
+//
+// @Summary Validate settings connectivity
+// @Description Run connectivity checks against external services (LiveKit, S3, email, TLS) without saving. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param request body object true "Partial settings to validate"
+// @Success 200 {object} map[string]interface{} "{checks: {livekit, s3, tls, email}}"
+// @Failure 400 {object} ErrorResponse "Invalid input"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Router /admin/settings/validate [post]
 func (h *AdminHandler) ValidateSettingsConnectivity(c *fiber.Ctx) error {
 	var raw map[string]json.RawMessage
 	if err := c.BodyParser(&raw); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid input"})
 	}
 
+	results := make(map[string]interface{})
+
 	// Build a partial SystemSettings from the request
 	var s models.SystemSettings
-	buf, _ := json.Marshal(raw)
-	json.Unmarshal(buf, &s) // best-effort; missing fields stay zero
-
-	results := make(map[string]interface{})
+	buf, err := json.Marshal(raw)
+	if err != nil {
+		results["marshal"] = failResult("failed to marshal settings: " + err.Error())
+		return c.JSON(fiber.Map{"checks": results})
+	}
+	if err := json.Unmarshal(buf, &s); err != nil {
+		results["unmarshal"] = failResult("invalid settings format: " + err.Error())
+		return c.JSON(fiber.Map{"checks": results})
+	}
 
 	// LiveKit connectivity check
 	if s.LiveKitHost != "" || s.LiveKitAPIKey != "" || s.LiveKitAPISecret != "" {
@@ -685,6 +1075,16 @@ func checkS3Connectivity(s models.SystemSettings) checkResult {
 
 	// Minimal connectivity: HEAD request to bucket endpoint
 	endpoint := strings.TrimRight(s.ChatUploadS3Endpoint, "/")
+
+	// Warn if S3 endpoint uses plain HTTP (credentials exposed)
+	parsedURL, err := url.Parse(endpoint)
+	if err == nil && parsedURL.Scheme != "https" {
+		return checkResult{
+			Status:  "warning",
+			Message: "S3 endpoint uses non-HTTPS — credentials sent in plaintext",
+		}
+	}
+
 	url := fmt.Sprintf("%s/%s", endpoint, s.ChatUploadS3Bucket)
 
 	req, err := http.NewRequest("HEAD", url, nil)
@@ -748,6 +1148,20 @@ func checkEmailDelivery(email string) checkResult {
 	return okResult()
 }
 
+// DeleteInviteToken deletes an invite token.
+// DELETE /api/admin/invite-tokens/:id
+//
+// @Summary Delete invite token
+// @Description Delete a registration invite token. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param id path string true "Token ID"
+// @Success 200 {object} map[string]string "{status: success}"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 500 {object} ErrorResponse "Failed to delete token"
+// @Router /admin/invite-tokens/{id} [delete]
 func (h *AdminHandler) DeleteInviteToken(c *fiber.Ctx) error {
 	tokenID := c.Params("id")
 	if err := h.inviteTokenRepo.Delete(tokenID); err != nil {
@@ -755,4 +1169,388 @@ func (h *AdminHandler) DeleteInviteToken(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete token"})
 	}
 	return c.JSON(fiber.Map{"status": "success"})
+}
+
+// ---------- Webhook CRUD ----------
+
+// webhookDTO is the public representation of a webhook (secret masked).
+type webhookDTO struct {
+	ID        string     `json:"id"`
+	Name      string     `json:"name"`
+	URL       string     `json:"url"`
+	Secret    string     `json:"secret,omitempty"` // only returned once on create/rotate
+	Events    []string   `json:"events"`
+	IsActive  bool       `json:"isActive"`
+	LastSeen  *time.Time `json:"lastSeen,omitempty"`
+	CreatedBy string     `json:"createdBy"`
+	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt time.Time  `json:"updatedAt"`
+}
+
+// validWebhookEvents is the set of event types subscribers can listen for.
+var validWebhookEvents = map[string]bool{
+	models.EventRoomCreated:        true,
+	models.EventRoomEnded:          true,
+	models.EventParticipantJoined:  true,
+	models.EventRecordingCompleted: true,
+	models.EventWebhookTest:        true,
+}
+
+// validateEvents checks that the provided event list is non-empty and contains
+// only known event types. Returns an error message suitable for API response.
+func validateEvents(events []string) error {
+	if len(events) == 0 {
+		return fmt.Errorf("at least one event must be specified")
+	}
+	for _, e := range events {
+		if !validWebhookEvents[e] {
+			return fmt.Errorf("unknown event type: %q", e)
+		}
+	}
+	return nil
+}
+
+// ListWebhooks returns paginated webhook endpoints.
+// GET /api/admin/webhooks
+//
+// @Summary List webhooks
+// @Description Get paginated list of webhook endpoints. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(50)
+// @Success 200 {object} map[string]interface{} "{webhooks, total, page, limit}"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 500 {object} ErrorResponse "Failed to list webhooks"
+// @Router /admin/webhooks [get]
+func (h *AdminHandler) ListWebhooks(c *fiber.Ctx) error {
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 50)
+	webhooks, total, err := h.webhookRepo.ListPaginated(repository.PaginationParams{Page: page, Limit: limit})
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to list webhooks")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to list webhooks"})
+	}
+	result := make([]webhookDTO, len(webhooks))
+	for i, w := range webhooks {
+		result[i] = webhookDTO{
+			ID:        w.ID,
+			Name:      w.Name,
+			URL:       w.URL,
+			Secret:    w.MaskedSecret(),
+			Events:    w.Events,
+			IsActive:  w.IsActive,
+			LastSeen:  w.LastSeen,
+			CreatedBy: w.CreatedBy,
+			CreatedAt: w.CreatedAt,
+			UpdatedAt: w.UpdatedAt,
+		}
+	}
+	return c.JSON(fiber.Map{"webhooks": result, "total": total, "page": page, "limit": limit})
+}
+
+type createWebhookRequest struct {
+	Name   string   `json:"name"`
+	URL    string   `json:"url"`
+	Events []string `json:"events"`
+}
+
+// CreateWebhook creates a new webhook endpoint.
+// POST /api/admin/webhooks
+//
+// @Summary Create webhook
+// @Description Create a new webhook endpoint with a generated secret. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param request body createWebhookRequest true "Webhook configuration"
+// @Success 201 {object} webhookDTO "Created webhook with plaintext secret"
+// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 500 {object} ErrorResponse "Failed to create webhook"
+// @Router /admin/webhooks [post]
+func (h *AdminHandler) CreateWebhook(c *fiber.Ctx) error {
+	var req createWebhookRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+	if req.Name == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "name is required"})
+	}
+	if req.URL == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "url is required"})
+	}
+
+	if err := validateEvents(req.Events); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Validate URL
+	parsed, err := url.Parse(req.URL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid URL: must be absolute http:// or https:// URL"})
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return c.Status(400).JSON(fiber.Map{"error": "URL scheme must be http:// or https://"})
+	}
+
+	// Generate a 32-char crypto-random secret
+	secretBytes := make([]byte, 16)
+	if _, err := rand.Read(secretBytes); err != nil {
+		log.Error().Err(err).Msg("Failed to generate webhook secret")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to generate secret"})
+	}
+	secret := hex.EncodeToString(secretBytes)
+
+	userID := c.Locals("userID").(string)
+	w := models.Webhook{
+		ID:        uuid.New().String(),
+		Name:      req.Name,
+		URL:       req.URL,
+		Secret:    secret,
+		Events:    req.Events,
+		IsActive:  true,
+		CreatedBy: userID,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	if err := h.webhookRepo.Create(&w); err != nil {
+		log.Error().Err(err).Msg("Failed to create webhook")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to create webhook"})
+	}
+
+	// Return secret plaintext once
+	return c.Status(201).JSON(webhookDTO{
+		ID:        w.ID,
+		Name:      w.Name,
+		URL:       w.URL,
+		Secret:    secret,
+		Events:    w.Events,
+		IsActive:  w.IsActive,
+		CreatedBy: w.CreatedBy,
+		CreatedAt: w.CreatedAt,
+		UpdatedAt: w.UpdatedAt,
+	})
+}
+
+type updateWebhookRequest struct {
+	Name     *string   `json:"name"`
+	URL      *string   `json:"url"`
+	Events   *[]string `json:"events"`
+	IsActive *bool     `json:"isActive"`
+}
+
+// UpdateWebhook updates an existing webhook endpoint.
+// PUT /api/admin/webhooks/:id
+//
+// @Summary Update webhook
+// @Description Update webhook name, URL, events, or active status. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param id path string true "Webhook ID"
+// @Param request body updateWebhookRequest true "Webhook fields to update"
+// @Success 200 {object} webhookDTO "Updated webhook"
+// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 404 {object} ErrorResponse "Webhook not found"
+// @Failure 500 {object} ErrorResponse "Failed to update webhook"
+// @Router /admin/webhooks/{id} [put]
+func (h *AdminHandler) UpdateWebhook(c *fiber.Ctx) error {
+	id := c.Params("id")
+	w, err := h.webhookRepo.GetByID(id)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Webhook not found"})
+	}
+
+	var req updateWebhookRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	if req.Name != nil {
+		if *req.Name == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "name cannot be empty"})
+		}
+		w.Name = *req.Name
+	}
+	if req.URL != nil {
+		if *req.URL == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "url cannot be empty"})
+		}
+		parsed, err := url.Parse(*req.URL)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid URL"})
+		}
+		if parsed.Scheme != "http" && parsed.Scheme != "https" {
+			return c.Status(400).JSON(fiber.Map{"error": "URL scheme must be http:// or https://"})
+		}
+		w.URL = *req.URL
+	}
+	if req.Events != nil {
+		if err := validateEvents(*req.Events); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+		}
+		w.Events = *req.Events
+	}
+	if req.IsActive != nil {
+		w.IsActive = *req.IsActive
+	}
+
+	if err := h.webhookRepo.Update(w); err != nil {
+		log.Error().Err(err).Str("webhookID", id).Msg("Failed to update webhook")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update webhook"})
+	}
+
+	return c.JSON(webhookDTO{
+		ID:        w.ID,
+		Name:      w.Name,
+		URL:       w.URL,
+		Secret:    w.MaskedSecret(),
+		Events:    w.Events,
+		IsActive:  w.IsActive,
+		LastSeen:  w.LastSeen,
+		CreatedBy: w.CreatedBy,
+		CreatedAt: w.CreatedAt,
+		UpdatedAt: w.UpdatedAt,
+	})
+}
+
+// DeleteWebhook deletes a webhook endpoint.
+// DELETE /api/admin/webhooks/:id
+//
+// @Summary Delete webhook
+// @Description Delete a webhook endpoint. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param id path string true "Webhook ID"
+// @Success 200 {object} map[string]string "{status: deleted}"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 404 {object} ErrorResponse "Webhook not found"
+// @Failure 500 {object} ErrorResponse "Failed to delete webhook"
+// @Router /admin/webhooks/{id} [delete]
+func (h *AdminHandler) DeleteWebhook(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if err := h.webhookRepo.Delete(id); err != nil {
+		if err == repository.ErrWebhookNotFound {
+			return c.Status(404).JSON(fiber.Map{"error": "Webhook not found"})
+		}
+		log.Error().Err(err).Str("webhookID", id).Msg("Failed to delete webhook")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete webhook"})
+	}
+	return c.JSON(fiber.Map{"status": "deleted"})
+}
+
+// RotateWebhookSecret generates a new secret for a webhook endpoint.
+// POST /api/admin/webhooks/:id/rotate-secret
+//
+// @Summary Rotate webhook secret
+// @Description Generate a new crypto-random secret for a webhook endpoint. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param id path string true "Webhook ID"
+// @Success 200 {object} map[string]string "{secret: ...}"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 404 {object} ErrorResponse "Webhook not found"
+// @Failure 500 {object} ErrorResponse "Failed to rotate secret"
+// @Router /admin/webhooks/{id}/rotate-secret [post]
+func (h *AdminHandler) RotateWebhookSecret(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	// Generate new 32-char crypto-random secret
+	secretBytes := make([]byte, 16)
+	if _, err := rand.Read(secretBytes); err != nil {
+		log.Error().Err(err).Msg("Failed to generate webhook secret")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to generate secret"})
+	}
+	newSecret := hex.EncodeToString(secretBytes)
+
+	if err := h.webhookRepo.UpdateSecret(id, newSecret); err != nil {
+		if err == repository.ErrWebhookNotFound {
+			return c.Status(404).JSON(fiber.Map{"error": "Webhook not found"})
+		}
+		log.Error().Err(err).Str("webhookID", id).Msg("Failed to rotate webhook secret")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to rotate secret"})
+	}
+
+	// Return new secret plaintext once
+	return c.JSON(fiber.Map{"secret": newSecret})
+}
+
+// TestWebhook sends a ping event to a webhook endpoint and returns the result.
+// POST /api/admin/webhooks/:id/test
+//
+// @Summary Test webhook
+// @Description Send a ping event to test webhook connectivity and latency. Superadmin access required.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param id path string true "Webhook ID"
+// @Success 200 {object} map[string]interface{} "{status, httpStatus, latencyMs, error?}"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 404 {object} ErrorResponse "Webhook not found"
+// @Router /admin/webhooks/{id}/test [post]
+func (h *AdminHandler) TestWebhook(c *fiber.Ctx) error {
+	id := c.Params("id")
+	w, err := h.webhookRepo.GetByID(id)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Webhook not found"})
+	}
+
+	start := time.Now()
+
+	// Build ping payload
+	envelope := map[string]any{
+		"event":     "ping",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"data":      map[string]any{},
+	}
+	body, _ := json.Marshal(envelope)
+
+	// HMAC-SHA256 signature
+	mac := hmac.New(sha256.New, []byte(w.Secret))
+	mac.Write(body)
+	sig := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+
+	req, err := http.NewRequest(http.MethodPost, w.URL, bytes.NewReader(body))
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": "error",
+			"error":  fmt.Sprintf("Invalid URL: %v", err),
+		})
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Bedrud-Signature", sig)
+	req.Header.Set("X-Bedrud-Event", "ping")
+	req.Header.Set("X-Bedrud-Timestamp", envelope["timestamp"].(string))
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	latency := time.Since(start).Milliseconds()
+
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status":    "delivery_failed",
+			"error":     err.Error(),
+			"latencyMs": latency,
+		})
+	}
+	resp.Body.Close()
+
+	success := resp.StatusCode >= 200 && resp.StatusCode < 300
+	return c.JSON(fiber.Map{
+		"status":     map[bool]string{true: "success", false: "non_2xx"}[success],
+		"httpStatus": resp.StatusCode,
+		"latencyMs":  latency,
+	})
 }
