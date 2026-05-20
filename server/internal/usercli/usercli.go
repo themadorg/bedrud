@@ -10,7 +10,11 @@ import (
 	"bedrud/internal/services"
 	"bedrud/internal/storage"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -193,6 +197,140 @@ func DeleteUser(configPath, email string) error {
 
 	fmt.Printf("✓ Deleted user: %s (%d room(s) cleaned up)\n", user.Email, len(rooms))
 	return nil
+}
+
+// ListUsers prints a table of users, paginated.
+func ListUsers(configPath string, page, pageSize int) error {
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+	if err := database.Initialize(&cfg.Database); err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	defer database.Close()
+	if err := database.RunMigrations(); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	repo := repository.NewUserRepository(database.GetDB())
+	users, total, err := repo.GetAllUsers(repository.PaginationParams{Page: page, Limit: pageSize})
+	if err != nil {
+		return fmt.Errorf("failed to list users: %w", err)
+	}
+
+	fmt.Printf("%-36s  %-32s  %-20s  %-10s  %-9s  %s\n", "ID", "EMAIL", "NAME", "PROVIDER", "ACTIVE", "ACCESSES")
+	for _, u := range users {
+		accesses := strings.Join([]string(u.Accesses), ",")
+		active := "no"
+		if u.IsActive {
+			active = "yes"
+		}
+		fmt.Printf("%-36s  %-32s  %-20s  %-10s  %-9s  %s\n",
+			u.ID, truncate(u.Email, 32), truncate(u.Name, 20), u.Provider, active, accesses)
+	}
+	fmt.Printf("\nshowing page %d (%d per page) of %d total user(s)\n", page, pageSize, total)
+	return nil
+}
+
+// ShowUser prints full information for a user identified by email.
+func ShowUser(configPath, email string) error {
+	return withUser(configPath, email, func(repo *repository.UserRepository, user *models.User) error {
+		accesses := append([]string(nil), []string(user.Accesses)...)
+		sort.Strings(accesses)
+		fmt.Println("User:")
+		fmt.Printf("  ID:        %s\n", user.ID)
+		fmt.Printf("  Email:     %s\n", user.Email)
+		fmt.Printf("  Name:      %s\n", user.Name)
+		fmt.Printf("  Provider:  %s\n", user.Provider)
+		fmt.Printf("  Avatar:    %s\n", user.AvatarURL)
+		fmt.Printf("  Active:    %t\n", user.IsActive)
+		fmt.Printf("  Accesses:  %s\n", strings.Join(accesses, ", "))
+		fmt.Printf("  Created:   %s\n", user.CreatedAt.Format(time.RFC3339))
+		fmt.Printf("  Updated:   %s\n", user.UpdatedAt.Format(time.RFC3339))
+		return nil
+	})
+}
+
+// SetUserPassword overwrites the password for a local-provider user. The
+// caller may pass an empty password to request generation of a random one,
+// which is then printed to stdout.
+func SetUserPassword(configPath, email, newPassword string) error {
+	return withUser(configPath, email, func(repo *repository.UserRepository, user *models.User) error {
+		generated := false
+		if newPassword == "" {
+			gen, err := generatePassword(20)
+			if err != nil {
+				return fmt.Errorf("generate password: %w", err)
+			}
+			newPassword = gen
+			generated = true
+		}
+		hashed, err := auth.HashPassword(newPassword)
+		if err != nil {
+			return fmt.Errorf("hash password: %w", err)
+		}
+		if err := repo.UpdatePassword(user.ID, string(hashed)); err != nil {
+			return fmt.Errorf("update password: %w", err)
+		}
+		if err := repo.ClearRefreshToken(user.ID); err != nil {
+			return fmt.Errorf("invalidate sessions: %w", err)
+		}
+		fmt.Printf("✓ Password updated for %s\n", email)
+		if generated {
+			fmt.Printf("  New password: %s\n", newPassword)
+		}
+		return nil
+	})
+}
+
+// SetUserActive toggles the IsActive flag and clears any cached refresh token.
+func SetUserActive(configPath, email string, active bool) error {
+	return withUser(configPath, email, func(repo *repository.UserRepository, user *models.User) error {
+		if user.IsActive == active {
+			fmt.Printf("User %q already %s.\n", email, activeWord(active))
+			return nil
+		}
+		if err := repo.UpdateUserStatusAndClearToken(user.ID, active); err != nil {
+			return fmt.Errorf("update status: %w", err)
+		}
+		fmt.Printf("✓ User %q is now %s.\n", email, activeWord(active))
+		return nil
+	})
+}
+
+func activeWord(active bool) string {
+	if active {
+		return "active"
+	}
+	return "disabled"
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	if n < 1 {
+		return ""
+	}
+	return s[:n-1] + "…"
+}
+
+func generatePassword(n int) (string, error) {
+	if n < 8 {
+		n = 8
+	}
+	raw := make([]byte, n)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw)[:n], nil
 }
 
 func withUser(configPath, email string, fn func(*repository.UserRepository, *models.User) error) error {

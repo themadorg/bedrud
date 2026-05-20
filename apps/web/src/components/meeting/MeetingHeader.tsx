@@ -7,6 +7,8 @@ import { cn } from '#/lib/utils'
 
 interface MeetingHeaderProps {
   meetId: string
+  /** Epoch ms when the LiveKit session was created on the server. 0/undefined means this user is the first joiner — fall back to local connect time. */
+  sessionStartedAt?: number
 }
 
 function formatElapsed(ms: number): string {

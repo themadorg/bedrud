@@ -73,7 +73,6 @@
   <string name="meeting_state_kickedTitle">Вас удалили</string>
   <string name="meeting_state_kickedMessage">Модератор удалил вас из этой встречи.</string>
   <string name="meeting_button_backToDashboard">Вернуться на панель</string>
-  <string name="meeting_badge_live">В ЭФИРЕ</string>
   <string name="meeting_chat_uploading">Загрузка…</string>
   <string name="meeting_chat_placeholder">Напишите сообщение…</string>
   <string name="meeting_chat_sharedImage">Изображение</string>

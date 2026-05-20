@@ -1,18 +1,6 @@
 package main
 
-import (
-	"bedrud/config"
-	"bedrud/internal/install"
-	"bedrud/internal/livekit"
-	"bedrud/internal/server"
-	"bedrud/internal/usercli"
-	"bedrud/internal/utils"
-	"flag"
-	"fmt"
-	"net"
-	"os"
-	"strings"
-)
+import "bedrud/internal/cli"
 
 var version = "dev"
 

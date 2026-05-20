@@ -73,7 +73,6 @@
   <string name="meeting_state_kickedTitle">تمت إزالتك</string>
   <string name="meeting_state_kickedMessage">قام مشرف بإزالتك من هذا الاجتماع.</string>
   <string name="meeting_button_backToDashboard">العودة إلى لوحة التحكم</string>
-  <string name="meeting_badge_live">مباشر</string>
   <string name="meeting_chat_uploading">جارٍ الرفع…</string>
   <string name="meeting_chat_placeholder">اكتب رسالة…</string>
   <string name="meeting_chat_sharedImage">صورة مشتركة</string>

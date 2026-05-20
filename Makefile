@@ -262,7 +262,7 @@ build-embed:
 
 # Build backend
 build-back: ensure-zig
-	cd server && CGO_ENABLED=1 CC="$(CC_LINUX_AMD64)" go build $(LDFLAGS) -o dist/bedrud ./cmd/bedrud/main.go
+	cd server && CGO_ENABLED=1 CC="$(CC_LINUX_AMD64)" GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o dist/bedrud ./cmd/bedrud/main.go
 
 # Build both frontend and backend
 build: build-embed
@@ -516,9 +516,9 @@ push-prod:
 
 # ---- Local single-binary targets ---------------------------------------------
 
-# Build a single binary with frontend embedded
-local-build: build-embed ensure-zig
-	@cd server && CGO_ENABLED=1 CC="$(CC_LINUX_AMD64)" go build $(LDFLAGS) -o dist/bedrud ./cmd/bedrud/main.go && \
+# Build a single binary with frontend embedded (host OS/arch, dynamically linked)
+local-build: build-embed
+	@cd server && CGO_ENABLED=1 go build -ldflags "-X main.version=$(VERSION) -s -w" -o dist/bedrud ./cmd/bedrud/main.go && \
 		printf "$(GREEN)✅ Single binary ready: server/dist/bedrud$(RESET)\n" || \
 		( printf "$(RED)❌ Local build failed$(RESET)\n"; exit 1 )
 	@echo "   Run with: CONFIG_PATH=server/config.local.yaml server/dist/bedrud run"

@@ -73,7 +73,6 @@
   <string name="meeting_state_kickedTitle">Vous avez été retiré</string>
   <string name="meeting_state_kickedMessage">Un modérateur vous a retiré de cette réunion.</string>
   <string name="meeting_button_backToDashboard">Retour au tableau de bord</string>
-  <string name="meeting_badge_live">EN DIRECT</string>
   <string name="meeting_chat_uploading">Téléchargement…</string>
   <string name="meeting_chat_placeholder">Tapez un message…</string>
   <string name="meeting_chat_sharedImage">Image partagée</string>

@@ -138,6 +138,19 @@ func (h *RoomHandler) maxParticipantsLimit() int {
 	return s.MaxParticipantsLimit
 }
 
+// lkSessionStartedAt returns the LiveKit room creation timestamp (epoch ms) for
+// roomName, or 0 if no active session exists yet. The first user to join sees 0
+// because the LiveKit room is created when their client connects via WebSocket;
+// subsequent joiners see the session start time.
+func (h *RoomHandler) lkSessionStartedAt(ctx context.Context, roomName string) int64 {
+	authedCtx := h.withAuth(ctx, &lkauth.VideoGrant{RoomList: true})
+	resp, err := h.client.ListRooms(authedCtx, &livekit.ListRoomsRequest{Names: []string{roomName}})
+	if err != nil || len(resp.Rooms) == 0 {
+		return 0
+	}
+	return resp.Rooms[0].CreationTime * 1000
+}
+
 func (h *RoomHandler) withAuth(ctx context.Context, grants ...*lkauth.VideoGrant) context.Context {
 	ctx, err := lkutil.AuthContext(ctx, h.apiKey, h.apiSecret, grants...)
 	if err != nil {
