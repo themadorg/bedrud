@@ -1,0 +1,14 @@
+Hi,
+
+{{.InviterName}} invited you to join a room on {{.InstanceName}}.
+{{if .RoomName}}
+Room: {{.RoomName}}
+{{end}}
+Click the link below to join:
+
+{{.JoinURL}}
+
+If you weren't expecting this invitation, you can ignore this email.
+{{if .SupportEmail}}
+Contact: {{.SupportEmail}}
+{{end}}

@@ -55,6 +55,7 @@
             h1, h2, h3, p, li, .darkmode-text, .email-container a:not([class]) { color: #F7F7F9 !important; }
             td.button-td-primary, td.button-td-primary a { background: #ffffff !important; border-color: #ffffff !important; color: #222222 !important; }
             .footer td { color: #aaaaaa !important; }
+            .verify-url-fallback { background: #333333 !important; color: #cccccc !important; }
         }
     </style>
 </head>
@@ -88,28 +89,33 @@
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                         <tr>
                             <td style="padding:28px 24px 12px; font-family:sans-serif; font-size:15px; line-height:22px; color:#333333;">
-                                <h2 style="margin:0 0 12px; font-size:22px; line-height:28px; color:#1a1a2e; font-weight:600;">Password Reset</h2>
-                                <p style="margin:0 0 8px;">We received a request to reset the password for your {{.InstanceName}} account.</p>
-                                <p style="margin:0 0 4px;">Click the link below to set a new password. This link expires in 1 hour.</p>
+                                <h2 style="margin:0 0 12px; font-size:22px; line-height:28px; color:#1a1a2e; font-weight:600;">Verify your email, {{.Name}}</h2>
+                                <p style="margin:0 0 8px;">Thanks for signing up for {{.InstanceName}}. Click the button below to verify your email address and start using the platform.</p>
                             </td>
                         </tr>
-                        {{if .ResetURL}}
+                        {{if .VerifyURL}}
                         <tr>
-                            <td style="padding:4px 24px 12px;">
+                            <td style="padding:4px 24px 8px;">
                                 <table align="center" role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:auto;">
                                     <tr>
                                         <td class="button-td button-td-primary" style="border-radius:4px; background:{{.ButtonBg}};">
-                                            <a class="button-a button-a-primary" href="{{.ResetURL}}" style="background:{{.ButtonBg}}; border:1px solid {{.ButtonBg}}; font-family:sans-serif; font-size:15px; line-height:15px; text-decoration:none; padding:13px 22px; color:#ffffff; display:block; border-radius:4px;">Reset Password</a>
+                                            <a class="button-a button-a-primary" href="{{.VerifyURL}}" style="background:{{.ButtonBg}}; border:1px solid {{.ButtonBg}}; font-family:sans-serif; font-size:15px; line-height:15px; text-decoration:none; padding:13px 22px; color:#ffffff; display:block; border-radius:4px;">Verify Email</a>
                                         </td>
                                     </tr>
                                 </table>
                             </td>
                         </tr>
-                        {{end}}
                         <tr>
                             <td style="padding:4px 24px 28px; font-family:sans-serif; font-size:13px; line-height:18px; color:#666666;">
-                                <p style="margin:0 0 6px;">If you didn't request this, you can safely ignore this email. Your password won't change.</p>
-                                {{if .IPAddress}}<p style="margin:0;">Password reset requested from IP: <strong style="color:#444444;">{{.IPAddress}}</strong></p>{{end}}
+                                <p style="margin:0 0 8px;">Or copy this link into your browser:</p>
+                                <div style="background:#f1f5f9; padding:12px; border-radius:4px; color:#475569; font-size:12px; word-break:break-all; font-family:monospace;" class="verify-url-fallback">{{.VerifyURL}}</div>
+                                <p style="margin:12px 0 0;">This link expires in 24 hours.</p>
+                            </td>
+                        </tr>
+                        {{end}}
+                        <tr>
+                            <td style="padding:0 24px 28px; font-family:sans-serif; font-size:13px; line-height:18px; color:#666666;">
+                                <p style="margin:0;">If you didn't sign up for {{.InstanceName}}, you can ignore this email.</p>
                             </td>
                         </tr>
                     </table>
@@ -121,6 +127,7 @@
             <tr>
                 <td style="padding:16px 24px; background-color:#f5f5f5; text-align:center; font-family:sans-serif; font-size:12px; line-height:16px; color:#666666;" class="footer">
                     {{if .SupportEmail}}<p style="margin:0;">Contact: <a href="mailto:{{.SupportEmail}}" style="color:#666666; text-decoration:underline;">{{.SupportEmail}}</a></p>{{end}}
+                    {{if .InstanceURL}}<p style="margin:4px 0 0;"><a href="{{.InstanceURL}}" style="color:#666666; text-decoration:underline;">{{.InstanceURL}}</a></p>{{end}}
                 </td>
             </tr>
             <!-- Email Footer : END -->

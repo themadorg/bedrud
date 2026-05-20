@@ -1,0 +1,12 @@
+Hi {{.Name}},
+
+Thanks for signing up for {{.InstanceName}}. Click the link below to verify your email address:
+
+{{.VerifyURL}}
+
+This link expires in 24 hours.
+
+If you didn't sign up for {{.InstanceName}}, you can ignore this email.
+{{if .SupportEmail}}
+Contact: {{.SupportEmail}}
+{{end}}

@@ -3,7 +3,6 @@ package queue
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -14,18 +13,20 @@ import (
 
 	"bedrud/config"
 	"bedrud/internal/models"
+	"bedrud/internal/utils"
 
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
 )
 
-//go:embed templates/*.html
+//go:embed templates/*.html templates/*.txt
 var emailTemplatesFS embed.FS
 
-// emailHandler holds SMTP config and parsed templates for sending transactional emails.
+// emailHandler holds SMTP config, parsed templates, and email branding config.
 type emailHandler struct {
-	cfg    *config.EmailConfig
-	tmpls  map[string]*template.Template
+	cfg        *config.EmailConfig
+	tmpls      map[string]*template.Template
+	plainTmpls map[string]*template.Template
 }
 
 // NewSendEmailHandler creates a handler that sends transactional emails via SMTP.
@@ -33,15 +34,20 @@ type emailHandler struct {
 func NewSendEmailHandler(cfg *config.EmailConfig) Handler {
 	h := &emailHandler{cfg: cfg}
 
-	// Parse all embedded HTML templates on init.
 	h.tmpls = make(map[string]*template.Template)
-	for _, name := range []string{"welcome", "room_invite", "password_reset", "password_changed", "generic"} {
+	h.plainTmpls = make(map[string]*template.Template)
+	for _, name := range []string{"welcome", "room_invite", "password_reset", "password_changed", "verify_email", "generic"} {
 		t, err := template.ParseFS(emailTemplatesFS, "templates/"+name+".html")
 		if err != nil {
-			log.Warn().Err(err).Str("template", name).Msg("email: failed to parse template, will fall back to plain text")
+			log.Warn().Err(err).Str("template", name).Msg("email: failed to parse HTML template, will fall back to plain text")
 			continue
 		}
 		h.tmpls[name] = t
+
+		pt, err := template.ParseFS(emailTemplatesFS, "templates/"+name+".txt")
+		if err == nil {
+			h.plainTmpls[name] = pt
+		}
 	}
 
 	h.validateConfig()
@@ -52,18 +58,32 @@ func NewSendEmailHandler(cfg *config.EmailConfig) Handler {
 			return fmt.Errorf("unmarshal send_email payload: %w", err)
 		}
 
-		// Render HTML body from template (needed for both SMTP path and no-SMTP logging).
-		bodyHTML, err := renderEmailBody(h.tmpls, payload)
+		branding := loadBranding(ctx, db, h.cfg)
+		templateName := payload.TemplateName
+
+		// Resolve subject: DB override -> config subject line -> payload subject -> hardcoded
+		subject := resolveSubject(branding, templateName, payload.Subject)
+
+		// Inject branding fields into template data
+		data := payload.TemplateData
+		if data == nil {
+			data = make(map[string]any)
+		}
+		injectBranding(branding, templateName, data)
+
+		bodyHTML, err := renderEmailBody(h.tmpls, SendEmailPayload{
+			TemplateName: templateName,
+			TemplateData: data,
+		})
 		if err != nil {
 			return err
 		}
 
-		// Skip if SMTP not configured — log rendered body and return nil so job is marked done.
 		if h.cfg == nil || h.cfg.SMTPHost == "" || h.cfg.SMTPPort == 0 {
-			log.Warn().Str("to", payload.To).Str("subject", payload.Subject).
-				Str("template", payload.TemplateName).
+			log.Warn().Str("to", payload.To).Str("subject", subject).
+				Str("template", templateName).
 				Str("body", bodyHTML).
-				Interface("data", payload.TemplateData).
+				Interface("data", data).
 				Msg("email: SMTP not configured, skipping send — body logged")
 			return nil
 		}
@@ -77,19 +97,20 @@ func NewSendEmailHandler(cfg *config.EmailConfig) Handler {
 			fromName = "Bedrud"
 		}
 
-		// Build RFC 2822 message.
-		msg := buildMessage(from, fromName, payload.To, payload.Subject, bodyHTML)
+		bodyPlain := renderPlaintextBody(h.plainTmpls, SendEmailPayload{
+			TemplateName: templateName,
+			TemplateData: data,
+		})
+
+		msg := utils.BuildMessage(from, fromName, payload.To, subject, bodyHTML, bodyPlain)
 
 		addr := net.JoinHostPort(h.cfg.SMTPHost, fmt.Sprint(h.cfg.SMTPPort))
 
-		// Auth
 		var auth smtp.Auth
 		if h.cfg.Username != "" {
 			auth = smtp.PlainAuth("", h.cfg.Username, h.cfg.Password, h.cfg.SMTPHost)
 		}
 
-		// Send via SMTP with a deadline.
-		// StartTLS is preferred; fall back to plain SMTP if server doesn't support it.
 		done := make(chan error, 1)
 		go func() {
 			defer func() {
@@ -97,7 +118,7 @@ func NewSendEmailHandler(cfg *config.EmailConfig) Handler {
 					done <- fmt.Errorf("panic in sendSMTP: %v", r)
 				}
 			}()
-			done <- sendSMTP(addr, auth, from, []string{payload.To}, []byte(msg),
+			done <- utils.SendSMTP(addr, auth, from, []string{payload.To}, []byte(msg),
 				h.cfg.SMTPHost, h.cfg.TLSSkipVerify, h.cfg.SMTPSMode)
 		}()
 
@@ -114,37 +135,176 @@ func NewSendEmailHandler(cfg *config.EmailConfig) Handler {
 			return fmt.Errorf("smtp send timed out after 30s")
 		}
 
-		log.Info().Str("to", payload.To).Str("subject", payload.Subject).
-			Str("template", payload.TemplateName).
+		log.Info().Str("to", payload.To).Str("subject", subject).
+			Str("template", templateName).
 			Msg("email: sent successfully")
 		return nil
 	}
 }
 
+// emailBranding holds the merged branding values for email rendering.
+type emailBranding struct {
+	InstanceName  string
+	SupportEmail  string
+	InstanceURL   string
+	HeaderBg      string
+	ButtonBg      string
+	SubjectLines  map[string]string
+	PreheaderText map[string]string
+}
+
+// loadBranding loads effective email branding from SystemSettings DB overlaid on config.yaml defaults.
+func loadBranding(ctx context.Context, db *gorm.DB, cfg *config.EmailConfig) *emailBranding {
+	b := &emailBranding{
+		InstanceName:  "Bedrud",
+		HeaderBg:      "#1a1a2e",
+		ButtonBg:      "#e11d48",
+		SubjectLines:  make(map[string]string),
+		PreheaderText: make(map[string]string),
+	}
+
+	if cfg != nil {
+		if cfg.Templates.InstanceName != "" {
+			b.InstanceName = cfg.Templates.InstanceName
+		}
+		if cfg.Templates.SupportEmail != "" {
+			b.SupportEmail = cfg.Templates.SupportEmail
+		}
+		if cfg.Templates.InstanceURL != "" {
+			b.InstanceURL = cfg.Templates.InstanceURL
+		}
+		if cfg.Templates.HeaderBgColor != "" {
+			b.HeaderBg = cfg.Templates.HeaderBgColor
+		}
+		if cfg.Templates.ButtonBgColor != "" {
+			b.ButtonBg = cfg.Templates.ButtonBgColor
+		}
+		for k, v := range cfg.Templates.SubjectLines {
+			b.SubjectLines[k] = v
+		}
+		for k, v := range cfg.Templates.PreheaderText {
+			b.PreheaderText[k] = v
+		}
+	}
+
+	if db == nil || db.Statement == nil || db.Statement.DB == nil {
+		return b
+	}
+
+	db = db.WithContext(ctx)
+	var s models.SystemSettings
+	if err := db.First(&s, 1).Error; err != nil {
+		return b
+	}
+
+	if s.EmailInstanceName != "" {
+		b.InstanceName = s.EmailInstanceName
+	}
+	if s.EmailSupportEmail != "" {
+		b.SupportEmail = s.EmailSupportEmail
+	}
+	if s.EmailInstanceURL != "" {
+		b.InstanceURL = s.EmailInstanceURL
+	}
+	if s.EmailHeaderBg != "" {
+		b.HeaderBg = s.EmailHeaderBg
+	}
+	if s.EmailButtonBg != "" {
+		b.ButtonBg = s.EmailButtonBg
+	}
+
+	if s.EmailSubjectVerify != "" {
+		b.SubjectLines["verify_email"] = s.EmailSubjectVerify
+	}
+	if s.EmailSubjectWelcome != "" {
+		b.SubjectLines["welcome"] = s.EmailSubjectWelcome
+	}
+	if s.EmailSubjectReset != "" {
+		b.SubjectLines["password_reset"] = s.EmailSubjectReset
+	}
+	if s.EmailSubjectChanged != "" {
+		b.SubjectLines["password_changed"] = s.EmailSubjectChanged
+	}
+	if s.EmailSubjectInvite != "" {
+		b.SubjectLines["room_invite"] = s.EmailSubjectInvite
+	}
+
+	if s.EmailPreheaderVerify != "" {
+		b.PreheaderText["verify_email"] = s.EmailPreheaderVerify
+	}
+	if s.EmailPreheaderWelcome != "" {
+		b.PreheaderText["welcome"] = s.EmailPreheaderWelcome
+	}
+	if s.EmailPreheaderReset != "" {
+		b.PreheaderText["password_reset"] = s.EmailPreheaderReset
+	}
+	if s.EmailPreheaderChanged != "" {
+		b.PreheaderText["password_changed"] = s.EmailPreheaderChanged
+	}
+	if s.EmailPreheaderInvite != "" {
+		b.PreheaderText["room_invite"] = s.EmailPreheaderInvite
+	}
+
+	return b
+}
+
+// resolveSubject returns the configured subject line or falls back to the payload subject.
+func resolveSubject(b *emailBranding, templateName, fallback string) string {
+	if b != nil {
+		if s, ok := b.SubjectLines[templateName]; ok && s != "" {
+			return s
+		}
+	}
+	return fallback
+}
+
+// injectBranding merges branding fields into the template data map.
+func injectBranding(b *emailBranding, templateName string, data map[string]any) {
+	if b == nil || data == nil {
+		return
+	}
+	if _, ok := data["InstanceName"]; !ok {
+		data["InstanceName"] = b.InstanceName
+	}
+	if _, ok := data["SupportEmail"]; !ok {
+		data["SupportEmail"] = b.SupportEmail
+	}
+	if _, ok := data["InstanceURL"]; !ok {
+		data["InstanceURL"] = b.InstanceURL
+	}
+	if _, ok := data["HeaderBg"]; !ok {
+		data["HeaderBg"] = b.HeaderBg
+	}
+	if _, ok := data["ButtonBg"]; !ok {
+		data["ButtonBg"] = b.ButtonBg
+	}
+	if _, ok := data["Preheader"]; !ok {
+		if pt, ok := b.PreheaderText[templateName]; ok {
+			data["Preheader"] = pt
+		}
+	}
+}
+
 // renderEmailBody resolves the template by name and renders it with the payload data.
-// Falls back to "generic" template if named template not found, then to renderFallback.
 func renderEmailBody(tmpls map[string]*template.Template, payload SendEmailPayload) (string, error) {
-	var buf bytes.Buffer
 	tmpl, ok := tmpls[payload.TemplateName]
 	if ok {
+		var buf bytes.Buffer
 		if err := tmpl.Execute(&buf, payload.TemplateData); err != nil {
 			return "", fmt.Errorf("render template %s: %w", payload.TemplateName, err)
 		}
 		return buf.String(), nil
 	}
-	// Unknown template name — try generic fallback.
 	if genericTmpl, ok := tmpls["generic"]; ok {
-		if err := genericTmpl.Execute(&buf, payload.TemplateData); err != nil {
-			buf.WriteString(renderFallback(payload.TemplateData))
+		var fb bytes.Buffer
+		if err := genericTmpl.Execute(&fb, payload.TemplateData); err != nil {
+			return renderFallback(payload.TemplateData), nil
 		}
-		return buf.String(), nil
+		return fb.String(), nil
 	}
-	// Last resort: plain text data dump.
-	buf.WriteString(renderFallback(payload.TemplateData))
-	return buf.String(), nil
+	return renderFallback(payload.TemplateData), nil
 }
 
-// validateConfig logs warnings for misconfigured SMTP settings.
 func (h *emailHandler) validateConfig() {
 	if h.cfg == nil || h.cfg.SMTPHost == "" {
 		return
@@ -160,114 +320,22 @@ func (h *emailHandler) validateConfig() {
 	}
 }
 
-// sendSMTP sends email via SMTP. Supports three modes:
-//   - SMTPS (direct TLS, port 465): tls.Dial → smtp.NewClient → Auth → send
-//   - STARTTLS (port 587/25): plain TCP → STARTTLS → Auth → send
-//   - Plain (no TLS): send on existing connection without TLS
-//
-// Never falls back to smtp.SendMail — each failure returns the actual error.
-func sendSMTP(addr string, auth smtp.Auth, from string, to []string, msg []byte, host string, tlsSkipVerify, smtpsMode bool) error {
-	tlsCfg := &tls.Config{ServerName: host, InsecureSkipVerify: tlsSkipVerify}
 
-	if smtpsMode {
-		// SMTPS — direct TLS connection (common on port 465).
-		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}, "tcp", addr, tlsCfg)
-		if err != nil {
-			return fmt.Errorf("smtps dial: %w", err)
-		}
-		client, err := smtp.NewClient(conn, host)
-		if err != nil {
-			conn.Close()
-			return fmt.Errorf("smtps new client: %w", err)
-		}
-		defer client.Close()
-		if auth != nil {
-			if err := client.Auth(auth); err != nil {
-				return fmt.Errorf("smtps auth: %w", err)
-			}
-		}
-		return sendMailClient(client, from, to, msg)
-	}
 
-	// STARTTLS path — dial plain TCP, upgrade to TLS if available.
-	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
-	if err != nil {
-		return fmt.Errorf("smtp dial: %w", err)
-	}
-
-	client, err := smtp.NewClient(conn, host)
-	if err != nil {
-		conn.Close()
-		return fmt.Errorf("smtp new client: %w", err)
-	}
-	defer client.Close()
-
-	if ok, _ := client.Extension("STARTTLS"); ok {
-		if err := client.StartTLS(tlsCfg); err != nil {
-			return fmt.Errorf("smtp STARTTLS: %w", err)
-		}
-		if auth != nil {
-			if err := client.Auth(auth); err != nil {
-				return fmt.Errorf("smtp auth after STARTTLS: %w", err)
-			}
-		}
-		return sendMailClient(client, from, to, msg)
-	}
-
-	// STARTTLS not available — send plain on the existing connection.
-	// PlainAuth checks if conn has TLS state and will refuse if auth is set
-	// but connection is not encrypted. This is by design for security.
-	if auth != nil {
-		if err := client.Auth(auth); err != nil {
-			return fmt.Errorf("smtp auth without TLS: %w (SMTP server does not support STARTTLS)", err)
+func renderPlaintextBody(plainTmpls map[string]*template.Template, payload SendEmailPayload) string {
+	pt, ok := plainTmpls[payload.TemplateName]
+	if ok && pt != nil {
+		var buf bytes.Buffer
+		if err := pt.Execute(&buf, payload.TemplateData); err == nil {
+			return buf.String()
 		}
 	}
-	return sendMailClient(client, from, to, msg)
+	bodyHTML, _ := renderEmailBody(nil, payload)
+	return stripHTML(bodyHTML)
 }
 
-// sendMailClient performs MAIL FROM, RCPT TO, and DATA on an already-connected SMTP client.
-func sendMailClient(client *smtp.Client, from string, to []string, msg []byte) error {
-	if err := client.Mail(from); err != nil {
-		return fmt.Errorf("mail from: %w", err)
-	}
-	for _, addr := range to {
-		if err := client.Rcpt(addr); err != nil {
-			return fmt.Errorf("rcpt %s: %w", addr, err)
-		}
-	}
-	w, err := client.Data()
-	if err != nil {
-		return fmt.Errorf("data: %w", err)
-	}
-	if _, err := w.Write(msg); err != nil {
-		return fmt.Errorf("write: %w", err)
-	}
-	return w.Close()
-}
 
-// buildMessage constructs RFC 2822 formatted email with MIME multipart.
-func buildMessage(from, fromName, to, subject, bodyHTML string) string {
-	boundary := fmt.Sprintf("bedrud-boundary-%d", time.Now().UnixNano())
-	msg := fmt.Sprintf("From: %s <%s>\r\n", fromName, from)
-	msg += fmt.Sprintf("To: %s\r\n", to)
-	msg += fmt.Sprintf("Subject: %s\r\n", subject)
-	msg += "MIME-Version: 1.0\r\n"
-	msg += fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"\r\n", boundary)
-	msg += "\r\n"
-	msg += fmt.Sprintf("--%s\r\n", boundary)
-	msg += "Content-Type: text/plain; charset=\"utf-8\"\r\n"
-	msg += "\r\n"
-	msg += stripHTML(bodyHTML) + "\r\n"
-	msg += fmt.Sprintf("\r\n--%s\r\n", boundary)
-	msg += "Content-Type: text/html; charset=\"utf-8\"\r\n"
-	msg += "Content-Transfer-Encoding: quoted-printable\r\n"
-	msg += "\r\n"
-	msg += bodyHTML + "\r\n"
-	msg += fmt.Sprintf("\r\n--%s--\r\n", boundary)
-	return msg
-}
 
-// stripHTML removes HTML tags for plaintext fallback.
 func stripHTML(html string) string {
 	var buf bytes.Buffer
 	inTag := false
@@ -284,7 +352,6 @@ func stripHTML(html string) string {
 	return buf.String()
 }
 
-// renderFallback builds a plain text summary from TemplateData when template parsing fails.
 func renderFallback(data map[string]any) string {
 	var buf bytes.Buffer
 	buf.WriteString("<html><body><pre>")

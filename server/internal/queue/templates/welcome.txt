@@ -1,0 +1,10 @@
+Hi {{.Name}},
+
+Welcome to {{.InstanceName}}! You've been successfully registered.
+
+Get started by creating a room or joining an existing one. No setup required.
+
+{{if .LoginURL}}Open {{.InstanceName}}: {{.LoginURL}}{{end}}
+{{if .SupportEmail}}
+Questions? Contact: {{.SupportEmail}}
+{{end}}

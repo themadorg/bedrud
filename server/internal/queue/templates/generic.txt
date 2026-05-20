@@ -1,0 +1,5 @@
+Notification from {{.InstanceName}}:
+
+{{range $k, $v := .}}
+{{$k}}: {{$v}}
+{{end}}

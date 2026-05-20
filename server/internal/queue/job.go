@@ -13,6 +13,9 @@ type RoomDeletePayload struct {
 	SystemEvent     string `json:"system_event"`
 	SystemMessage   string `json:"system_message"`
 	DeletedIdentity string `json:"deleted_identity,omitempty"`
+	// Purge=true hard-deletes room + recording rows and files.
+	// Purge=false archives room (soft-delete, recordings preserved).
+	Purge bool `json:"purge"`
 }
 
 // RoomSuspendPayload carries data for suspending a room.
@@ -39,11 +42,18 @@ type SendEmailPayload struct {
 
 // WebhookPayload carries data for dispatching a webhook event.
 type WebhookPayload struct {
-	URL        string         `json:"url"`
-	Event      string         `json:"event"` // "room.created", "room.ended", "participant.joined"
-	Body       map[string]any `json:"body"`
-	Secret     string         `json:"secret,omitempty"`
-	MaxRetries int            `json:"max_retries,omitempty"`
+	URL    string         `json:"url"`
+	Event  string         `json:"event"` // "room.created", "room.ended", "participant.joined"
+	Body   map[string]any `json:"body"`
+	Secret string         `json:"secret,omitempty"`
+}
+
+// TODO oncoming feature: recording delete/process payloads
+// RecordingDeletePayload carries data for deleting a recording.
+type RecordingDeletePayload struct {
+	RecordingID string `json:"recording_id"`
+	RoomID      string `json:"room_id"`
+	RoomName    string `json:"room_name"`
 }
 
 // ProcessRecordingPayload carries data for processing a recording after Egress.
@@ -54,6 +64,6 @@ type ProcessRecordingPayload struct {
 	FileURL       string `json:"file_url"`
 	FileSize      int64  `json:"file_size"`
 	RecordingType string `json:"recording_type"` // "audio", "video", "screen", "composite"
-	DurationMs    int    `json:"duration_ms"`
+	DurationMs    int64  `json:"duration_ms"`
 	StartedAt     string `json:"started_at,omitempty"` // RFC3339
 }

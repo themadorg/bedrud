@@ -12,7 +12,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// NewRoomDeleteHandler creates a handler that cascades room deletion.
+// NewRoomDeleteHandler creates a handler that archives or purges a room.
+// purge=true: hard-deletes room + recording rows and files.
+// purge=false: archives room (soft-delete, recordings preserved).
 func NewRoomDeleteHandler(
 	cleanupSvc *services.RoomCleanupService,
 	roomRepo *repository.RoomRepository,
@@ -28,14 +30,20 @@ func NewRoomDeleteHandler(
 			return fmt.Errorf("fetch room %s: %w", payload.RoomID, err)
 		}
 		if room == nil {
-			return fmt.Errorf("room not found: %s", payload.RoomID)
+			return nil // already gone
 		}
 
-		opts := services.CascadeDeleteOptions{
-			SystemEvent:     payload.SystemEvent,
-			SystemMessage:   payload.SystemMessage,
-			DeletedIdentity: payload.DeletedIdentity,
+		if payload.Purge {
+			// Hard-delete: wipes room + recording DB rows + files
+			opts := services.CascadeDeleteOptions{
+				SystemEvent:     payload.SystemEvent,
+				SystemMessage:   payload.SystemMessage,
+				DeletedIdentity: payload.DeletedIdentity,
+			}
+			return cleanupSvc.CascadeDeleteRoom(ctx, room, opts)
 		}
-		return cleanupSvc.CascadeDeleteRoom(ctx, room, opts)
+
+		// Archive: soft-delete room, preserve recordings
+		return cleanupSvc.ArchiveRoom(ctx, room)
 	}
 }

@@ -23,7 +23,7 @@ func (r *SettingsRepository) SetConfig(cfg *config.Config) {
 
 func (r *SettingsRepository) GetSettings() (*models.SystemSettings, error) {
 	var s models.SystemSettings
-	err := r.db.Attrs(models.SystemSettings{RegistrationEnabled: true, PasskeysEnabled: true, TokenDuration: 24}).FirstOrCreate(&s, models.SystemSettings{ID: 1}).Error
+	err := r.db.Attrs(models.SystemSettings{RegistrationEnabled: true, GuestLoginEnabled: true, PasskeysEnabled: true, TokenDuration: 24}).FirstOrCreate(&s, models.SystemSettings{ID: 1}).Error
 	return &s, err
 }
 
@@ -212,5 +212,82 @@ func mergeFromConfig(s *models.SystemSettings, cfg *config.Config) {
 	// Logger
 	if s.LogLevel == "" {
 		s.LogLevel = cfg.Logger.Level
+	}
+
+	// Email branding
+	if s.EmailInstanceName == "" {
+		s.EmailInstanceName = cfg.Email.Templates.InstanceName
+	}
+	if s.EmailSupportEmail == "" {
+		s.EmailSupportEmail = cfg.Email.Templates.SupportEmail
+	}
+	if s.EmailInstanceURL == "" {
+		s.EmailInstanceURL = cfg.Email.Templates.InstanceURL
+	}
+	if s.EmailHeaderBg == "" {
+		s.EmailHeaderBg = cfg.Email.Templates.HeaderBgColor
+	}
+	if s.EmailButtonBg == "" {
+		s.EmailButtonBg = cfg.Email.Templates.ButtonBgColor
+	}
+
+	// Per-template subject overrides
+	if s.EmailSubjectVerify == "" {
+		s.EmailSubjectVerify = cfg.Email.Templates.SubjectLines["verify_email"]
+	}
+	if s.EmailSubjectWelcome == "" {
+		s.EmailSubjectWelcome = cfg.Email.Templates.SubjectLines["welcome"]
+	}
+	if s.EmailSubjectReset == "" {
+		s.EmailSubjectReset = cfg.Email.Templates.SubjectLines["password_reset"]
+	}
+	if s.EmailSubjectChanged == "" {
+		s.EmailSubjectChanged = cfg.Email.Templates.SubjectLines["password_changed"]
+	}
+	if s.EmailSubjectInvite == "" {
+		s.EmailSubjectInvite = cfg.Email.Templates.SubjectLines["room_invite"]
+	}
+
+	// Per-template preheader overrides
+	if s.EmailPreheaderVerify == "" {
+		s.EmailPreheaderVerify = cfg.Email.Templates.PreheaderText["verify_email"]
+	}
+	if s.EmailPreheaderWelcome == "" {
+		s.EmailPreheaderWelcome = cfg.Email.Templates.PreheaderText["welcome"]
+	}
+	if s.EmailPreheaderReset == "" {
+		s.EmailPreheaderReset = cfg.Email.Templates.PreheaderText["password_reset"]
+	}
+	if s.EmailPreheaderChanged == "" {
+		s.EmailPreheaderChanged = cfg.Email.Templates.PreheaderText["password_changed"]
+	}
+	if s.EmailPreheaderInvite == "" {
+		s.EmailPreheaderInvite = cfg.Email.Templates.PreheaderText["room_invite"]
+	}
+
+	// SMTP settings from DB
+	if s.EmailSMTPHost == "" {
+		s.EmailSMTPHost = cfg.Email.SMTPHost
+	}
+	if s.EmailSMTPPort == 0 {
+		s.EmailSMTPPort = cfg.Email.SMTPPort
+	}
+	if s.EmailUsername == "" {
+		s.EmailUsername = cfg.Email.Username
+	}
+	if s.EmailPassword == "" {
+		s.EmailPassword = cfg.Email.Password
+	}
+	if s.EmailFromAddress == "" {
+		s.EmailFromAddress = cfg.Email.FromAddress
+	}
+	if s.EmailFromName == "" {
+		s.EmailFromName = cfg.Email.FromName
+	}
+	if !s.EmailTLSSkipVerify && cfg.Email.TLSSkipVerify {
+		s.EmailTLSSkipVerify = cfg.Email.TLSSkipVerify
+	}
+	if !s.EmailSMTPSMode && cfg.Email.SMTPSMode {
+		s.EmailSMTPSMode = cfg.Email.SMTPSMode
 	}
 }

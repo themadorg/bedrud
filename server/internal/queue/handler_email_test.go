@@ -10,6 +10,7 @@ import (
 
 	"bedrud/config"
 	"bedrud/internal/models"
+	"bedrud/internal/utils"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -107,7 +108,7 @@ func TestSendEmailHandler_MissingTemplateName(t *testing.T) {
 }
 
 func TestBuildMessage_Format(t *testing.T) {
-	msg := buildMessage("noreply@bedrud.org", "Bedrud", "alice@test.com", "Hello", "<p>Welcome</p>")
+	msg := utils.BuildMessage("noreply@bedrud.org", "Bedrud", "alice@test.com", "Hello", "<p>Welcome</p>", "Plain text fallback")
 
 	if !strings.Contains(msg, "From: Bedrud <noreply@bedrud.org>") {
 		t.Error("missing From header")
@@ -136,7 +137,7 @@ func TestBuildMessage_Format(t *testing.T) {
 }
 
 func TestBuildMessage_EmptyFromName(t *testing.T) {
-	msg := buildMessage("noreply@bedrud.org", "", "alice@test.com", "Test", "<p>Hi</p>")
+	msg := utils.BuildMessage("noreply@bedrud.org", "", "alice@test.com", "Test", "<p>Hi</p>", "Plain text fallback")
 	if !strings.Contains(msg, "From:  <noreply@bedrud.org>") {
 		t.Error("from should have empty name")
 	}
@@ -265,7 +266,7 @@ func TestSendEmailHandler_NilData(t *testing.T) {
 }
 
 func TestBuildMessage_NoBody(t *testing.T) {
-	msg := buildMessage("from@test.com", "Tester", "to@test.com", "Empty", "")
+	msg := utils.BuildMessage("from@test.com", "Tester", "to@test.com", "Empty", "", "Plain text fallback")
 	if !strings.Contains(msg, "text/plain") {
 		t.Error("missing plaintext part")
 	}
@@ -396,11 +397,13 @@ func TestRenderGenericTemplate_EmptyData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse generic template: %v", err)
 	}
-	if err := tmpl.Execute(&buf, map[string]any{}); err != nil {
+	if err := tmpl.Execute(&buf, map[string]any{
+		"InstanceName": "Bedrud",
+	}); err != nil {
 		t.Fatalf("execute generic template with empty data: %v", err)
 	}
 	output := buf.String()
-	if !strings.Contains(output, "Notification from Bedrud") {
+	if !strings.Contains(output, "Bedrud") {
 		t.Error("generic template missing heading with empty data")
 	}
 }
@@ -652,13 +655,13 @@ func TestRenderEmailBody_UnknownTemplate_UsesGeneric(t *testing.T) {
 
 	body, err := renderEmailBody(tmpls, SendEmailPayload{
 		TemplateName: "bogus_template",
-		TemplateData: map[string]any{"key": "value"},
+		TemplateData: map[string]any{"key": "value", "InstanceName": "Bedrud"},
 	})
 	if err != nil {
 		t.Fatalf("renderEmailBody with unknown template: %v", err)
 	}
 	// Generic template heading should be present.
-	if !strings.Contains(body, "Notification from Bedrud") {
+	if !strings.Contains(body, "Bedrud") {
 		t.Error("unknown template should render generic template heading")
 	}
 	// Data keys should appear in generic output.
@@ -749,12 +752,504 @@ func TestRenderEmailBody_UnknownTemplate_EmptyData(t *testing.T) {
 
 	body, err := renderEmailBody(tmpls, SendEmailPayload{
 		TemplateName: "does_not_exist",
-		TemplateData: map[string]any{},
+		TemplateData: map[string]any{"InstanceName": "Bedrud"},
 	})
 	if err != nil {
 		t.Fatalf("renderEmailBody with empty data: %v", err)
 	}
-	if !strings.Contains(body, "Notification from Bedrud") {
+	if !strings.Contains(body, "Bedrud") {
 		t.Error("body missing generic heading with empty data")
+	}
+}
+
+// --- loadBranding tests ---
+
+func TestLoadBranding_Defaults(t *testing.T) {
+	b := loadBranding(context.Background(), nil, nil)
+	if b.InstanceName != "Bedrud" {
+		t.Errorf("expected 'Bedrud', got %q", b.InstanceName)
+	}
+	if b.HeaderBg != "#1a1a2e" {
+		t.Errorf("expected '#1a1a2e', got %q", b.HeaderBg)
+	}
+	if b.ButtonBg != "#e11d48" {
+		t.Errorf("expected '#e11d48', got %q", b.ButtonBg)
+	}
+	if b.SupportEmail != "" {
+		t.Errorf("expected empty, got %q", b.SupportEmail)
+	}
+}
+
+func TestLoadBranding_NilDB_UsesConfig(t *testing.T) {
+	cfg := &config.EmailConfig{
+		Templates: config.EmailTemplateConfig{
+			InstanceName:  "MyInstance",
+			SupportEmail:  "admin@myinstance.com",
+			InstanceURL:   "https://myinstance.com",
+			HeaderBgColor: "#ff0000",
+			ButtonBgColor: "#00ff00",
+			SubjectLines:  map[string]string{"verify_email": "Custom subject"},
+			PreheaderText: map[string]string{"welcome": "Custom preheader"},
+		},
+	}
+	b := loadBranding(context.Background(), nil, cfg)
+	if b.InstanceName != "MyInstance" {
+		t.Errorf("expected 'MyInstance', got %q", b.InstanceName)
+	}
+	if b.SupportEmail != "admin@myinstance.com" {
+		t.Errorf("expected 'admin@myinstance.com', got %q", b.SupportEmail)
+	}
+	if b.InstanceURL != "https://myinstance.com" {
+		t.Errorf("expected 'https://myinstance.com', got %q", b.InstanceURL)
+	}
+	if b.HeaderBg != "#ff0000" {
+		t.Errorf("expected '#ff0000', got %q", b.HeaderBg)
+	}
+	if b.ButtonBg != "#00ff00" {
+		t.Errorf("expected '#00ff00', got %q", b.ButtonBg)
+	}
+	if b.SubjectLines["verify_email"] != "Custom subject" {
+		t.Errorf("expected 'Custom subject', got %q", b.SubjectLines["verify_email"])
+	}
+	if b.PreheaderText["welcome"] != "Custom preheader" {
+		t.Errorf("expected 'Custom preheader', got %q", b.PreheaderText["welcome"])
+	}
+}
+
+func TestLoadBranding_EmptyConfig(t *testing.T) {
+	cfg := &config.EmailConfig{}
+	b := loadBranding(context.Background(), nil, cfg)
+	if b.InstanceName != "Bedrud" {
+		t.Errorf("expected default 'Bedrud', got %q", b.InstanceName)
+	}
+	if b.HeaderBg != "#1a1a2e" {
+		t.Errorf("expected default '#1a1a2e', got %q", b.HeaderBg)
+	}
+}
+
+func TestLoadBranding_PartialConfig(t *testing.T) {
+	cfg := &config.EmailConfig{
+		Templates: config.EmailTemplateConfig{
+			InstanceName: "Partial Instance",
+		},
+	}
+	b := loadBranding(context.Background(), nil, cfg)
+	if b.InstanceName != "Partial Instance" {
+		t.Errorf("expected 'Partial Instance', got %q", b.InstanceName)
+	}
+	// Should still get defaults for unset fields
+	if b.HeaderBg != "#1a1a2e" {
+		t.Errorf("expected default '#1a1a2e', got %q", b.HeaderBg)
+	}
+	if b.ButtonBg != "#e11d48" {
+		t.Errorf("expected default '#e11d48', got %q", b.ButtonBg)
+	}
+}
+
+// --- injectBranding tests ---
+
+func TestInjectBranding_NilBranding(t *testing.T) {
+	data := map[string]any{"Name": "Alice"}
+	injectBranding(nil, "welcome", data)
+	if data["Name"] != "Alice" {
+		t.Error("injectBranding should not modify data when branding is nil")
+	}
+}
+
+func TestInjectBranding_AddsFields(t *testing.T) {
+	b := &emailBranding{
+		InstanceName:  "TestBedrud",
+		SupportEmail:  "test@example.com",
+		InstanceURL:   "https://test.example.com",
+		HeaderBg:      "#111222",
+		ButtonBg:      "#333444",
+		PreheaderText: map[string]string{"verify_email": "Please verify"},
+	}
+	data := map[string]any{"Name": "Bob"}
+	injectBranding(b, "verify_email", data)
+
+	if data["InstanceName"] != "TestBedrud" {
+		t.Errorf("expected InstanceName 'TestBedrud', got %v", data["InstanceName"])
+	}
+	if data["SupportEmail"] != "test@example.com" {
+		t.Errorf("expected SupportEmail 'test@example.com', got %v", data["SupportEmail"])
+	}
+	if data["InstanceURL"] != "https://test.example.com" {
+		t.Errorf("expected InstanceURL 'https://test.example.com', got %v", data["InstanceURL"])
+	}
+	if data["HeaderBg"] != "#111222" {
+		t.Errorf("expected HeaderBg '#111222', got %v", data["HeaderBg"])
+	}
+	if data["ButtonBg"] != "#333444" {
+		t.Errorf("expected ButtonBg '#333444', got %v", data["ButtonBg"])
+	}
+	if data["Preheader"] != "Please verify" {
+		t.Errorf("expected Preheader 'Please verify', got %v", data["Preheader"])
+	}
+}
+
+func TestInjectBranding_NilData(t *testing.T) {
+	b := &emailBranding{InstanceName: "Test"}
+	// Should not panic with nil data — allocates internally
+	injectBranding(b, "welcome", nil)
+}
+
+func TestInjectBranding_DoesNotOverrideExisting(t *testing.T) {
+	b := &emailBranding{
+		InstanceName:  "ConfigBrand",
+		SupportEmail:  "config@example.com",
+		PreheaderText: map[string]string{"welcome": "config preheader"},
+	}
+	data := map[string]any{
+		"InstanceName": "ExistingBrand",
+		"Preheader":    "existing preheader",
+	}
+	injectBranding(b, "welcome", data)
+	if data["InstanceName"] != "ExistingBrand" {
+		t.Errorf("injectBranding should not override existing InstanceName")
+	}
+	if data["Preheader"] != "existing preheader" {
+		t.Errorf("injectBranding should not override existing Preheader")
+	}
+}
+
+func TestInjectBranding_NoPreheaderForTemplate(t *testing.T) {
+	b := &emailBranding{
+		InstanceName:  "Test",
+		PreheaderText: map[string]string{"verify_email": "Verify preheader"},
+	}
+	data := map[string]any{}
+	injectBranding(b, "welcome", data)
+	// welcome has no preheader configured, so Preheader should not be set
+	if _, ok := data["Preheader"]; ok {
+		t.Error("Preheader should not be set when no preheader configured for template")
+	}
+}
+
+// --- resolveSubject tests ---
+
+func TestResolveSubject_FromBranding(t *testing.T) {
+	b := &emailBranding{
+		SubjectLines: map[string]string{
+			"welcome":      "Welcome to {{.InstanceName}}",
+			"verify_email": "Verify your email",
+		},
+	}
+	subject := resolveSubject(b, "welcome", "Fallback subject")
+	if subject != "Welcome to {{.InstanceName}}" {
+		t.Errorf("expected subject from branding, got %q", subject)
+	}
+}
+
+func TestResolveSubject_Fallback(t *testing.T) {
+	subject := resolveSubject(nil, "welcome", "Fallback subject")
+	if subject != "Fallback subject" {
+		t.Errorf("expected fallback subject, got %q", subject)
+	}
+}
+
+func TestResolveSubject_NoMatch(t *testing.T) {
+	b := &emailBranding{
+		SubjectLines: map[string]string{"welcome": "Welcome"},
+	}
+	subject := resolveSubject(b, "unknown_template", "Fallback")
+	if subject != "Fallback" {
+		t.Errorf("expected fallback for unknown template, got %q", subject)
+	}
+}
+
+func TestResolveSubject_EmptyString(t *testing.T) {
+	b := &emailBranding{
+		SubjectLines: map[string]string{"welcome": ""},
+	}
+	subject := resolveSubject(b, "welcome", "Fallback")
+	// Empty string in the map should still cause fallback
+	if subject != "Fallback" {
+		t.Errorf("expected fallback for empty subject, got %q", subject)
+	}
+}
+
+// --- Template rendering with branding ---
+
+func TestRenderWelcomeTemplate_WithBranding(t *testing.T) {
+	var buf bytes.Buffer
+	tmpl, err := template.ParseFS(emailTemplatesFS, "templates/welcome.html")
+	if err != nil {
+		t.Fatalf("parse welcome template: %v", err)
+	}
+	if err := tmpl.Execute(&buf, map[string]any{
+		"Name":         "Alice",
+		"LoginURL":     "https://bedrud.org/login",
+		"InstanceName": "TestBedrud",
+		"HeaderBg":     "#111222",
+		"ButtonBg":     "#333444",
+		"SupportEmail": "support@test.com",
+		"InstanceURL":  "https://test.com",
+	}); err != nil {
+		t.Fatalf("execute welcome template: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "Welcome, Alice") {
+		t.Error("welcome template missing name")
+	}
+	if !strings.Contains(output, "TestBedrud") {
+		t.Error("welcome template missing instance name")
+	}
+	if !strings.Contains(output, "#111222") {
+		t.Error("welcome template missing header bg color")
+	}
+	if !strings.Contains(output, "#333444") {
+		t.Error("welcome template missing button bg color")
+	}
+	if !strings.Contains(output, "support@test.com") {
+		t.Error("welcome template missing support email")
+	}
+	if !strings.Contains(output, "https://test.com") {
+		t.Error("welcome template missing instance URL")
+	}
+	if strings.Contains(output, "<no value>") {
+		t.Error("welcome template has unrendered placeholders")
+	}
+}
+
+func TestRenderVerifyTemplate_WithPreheader(t *testing.T) {
+	var buf bytes.Buffer
+	tmpl, err := template.ParseFS(emailTemplatesFS, "templates/verify_email.html")
+	if err != nil {
+		t.Fatalf("parse verify_email template: %v", err)
+	}
+	if err := tmpl.Execute(&buf, map[string]any{
+		"Name":         "Bob",
+		"VerifyURL":    "https://bedrud.org/verify?token=abc",
+		"InstanceName": "Bedrud",
+		"HeaderBg":     "#1a1a2e",
+		"ButtonBg":     "#e11d48",
+		"Preheader":    "Verify your email for Bedrud",
+	}); err != nil {
+		t.Fatalf("execute verify_email template: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "Verify your email, Bob") {
+		t.Error("verify_email template missing greeting")
+	}
+	if !strings.Contains(output, "Verify your email for Bedrud") {
+		t.Error("verify_email template missing preheader")
+	}
+	// Preheader should be in a hidden div
+	if !strings.Contains(output, "display:none") {
+		t.Error("preheader should be hidden")
+	}
+	if !strings.Contains(output, "Verify Email") {
+		t.Error("verify_email template missing verify button")
+	}
+	if strings.Contains(output, "<no value>") {
+		t.Error("verify_email template has unrendered placeholders")
+	}
+}
+
+func TestRenderVerifyTemplate_CodeBlockURL(t *testing.T) {
+	var buf bytes.Buffer
+	tmpl, err := template.ParseFS(emailTemplatesFS, "templates/verify_email.html")
+	if err != nil {
+		t.Fatalf("parse verify_email template: %v", err)
+	}
+	if err := tmpl.Execute(&buf, map[string]any{
+		"Name":         "Charlie",
+		"VerifyURL":    "https://bedrud.org/verify?token=long-token-here",
+		"InstanceName": "Bedrud",
+		"HeaderBg":     "#1a1a2e",
+		"ButtonBg":     "#e11d48",
+	}); err != nil {
+		t.Fatalf("execute verify_email template: %v", err)
+	}
+	output := buf.String()
+	// Verify URL should appear in a code-block-like container
+	if !strings.Contains(output, "background:#f1f5f9") {
+		t.Error("verify_email template should wrap URL in gray code block")
+	}
+	if !strings.Contains(output, "font-family:monospace") {
+		t.Error("verify_email template URL block should use monospace font")
+	}
+}
+
+func TestRenderPasswordChangedTemplate_WithUserAgent(t *testing.T) {
+	var buf bytes.Buffer
+	tmpl, err := template.ParseFS(emailTemplatesFS, "templates/password_changed.html")
+	if err != nil {
+		t.Fatalf("parse password_changed template: %v", err)
+	}
+	if err := tmpl.Execute(&buf, map[string]any{
+		"IPAddress":    "10.0.0.1",
+		"UserAgent":    "Mozilla/5.0 Chrome/120",
+		"InstanceName": "Bedrud",
+		"HeaderBg":     "#1a1a2e",
+		"ButtonBg":     "#e11d48",
+	}); err != nil {
+		t.Fatalf("execute password_changed template: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "10.0.0.1") {
+		t.Error("password_changed template missing IP address")
+	}
+	if !strings.Contains(output, "Mozilla/5.0") {
+		t.Error("password_changed template missing user agent")
+	}
+	if strings.Contains(output, "<no value>") {
+		t.Error("password_changed template has unrendered placeholders")
+	}
+}
+
+func TestRenderPasswordChangedTemplate_WithoutUserAgent(t *testing.T) {
+	var buf bytes.Buffer
+	tmpl, err := template.ParseFS(emailTemplatesFS, "templates/password_changed.html")
+	if err != nil {
+		t.Fatalf("parse password_changed template: %v", err)
+	}
+	if err := tmpl.Execute(&buf, map[string]any{
+		"IPAddress":    "10.0.0.1",
+		"InstanceName": "Bedrud",
+		"HeaderBg":     "#1a1a2e",
+		"ButtonBg":     "#e11d48",
+	}); err != nil {
+		t.Fatalf("execute password_changed template: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "10.0.0.1") {
+		t.Error("password_changed template missing IP address")
+	}
+	if strings.Contains(output, "Browser/OS:") {
+		t.Error("password_changed template should not show UserAgent section when absent")
+	}
+}
+
+func TestRenderGenericTemplate_TableFormat(t *testing.T) {
+	var buf bytes.Buffer
+	tmpl, err := template.ParseFS(emailTemplatesFS, "templates/generic.html")
+	if err != nil {
+		t.Fatalf("parse generic template: %v", err)
+	}
+	if err := tmpl.Execute(&buf, map[string]any{
+		"InstanceName": "Bedrud",
+		"HeaderBg":     "#1a1a2e",
+		"ButtonBg":     "#e11d48",
+		"UserID":       "u-123",
+		"Room":         "test-room",
+	}); err != nil {
+		t.Fatalf("execute generic template: %v", err)
+	}
+	output := buf.String()
+	// Should render branding fields in header but not in the data table
+	if !strings.Contains(output, "u-123") {
+		t.Error("generic template missing UserID value")
+	}
+	if !strings.Contains(output, "test-room") {
+		t.Error("generic template missing Room value")
+	}
+	// Branding fields should not appear in the data table
+	if strings.Contains(output, ">InstanceName<") {
+		t.Error("generic template should filter out InstanceName from data table")
+	}
+	if strings.Contains(output, ">HeaderBg<") {
+		t.Error("generic template should filter out HeaderBg from data table")
+	}
+	if strings.Contains(output, ">ButtonBg<") {
+		t.Error("generic template should filter out ButtonBg from data table")
+	}
+}
+
+// --- All .txt templates parse and render ---
+
+func TestAllPlainTextTemplates_Parse(t *testing.T) {
+	names := []string{"welcome", "room_invite", "password_reset", "password_changed", "verify_email", "generic"}
+	for _, name := range names {
+		_, err := template.ParseFS(emailTemplatesFS, "templates/"+name+".txt")
+		if err != nil {
+			t.Errorf("failed to parse plaintext template %s: %v", name, err)
+		}
+	}
+}
+
+func TestAllPlainTextTemplates_Render(t *testing.T) {
+	names := []string{"welcome", "room_invite", "password_reset", "password_changed", "verify_email", "generic"}
+	for _, name := range names {
+		tmpl, err := template.ParseFS(emailTemplatesFS, "templates/"+name+".txt")
+		if err != nil {
+			t.Fatalf("parse %s.txt: %v", name, err)
+		}
+		data := map[string]any{
+			"InstanceName": "Bedrud",
+			"Name":         "Test",
+			"VerifyURL":    "https://example.com/verify",
+			"ResetURL":     "https://example.com/reset",
+			"InviterName":  "Alice",
+			"RoomName":     "TestRoom",
+			"JoinURL":      "https://example.com/join",
+			"IPAddress":    "10.0.0.1",
+			"LoginURL":     "https://example.com/login",
+			"SupportEmail": "support@example.com",
+		}
+		var buf bytes.Buffer
+		if err := tmpl.Execute(&buf, data); err != nil {
+			t.Errorf("render %s.txt: %v", name, err)
+			continue
+		}
+		output := buf.String()
+		if output == "" {
+			t.Errorf("%s.txt rendered empty output", name)
+		}
+		if strings.Contains(output, "<no value>") {
+			t.Errorf("%s.txt has unrendered placeholders", name)
+		}
+	}
+}
+
+func TestPlainTextWelcome_RendersBranding(t *testing.T) {
+	var buf bytes.Buffer
+	tmpl, err := template.ParseFS(emailTemplatesFS, "templates/welcome.txt")
+	if err != nil {
+		t.Fatalf("parse welcome.txt: %v", err)
+	}
+	if err := tmpl.Execute(&buf, map[string]any{
+		"Name":         "Alice",
+		"InstanceName": "TestBedrud",
+		"LoginURL":     "https://example.com/login",
+	}); err != nil {
+		t.Fatalf("execute welcome.txt: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "Welcome") {
+		t.Error("welcome.txt missing greeting")
+	}
+	if !strings.Contains(output, "TestBedrud") {
+		t.Error("welcome.txt missing instance name")
+	}
+}
+
+func TestPlainTextVerifyEmail_RendersAllSections(t *testing.T) {
+	var buf bytes.Buffer
+	tmpl, err := template.ParseFS(emailTemplatesFS, "templates/verify_email.txt")
+	if err != nil {
+		t.Fatalf("parse verify_email.txt: %v", err)
+	}
+	if err := tmpl.Execute(&buf, map[string]any{
+		"Name":         "Bob",
+		"VerifyURL":    "https://example.com/verify?token=abc",
+		"InstanceName": "Bedrud",
+		"SupportEmail": "admin@bedrud.org",
+	}); err != nil {
+		t.Fatalf("execute verify_email.txt: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "Bob") {
+		t.Error("verify_email.txt missing name")
+	}
+	if !strings.Contains(output, "token=abc") {
+		t.Error("verify_email.txt missing verify URL")
+	}
+	if !strings.Contains(output, "24 hours") {
+		t.Error("verify_email.txt missing expiration notice")
+	}
+	if !strings.Contains(output, "admin@bedrud.org") {
+		t.Error("verify_email.txt missing support email")
 	}
 }
