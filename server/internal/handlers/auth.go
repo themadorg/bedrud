@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -227,6 +229,20 @@ func (h *AuthHandler) CallbackHandler(c *fiber.Ctx) error {
 
 	log.Debug().Str("provider", provider).Msg("Auth completed successfully")
 
+	// Canonicalize email from OAuth provider
+	gothUser.Email = auth.CanonicalizeEmail(gothUser.Email)
+
+	// Normalize name: fall back to email local-part or nick if provider returns empty
+	if gothUser.Name == "" {
+		if gothUser.NickName != "" {
+			gothUser.Name = gothUser.NickName
+		} else if atIdx := strings.Index(gothUser.Email, "@"); atIdx > 0 {
+			gothUser.Name = gothUser.Email[:atIdx]
+		} else {
+			gothUser.Name = gothUser.Email
+		}
+	}
+
 	// Check registration settings — block new account creation if disabled,
 	// but allow existing users to log in via OAuth.
 	if h.settingsRepo != nil {
@@ -293,13 +309,24 @@ func (h *AuthHandler) CallbackHandler(c *fiber.Ctx) error {
 		}
 	}
 
+	// OAuth providers already verify emails — trust their verification
+	if h.config.Auth.RequireEmailVerification && dbUser.EmailVerifiedAt == nil {
+		now := time.Now()
+		dbUser.EmailVerifiedAt = &now
+		if err := userRepo.UpdateUser(dbUser); err != nil {
+			log.Error().Err(err).Str("userID", dbUser.ID).Msg("Failed to set email verified for OAuth user")
+		}
+	}
+
 	// Generate token pair (access + refresh)
 	accessToken, refreshToken, err := auth.GenerateTokenPair(
 		dbUser.ID,
 		dbUser.Email,
 		dbUser.Name,
+		dbUser.Provider,
 		dbUser.Accesses,
 		h.config,
+		dbUser.EmailVerifiedAt,
 	)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to generate JWT token pair")

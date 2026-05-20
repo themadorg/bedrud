@@ -3,6 +3,7 @@ package middleware
 import (
 	"bedrud/config"
 	"bedrud/internal/auth"
+	"bedrud/internal/repository"
 	"strings"
 
 	"bedrud/internal/models"
@@ -128,6 +129,46 @@ func RejectGuest() fiber.Handler {
 		}
 		if claims.Provider == "guest" {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Not available for guest accounts"})
+		}
+		return c.Next()
+	}
+}
+
+// RequireEmailVerified blocks requests from unverified users when email
+// verification is enabled in config. Must be used after Protected().
+// Guest users are exempt (no email).
+//
+// Always verifies against DB — does NOT trust JWT claim to avoid stale
+// token bypass if admin un-verifies a user while their token is still valid.
+func RequireEmailVerified(cfg *config.Config, userRepo *repository.UserRepository) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if !cfg.Auth.RequireEmailVerification {
+			return c.Next()
+		}
+
+		raw := c.Locals("user")
+		if raw == nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+		}
+		claims, ok := raw.(*auth.Claims)
+		if !ok || claims == nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+		}
+
+		// Guest users have no email — exempt
+		if claims.Provider == "guest" {
+			return c.Next()
+		}
+
+		// Always verify against DB — don't trust stale JWT claim
+		user, err := userRepo.GetUserByID(claims.UserID)
+		if err != nil || user == nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "User not found"})
+		}
+		if user.EmailVerifiedAt == nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Email not verified",
+			})
 		}
 		return c.Next()
 	}
