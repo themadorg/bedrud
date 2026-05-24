@@ -168,7 +168,7 @@ bedrud user [--config <path>] <subcommand> [flags]
 ローカル認証（bcrypt ハッシュパスワード）で新しいユーザーを作成します。
 
 ```bash
-bedrud user [--config <path>] create --email <email> --password <password> --name <name>
+bedrud user [--config <path>] create --email <email> --password <password> --name <name> [--admin]
 ```
 
 **必須フラグ:**
@@ -176,7 +176,10 @@ bedrud user [--config <path>] create --email <email> --password <password> --nam
 - `--password`: ユーザーのパスワード。保存前に bcrypt でハッシュ化
 - `--name`: ユーザーの表示名
 
-**アクセスレベル:** `user`（superadmin ではない）。管理者権限を付与するには `promote` を使用。
+**オプションフラグ:**
+- `--admin`: ユーザーを superadmin として作成
+
+**アクセスレベル:** デフォルトは `user`。`--admin` を使用すると、1つのコマンドで superadmin を作成できます。
 
 #### `delete`
 
@@ -338,10 +341,11 @@ bedrud install --fresh --domain example.com --email admin@example.com
 ### ユーザー管理
 
 ```bash
-# 最初の管理者ユーザーを作成
-bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User"
+# 最初の管理者ユーザーを作成（単一コマンド）
+bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User" --admin
 
-# superadmin アクセスを付与
+# または一般ユーザーを作成してから昇格
+bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User"
 bedrud user [--config <path>] promote --email admin@example.com
 
 # 一般ユーザーを作成

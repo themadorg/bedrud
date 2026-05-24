@@ -168,7 +168,7 @@ bedrud user [--config <path>] <subcommand> [flags]
 Crea un nuevo usuario con autenticación local (contraseña con hash bcrypt).
 
 ```bash
-bedrud user [--config <path>] create --email <email> --password <password> --name <name>
+bedrud user [--config <path>] create --email <email> --password <password> --name <name> [--admin]
 ```
 
 **Flags requeridos:**
@@ -176,7 +176,10 @@ bedrud user [--config <path>] create --email <email> --password <password> --nam
 - `--password`: Contraseña del usuario, con hash bcrypt antes del almacenamiento
 - `--name`: Nombre para mostrar del usuario
 
-**Nivel de acceso:** `user` (no superadmin). Usa `promote` para otorgar derechos de administrador.
+**Flags opcionales:**
+- `--admin`: Crear usuario como superadmin
+
+**Nivel de acceso:** `user` por defecto. Usa `--admin` para crear un superadmin en un solo comando.
 
 #### `delete`
 
@@ -338,10 +341,11 @@ bedrud install --fresh --domain example.com --email admin@example.com
 ### Gestión de usuarios
 
 ```bash
-# Crear el primer usuario administrador
-bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User"
+# Crear el primer usuario administrador (un solo comando)
+bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User" --admin
 
-# Otorgar acceso superadmin
+# O crear un usuario regular, luego promover
+bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User"
 bedrud user [--config <path>] promote --email admin@example.com
 
 # Crear usuario regular

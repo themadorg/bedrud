@@ -168,7 +168,7 @@ bedrud user [--config <yol>] <alt-komut> [bayraklar]
 Yerel kimlik doğrulama ile yeni bir kullanıcı oluşturur (bcrypt ile hashlenmiş parola).
 
 ```bash
-bedrud user [--config <yol>] create --email <e-posta> --password <parola> --name <ad>
+bedrud user [--config <yol>] create --email <e-posta> --password <parola> --name <ad> [--admin]
 ```
 
 **Gerekli bayraklar:**
@@ -176,7 +176,10 @@ bedrud user [--config <yol>] create --email <e-posta> --password <parola> --name
 - `--password`: Kullanıcı parolası, depolanmadan önce bcrypt ile hashlenir
 - `--name`: Kullanıcı görünen adı
 
-**Erişim seviyesi:** `user` (süper yönetici değil). Yönetici hakları vermek için `promote` kullanın.
+**İsteğe bağlı bayraklar:**
+- `--admin`: Kullanıcıyı süper yönetici olarak oluştur
+
+**Erişim seviyesi:** Varsayılan olarak `user`. Tek komutta süper yönetici oluşturmak için `--admin` kullanın.
 
 #### `delete`
 
@@ -338,10 +341,11 @@ bedrud install --fresh --domain example.com --email admin@example.com
 ### Kullanıcı yönetimi
 
 ```bash
-# İlk yönetici kullanıcısını oluştur
-bedrud user [--config <yol>] create --email admin@example.com --password secret123 --name "Admin User"
+# İlk yönetici kullanıcısını oluştur (tek komut)
+bedrud user [--config <yol>] create --email admin@example.com --password secret123 --name "Admin User" --admin
 
-# Süper yönetici erişimi ver
+# Veya normal kullanıcı oluşturup yükselt
+bedrud user [--config <yol>] create --email admin@example.com --password secret123 --name "Admin User"
 bedrud user [--config <yol>] promote --email admin@example.com
 
 # Normal kullanıcı oluştur

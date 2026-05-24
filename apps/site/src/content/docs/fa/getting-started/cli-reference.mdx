@@ -168,7 +168,7 @@ bedrud user [--config <path>] <subcommand> [flags]
 یک کاربر جدید با احراز هویت محلی (رمز عبور هش شده bcrypt) ایجاد کنید.
 
 ```bash
-bedrud user [--config <path>] create --email <email> --password <password> --name <name>
+bedrud user [--config <path>] create --email <email> --password <password> --name <name> [--admin]
 ```
 
 **فلگ‌های مورد نیاز:**
@@ -176,7 +176,10 @@ bedrud user [--config <path>] create --email <email> --password <password> --nam
 - `--password`: رمز عبور کاربر، قبل از ذخیره با bcrypt هش می‌شود
 - `--name`: نام نمایشی کاربر
 
-**سطح دسترسی:** `user` (not superadmin). برای اعطای حقوق ادمین از `promote` استفاده کنید.
+**فلگ‌های اختیاری:**
+- `--admin`: ایجاد کاربر به عنوان superadmin
+
+**سطح دسترسی:** پیش‌فرض `user`. برای ایجاد superadmin در یک دستور از `--admin` استفاده کنید.
 
 #### `delete`
 
@@ -338,10 +341,11 @@ bedrud install --fresh --domain example.com --email admin@example.com
 ### مدیریت کاربر
 
 ```bash
-# ایجاد اولین کاربر ادمین
-bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User"
+# ایجاد اولین کاربر ادمین (یک دستور)
+bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User" --admin
 
-# اعطای دسترسی superadmin
+# یا ایجاد کاربر معمولی و سپس ارتقا
+bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User"
 bedrud user [--config <path>] promote --email admin@example.com
 
 # ایجاد کاربر معمولی
