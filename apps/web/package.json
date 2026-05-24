@@ -6,8 +6,8 @@
     "#/*": "./src/*"
   },
   "scripts": {
-    "dev": "vite dev --port 3000",
-    "build": "vite build",
+    "dev": "bun --bun vite dev --port 3000",
+    "build": "bun --bun vite build",
     "build:embed": "node scripts/embed.mjs",
     "preview": "vite preview",
     "check": "biome check . && tsc --noEmit",
