@@ -45,7 +45,7 @@ jobs:
         if: matrix.language == 'go'
         uses: actions/setup-go@v6
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: server/go.sum
 
       - uses: oven-sh/setup-bun@v2
