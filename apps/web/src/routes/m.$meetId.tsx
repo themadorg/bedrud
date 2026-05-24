@@ -610,7 +610,7 @@ function MeetingPage() {
               style={{ background: 'linear-gradient(to top, rgba(7,7,15,0.6) 0%, transparent 100%)' }}
             />
 
-            <MeetingHeader meetId={meetId} sessionStartedAt={sessionStartedAt} />
+            <MeetingHeader meetId={meetId} />
 
             {/* Side panels */}
             <MeetingPanels navigate={() => navigate({ to: '/dashboard' })} />
