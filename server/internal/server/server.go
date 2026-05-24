@@ -348,7 +348,7 @@ func Run(configPath string, version string) error {
 	api.Get("/auth/me", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.GetMe)
 	api.Put("/auth/me", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.UpdateProfile)
 	api.Put("/auth/password", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.ChangePassword)
-	api.Get("/auth/verify", authHandler.VerifyEmail)
+	api.Post("/auth/verify", authHandler.VerifyEmail)
 	api.Get("/auth/verify/status", middleware.Protected(), authHandler.CheckVerificationStatus)
 	api.Post("/auth/verify/resend", middleware.ResendRateLimiter(cfg.RateLimit), authHandler.ResendVerification)
 	api.Post("/auth/forgot-password", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.ForgotPassword)

@@ -29,13 +29,13 @@ import (
 )
 
 type AuthHandler struct {
-	authService       *auth.AuthService
-	config            *config.Config
-	settingsRepo      *repository.SettingsRepository
-	inviteTokenRepo   *repository.InviteTokenRepository
-	challengeStore    *auth.ChallengeStore
-	emailCooldown     *CooldownCache
-	verifEventRepo    *repository.VerificationEventRepository
+	authService     *auth.AuthService
+	config          *config.Config
+	settingsRepo    *repository.SettingsRepository
+	inviteTokenRepo *repository.InviteTokenRepository
+	challengeStore  *auth.ChallengeStore
+	emailCooldown   *CooldownCache
+	verifEventRepo  *repository.VerificationEventRepository
 }
 
 func NewAuthHandler(authService *auth.AuthService, cfg *config.Config, settingsRepo *repository.SettingsRepository, inviteTokenRepo *repository.InviteTokenRepository, challengeStore *auth.ChallengeStore, emailCooldown *CooldownCache, verifEventRepo *repository.VerificationEventRepository) *AuthHandler {
@@ -602,8 +602,8 @@ func (h *AuthHandler) UpdateProfile(c *fiber.Ctx) error {
 	}
 
 	res := fiber.Map{
-		"id":   user.ID,
-		"name": user.Name,
+		"id":    user.ID,
+		"name":  user.Name,
 		"email": user.Email,
 	}
 	if input.Email != "" && auth.CanonicalizeEmail(input.Email) != auth.CanonicalizeEmail(claims.Email) {
@@ -890,7 +890,7 @@ func enqueuePasswordResetEmail(h *AuthHandler, c *fiber.Ctx, user *models.User) 
 			Subject:      "Reset your Bedrud password",
 			TemplateName: "password_reset",
 			TemplateData: map[string]any{
-				"ResetURL": resetURL,
+				"ResetURL":  resetURL,
 				"IPAddress": c.IP(),
 			},
 		},
@@ -927,7 +927,7 @@ func enqueueVerificationEmail(h *AuthHandler, c *fiber.Ctx, user *models.User) {
 	if frontendURL == "" && h.config.Server.Domain != "" {
 		frontendURL = fmt.Sprintf("https://%s", strings.TrimRight(h.config.Server.Domain, "/"))
 	}
-	verifyURL := frontendURL + "/api/auth/verify?token=" + token
+	verifyURL := frontendURL + "/auth/verify?token=" + token
 
 	if err := queue.Enqueue(context.Background(), database.GetDB(), "send_email",
 		queue.SendEmailPayload{
@@ -955,58 +955,79 @@ func verifyFrontendURL(cfg *config.Config) string {
 }
 
 // @Summary Verify email
-// @Description Complete email verification with token from verification link. Redirects to frontend on success or failure.
+// @Description Complete email verification with token from verification link. Returns tokens so frontend can auto-login.
 // @Tags auth
+// @Accept json
 // @Produce json
-// @Param token query string true "Verification token from email"
-// @Success 302 {string} string "Redirects to /dashboard?emailVerified=true on success"
-// @Failure 302 {string} string "Redirects to /auth/verify?status=... on failure"
-// @Router /auth/verify [get]
+// @Param request body object true "Verification token"
+// @Success 200 {object} auth.TokenResponse
+// @Failure 400 {object} auth.ErrorResponse
+// @Failure 401 {object} auth.ErrorResponse
+// @Failure 404 {object} auth.ErrorResponse
+// @Failure 409 {object} map[string]interface{}
+// @Router /auth/verify [post]
 func (h *AuthHandler) VerifyEmail(c *fiber.Ctx) error {
-	tokenParam := c.Query("token")
-	if tokenParam == "" {
-		return c.Redirect(verifyFrontendURL(h.config) + "/auth/verify?status=invalid&reason=missing_token")
+	var input struct {
+		Token string `json:"token"`
+	}
+	if err := c.BodyParser(&input); err != nil || input.Token == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "No verification token provided",
+		})
 	}
 
-	userID, tokenEmail, err := auth.ValidateVerificationToken(tokenParam, h.config)
+	userID, tokenEmail, err := auth.ValidateVerificationToken(input.Token, h.config)
 	if err != nil {
-		return c.Redirect(verifyFrontendURL(h.config) + "/auth/verify?status=invalid&reason=expired")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "The verification link has expired",
+		})
 	}
 
 	user, err := h.authService.GetUserByID(userID)
 	if err != nil || user == nil {
-		return c.Redirect(verifyFrontendURL(h.config) + "/auth/verify?status=invalid&reason=not_found")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "User not found",
+		})
 	}
 
-	// Verify the token's embedded email matches the user's current email.
-	// This prevents a verification token issued for an old email from
-	// being reused after the user changes their email address.
 	if tokenEmail != "" && auth.CanonicalizeEmail(tokenEmail) != auth.CanonicalizeEmail(user.Email) {
-		return c.Redirect(verifyFrontendURL(h.config) + "/auth/verify?status=invalid&reason=expired")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "The verification link has expired",
+		})
 	}
 
 	if user.EmailVerifiedAt != nil {
-		return c.Redirect(verifyFrontendURL(h.config) + "/auth/verify?status=already_verified")
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+			"error":            "Email already verified",
+			"already_verified": true,
+		})
 	}
 
 	now := time.Now()
 	user.EmailVerifiedAt = &now
 	if err := h.authService.UpdateUser(user); err != nil {
-		return c.Redirect(verifyFrontendURL(h.config) + "/auth/verify?status=invalid&reason=save_error")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "An error occurred while verifying your email",
+		})
 	}
 
-	// Issue tokens so user is auto-logged in after verification
-	if accessToken, refreshToken, tokErr := auth.GenerateTokenPair(
+	accessToken, refreshToken, tokErr := auth.GenerateTokenPair(
 		user.ID, user.Email, user.Name, user.Provider, user.Accesses, h.config, user.EmailVerifiedAt,
-	); tokErr == nil {
-		_ = h.authService.UpdateRefreshToken(user.ID, refreshToken)
-		setAuthCookies(c, h.config, accessToken, refreshToken)
+	)
+	if tokErr != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to generate tokens",
+		})
 	}
+	_ = h.authService.UpdateRefreshToken(user.ID, refreshToken)
 
-	// Audit log
 	h.auditVerificationEvent(user.ID, user.Email, models.VerificationSuccess, c)
 
-	return c.Redirect(verifyFrontendURL(h.config) + "/dashboard?emailVerified=true")
+	return c.JSON(fiber.Map{
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+		"verified":      true,
+	})
 }
 
 // @Summary Check email verification status

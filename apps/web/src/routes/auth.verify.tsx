@@ -1,7 +1,8 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
-import { CheckCircle, Info, Mail, XCircle } from 'lucide-react'
-import { useState } from 'react'
-import { api } from '#/lib/api'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { Info, Loader2, Mail, XCircle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ApiError, api } from '#/lib/api'
+import { useAuthStore } from '#/lib/auth.store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,24 +12,15 @@ export const Route = createFileRoute('/auth/verify')({
   validateSearch: (search: Record<string, string>) => ({
     status: (search.status as string) || '',
     reason: (search.reason as string) || '',
+    token: (search.token as string) || '',
   }),
 })
 
-function SuccessView() {
+function LoadingView() {
   return (
-    <div className="space-y-7 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success/10">
-        <CheckCircle className="h-7 w-7 text-success" />
-      </div>
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">Email verified!</h1>
-        <p className="text-sm text-muted-foreground">
-          Your email has been successfully verified. You can now sign in to your account.
-        </p>
-      </div>
-      <Link to="/auth/login" search={{ redirect: undefined }}>
-        <Button className="w-full">Sign in</Button>
-      </Link>
+    <div className="flex flex-col items-center justify-center space-y-4 py-12">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <p className="text-sm text-muted-foreground">Verifying your email…</p>
     </div>
   )
 }
@@ -104,7 +96,6 @@ function ResendVerificationForm() {
       await api.post('/api/auth/verify/resend', { email })
       setSent(true)
     } catch {
-      // Always uniform — user gets same message regardless
       setSent(true)
     } finally {
       setIsLoading(false)
@@ -143,11 +134,44 @@ function ResendVerificationForm() {
 }
 
 function VerifyPage() {
-  const { status, reason } = Route.useSearch()
+  const { status, reason, token } = Route.useSearch()
+  const navigate = useNavigate()
+  const setTokens = useAuthStore((s) => s.setTokens)
+  const [processing, setProcessing] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!token) {
+      setProcessing(false)
+      return
+    }
+    setProcessing(true)
+
+    api
+      .post<{ access_token: string; refresh_token: string }>('/api/auth/verify', { token })
+      .then((res) => {
+        setTokens({ accessToken: res.access_token, refreshToken: res.refresh_token })
+        navigate({ to: '/dashboard' })
+      })
+      .catch((err: Error) => {
+        setProcessing(false)
+        if (err instanceof ApiError && err.parsedBody?.already_verified) {
+          navigate({ to: '/auth/login' })
+          return
+        }
+        setError(err.message || 'Verification failed')
+      })
+  }, [token, navigate, setTokens])
+
+  if (token && processing) {
+    return <LoadingView />
+  }
+
+  if (error) {
+    return <InvalidView reason={error} />
+  }
 
   switch (status) {
-    case 'success':
-      return <SuccessView />
     case 'already_verified':
       return <AlreadyVerifiedView />
     case 'invalid':

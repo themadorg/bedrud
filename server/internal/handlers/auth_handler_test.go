@@ -588,7 +588,7 @@ func setupVerificationTestApp(t *testing.T) (*fiber.App, *auth.AuthService, *con
 	app := fiber.New()
 	app.Post("/api/auth/register", authHandler.Register)
 	app.Post("/api/auth/login", authHandler.Login)
-	app.Get("/api/auth/verify", authHandler.VerifyEmail)
+	app.Post("/api/auth/verify", authHandler.VerifyEmail)
 	app.Post("/api/auth/verify/resend", authHandler.ResendVerification)
 	app.Get("/api/auth/verify/status", middleware.Protected(), authHandler.CheckVerificationStatus)
 
@@ -625,7 +625,7 @@ func setupVerificationTestAppWithDB(t *testing.T) (*fiber.App, *auth.AuthService
 	app := fiber.New()
 	app.Post("/api/auth/register", authHandler.Register)
 	app.Post("/api/auth/login", authHandler.Login)
-	app.Get("/api/auth/verify", authHandler.VerifyEmail)
+	app.Post("/api/auth/verify", authHandler.VerifyEmail)
 	app.Post("/api/auth/verify/resend", authHandler.ResendVerification)
 	app.Get("/api/auth/verify/status", middleware.Protected(), authHandler.CheckVerificationStatus)
 
@@ -708,8 +708,8 @@ func TestAuthHandler_Register_VerificationEmailURL(t *testing.T) {
 		t.Fatal("could not find verify_email job with VerifyURL")
 	}
 
-	// Assert VerifyURL uses the correct prefix (matches change from /auth/verify to /api/auth/verify)
-	expectedPrefix := "https://localhost/api/auth/verify?token="
+	// Assert VerifyURL points to frontend /auth/verify route
+	expectedPrefix := "https://localhost/auth/verify?token="
 	if !strings.HasPrefix(verifyURL, expectedPrefix) {
 		t.Fatalf("expected VerifyURL to start with '%s', got '%s'", expectedPrefix, verifyURL)
 	}
@@ -800,41 +800,36 @@ func TestAuthHandler_VerifyEmail_Success(t *testing.T) {
 		t.Fatalf("failed to generate verification token: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/auth/verify?token="+token, http.NoBody)
+	body, _ := json.Marshal(map[string]string{"token": token})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	resp, _ := app.Test(req, -1)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusFound {
-		t.Fatalf("expected 302 redirect, got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", resp.StatusCode)
 	}
 
-	loc := resp.Header.Get("Location")
-	if loc != "/dashboard?emailVerified=true" {
-		t.Fatalf("expected redirect to /dashboard?emailVerified=true, got %s", loc)
+	respBody, _ := io.ReadAll(resp.Body)
+	var result map[string]interface{}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if result["access_token"] == nil || result["access_token"] == "" {
+		t.Fatal("expected access_token in response")
+	}
+	if result["refresh_token"] == nil || result["refresh_token"] == "" {
+		t.Fatal("expected refresh_token in response")
+	}
+	if result["verified"] != true {
+		t.Fatal("expected verified=true in response")
 	}
 
 	// Verify the user is now marked as verified
 	updated, _ := authService.GetUserByID(user.ID)
 	if updated.EmailVerifiedAt == nil {
 		t.Fatal("expected EmailVerifiedAt to be set after successful verification")
-	}
-
-	// Verify auth cookies (tokens) are set — user should be auto-logged in
-	cookies := resp.Cookies()
-	var hasAccessToken, hasRefreshToken bool
-	for _, c := range cookies {
-		if c.Name == "access_token" && c.Value != "" {
-			hasAccessToken = true
-		}
-		if c.Name == "refresh_token" && c.Value != "" {
-			hasRefreshToken = true
-		}
-	}
-	if !hasAccessToken {
-		t.Fatal("expected access_token cookie after VerifyEmail (auto-login)")
-	}
-	if !hasRefreshToken {
-		t.Fatal("expected refresh_token cookie after VerifyEmail (auto-login)")
 	}
 }
 
@@ -854,16 +849,14 @@ func TestAuthHandler_VerifyEmail_TokenEmailMismatch(t *testing.T) {
 	}
 
 	// Verify should reject — token issued for original@test.com, user now changed@test.com
-	req := httptest.NewRequest(http.MethodGet, "/api/auth/verify?token="+token, http.NoBody)
+	body, _ := json.Marshal(map[string]string{"token": token})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	resp, _ := app.Test(req, -1)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusFound {
-		t.Fatalf("expected 302 redirect on email mismatch, got %d", resp.StatusCode)
-	}
-	loc := resp.Header.Get("Location")
-	if !strings.Contains(loc, "status=invalid") {
-		t.Fatalf("expected redirect with status=invalid on email mismatch, got %s", loc)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 on email mismatch, got %d", resp.StatusCode)
 	}
 
 	// Verify user is still NOT verified
@@ -876,17 +869,14 @@ func TestAuthHandler_VerifyEmail_TokenEmailMismatch(t *testing.T) {
 func TestAuthHandler_VerifyEmail_MissingToken(t *testing.T) {
 	app, _, _ := setupVerificationTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/auth/verify", http.NoBody)
+	body, _ := json.Marshal(map[string]string{})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	resp, _ := app.Test(req, -1)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusFound {
-		t.Fatalf("expected 302 redirect, got %d", resp.StatusCode)
-	}
-
-	loc := resp.Header.Get("Location")
-	if loc != "/auth/verify?status=invalid&reason=missing_token" {
-		t.Fatalf("expected redirect to /auth/verify?status=invalid&reason=missing_token, got %s", loc)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
 }
 
@@ -907,17 +897,14 @@ func TestAuthHandler_VerifyEmail_AlreadyVerified(t *testing.T) {
 		t.Fatalf("failed to generate verification token: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/auth/verify?token="+token, http.NoBody)
+	body, _ := json.Marshal(map[string]string{"token": token})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	resp, _ := app.Test(req, -1)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusFound {
-		t.Fatalf("expected 302 redirect, got %d", resp.StatusCode)
-	}
-
-	loc := resp.Header.Get("Location")
-	if loc != "/auth/verify?status=already_verified" {
-		t.Fatalf("expected redirect to /auth/verify?status=already_verified, got %s", loc)
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("expected 409 Conflict, got %d", resp.StatusCode)
 	}
 }
 
@@ -931,17 +918,14 @@ func TestAuthHandler_VerifyEmail_UserNotFound(t *testing.T) {
 	}
 
 	app, _, _ := setupVerificationTestApp(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/auth/verify?token="+token, http.NoBody)
+	body, _ := json.Marshal(map[string]string{"token": token})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	resp, _ := app.Test(req, -1)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusFound {
-		t.Fatalf("expected 302 redirect, got %d", resp.StatusCode)
-	}
-
-	loc := resp.Header.Get("Location")
-	if loc != "/auth/verify?status=invalid&reason=not_found" {
-		t.Fatalf("expected redirect to /auth/verify?status=invalid&reason=not_found, got %s", loc)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.StatusCode)
 	}
 }
 
@@ -1112,18 +1096,14 @@ func TestVerifyEmail_ExpiredToken(t *testing.T) {
 	expiredToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenStr, _ := expiredToken.SignedString([]byte(cfg.Auth.JWTSecret))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/auth/verify?token="+tokenStr, http.NoBody)
+	body, _ := json.Marshal(map[string]string{"token": tokenStr})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	resp, _ := app.Test(req, -1)
 	defer resp.Body.Close()
 
-	// Should be a redirect with status=invalid&reason=expired
-	loc, err := resp.Location()
-	if err != nil {
-		t.Fatalf("expected redirect, got no location: %v", err)
-	}
-	qs := loc.Query()
-	if qs.Get("status") != "invalid" || qs.Get("reason") != "expired" {
-		t.Fatalf("expected redirect with status=invalid&reason=expired, got: %s", loc.String())
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for expired token, got %d", resp.StatusCode)
 	}
 }
 
@@ -1216,22 +1196,30 @@ func TestRegister_ThenVerify_ThenDoubleVerify(t *testing.T) {
 	// Generate verification token
 	token, _ := auth.GenerateVerificationToken(user.ID, user.Email, cfg)
 
-	// First verify — now redirects to /dashboard?emailVerified=true
-	req1 := httptest.NewRequest(http.MethodGet, "/api/auth/verify?token="+token, http.NoBody)
+	// First verify — should return 200 with tokens
+	body1, _ := json.Marshal(map[string]string{"token": token})
+	req1 := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body1))
+	req1.Header.Set("Content-Type", "application/json")
 	resp1, _ := app.Test(req1, -1)
-	resp1.Body.Close()
-	loc1 := resp1.Header.Get("Location")
-	if !strings.Contains(loc1, "emailVerified=true") {
-		t.Fatalf("expected first verify to redirect with emailVerified=true, got: %s", loc1)
+	defer resp1.Body.Close()
+	if resp1.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 on first verify, got %d", resp1.StatusCode)
+	}
+	respBody1, _ := io.ReadAll(resp1.Body)
+	var result1 map[string]interface{}
+	json.Unmarshal(respBody1, &result1)
+	if result1["verified"] != true {
+		t.Fatal("expected verified=true on first verify")
 	}
 
-	// Double verify — should say already_verified
-	req2 := httptest.NewRequest(http.MethodGet, "/api/auth/verify?token="+token, http.NoBody)
+	// Double verify — should say already_verified (409)
+	body2, _ := json.Marshal(map[string]string{"token": token})
+	req2 := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body2))
+	req2.Header.Set("Content-Type", "application/json")
 	resp2, _ := app.Test(req2, -1)
-	resp2.Body.Close()
-	loc2, _ := resp2.Location()
-	if loc2.Query().Get("status") != "already_verified" {
-		t.Fatalf("expected double-verify to redirect with status=already_verified, got: %s", loc2.String())
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusConflict {
+		t.Fatalf("expected 409 on double-verify, got %d", resp2.StatusCode)
 	}
 }
 
@@ -1270,7 +1258,7 @@ func setupAdminVerificationTest(t *testing.T) (*fiber.App, *repository.UserRepos
 	app := fiber.New()
 	app.Post("/api/auth/register", authHandler.Register)
 	app.Post("/api/auth/login", authHandler.Login)
-	app.Get("/api/auth/verify", authHandler.VerifyEmail)
+	app.Post("/api/auth/verify", authHandler.VerifyEmail)
 	app.Post("/api/auth/verify/resend", authHandler.ResendVerification)
 	app.Get("/api/auth/verify/status", middleware.Protected(), authHandler.CheckVerificationStatus)
 
@@ -1455,8 +1443,8 @@ func TestEmailChange_AutoSendsVerification(t *testing.T) {
 		c.Locals("user", claims)
 		return c.Next()
 	}, (&AuthHandler{
-		authService:  authService,
-		config:       cfg,
+		authService:   authService,
+		config:        cfg,
 		emailCooldown: NewCooldownCache(2 * time.Minute),
 	}).UpdateProfile)
 
@@ -1577,8 +1565,8 @@ func TestAuthHandler_UpdateProfile_InvalidEmailFormat(t *testing.T) {
 		c.Locals("user", claims)
 		return c.Next()
 	}, (&AuthHandler{
-		authService:  authService,
-		config:       cfg,
+		authService:   authService,
+		config:        cfg,
 		emailCooldown: NewCooldownCache(2 * time.Minute),
 	}).UpdateProfile)
 
@@ -1651,8 +1639,8 @@ func TestAuthHandler_UpdateProfile_OAuthEmailBlocked(t *testing.T) {
 		c.Locals("user", claims)
 		return c.Next()
 	}, (&AuthHandler{
-		authService:  authService,
-		config:       cfg,
+		authService:   authService,
+		config:        cfg,
 		emailCooldown: NewCooldownCache(2 * time.Minute),
 	}).UpdateProfile)
 
@@ -1718,8 +1706,8 @@ func TestAuthHandler_EmailChangeThenReVerify(t *testing.T) {
 		c.Locals("user", claims)
 		return c.Next()
 	}, (&AuthHandler{
-		authService:  authService,
-		config:       cfg,
+		authService:   authService,
+		config:        cfg,
 		emailCooldown: NewCooldownCache(2 * time.Minute),
 	}).UpdateProfile)
 
@@ -1763,7 +1751,7 @@ func TestAuthHandler_EmailChangeThenReVerify(t *testing.T) {
 		if payload.TemplateName == "verify_email" {
 			if data, ok := payload.TemplateData["VerifyURL"]; ok {
 				urlStr, _ := data.(string)
-				// URL looks like: ".../api/auth/verify?token=XXX"
+				// URL looks like: ".../auth/verify?token=XXX"
 				if idx := strings.Index(urlStr, "token="); idx >= 0 {
 					verifyToken = urlStr[idx+6:]
 				}
@@ -1775,17 +1763,22 @@ func TestAuthHandler_EmailChangeThenReVerify(t *testing.T) {
 	}
 
 	// Call verify endpoint with the new email's token
-	req = httptest.NewRequest(http.MethodGet, "/api/auth/verify?token="+verifyToken, http.NoBody)
+	body, _ = json.Marshal(map[string]string{"token": verifyToken})
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	resp, _ = app.Test(req, -1)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusFound {
-		t.Fatalf("expected 302 redirect on verify, got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200 on verify, got %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	loc := resp.Header.Get("Location")
-	if !strings.Contains(loc, "emailVerified=true") {
-		t.Fatalf("expected redirect to dashboard with emailVerified=true, got %s", loc)
+	respBody, _ := io.ReadAll(resp.Body)
+	var result map[string]interface{}
+	json.Unmarshal(respBody, &result)
+	if result["verified"] != true {
+		t.Fatal("expected verified=true in response")
 	}
 
 	// Verify DB: EmailVerifiedAt set, email still new
@@ -1797,17 +1790,9 @@ func TestAuthHandler_EmailChangeThenReVerify(t *testing.T) {
 		t.Fatal("expected EmailVerifiedAt to be set after re-verification")
 	}
 
-	// Verify auth cookies are set (user is auto-logged in)
-	cookies := resp.Header.Values("Set-Cookie")
-	var hasAccessToken bool
-	for _, c := range cookies {
-		if strings.HasPrefix(c, "access_token=") {
-			hasAccessToken = true
-			break
-		}
-	}
-	if !hasAccessToken {
-		t.Fatal("expected access_token cookie to be set after verification")
+	// Verify tokens are returned in response body
+	if result["access_token"] == nil || result["access_token"] == "" {
+		t.Fatal("expected access_token in response after verification")
 	}
 }
 
@@ -1839,8 +1824,8 @@ func TestAuthHandler_EmailChangeCooldown(t *testing.T) {
 		c.Locals("user", claims)
 		return c.Next()
 	}, (&AuthHandler{
-		authService:  authService,
-		config:       cfg,
+		authService:   authService,
+		config:        cfg,
 		emailCooldown: NewCooldownCache(2 * time.Minute),
 	}).UpdateProfile)
 
@@ -1928,10 +1913,10 @@ func setupPasswordResetTestApp(t *testing.T) (*fiber.App, *auth.AuthService, *co
 	authService := auth.NewAuthService(userRepo, passkeyRepo)
 	cfg := &config.Config{
 		Auth: config.AuthConfig{
-			JWTSecret:               "password-reset-test-secret-key-32b",
-			TokenDuration:            1,
-			SessionSecret:            "session-secret-for-testing",
-			ResetTokenTTLHours:       1,
+			JWTSecret:                 "password-reset-test-secret-key-32b",
+			TokenDuration:             1,
+			SessionSecret:             "session-secret-for-testing",
+			ResetTokenTTLHours:        1,
 			VerificationTokenTTLHours: 24,
 		},
 		Server: config.ServerConfig{
@@ -1962,10 +1947,10 @@ func setupPasswordResetTestAppWithDB(t *testing.T) (*fiber.App, *auth.AuthServic
 	authService := auth.NewAuthService(userRepo, passkeyRepo)
 	cfg := &config.Config{
 		Auth: config.AuthConfig{
-			JWTSecret:               "password-reset-test-secret-key-32b",
-			TokenDuration:            1,
-			SessionSecret:            "session-secret-for-testing",
-			ResetTokenTTLHours:       1,
+			JWTSecret:                 "password-reset-test-secret-key-32b",
+			TokenDuration:             1,
+			SessionSecret:             "session-secret-for-testing",
+			ResetTokenTTLHours:        1,
 			VerificationTokenTTLHours: 24,
 		},
 		Server: config.ServerConfig{
