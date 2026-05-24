@@ -59,9 +59,11 @@ const config = defineConfig({
           ) {
             return 'markdown-vendor'
           }
-          if (id.includes('/node_modules/') &&
+          if (
+            id.includes('/node_modules/') &&
             !id.includes('/node_modules/@livekit/krisp-noise-filter/') &&
-            !id.includes('/node_modules/@jitsi/rnnoise-wasm/')) {
+            !id.includes('/node_modules/@jitsi/rnnoise-wasm/')
+          ) {
             return 'vendor'
           }
         },

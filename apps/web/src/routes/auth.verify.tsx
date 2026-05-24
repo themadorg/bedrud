@@ -156,7 +156,7 @@ function VerifyPage() {
       .catch((err: Error) => {
         setProcessing(false)
         if (err instanceof ApiError && err.parsedBody?.already_verified) {
-          navigate({ to: '/auth/login' })
+          navigate({ to: '/auth/login', search: { redirect: undefined } })
           return
         }
         setError(err.message || 'Verification failed')
