@@ -1,0 +1,18 @@
+# GitHub Linguist language detection overrides
+#
+# The marketing/docs site (apps/site) contains a large number of .md and .mdx
+# files (i18n docs + blog across 10 locales). Without overrides, GitHub
+# incorrectly reports the repository's primary language as "MDX".
+#
+# These settings ensure the real source languages (Go, TypeScript, etc.) are
+# used for the language bar.
+
+*.md linguist-detectable=false
+*.mdx linguist-detectable=false
+*.markdown linguist-detectable=false
+
+# Explicitly mark real source as detectable (defensive)
+*.go linguist-detectable=true
+*.ts linguist-detectable=true
+*.tsx linguist-detectable=true
+*.js linguist-detectable=true
