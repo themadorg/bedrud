@@ -1,0 +1,114 @@
+---
+title: نقش‌های کاربری
+description: کنترل دسترسی مبتنی بر نقش با 5 سطح — ابرمدیر، مدیر، ناظر، کاربر، مهمان
+order: 36
+---
+
+Bedrud یک سیستم نقش 5 سطحی برای کنترل دسترسی پیاده‌سازی می‌کند. هر نقش به مجموعه‌ای از رشته‌های دسترسی نگاشت می‌شود که در رکورد کاربر ذخیره شده و هم در لایه API (میان‌افزار بک‌اند) و هم در لایه UI (گاردهای فرانت‌اند و رندر شرطی) اعمال می‌شوند.
+
+## سلسله‌مراتب نقش‌ها
+
+| نقش | آرایه دسترسی | وزن بک‌اند | توضیحات |
+|------|-------------|------------|---------|
+| ابرمدیر | `['superadmin', 'user']` | 4 | دسترسی کامل سیستم، تمام قابلیت‌های مدیریتی |
+| مدیر | `['admin', 'user']` | 3 | دسترسی کامل مدیریت، مانند ابرمدیر |
+| ناظر | `['moderator', 'user']` | 2 | نمای مدیریت فقط‌خواندنی، بدون تغییر |
+| کاربر | `['user']` | 1 | کاربر ثبت‌نام‌شده استاندارد |
+| مهمان | `['guest']` | 0 | شرکت‌کننده ثبت‌نام‌نشده، فقط عضویت |
+
+## اعمال در بک‌اند
+
+سطوح دسترسی از طریق میان‌افزار `RequireAccess` در هر مسیر مدیریتی اعمال می‌شوند. میان‌افزار آرایه دسترسی کاربر را با حداقل سطح مورد نیاز بررسی می‌کند:
+
+- مسیرهایی که نیاز به دسترسی `superadmin` دارند، مدیر، ناظر، کاربر و مهمان را رد می‌کنند
+- مسیرهایی که نیاز به دسترسی `admin` دارند، ابرمدیر و مدیر را مجاز می‌کنند
+- مسیرهایی که نیاز به دسترسی `moderator` دارند، ابرمدیر، مدیر و ناظر را مجاز می‌کنند
+
+بک‌اند دسترسی‌ها را به صورت رشته‌ای جدا شده با کاما در پایگاه داده ذخیره می‌کند (ستون `accesses` در جدول `users`). نوع GORM `StringArray` سریال‌سازی و دی‌سریال‌سازی را مدیریت می‌کند.
+
+## یکپارچه‌سازی فرانت‌اند
+
+### نوع کاربر
+
+اینترفیس `User` در `user.store.ts` شامل دو فیلد بولی مشتق شده از آرایه دسترسی است:
+
+```ts
+interface User {
+  // ...
+  isSuperAdmin: boolean  // accesses.includes('superadmin')
+  isAdmin: boolean       // accesses.includes('admin') || accesses.includes('superadmin')
+  accesses: string[]     // raw access list from backend
+}
+```
+
+### گارد مدیریت
+
+طرح مدیریت (`/dashboard/admin`) به ابرمدیر، مدیر و ناظر اجازه عبور می‌دهد. ناظران یک متغیر زمینه `isReadOnly=true` دریافت می‌کنند:
+
+```tsx
+// routes/dashboard/admin.tsx
+const canAccess = user?.isSuperAdmin || accesses.includes('admin') || accesses.includes('moderator')
+```
+
+هوک `useAdminContext()` پرچم `isReadOnly` را به تمام مسیرهای فرزند ارائه می‌دهد:
+
+```tsx
+const { isReadOnly } = useAdminContext()
+```
+
+### آنچه ناظران می‌توانند ببینند در مقابل انجام دهند
+
+| صفحه | مشاهده | تغییر |
+|------|--------|-------|
+| آمار کلی | ✅ آمار کامل | نامعتبر |
+| لیست کاربران | ✅ لیست کامل | ❌ بدون اقدامات گروهی |
+| جزئیات کاربر | ✅ پروفایل کامل | ❌ بدون وضعیت/نقش/حذف/خروج |
+| لیست اتاق‌ها | ✅ لیست کامل | ❌ بدون تعلیق/حذف/ویرایش سقف |
+| جزئیات اتاق | ✅ اطلاعات کامل | ❌ بدون تعلیق/حذف/اخراج/سکوت |
+| تنظیمات | ❌ هدایت شده | ❌ |
+
+### انتخابگر نقش
+
+رابط مدیریت یک منوی کشویی `<Select>` را هم در جدول لیست کاربران و هم در صفحه جزئیات کاربر ارائه می‌دهد که جایگزین کلید باینری قبلی ابرمدیر می‌شود. گزینه‌های موجود:
+
+| گزینه | ذخیره به عنوان |
+|-------|---------------|
+| ابرمدیر | `['superadmin', 'user']` |
+| مدیر | `['admin', 'user']` |
+| ناظر | `['moderator', 'user']` |
+| کاربر | `['user']` |
+| مهمان | `['guest']` |
+
+منوی کشویی یک درخواست `PUT /api/admin/users/:id/accesses` با آرایه دسترسی کامل ارسال می‌کند.
+
+## مدیریت خط فرمان
+
+دستورات `bedrud user promote` و `bedrud user demote` یک پرچم `--role` می‌پذیرند:
+
+```bash
+# Promote to superadmin (default)
+bedrud user promote --email user@example.com
+
+# Promote to admin
+bedrud user promote --email user@example.com --role admin
+
+# Promote to moderator
+bedrud user promote --email user@example.com --role moderator
+
+# Demote specific role
+bedrud user demote --email user@example.com --role admin
+```
+
+مقادیر معتبر `--role`: `superadmin`، `admin`، `moderator`، `user`، `guest`.
+
+## مکان‌های کد
+
+| فایل | هدف |
+|------|-----|
+| `server/internal/models/user.go` | ثابت‌های سطح دسترسی بک‌اند |
+| `server/internal/middleware/` | میان‌افزار `RequireAccess` |
+| `server/internal/usercli/usercli.go` | توابع مدیریت نقش خط فرمان |
+| `apps/web/src/lib/user.store.ts` | نوع User فرانت‌اند |
+| `apps/web/src/routes/dashboard/admin.tsx` | گارد مدیریت + زمینه isReadOnly |
+| `apps/web/src/components/admin/UserTable.tsx` | منوی کشویی انتخابگر نقش + نشان‌ها |
+| `apps/web/src/components/admin/RoomTable.tsx` | ماسک جدول اتاق فقط‌خواندنی |

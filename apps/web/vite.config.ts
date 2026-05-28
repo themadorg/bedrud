@@ -25,14 +25,27 @@ const config = defineConfig({
     },
   },
   build: {
+    chunkSizeWarningLimit: 6000,
     rollupOptions: {
       output: {
         manualChunks(id: string) {
           if (id.includes('/node_modules/react/') || id.includes('/node_modules/react-dom/')) {
             return 'react-vendor'
           }
+          if (id.includes('/node_modules/@tanstack/')) {
+            return 'tanstack-vendor'
+          }
+          if (id.includes('/node_modules/livekit-client/')) {
+            return 'livekit-client-vendor'
+          }
+          if (id.includes('/node_modules/@livekit/components-react/')) {
+            return 'livekit-components-vendor'
+          }
           if (id.includes('/node_modules/recharts') || id.includes('/node_modules/d3-')) {
             return 'charts-vendor'
+          }
+          if (id.includes('/node_modules/@radix-ui/')) {
+            return 'ui-vendor'
           }
           if (
             id.includes('/node_modules/react-markdown') ||
@@ -45,6 +58,13 @@ const config = defineConfig({
             id.includes('/node_modules/vfile')
           ) {
             return 'markdown-vendor'
+          }
+          if (
+            id.includes('/node_modules/') &&
+            !id.includes('/node_modules/@livekit/krisp-noise-filter/') &&
+            !id.includes('/node_modules/@jitsi/rnnoise-wasm/')
+          ) {
+            return 'vendor'
           }
         },
       },

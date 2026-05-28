@@ -20,7 +20,7 @@ func newRunCmd() *cobra.Command {
 				os.Setenv("BEDRUD_SKIP_MIGRATE", "1")
 			}
 			path := resolveConfigPath(defaultConfigPath)
-			if err := server.Run(path); err != nil {
+			if err := server.Run(path, Version); err != nil {
 				return fmt.Errorf("server: %w", err)
 			}
 			return nil

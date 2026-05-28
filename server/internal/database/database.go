@@ -129,11 +129,15 @@ func gormLogLevelFromZerolog(level zerolog.Level) logger.LogLevel {
 		return logger.Error
 	case level >= zerolog.WarnLevel:
 		return logger.Warn
-	case level >= zerolog.InfoLevel:
-		return logger.Info
-	default: // debug/trace — show everything
-		return logger.Info
+	default:
+		return logger.Warn
 	}
+}
+
+// SetForTest sets the global database connection for testing.
+// This bypasses Initialize and should only be used in tests.
+func SetForTest(testDB *gorm.DB) {
+	db = testDB
 }
 
 // Close closes the database connection

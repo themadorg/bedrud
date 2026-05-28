@@ -1,6 +1,8 @@
 import { useCallback, useMemo } from 'react'
 import type { ChatMessage } from '../MeetingContext'
 
+export const MAX_INITIAL_LOAD = 400
+
 export function useChatPersistence(
   roomId: string,
   maxMessageCount: number,
@@ -11,12 +13,10 @@ export function useChatPersistence(
   const initialMessages = useMemo<ChatMessage[]>(() => {
     try {
       const raw = sessionStorage.getItem(key)
-      const msgs = raw ? (JSON.parse(raw) as ChatMessage[]) : []
-      if (messageTTLHours > 0) {
-        const cutoff = Date.now() - messageTTLHours * 60 * 60 * 1000
-        return msgs.filter((m) => m.timestamp >= cutoff)
-      }
-      return msgs
+      const msgs: ChatMessage[] = raw ? (JSON.parse(raw) as ChatMessage[]) : []
+      const filtered =
+        messageTTLHours > 0 ? msgs.filter((m) => m.timestamp >= Date.now() - messageTTLHours * 3600000) : msgs
+      return filtered.slice(-MAX_INITIAL_LOAD)
     } catch {
       return []
     }
@@ -26,6 +26,10 @@ export function useChatPersistence(
     (msgs: ChatMessage[]) => {
       try {
         let toStore = msgs
+        if (messageTTLHours > 0) {
+          const cutoff = Date.now() - messageTTLHours * 60 * 60 * 1000
+          toStore = toStore.filter((m) => m.timestamp >= cutoff)
+        }
         if (maxMessageCount > 0 && toStore.length > maxMessageCount) {
           toStore = toStore.slice(toStore.length - maxMessageCount)
         }
@@ -34,7 +38,7 @@ export function useChatPersistence(
         // sessionStorage unavailable (private browsing quota exceeded)
       }
     },
-    [key, maxMessageCount],
+    [key, maxMessageCount, messageTTLHours],
   )
 
   return [initialMessages, persist]

@@ -34,6 +34,10 @@ type SystemSettings struct {
 	ServerEmail     string `gorm:"size:255" json:"serverEmail"`
 	BehindProxy     bool   `json:"behindProxy"`
 
+	// Instance
+	ServerName        string `gorm:"size:255" json:"serverName"`
+	GuestLoginEnabled bool   `gorm:"not null;default:true" json:"guestLoginEnabled"`
+
 	// LiveKit
 	LiveKitHost      string `gorm:"size:255" json:"livekitHost"`
 	LiveKitAPIKey    string `gorm:"size:255" json:"livekitApiKey"`
@@ -71,22 +75,47 @@ type SystemSettings struct {
 	ChatMaxMessageCount int `gorm:"default:10000" json:"chatMaxMessageCount"`
 	ChatMessageTTLHours int `gorm:"default:2160" json:"chatMessageTTLHours"`
 
+	// TODO oncoming feature: recordings
+	// RecordingsEnabled, RecordingMaxDurationMins, RecordingMaxFileSizeMB
+	RecordingsEnabled        bool `gorm:"default:false" json:"recordingsEnabled"`
+	RecordingMaxDurationMins int  `gorm:"default:60" json:"recordingMaxDurationMins"` // 0 = unlimited
+	RecordingMaxFileSizeMB   int  `gorm:"default:2048" json:"recordingMaxFileSizeMB"` // 0 = unlimited
+
+	// Email branding
+	EmailInstanceName string `gorm:"size:255" json:"emailInstanceName"`
+	EmailSupportEmail string `gorm:"size:255" json:"emailSupportEmail"`
+	EmailInstanceURL  string `gorm:"size:512" json:"emailInstanceUrl"`
+	EmailHeaderBg     string `gorm:"size:7" json:"emailHeaderBg"`
+	EmailButtonBg     string `gorm:"size:7" json:"emailButtonBg"`
+
+	// Per-template subject line overrides (empty = use config.yaml or hardcoded default)
+	EmailSubjectVerify  string `gorm:"size:255" json:"emailSubjectVerify"`
+	EmailSubjectWelcome string `gorm:"size:255" json:"emailSubjectWelcome"`
+	EmailSubjectReset   string `gorm:"size:255" json:"emailSubjectReset"`
+	EmailSubjectChanged string `gorm:"size:255" json:"emailSubjectChanged"`
+	EmailSubjectInvite  string `gorm:"size:255" json:"emailSubjectInvite"`
+
+	// Per-template preheader text overrides
+	EmailPreheaderVerify  string `gorm:"size:512" json:"emailPreheaderVerify"`
+	EmailPreheaderWelcome string `gorm:"size:512" json:"emailPreheaderWelcome"`
+	EmailPreheaderReset   string `gorm:"size:512" json:"emailPreheaderReset"`
+	EmailPreheaderChanged string `gorm:"size:512" json:"emailPreheaderChanged"`
+	EmailPreheaderInvite  string `gorm:"size:512" json:"emailPreheaderInvite"`
+
+	// SMTP settings in DB (empty = fall back to config.yaml)
+	EmailSMTPHost      string `gorm:"size:255" json:"emailSmtpHost"`
+	EmailSMTPPort      int    `gorm:"default:0" json:"emailSmtpPort"`
+	EmailUsername      string `gorm:"size:255" json:"emailUsername"`
+	EmailPassword      string `gorm:"size:512" json:"emailPassword"`
+	EmailFromAddress   string `gorm:"size:255" json:"emailFromAddress"`
+	EmailFromName      string `gorm:"size:255" json:"emailFromName"`
+	EmailTLSSkipVerify bool   `json:"emailTlsSkipVerify"`
+	EmailSMTPSMode     bool   `json:"emailSmtpsMode"`
+
 	// Logger
 	LogLevel string `gorm:"size:20" json:"logLevel"`
 
 	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-// SecretFields lists JSON field names that should be masked in API responses.
-var SecretFields = []string{
-	"googleClientSecret",
-	"githubClientSecret",
-	"twitterClientSecret",
-	"jwtSecret",
-	"sessionSecret",
-	"livekitApiSecret",
-	"chatUploadS3AccessKey",
-	"chatUploadS3SecretKey",
 }
 
 // IsOAuthProviderConfigured returns true if the given provider has both

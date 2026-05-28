@@ -1,0 +1,207 @@
+---
+title: Webhooks API
+description: Webhook CRUD and event management
+order: 27
+---
+
+Webhook endpoints allow superadmins to register HTTP callbacks for real-time event notifications. All endpoints require superadmin access.
+
+## Overview
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/admin/webhooks` | GET | List all webhooks |
+| `/api/admin/webhooks` | POST | Create a new webhook |
+| `/api/admin/webhooks/:id` | PUT | Update a webhook |
+| `/api/admin/webhooks/:id` | DELETE | Delete a webhook |
+| `/api/admin/webhooks/:id/rotate-secret` | POST | Rotate HMAC signing secret |
+| `/api/admin/webhooks/:id/test` | POST | Send a test event |
+
+---
+
+## List Webhooks
+
+Retrieve all registered webhook endpoints.
+
+```
+GET /api/admin/webhooks
+```
+
+**Headers:** `Authorization: Bearer <accessToken>`
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "wh_abc123",
+    "url": "https://example.com/webhook",
+    "events": ["room.ended", "recording.completed"],
+    "isActive": true,
+    "lastSeenAt": "2025-03-15T10:30:00Z",
+    "lastStatus": 200,
+    "createdAt": "2025-01-15T10:30:00Z"
+  }
+]
+```
+
+---
+
+## Create Webhook
+
+Register a new webhook endpoint.
+
+```
+POST /api/admin/webhooks
+```
+
+**Headers:** `Authorization: Bearer <accessToken>`
+
+**Request Body:**
+
+```json
+{
+  "url": "https://example.com/webhook",
+  "events": ["room.ended", "participant.left", "recording.completed"],
+  "isActive": true,
+  "secret": "your-hmac-secret"
+}
+```
+
+`secret` is optional — if omitted, a random secret is generated.
+
+**Response (201):**
+
+```json
+{
+  "id": "wh_abc123",
+  "url": "https://example.com/webhook",
+  "events": ["room.ended", "participant.left", "recording.completed"],
+  "secret": "generated-secret",
+  "isActive": true,
+  "createdAt": "2025-03-15T10:30:00Z"
+}
+```
+
+> **Security:** The `secret` is returned **only on creation and rotation**. Subsequent GET requests mask it.
+
+---
+
+## Update Webhook
+
+Modify an existing webhook's URL, events, or active state.
+
+```
+PUT /api/admin/webhooks/:id
+```
+
+**Headers:** `Authorization: Bearer <accessToken>`
+
+**Request Body:**
+
+```json
+{
+  "url": "https://new-url.example.com/webhook",
+  "events": ["room.ended"],
+  "isActive": false
+}
+```
+
+**Response (200):** Updated webhook object (secret masked).
+
+---
+
+## Delete Webhook
+
+Remove a webhook endpoint.
+
+```
+DELETE /api/admin/webhooks/:id
+```
+
+**Headers:** `Authorization: Bearer <accessToken>`
+
+**Response (200):**
+
+```json
+{
+  "success": true
+}
+```
+
+---
+
+## Rotate Secret
+
+Generate a new HMAC signing secret for a webhook. The old secret is immediately invalidated.
+
+```
+POST /api/admin/webhooks/:id/rotate-secret
+```
+
+**Headers:** `Authorization: Bearer <accessToken>`
+
+**Response (200):**
+
+```json
+{
+  "id": "wh_abc123",
+  "secret": "new-generated-secret"
+}
+```
+
+---
+
+## Test Webhook
+
+Send a test event to the webhook URL to verify connectivity and payload format.
+
+```
+POST /api/admin/webhooks/:id/test
+```
+
+**Headers:** `Authorization: Bearer <accessToken>`
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "statusCode": 200
+}
+```
+
+---
+
+## Event Types
+
+| Event | Triggered When |
+|-------|---------------|
+| `room.ended` | A room becomes idle (all participants left) |
+| `participant.joined` | A participant enters a room |
+| `participant.left` | A participant disconnects or is kicked |
+| `recording.completed` | A recording finishes processing and is stored |
+
+## Payload Format
+
+All webhook events are sent as `POST` with `Content-Type: application/json` and signed with HMAC-SHA256.
+
+**Headers:**
+
+```
+X-Webhook-Signature: sha256=<hex-encoded-hmac>
+X-Webhook-Event: room.ended
+```
+
+**Payload:**
+
+```json
+{
+  "event": "room.ended",
+  "roomId": "room-uuid",
+  "roomName": "team-standup",
+  "timestamp": "2025-03-15T10:30:00Z"
+}
+```
+
+The HMAC signature is computed over the raw request body using the webhook's secret. Verify it to confirm the payload wasn't tampered with.

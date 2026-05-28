@@ -688,6 +688,7 @@
       "guides/appliance": "Режим Appliance",
       "guides/admin-dashboard": "Панель администратора",
       "guides/behind-proxy": "За прокси/CDN",
+      "guides/roles": "Роли пользователей",
       contributing: "Участие в разработке",
     },
   },

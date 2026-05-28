@@ -19,6 +19,12 @@ Bedrud unterstützt mehrere Authentifizierungsmethoden:
 | Passkeys | `POST /api/auth/passkey/*` | FIDO2/WebAuthn |
 | Token-Aktualisierung | `POST /api/auth/refresh` | Zugriffstoken erneuern |
 
+| Resend Verification | `POST /api/auth/verify/resend` | Resend verification email |
+| Verify Email | `GET /api/auth/verify` | Verify email with token (query param, redirect) |
+| Check Verification Status | `GET /api/auth/verify/status` | Check if email is verified |
+| Forgot Password | `POST /api/auth/forgot-password` | Request password reset email |
+| Reset Password | `POST /api/auth/reset-password` | Reset password with token |
+
 ## Token-Format
 
 Eine erfolgreiche Authentifizierung gibt ein Paar JWT-Token zurück:
@@ -246,6 +252,32 @@ Der Server leitet den Benutzer zur Autorisierungsseite des Providers weiter. Nac
 
 ---
 
+### Bestätigungs-E-Mail erneut senden
+
+Sendet den Bestätigungs-E-Mail-Link erneut. Nur für unbestätigte lokale Konten. Setzt die Abklingzeit stillschweigend durch `verificationEmailCooldownMins` durch — gibt immer 200 zurück, um E-Mail-Enumeration zu verhindern.
+
+---
+
+### E-Mail bestätigen
+
+Schließt die E-Mail-Bestätigung mit dem Token aus dem Bestätigungs-Link ab.
+
+---
+
+### Passwort vergessen
+
+Fordert eine E-Mail zum Zurücksetzen des Passworts an. Erfordert konfiguriertes SMTP.
+
+Der Endpunkt gibt immer 202 zurück, um E-Mail-Enumeration zu verhindern. Der Reset-Link läuft nach `resetTokenTTLHours` ab.
+
+---
+
+### Passwort zurücksetzen
+
+Setzt ein neues Passwort mit dem Token aus der Reset-E-Mail.
+
+---
+
 ## Fehlerantworten
 
 Alle Authentifizierungs-Endpunkte geben Fehler in diesem Format zurück:
@@ -259,7 +291,9 @@ Alle Authentifizierungs-Endpunkte geben Fehler in diesem Format zurück:
 | Status | Bedeutung |
 |--------|---------|
 | 400 | Ungültige Anfrage (fehlende Felder, Validierungsfehler) |
-| 401 | Ungültige Anmeldedaten oder abgelaufenes Token |
+| 401 | Invalid credentials or expired token |
+| 403 | Email not verified (`requiresVerification: true`) |
+| 429 | Rate limited — check `Retry-After` header |
 | 409 | E-Mail bereits registriert |
 | 500 | Interner Serverfehler |
 
@@ -267,5 +301,5 @@ Alle Authentifizierungs-Endpunkte geben Fehler in diesem Format zurück:
 
 ## Siehe auch
 
-- [Authentifizierungs-Ablauf](/de/docs/backend/authentication) - wie JWT, OAuth und Passkeys intern funktionieren
+- [/de/docs/backend/authentication](/de/docs/backend/authentication) - how JWT, OAuth, passkeys, email verification, and password reset work internally
 - [Passkeys-API](/de/docs/api/passkeys) - FIDO2/WebAuthn-Endpunktreferenz

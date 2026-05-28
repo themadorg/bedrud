@@ -17,8 +17,11 @@ Los endpoints de administración están bajo `/api/admin/`. Todos requieren el n
 | `/api/admin/users/:id` | DELETE | Eliminar permanentemente un usuario |
 | `/api/admin/rooms` | GET | Listar todas las salas (paginado) |
 | `/api/admin/rooms/:roomId` | PUT | Actualizar la configuración de cualquier sala |
-| `/api/admin/rooms/:roomId` | DELETE | Cerrar una sala (eliminación en cascada) |
-| `/api/admin/rooms/:roomId/suspend` | POST | Suspender una sala activa |
+| `/api/admin/rooms/:roomId` | DELETE | Eliminar una sala (tarea en segundo plano) |
+| `/api/admin/rooms/:roomId/suspend` | POST | Suspender una sala (tarea en segundo plano) |
+| `/api/admin/rooms/bulk/suspend` | POST | Suspender varias salas |
+| `/api/admin/rooms/bulk/close` | POST | Cerrar varias salas |
+| `/api/admin/users/bulk/delete` | POST | Eliminar varios usuarios |
 | `/api/admin/rooms/:roomId/participants` | GET | Obtener datos de participantes en vivo desde LiveKit |
 | `/api/admin/rooms/:roomId/participants/:identity/kick` | POST | Expulsar a cualquier participante de una sala |
 | `/api/admin/rooms/:roomId/participants/:identity/mute` | POST | Silenciar el audio de cualquier participante |
@@ -337,7 +340,7 @@ Todos los campos de configuración son opcionales — incluya solo los que desee
 
 ### Cerrar Sala
 
-Cierra permanentemente una sala con eliminación en cascada. Envía un mensaje del sistema a todos los participantes: "This room has been closed by an administrator".
+Eliminar permanentemente una sala y todos sus participantes. Se encola una tarea en segundo plano y regresa inmediatamente — la sala se eliminará por completo en cuestión de segundos.
 
 ```
 DELETE /api/admin/rooms/:roomId
@@ -349,19 +352,29 @@ DELETE /api/admin/rooms/:roomId
 |---|---|
 | `roomId` | UUID de la sala |
 
-**Respuesta (200):**
+**Respuesta (202):**
 
 ```json
 {
-  "status": "success"
+  "message": "Room deletion queued"
 }
 ```
+
+| Estado | Descripción |
+|--------|-------------|
+| 202 | Eliminación encolada — se completará en breve |
+| 404 | Sala no encontrada |
+| 500 | Error al obtener la sala o encolar la tarea |
+
+> **Nota:** Al cerrar se envía un mensaje del sistema a todos los participantes activos: "This room has been closed by an administrator".
+> La lógica de cierre llama a `cleanupSvc.CascadeDeleteRoom` que gestiona la eliminación de la sala en LiveKit, la limpieza de archivos subidos
+> y la eliminación del registro en la base de datos.
 
 ---
 
 ### Suspender Sala
 
-Desactiva una sala activa y todos sus participantes sin eliminar el registro de la sala. La sala puede reactivarse cuando un participante se una nuevamente.
+Desactivar una sala activa, finalizando todas las llamadas activas pero preservando el registro de la sala. La sala puede reactivarse cuando un participante se una nuevamente. Se ejecuta en segundo plano y regresa inmediatamente.
 
 ```
 POST /api/admin/rooms/:roomId/suspend
@@ -373,15 +386,70 @@ POST /api/admin/rooms/:roomId/suspend
 |---|---|
 | `roomId` | UUID de la sala |
 
-**Respuesta (200):**
+**Respuesta (202):**
 
 ```json
 {
-  "status": "success"
+  "message": "Room suspend queued"
 }
 ```
 
-**Error (400):** Devuelve `{"error": "Room is not active"}` si la sala ya está inactiva.
+| Estado | Descripción |
+|--------|-------------|
+| 202 | Suspensión encolada — se completará en breve |
+| 400 | Sala ya inactiva |
+| 404 | Sala no encontrada |
+| 500 | Error al obtener la sala o encolar la tarea |
+
+---
+
+### Suspender Varias Salas
+
+Encolar la suspensión de varias salas a la vez. Las salas ya suspendidas se omiten.
+
+```
+POST /api/admin/rooms/bulk/suspend
+```
+
+**Cuerpo de la Solicitud:**
+
+```json
+{
+  "ids": ["room-uuid-1", "room-uuid-2"]
+}
+```
+
+**Respuesta (202):**
+
+```json
+{
+  "results": {
+    "room-uuid-1": {"success": true, "name": "team-standup"},
+    "room-uuid-2": {"success": false, "name": "design-review", "error": "room not found"}
+  },
+  "totalProcessed": 1,
+  "totalFailed": 1
+}
+```
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `results` | object | Resultado por sala, indexado por ID |
+| `results.*.success` | bool | Si la operación fue encolada |
+| `results.*.name` | string | Nombre de la sala (presente en éxito) |
+| `results.*.error` | string | Mensaje de error (presente en fallo) |
+| `totalProcessed` | int | Número de salas encoladas con éxito |
+| `totalFailed` | int | Número de salas que fallaron |
+
+### Cerrar Varias Salas
+
+Encolar la eliminación permanente de varias salas a la vez. No se puede deshacer.
+
+```
+POST /api/admin/rooms/bulk/close
+```
+
+Misma forma de solicitud/respuesta que [Suspender Varias Salas](#suspender-varias-salas).
 
 ---
 

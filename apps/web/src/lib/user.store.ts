@@ -5,6 +5,7 @@ export interface User {
   email: string
   name: string
   provider: string
+  isSuperAdmin: boolean
   isAdmin: boolean
   accesses: string[] | null
   avatarUrl?: string

@@ -54,7 +54,7 @@ func TestRoomCleanupService_SuspendRoom_CleansUploads(t *testing.T) {
 
 	// Suspend — with fake LK client
 	client := lkutil.NewClient(&config.LiveKitConfig{Host: "http://localhost:9999", APIKey: "test", APISecret: "testsecret1234567890123456789012"})
-	svc := NewRoomCleanupService(roomRepo, client, "test", "testsecret1234567890123456789012", uploadTracker)
+	svc := NewRoomCleanupService(roomRepo, nil, client, nil, "test", "testsecret1234567890123456789012", uploadTracker)
 	_ = svc.SuspendRoom(context.Background(), room)
 
 	// Verify uploads cleaned up
@@ -86,7 +86,7 @@ func TestCascadeDeleteRoom_CleansS3Uploads(t *testing.T) {
 	_ = tracker.Record(room.ID, "cd-s3-user", "cascade-key", ".png", 200, "s3")
 
 	client := lkutil.NewClient(&config.LiveKitConfig{Host: "http://localhost:9999", APIKey: "test", APISecret: "testsecret1234567890123456789012"})
-	svc := NewRoomCleanupService(roomRepo, client, "test", "testsecret1234567890123456789012", tracker)
+	svc := NewRoomCleanupService(roomRepo, nil, client, nil, "test", "testsecret1234567890123456789012", tracker)
 	_ = svc.CascadeDeleteRoom(context.Background(), room, CascadeDeleteOptions{})
 
 	keys := del.Keys()
@@ -114,7 +114,7 @@ func TestCascadeDeleteRoom_CleansMixedUploads(t *testing.T) {
 	_ = tracker.Record(room.ID, "mix-user", "inline-h", ".gif", 50, "inline")
 
 	client := lkutil.NewClient(&config.LiveKitConfig{Host: "http://localhost:9999", APIKey: "test", APISecret: "testsecret1234567890123456789012"})
-	svc := NewRoomCleanupService(roomRepo, client, "test", "testsecret1234567890123456789012", tracker)
+	svc := NewRoomCleanupService(roomRepo, nil, client, nil, "test", "testsecret1234567890123456789012", tracker)
 	_ = svc.CascadeDeleteRoom(context.Background(), room, CascadeDeleteOptions{})
 
 	keys := del.Keys()
@@ -140,7 +140,7 @@ func TestSuspendRoom_CleansS3Uploads(t *testing.T) {
 	_ = tracker.Record(room.ID, "s3-suspend-user", "suspend-s3-key", ".png", 300, "s3")
 
 	client := lkutil.NewClient(&config.LiveKitConfig{Host: "http://localhost:9999", APIKey: "test", APISecret: "testsecret1234567890123456789012"})
-	svc := NewRoomCleanupService(roomRepo, client, "test", "testsecret1234567890123456789012", tracker)
+	svc := NewRoomCleanupService(roomRepo, nil, client, nil, "test", "testsecret1234567890123456789012", tracker)
 	_ = svc.SuspendRoom(context.Background(), room)
 
 	keys := del.Keys()
@@ -168,7 +168,7 @@ func TestDeleteUserRooms_CleansS3Uploads(t *testing.T) {
 	_ = tracker.Record(room2.ID, "del-user", "del-key-2", ".jpg", 200, "s3")
 
 	client := lkutil.NewClient(&config.LiveKitConfig{Host: "http://localhost:9999", APIKey: "test", APISecret: "testsecret1234567890123456789012"})
-	svc := NewRoomCleanupService(roomRepo, client, "test", "testsecret1234567890123456789012", tracker)
+	svc := NewRoomCleanupService(roomRepo, nil, client, nil, "test", "testsecret1234567890123456789012", tracker)
 	_ = svc.DeleteUserRooms(context.Background(), []models.Room{*room1, *room2}, "del-user")
 
 	keys := del.Keys()

@@ -204,7 +204,7 @@ POST /api/room/:roomId/kick/:identity
 
 ### Couper le micro d'un participant
 
-Couper le micro d'un participant. Seul l'administrateur de la salle peut le faire.
+Couper le microphone d'un participant. Seul l'administrateur de la salle peut le faire.
 
 ```
 POST /api/room/:roomId/mute/:identity
@@ -219,6 +219,42 @@ POST /api/room/:roomId/mute/:identity
   "status": "success"
 }
 ```
+
+---
+
+### Supprimer une salle
+
+Supprimez une salle que vous avez créée. Cela supprime définitivement la salle et toutes les données associées. Exécuté en tâche de fond et retourne immédiatement.
+
+```
+DELETE /api/room/:roomId
+```
+
+**Paramètres d'URL :**
+
+| Paramètre | Description |
+|---|---|
+| `roomId` | UUID de la salle |
+
+**En-têtes :** `Authorization: Bearer <accessToken>`
+
+**Réponse (202) :**
+
+```json
+{
+  "message": "Room deletion queued"
+}
+```
+
+| Statut | Description |
+|--------|-------------|
+| 202 | Suppression planifiée — sera effectuée sous peu |
+| 403 | Pas le créateur de la salle (seul le créateur peut supprimer) |
+| 404 | Salle introuvable |
+| 409 | Suppression déjà en cours |
+| 500 | Erreur serveur |
+
+Si la salle est active, tous les participants sont déconnectés et voient le message « This room has been ended by the creator ».
 
 ---
 

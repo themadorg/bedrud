@@ -168,7 +168,7 @@ bedrud user [--config <path>] <subcommand> [flags]
 Erstellt einen neuen Benutzer mit lokaler Authentifizierung (bcrypt-gehashtes Passwort).
 
 ```bash
-bedrud user [--config <path>] create --email <email> --password <password> --name <name>
+bedrud user [--config <path>] create --email <email> --password <password> --name <name> [--admin]
 ```
 
 **Erforderliche Flags:**
@@ -176,7 +176,10 @@ bedrud user [--config <path>] create --email <email> --password <password> --nam
 - `--password`: Benutzerpasswort, vor der Speicherung mit bcrypt gehasht
 - `--name`: Anzeigename des Benutzers
 
-**Zugriffsstufe:** `user` (kein Superadmin). Verwenden Sie `promote`, um Admin-Rechte zu gewähren.
+**Optionale Flags:**
+- `--admin`: Benutzer als Superadmin erstellen
+
+**Zugriffsstufe:** Standardmäßig `user`. Verwenden Sie `--admin`, um einen Superadmin in einem Befehl zu erstellen.
 
 #### `delete`
 
@@ -188,19 +191,49 @@ bedrud user [--config <path>] delete --email <email>
 
 #### `promote`
 
-Gewährt einem Benutzer `superadmin`-Zugriff.
+Legt die Rolle eines Benutzers fest, indem das Zugriffsarray ersetzt wird. Standard: `superadmin`.
 
 ```bash
-bedrud user [--config <path>] promote --email <email>
+bedrud user [--config <path>] promote --email <email> [--role <role>]
 ```
+
+| Flag   | Standard     | Beschreibung                                                      |
+|--------|--------------|------------------------------------------------------------------|
+| `--role` | `superadmin` | Zielrolle: `superadmin`, `admin`, `moderator`, `user`, `guest` |
+
+Beispiele:
+
+```bash
+# Superadmin-Rechte vergeben (Standard)
+bedrud user promote --email admin@example.com
+
+# Admin-Rechte vergeben
+bedrud user promote --email admin@example.com --role admin
+
+# Moderator-Rechte vergeben
+bedrud user promote --email mod@example.com --role moderator
+```
+
+Jede Rolle entspricht einem bestimmten Zugriffsarray:
+- `superadmin` → `['superadmin', 'user']`
+- `admin` → `['admin', 'user']`
+- `moderator` → `['moderator', 'user']`
+- `user` → `['user']`
+- `guest` → `['guest']`
 
 #### `demote`
 
-Entfernt `superadmin`-Zugriff von einem Benutzer (zurückgesetzt auf `user`-Ebene).
+Entfernt eine bestimmte Rolle von einem Benutzer. Standard: `superadmin`.
 
 ```bash
-bedrud user [--config <path>] demote --email <email>
+bedrud user [--config <path>] demote --email <email> [--role <role>]
 ```
+
+| Flag   | Standard     | Beschreibung                                            |
+|--------|--------------|--------------------------------------------------------|
+| `--role` | `superadmin` | Zu entfernende Rolle: `superadmin`, `admin`, `moderator` |
+
+Falls nach der Entfernung keine Rollen übrig bleiben, wird automatisch `user`-Zugriff hinzugefügt.
 
 **Implementierung:** `server/internal/usercli/usercli.go`
 
@@ -308,10 +341,11 @@ bedrud install --fresh --domain example.com --email admin@example.com
 ### Benutzerverwaltung
 
 ```bash
-# Create first admin user
-bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User"
+# Create first admin user (single command)
+bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User" --admin
 
-# Grant superadmin access
+# Or create a regular user, then promote
+bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User"
 bedrud user [--config <path>] promote --email admin@example.com
 
 # Create regular user

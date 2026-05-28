@@ -505,6 +505,7 @@
       "guides/appliance": "アプライアンスモード",
       "guides/admin-dashboard": "管理ダッシュボード",
       "guides/behind-proxy": "プロキシ/CDNの背後",
+      "guides/roles": "ユーザーロール",
       contributing: "貢献する",
     },
   },

@@ -19,6 +19,12 @@ order: 23
 | مفاتيح المرور | `POST /api/auth/passkey/*` | FIDO2/WebAuthn |
 | تحديث الرمز | `POST /api/auth/refresh` | تجديد رمز الوصول |
 
+| Resend Verification | `POST /api/auth/verify/resend` | Resend verification email |
+| Verify Email | `GET /api/auth/verify` | Verify email with token (query param, redirect) |
+| Check Verification Status | `GET /api/auth/verify/status` | Check if email is verified |
+| Forgot Password | `POST /api/auth/forgot-password` | Request password reset email |
+| Reset Password | `POST /api/auth/reset-password` | Reset password with token |
+
 ## تنسيق الرمز
 
 المصادقة الناجحة تُرجع زوجًا من رموز JWT:
@@ -246,8 +252,33 @@ GET /api/auth/:provider/login
 
 ---
 
-## استجابات الخطأ
+### إعادة إرسال التحقق
 
+إعادة إرسال رابط التحقق عبر البريد الإلكتروني. فقط للحسابات المحلية غير الموثقة. يفرض فترة التهدئة بصمت عبر `verificationEmailCooldownMins` — يعيد دائمًا 200 لمنع تعداد البريد الإلكتروني.
+
+---
+
+### التحقق من البريد الإلكتروني
+
+إكمال التحقق من البريد الإلكتروني باستخدام الرمز المميز من رابط التحقق.
+
+---
+
+### نسيت كلمة المرور
+
+طلب بريد إلكتروني لإعادة تعيين كلمة المرور. يتطلب تكوين SMTP.
+
+يعيد نقطة النهاية دائمًا 202 لمنع تعداد البريد الإلكتروني. ينتهي رابط إعادة التعيين بعد `resetTokenTTLHours`.
+
+---
+
+### إعادة تعيين كلمة المرور
+
+تعيين كلمة مرور جديدة باستخدام الرمز المميز من البريد الإلكتروني لإعادة التعيين.
+
+---
+
+## 
 جميع نقاط نهاية المصادقة تُرجع الأخطاء بهذا التنسيق:
 
 ```json
@@ -259,7 +290,9 @@ GET /api/auth/:provider/login
 | الحالة | المعنى |
 |--------|---------|
 | 400 | طلب غير صالح (حقول مفقودة، خطأ في التحقق) |
-| 401 | بيانات اعتماد غير صالحة أو رمز منتهي الصلاحية |
+| 401 | Invalid credentials or expired token |
+| 403 | Email not verified (`requiresVerification: true`) |
+| 429 | Rate limited — check `Retry-After` header |
 | 409 | البريد الإلكتروني مُسجَّل مسبقًا |
 | 500 | خطأ داخلي في الخادم |
 
@@ -267,5 +300,5 @@ GET /api/auth/:provider/login
 
 ## انظر أيضًا
 
-- [تدفق المصادقة](/ar/docs/backend/authentication) - كيف تعمل JWT وOAuth ومفاتيح المرور داخليًا
+- [/ar/docs/backend/authentication](/ar/docs/backend/authentication) - how JWT, OAuth, passkeys, email verification, and password reset work internally
 - [واجهة برمجة مفاتيح المرور](/ar/docs/api/passkeys) - مرجع نقاط نهاية FIDO2/WebAuthn

@@ -15,30 +15,12 @@ export function ChatScrollManager({ show, unreadCount, onScrollToBottom }: Props
     <>
       {/* Inline banner — pill centered just above the input */}
       {unreadCount > 0 && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 'calc(88px + env(safe-area-inset-bottom, 0px) + 8px)',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 6,
-          }}
-        >
+        <div className="absolute bottom-[calc(88px+env(safe-area-inset-bottom)+8px)] left-1/2 -translate-x-1/2 z-[6]">
           <button
             type="button"
             onClick={onScrollToBottom}
-            style={{
-              background: 'color-mix(in oklab, var(--primary) 85%, transparent)',
-              border: 'none',
-              borderRadius: 20,
-              padding: '5px 14px',
-              color: 'white',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-            }}
+            className="border-none rounded-full px-3.5 py-[5px] text-white text-xs font-semibold cursor-pointer whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+            style={{ background: 'color-mix(in oklab, var(--primary) 85%, transparent)' }}
           >
             {label}
           </button>
@@ -50,42 +32,14 @@ export function ChatScrollManager({ show, unreadCount, onScrollToBottom }: Props
         type="button"
         onClick={onScrollToBottom}
         aria-label="Scroll to latest messages"
-        style={{
-          position: 'absolute',
-          bottom: 'calc(88px + env(safe-area-inset-bottom, 0px) + 56px)',
-          right: 14,
-          width: 34,
-          height: 34,
-          borderRadius: '50%',
-          border: '1px solid rgba(255,255,255,0.12)',
-          background: 'rgba(30,30,50,0.92)',
-          color: 'color-mix(in oklab, var(--sky-300) 90%, transparent)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-          zIndex: 5,
-        }}
+        className="absolute bottom-[calc(88px+env(safe-area-inset-bottom)+56px)] right-3.5 w-[34px] h-[34px] rounded-full border border-white/[0.12] bg-[#1e1e32]/92 flex items-center justify-center cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.4)] z-[5]"
+        style={{ color: 'color-mix(in oklab, var(--accent-400) 90%, transparent)' }}
       >
         <ArrowDown size={14} />
         {unreadCount > 0 && (
           <span
-            style={{
-              position: 'absolute',
-              top: -5,
-              right: -5,
-              background: 'color-mix(in oklab, var(--primary) 90%, transparent)',
-              color: 'white',
-              fontSize: 9,
-              fontWeight: 700,
-              borderRadius: '50%',
-              width: 16,
-              height: 16,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+            className="absolute -top-[5px] -right-[5px] text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center"
+            style={{ background: 'color-mix(in oklab, var(--primary) 90%, transparent)' }}
           >
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>

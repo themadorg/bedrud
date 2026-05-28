@@ -1,3 +1,4 @@
+import { AlertCircle } from 'lucide-react'
 import { type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -33,7 +34,7 @@ function bubblePosition(idx: number, total: number): 'only' | 'first' | 'middle'
 }
 
 function ChatMarkdown({ content, isLocal }: { content: string; isLocal: boolean }) {
-  const linkColor = isLocal ? 'rgba(255,255,255,0.9)' : 'color-mix(in oklab, var(--sky-300) 90%, transparent)'
+  const linkColor = isLocal ? 'rgba(255,255,255,0.9)' : 'color-mix(in oklab, var(--accent-400) 90%, transparent)'
   const codeBg = isLocal ? 'rgba(0,0,0,0.25)' : 'color-mix(in oklab, var(--primary) 15%, transparent)'
 
   type C = { children?: ReactNode }
@@ -86,7 +87,7 @@ function ChatMarkdown({ content, isLocal }: { content: string; isLocal: boolean 
         style={{
           margin: '4px 0',
           paddingLeft: 10,
-          borderLeft: `2px solid ${isLocal ? 'rgba(255,255,255,0.4)' : 'color-mix(in oklab, var(--sky-300) 40%, transparent)'}`,
+          borderLeft: `2px solid ${isLocal ? 'rgba(255,255,255,0.4)' : 'color-mix(in oklab, var(--accent-400) 40%, transparent)'}`,
           color: isLocal ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.5)',
         }}
       >
@@ -116,16 +117,9 @@ export function ChatMessageCluster({ cluster }: Props) {
   const initials = avatarInitials(sender)
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: isLocal ? 'flex-end' : 'flex-start',
-        gap: 2,
-      }}
-    >
+    <div className="flex flex-col gap-0.5" style={{ alignItems: isLocal ? 'flex-end' : 'flex-start' }}>
       {/* Sender name (remote only) */}
-      {!isLocal && <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, paddingLeft: 36 }}>{sender}</span>}
+      {!isLocal && <span className="text-white/50 text-[11px] pl-9">{sender}</span>}
 
       {messages.map((msg, idx) => {
         const pos = bubblePosition(idx, total)
@@ -134,32 +128,16 @@ export function ChatMessageCluster({ cluster }: Props) {
         return (
           <div
             key={msg.id}
-            style={{
-              display: 'flex',
-              alignItems: 'flex-end',
-              gap: 8,
-              flexDirection: isLocal ? 'row-reverse' : 'row',
-              width: '100%',
-            }}
+            className="flex items-end gap-2 w-full"
+            style={{ flexDirection: isLocal ? 'row-reverse' : 'row' }}
           >
             {/* Avatar slot — 28px wide on remote side for alignment */}
             {!isLocal && (
-              <div style={{ width: 28, flexShrink: 0 }}>
+              <div className="w-7 shrink-0">
                 {(pos === 'only' || pos === 'first') && (
                   <div
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: '50%',
-                      background: color,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: 'rgba(255,255,255,0.95)',
-                      userSelect: 'none',
-                    }}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white/95 select-none"
+                    style={{ background: color }}
                   >
                     {initials}
                   </div>
@@ -169,19 +147,16 @@ export function ChatMessageCluster({ cluster }: Props) {
 
             {/* Bubble */}
             <div
+              className="text-[13px] leading-[1.45] break-words overflow-hidden"
               style={{
                 maxWidth: '78%',
                 padding: hasAttachments && !msg.message ? '4px' : '7px 12px',
                 borderRadius: bubbleRadius(isLocal, pos),
                 background: isLocal ? 'color-mix(in oklab, var(--primary) 75%, transparent)' : 'rgba(255,255,255,0.07)',
                 border: isLocal
-                  ? '1px solid color-mix(in oklab, var(--sky-300) 25%, transparent)'
+                  ? '1px solid color-mix(in oklab, var(--accent-400) 25%, transparent)'
                   : '1px solid rgba(255,255,255,0.06)',
                 color: isLocal ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.75)',
-                fontSize: 13,
-                lineHeight: 1.45,
-                wordBreak: 'break-word',
-                overflow: 'hidden',
               }}
             >
               {/* Image attachments */}
@@ -194,21 +169,23 @@ export function ChatMessageCluster({ cluster }: Props) {
                       src={att.url}
                       alt="attachment"
                       loading="lazy"
-                      style={{
-                        display: 'block',
-                        maxWidth: '100%',
-                        maxHeight: 240,
-                        borderRadius: 10,
-                        objectFit: 'contain',
-                      }}
+                      className="block max-w-full max-h-60 rounded-xl object-contain"
                     />
                   </a>
                 )
               })}
               {/* Text */}
               {msg.message && (
-                <div style={{ padding: hasAttachments ? '6px 8px 2px' : '0' }}>
+                <div className={hasAttachments ? 'pt-1.5 px-2 pb-0.5' : 'p-0'}>
                   <ChatMarkdown content={msg.message} isLocal={isLocal} />
+                </div>
+              )}
+              {isLocal && msg.status === 'failed' && (
+                <div className="flex items-center gap-1 mt-1 opacity-90">
+                  <AlertCircle size={12} style={{ color: 'var(--destructive, #ef4444)' }} />
+                  <span className="text-[11px]" style={{ color: 'var(--destructive, #ef4444)' }}>
+                    Failed to send
+                  </span>
                 </div>
               )}
             </div>
@@ -219,13 +196,10 @@ export function ChatMessageCluster({ cluster }: Props) {
       {/* Timestamp on last bubble */}
       <span
         title={absoluteTime(messages[total - 1].timestamp)}
+        className="text-[10px] text-white/50 cursor-default select-none"
         style={{
-          fontSize: 10,
-          color: 'rgba(255,255,255,0.25)',
           paddingLeft: isLocal ? 0 : 36,
           paddingRight: isLocal ? 2 : 0,
-          cursor: 'default',
-          userSelect: 'none',
         }}
       >
         {relativeTime(messages[total - 1].timestamp)}

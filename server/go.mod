@@ -18,6 +18,8 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/swaggo/swag v1.16.6
 	github.com/twitchtv/twirp v8.1.3+incompatible
+	golang.org/x/net v0.53.0
+	golang.org/x/text v0.37.0
 	golang.org/x/crypto v0.52.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1

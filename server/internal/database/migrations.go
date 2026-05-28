@@ -30,6 +30,64 @@ func RunMigrations() error {
 	if err := db.AutoMigrate(&models.Room{}); err != nil {
 		return err
 	}
+
+	// Room name index was unique in older versions. Archived (soft-deleted) rooms
+	// keep their names, blocking reuse. Drop the unique index and let AutoMigrate
+	// recreate it as a regular (non-unique) index. Uniqueness among active rooms
+	// is enforced by a partial unique index (idx_rooms_active_name) and the
+	// repository layer.
+	if db.Migrator().HasIndex(&models.Room{}, "idx_rooms_name") {
+		isUnique := false
+		if db.Dialector.Name() == "sqlite" {
+			rows, err := db.Raw("PRAGMA index_list('rooms')").Rows()
+			if err == nil {
+				for rows.Next() {
+					var seq int
+					var name string
+					var unique int
+					var origin, partial string
+					if rows.Scan(&seq, &name, &unique, &origin, &partial) == nil && name == "idx_rooms_name" && unique == 1 {
+						isUnique = true
+					}
+				}
+				rows.Close()
+			}
+		} else if db.Dialector.Name() == "postgres" {
+			var unique int
+			if err := db.Raw(`SELECT GREATEST((indexdef ~ ' UNIQUE ')::int, (indexdef ~ 'UNIQUE INDEX' )::int) FROM pg_indexes WHERE tablename = 'rooms' AND indexname = 'idx_rooms_name'`).Scan(&unique).Error; err == nil && unique == 1 {
+				isUnique = true
+			}
+		}
+		if isUnique {
+			log.Info().Msg("Dropping unique index on rooms.name — replacing with regular index for archived room re-use")
+			if err := db.Migrator().DropIndex(&models.Room{}, "idx_rooms_name"); err != nil {
+				log.Warn().Err(err).Msg("Failed to drop unique index on rooms.name")
+			} else {
+				// AutoMigrate will recreate as a regular index via the gorm:"index" tag
+				if err := db.AutoMigrate(&models.Room{}); err != nil {
+					log.Warn().Err(err).Msg("Failed to recreate rooms.name index")
+				}
+			}
+		}
+	}
+
+	// Partial unique index: only active rooms must have unique names.
+	// Inactive (idle) and archived (soft-deleted) rooms allow name reuse.
+	// DB-level enforcement alongside app-level check in repository.
+	idxName := "idx_rooms_active_name"
+	if db.Dialector.Name() == "sqlite" {
+		if !db.Migrator().HasIndex(&models.Room{}, idxName) {
+			if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_rooms_active_name ON rooms(name) WHERE is_active = 1").Error; err != nil {
+				log.Warn().Err(err).Msg("Failed to create partial unique index for active room names")
+			}
+		}
+	} else if db.Dialector.Name() == "postgres" {
+		if !db.Migrator().HasIndex(&models.Room{}, idxName) {
+			if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_rooms_active_name ON rooms(name) WHERE is_active = true").Error; err != nil {
+				log.Warn().Err(err).Msg("Failed to create partial unique index for active room names")
+			}
+		}
+	}
 	if err := db.AutoMigrate(&models.RoomParticipant{}); err != nil {
 		return err
 	}
@@ -49,6 +107,19 @@ func RunMigrations() error {
 		return err
 	}
 	if err := db.AutoMigrate(&models.ChatUpload{}); err != nil {
+		return err
+	}
+	if err := db.AutoMigrate(&models.Job{}); err != nil {
+		return err
+	}
+	if err := db.AutoMigrate(&models.VerificationEvent{}); err != nil {
+		return err
+	}
+	if err := db.AutoMigrate(&models.Webhook{}); err != nil {
+		return err
+	}
+	// TODO oncoming feature
+	if err := db.AutoMigrate(&models.Recording{}); err != nil {
 		return err
 	}
 

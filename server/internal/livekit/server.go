@@ -115,7 +115,7 @@ func RunLiveKit(configPath string) error {
 }
 
 // StartInternalServer starts a LiveKit server using the provided config file
-func generateTempConfig(apiKey, apiSecret string, port int, nodeIP, certFile, keyFile, serverHost string) (string, error) {
+func generateTempConfig(apiKey, apiSecret string, port int, nodeIP, certFile, keyFile, serverHost, httpPort string) (string, error) {
 	cfg := ConfigYAML{}
 	cfg.Port = port
 	cfg.Keys = map[string]string{apiKey: apiSecret}
@@ -141,6 +141,15 @@ func generateTempConfig(apiKey, apiSecret string, port int, nodeIP, certFile, ke
 		if serverHost != "" {
 			cfg.TURN.Domain = serverHost
 		}
+	}
+
+	// Auto-configure webhook to send events back to our API
+	// (only when no external config is provided)
+	if httpPort != "" {
+		webhookURL := fmt.Sprintf("http://localhost:%s/api/livekit/webhook", httpPort)
+		cfg.Webhook.URLs = []string{webhookURL}
+		cfg.Webhook.APIKey = apiKey
+		log.Info().Str("url", webhookURL).Msg("LiveKit: configured webhook to local API")
 	}
 
 	data, err := yaml.Marshal(&cfg)
@@ -178,7 +187,7 @@ func ResolveNodeIP(explicitIP, serverHost string) string {
 	return ""
 }
 
-func StartInternalServer(ctx context.Context, apiKey, apiSecret string, port int, certFile, keyFile, externalConfigPath, nodeIP, serverHost string) error {
+func StartInternalServer(ctx context.Context, apiKey, apiSecret string, port int, certFile, keyFile, externalConfigPath, nodeIP, serverHost, httpPort string) error {
 	if os.Getenv("LIVEKIT_MANAGED") == "true" {
 		log.Info().Msg("➜ Skipping internal LiveKit management (managed by system service)")
 		return nil
@@ -191,7 +200,7 @@ func StartInternalServer(ctx context.Context, apiKey, apiSecret string, port int
 	cleanupTemp := ""
 
 	if configPath == "" {
-		tmpPath, err := generateTempConfig(apiKey, apiSecret, port, nodeIP, certFile, keyFile, serverHost)
+		tmpPath, err := generateTempConfig(apiKey, apiSecret, port, nodeIP, certFile, keyFile, serverHost, httpPort)
 		if err != nil {
 			log.Warn().Err(err).Msg("Failed to generate temp LiveKit config, falling back to inline args")
 		} else {

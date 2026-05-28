@@ -1,4 +1,3 @@
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import {
   AlertCircle,
   Check,
@@ -15,6 +14,9 @@ import {
   Video,
 } from 'lucide-react'
 import { useState } from 'react'
+
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { getErrorMessage } from '@/lib/errors'
 import { cn } from '@/lib/utils'
@@ -91,10 +93,8 @@ export function RoomSettingsDialog({ room, open, onOpenChange, onSave }: Props) 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="gap-0 overflow-hidden border p-0 max-w-[calc(100vw-2rem)] sm:max-w-sm">
-        <VisuallyHidden>
-          <DialogTitle>Room Settings</DialogTitle>
-          <DialogDescription>Configure room visibility, capacity, and features</DialogDescription>
-        </VisuallyHidden>
+        <DialogTitle className="sr-only">Room Settings</DialogTitle>
+        <DialogDescription className="sr-only">Configure room visibility, capacity, and features</DialogDescription>
         <form onSubmit={handleSubmit}>
           {/* Room name as header */}
           <div className="px-5 pt-5 pb-4">
@@ -105,47 +105,47 @@ export function RoomSettingsDialog({ room, open, onOpenChange, onSave }: Props) 
           {/* Visibility + Capacity — single row */}
           <div className="flex flex-wrap items-center gap-3 border-t px-5 py-3">
             <div className="flex items-center gap-0.5 border bg-background p-0.5">
-              <button
+              <Button
                 type="button"
+                variant={!isPublic ? 'secondary' : 'ghost'}
+                size="sm"
                 onClick={() => setIsPublic(false)}
-                className={cn(
-                  'flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition-colors',
-                  !isPublic ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground',
-                )}
+                className={cn(!isPublic && 'bg-primary/10 text-primary')}
               >
                 <Lock className="h-3 w-3" />
                 Private
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant={isPublic ? 'secondary' : 'ghost'}
+                size="sm"
                 onClick={() => setIsPublic(true)}
-                className={cn(
-                  'flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition-colors',
-                  isPublic ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground',
-                )}
+                className={cn(isPublic && 'bg-primary/10 text-primary')}
               >
                 <Globe className="h-3 w-3" />
                 Public
-              </button>
+              </Button>
             </div>
 
             <div className="ml-auto flex items-center gap-2">
               <Users className="h-3.5 w-3.5 text-muted-foreground/50" />
-              <button
-                type="button"
+              <Button
+                variant="outline"
+                size="icon"
                 onClick={() => setMaxParticipants((p) => Math.max(2, p - 5))}
-                className="flex h-8 w-8 items-center justify-center border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                className="h-8 w-8"
               >
                 <Minus className="h-3 w-3" />
-              </button>
+              </Button>
               <span className="w-6 text-center font-mono text-xs font-medium">{maxParticipants}</span>
-              <button
-                type="button"
+              <Button
+                variant="outline"
+                size="icon"
                 onClick={() => setMaxParticipants((p) => Math.min(500, p + 5))}
-                className="flex h-8 w-8 items-center justify-center border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                className="h-8 w-8"
               >
                 <Plus className="h-3 w-3" />
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -154,20 +154,20 @@ export function RoomSettingsDialog({ room, open, onOpenChange, onSave }: Props) 
             {FEATURES.map(({ key, icon: Icon, label }) => {
               const active = settings[key]
               return (
-                <button
+                <Badge
                   key={key}
-                  type="button"
-                  onClick={() => toggle(key)}
+                  variant={active ? 'default' : 'outline'}
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                    'cursor-pointer gap-1.5 px-3 py-1.5 text-xs font-medium',
                     active
-                      ? 'border-primary/30 bg-primary/10 text-primary'
+                      ? 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15'
                       : 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',
                   )}
+                  onClick={() => toggle(key)}
                 >
                   <Icon className="h-3 w-3" />
                   {label}
-                </button>
+                </Badge>
               )
             })}
           </div>
@@ -182,11 +182,7 @@ export function RoomSettingsDialog({ room, open, onOpenChange, onSave }: Props) 
 
           {/* Action */}
           <div className="border-t px-5 py-3">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="flex h-9 w-full items-center justify-center gap-2 bg-primary text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
+            <Button type="submit" disabled={isLoading} className="w-full">
               {isLoading ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving...
@@ -196,7 +192,7 @@ export function RoomSettingsDialog({ room, open, onOpenChange, onSave }: Props) 
                   Save changes <Check className="h-3.5 w-3.5" />
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </form>
       </DialogContent>

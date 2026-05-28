@@ -12,6 +12,20 @@ Bedrud ORM olarak **GORM**'u kullanır ve hem SQLite hem de PostgreSQL'i destekl
 
 Veritabanı türünü ve bağlantı detaylarını `config.yaml` dosyasındaki `database:` bölümünden yapılandırabilirsiniz.
 
+## SQLite Dosya Düzeni
+
+SQLite kullanırken, Bedrud daha iyi eşzamanlı okuma performansı için **WAL (Write-Ahead Log) modunu** etkinleştirir. Bu, ana veritabanı dosyasının yanında iki ek dosya oluşturur:
+
+| Dosya | Amaç |
+|-------|------|
+| `bedrud-local.db` | Ana veritabanı dosyası |
+| `bedrud-local.db-shm` | Paylaşımlı bellek dosyası — okuyucular ve yazıcılar arasındaki erişimi koordine eder |
+| `bedrud-local.db-wal` | Write-Ahead Log — yeni yazmalar önce buraya gider, ardından ana veritabanına aktarılır |
+
+**Bu dosyalar normaldir.** Sunucu başlatıldığında otomatik olarak oluşturulur ve temiz kapanışta silinir. Sunucu çökerse, SQLite otomatik olarak kurtarır — veri kaybı olmaz.
+
+WAL modunu devre dışı bırakmak için (önerilmez), SQLite yapılandırmasında `PRAGMA journal_mode=DELETE;` ayarını yapın, ancak daha yavaş eşzamanlı okuma bekleyin.
+
 ## Çekirdek Modeller
 
 Modeller `internal/models/` dizininde bulunur. En önemlileri şunlardır:

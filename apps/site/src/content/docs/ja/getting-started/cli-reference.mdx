@@ -168,7 +168,7 @@ bedrud user [--config <path>] <subcommand> [flags]
 ローカル認証（bcrypt ハッシュパスワード）で新しいユーザーを作成します。
 
 ```bash
-bedrud user [--config <path>] create --email <email> --password <password> --name <name>
+bedrud user [--config <path>] create --email <email> --password <password> --name <name> [--admin]
 ```
 
 **必須フラグ:**
@@ -176,7 +176,10 @@ bedrud user [--config <path>] create --email <email> --password <password> --nam
 - `--password`: ユーザーのパスワード。保存前に bcrypt でハッシュ化
 - `--name`: ユーザーの表示名
 
-**アクセスレベル:** `user`（superadmin ではない）。管理者権限を付与するには `promote` を使用。
+**オプションフラグ:**
+- `--admin`: ユーザーを superadmin として作成
+
+**アクセスレベル:** デフォルトは `user`。`--admin` を使用すると、1つのコマンドで superadmin を作成できます。
 
 #### `delete`
 
@@ -188,19 +191,49 @@ bedrud user [--config <path>] delete --email <email>
 
 #### `promote`
 
-ユーザーに `superadmin` アクセスを付与します。
+ユーザーのロールをアクセス配列の置き換えで設定します。デフォルト: `superadmin`。
 
 ```bash
-bedrud user [--config <path>] promote --email <email>
+bedrud user [--config <path>] promote --email <email> [--role <role>]
 ```
+
+| フラグ   | デフォルト    | 説明                                                         |
+|---------|--------------|-------------------------------------------------------------|
+| `--role` | `superadmin` | 対象ロール: `superadmin`, `admin`, `moderator`, `user`, `guest` |
+
+例:
+
+```bash
+# superadmin 権限を付与 (デフォルト)
+bedrud user promote --email admin@example.com
+
+# admin 権限を付与
+bedrud user promote --email admin@example.com --role admin
+
+# moderator 権限を付与
+bedrud user promote --email mod@example.com --role moderator
+```
+
+各ロールは特定のアクセス配列にマップされます:
+- `superadmin` → `['superadmin', 'user']`
+- `admin` → `['admin', 'user']`
+- `moderator` → `['moderator', 'user']`
+- `user` → `['user']`
+- `guest` → `['guest']`
 
 #### `demote`
 
-ユーザーから `superadmin` アクセスを削除します（`user` レベルに戻る）。
+ユーザーから特定のロールを削除します。デフォルト: `superadmin`。
 
 ```bash
-bedrud user [--config <path>] demote --email <email>
+bedrud user [--config <path>] demote --email <email> [--role <role>]
 ```
+
+| フラグ   | デフォルト    | 説明                                         |
+|---------|--------------|---------------------------------------------|
+| `--role` | `superadmin` | 削除するロール: `superadmin`, `admin`, `moderator` |
+
+削除後、ユーザーにロールが残っていない場合、`user` アクセスが自動的に追加されます。
 
 **実装:** `server/internal/usercli/usercli.go`
 
@@ -308,10 +341,11 @@ bedrud install --fresh --domain example.com --email admin@example.com
 ### ユーザー管理
 
 ```bash
-# 最初の管理者ユーザーを作成
-bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User"
+# 最初の管理者ユーザーを作成（単一コマンド）
+bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User" --admin
 
-# superadmin アクセスを付与
+# または一般ユーザーを作成してから昇格
+bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User"
 bedrud user [--config <path>] promote --email admin@example.com
 
 # 一般ユーザーを作成

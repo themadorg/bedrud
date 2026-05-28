@@ -1,5 +1,6 @@
 import { useIsSpeaking, useParticipants, useTracks } from '@livekit/components-react'
 import { type Participant, Track } from 'livekit-client'
+
 import { ParticipantTile } from './ParticipantTile'
 import { ScreenShareTile } from './ScreenShareTile'
 
@@ -26,18 +27,14 @@ function StripTile({
 
   return (
     <div
+      className="shrink-0 overflow-hidden rounded-lg cursor-pointer transition-[border-color,box-shadow] duration-200"
       style={{
         width: STRIP_W,
         height: STRIP_H,
-        flexShrink: 0,
-        borderRadius: 8,
-        overflow: 'hidden',
         border: isSpeaking
           ? '1.5px solid color-mix(in oklab, var(--primary) 75%, transparent)'
           : '1.5px solid rgba(255,255,255,0.07)',
         boxShadow: isSpeaking ? '0 0 14px color-mix(in oklab, var(--primary) 30%, transparent)' : 'none',
-        transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-        cursor: 'pointer',
       }}
     >
       <ParticipantTile
@@ -67,27 +64,15 @@ export function FocusLayout({ pinnedIdentities, onTogglePin }: FocusLayoutProps)
 
   return (
     <div
-      style={{
-        position: 'absolute',
-        inset: 0,
-        paddingTop: 'calc(56px + env(safe-area-inset-top, 0px))',
-        paddingBottom: 'calc(88px + env(safe-area-inset-bottom, 0px))',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0,
-        zIndex: 0,
-      }}
+      id="meet-grid"
+      className="absolute inset-0 z-0 flex flex-col pt-[calc(56px+env(safe-area-inset-top))] pb-[calc(88px+env(safe-area-inset-bottom))]"
     >
       {/* ── Main focus area ─────────────────────────────────────── */}
       <div
+        className="flex-1 grid gap-[5px] p-[5px_5px_0] min-h-0"
         style={{
-          flex: 1,
-          display: 'grid',
           gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
           gridAutoRows: '1fr',
-          gap: 5,
-          padding: '5px 5px 0',
-          minHeight: 0,
         }}
       >
         {screenShareTracks.map((track) => (
@@ -108,67 +93,34 @@ export function FocusLayout({ pinnedIdentities, onTogglePin }: FocusLayoutProps)
       {/* ── Bottom filmstrip ─────────────────────────────────────── */}
       {hasStrip && (
         <div
-          style={{
-            height: STRIP_OUTER,
-            flexShrink: 0,
-            position: 'relative',
-            // Glass panel separating strip from main area
-            background: 'rgba(8,8,18,0.7)',
-            borderTop: '1px solid rgba(255,255,255,0.06)',
-            backdropFilter: 'blur(12px)',
-            marginTop: 5,
-          }}
+          className="shrink-0 relative bg-[#080812]/70 border-t border-white/[0.06] backdrop-blur-lg mt-[5px]"
+          style={{ height: STRIP_OUTER }}
         >
           {/* Scrollable row */}
-          <div
-            style={{
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '0 10px',
-              overflowX: 'auto',
-              // Hide scrollbar cross-browser
-              scrollbarWidth: 'none',
-            }}
-            // Webkit scrollbar hidden via className below
-            className="strip-scroll"
-          >
+          <div className="h-full flex items-center gap-1.5 px-2.5 overflow-x-auto [scrollbar-width:none]">
             {stripParticipants.map((p, i) => (
               <StripTile key={p.identity} participant={p} index={i} onTogglePin={() => onTogglePin(p.identity)} />
             ))}
 
             {/* Right padding sentinel so last tile isn't occluded by fade */}
-            <div style={{ width: 32, flexShrink: 0 }} />
+            <div className="w-8 shrink-0" />
           </div>
 
           {/* Right-edge fade — hints at horizontal scroll */}
           <div
+            className="absolute right-0 top-0 w-16 h-full pointer-events-none"
             style={{
-              position: 'absolute',
-              right: 0,
-              top: 0,
-              width: 64,
-              height: '100%',
               background: 'linear-gradient(to right, transparent, rgba(8,8,18,0.85))',
-              pointerEvents: 'none',
             }}
           />
 
           {/* Participant count badge */}
           <div
+            className="absolute top-2 right-3.5 rounded-md px-[7px] py-0.5 text-[11px] font-semibold pointer-events-none"
             style={{
-              position: 'absolute',
-              top: 8,
-              right: 14,
               background: 'color-mix(in oklab, var(--primary) 18%, transparent)',
               border: '1px solid color-mix(in oklab, var(--primary) 30%, transparent)',
-              borderRadius: 6,
-              padding: '2px 7px',
-              fontSize: 11,
-              fontWeight: 600,
-              color: 'color-mix(in oklab, var(--sky-300) 80%, transparent)',
-              pointerEvents: 'none',
+              color: 'color-mix(in oklab, var(--accent-400) 80%, transparent)',
             }}
           >
             {stripParticipants.length}

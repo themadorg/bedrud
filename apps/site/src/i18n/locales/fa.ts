@@ -743,6 +743,7 @@
       "guides/appliance": "حالت دستگاه",
       "guides/admin-dashboard": "داشبورد مدیریت",
       "guides/behind-proxy": "پشت یک پروکسی/CDN",
+      "guides/roles": "نقش‌های کاربری",
       contributing: "مشارکت",
     },
   },

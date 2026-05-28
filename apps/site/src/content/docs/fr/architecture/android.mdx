@@ -95,7 +95,7 @@ flowchart TB
         RM["RoomManager"]
     end
 
-    AI --> DEPS
+    AI */} DEPS
 ```
 
 ### Key Pattern
@@ -113,9 +113,9 @@ Le motif `?: return` garantit que le composable ne render pas tant que l'instanc
 
 ```mermaid
 flowchart LR
-    A["No instances"] --> B[AddInstanceScreen]
-    C["Has instances, not logged in"] --> D[LoginScreen]
-    E["Has instances, logged in"] --> F[DashboardScreen]
+    A["No instances"] */} B[AddInstanceScreen]
+    C["Has instances, not logged in"] */} D[LoginScreen]
+    E["Has instances, logged in"] */} F[DashboardScreen]
 ```
 
 L'instance switcher apparaît comme un `ModalBottomSheet` déclenché depuis le Dashboard toolbar.

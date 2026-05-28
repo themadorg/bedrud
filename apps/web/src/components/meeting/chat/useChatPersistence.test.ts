@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ChatMessage } from '../MeetingContext'
-import { useChatPersistence } from './useChatPersistence'
+import { MAX_INITIAL_LOAD, useChatPersistence } from './useChatPersistence'
 
 function makeMsg(id: string): ChatMessage {
   return {
@@ -82,5 +82,28 @@ describe('useChatPersistence', () => {
     expect(stored).toHaveLength(2)
     expect(stored[0].id).toBe('b')
     expect(stored[1].id).toBe('c')
+  })
+
+  it('caps initial load when storage exceeds MAX_INITIAL_LOAD', () => {
+    const excess = MAX_INITIAL_LOAD + 50
+    const msgs = Array.from({ length: excess }, (_, i) => makeMsg(`msg-${i}`))
+    sessionStorage.setItem('chat:room-excess', JSON.stringify(msgs))
+    const { result } = renderHook(() => useChatPersistence('room-excess', 10000, 0))
+    const [initial] = result.current
+    expect(initial).toHaveLength(MAX_INITIAL_LOAD)
+    expect(initial[0].id).toBe(`msg-${excess - MAX_INITIAL_LOAD}`)
+    expect(initial[MAX_INITIAL_LOAD - 1].id).toBe(`msg-${excess - 1}`)
+  })
+
+  it('filters expired messages on persist when TTL is set', () => {
+    const { result } = renderHook(() => useChatPersistence('room-persist-ttl', 100, 48))
+    const [, persist] = result.current
+    const fresh = makeMsg('fresh')
+    const stale = makeMsg('stale')
+    stale.timestamp = Date.now() - 100 * 60 * 60 * 1000 // 100 hours ago
+    act(() => persist([fresh, stale]))
+    const stored = JSON.parse(sessionStorage.getItem('chat:room-persist-ttl') ?? '[]') as ChatMessage[]
+    expect(stored).toHaveLength(1)
+    expect(stored[0].id).toBe('fresh')
   })
 })

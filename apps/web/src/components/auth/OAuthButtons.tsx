@@ -1,6 +1,8 @@
 // OAuth redirects must be absolute — the browser navigates there directly.
 // Prefer VITE_OAUTH_URL, fall back to VITE_API_URL, and never silently
 // default to an insecure localhost URL in production.
+import { Button } from '@/components/ui/button'
+
 const _EXPLICIT_OAUTH = import.meta.env['VITE_OAUTH_URL'] as string | undefined
 const _API_URL = import.meta.env['VITE_API_URL'] as string | undefined
 
@@ -81,14 +83,12 @@ export function OAuthButtons({ availableProviders }: Props) {
   return (
     <div className="space-y-2">
       {filtered.map(({ id, label, icon }) => (
-        <a
-          key={id}
-          href={`${OAUTH_BASE}/api/auth/${id}/login`}
-          className="flex w-full items-center justify-center gap-2 border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
-        >
-          {icon}
-          {label}
-        </a>
+        <Button key={id} variant="outline" className="w-full gap-2" asChild>
+          <a href={`${OAUTH_BASE}/api/auth/${id}/login`}>
+            {icon}
+            {label}
+          </a>
+        </Button>
       ))}
     </div>
   )

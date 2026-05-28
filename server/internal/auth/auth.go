@@ -10,8 +10,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/mail"
 	"strings"
 	"time"
+
+	"golang.org/x/net/idna"
+
+	"gorm.io/gorm"
 
 	"github.com/go-passkeys/go-passkeys/webauthn"
 	"github.com/golang-jwt/jwt/v5"
@@ -115,7 +120,7 @@ func NewAuthService(userRepo *repository.UserRepository, passkeyRepo *repository
 // @Router /auth/register [post]
 func (s *AuthService) Register(email, password, name string) (*models.User, error) {
 	// Check if user exists
-	existingUser, err := s.userRepo.GetUserByEmail(email)
+	existingUser, err := s.GetUserByEmail(email)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +164,7 @@ func (s *AuthService) Register(email, password, name string) (*models.User, erro
 // @Failure 401 {object} ErrorResponse
 // @Router /auth/login [post]
 func (s *AuthService) Login(email, password string) (*LoginResponse, error) {
-	user, err := s.userRepo.GetUserByEmail(email)
+	user, err := s.GetUserByEmail(email)
 	if err != nil {
 		return nil, err
 	}
@@ -184,8 +189,14 @@ func (s *AuthService) Login(email, password string) (*LoginResponse, error) {
 		return nil, errors.New("account is deactivated")
 	}
 
+	// Check email verification BEFORE generating tokens (Fix: no wasted token gen for unverified users)
+	cfg := config.Get()
+	if cfg.Auth.RequireEmailVerification && user.EmailVerifiedAt == nil {
+		return nil, &ErrEmailNotVerified{Email: user.Email}
+	}
+
 	// Generate tokens
-	accessToken, refreshToken, err := GenerateTokenPair(user.ID, user.Email, user.Name, user.Accesses, config.Get())
+	accessToken, refreshToken, err := GenerateTokenPair(user.ID, user.Email, user.Name, user.Provider, user.Accesses, config.Get(), user.EmailVerifiedAt)
 	if err != nil {
 		return nil, errors.New("failed to generate tokens")
 	}
@@ -230,7 +241,7 @@ func (s *AuthService) GuestLogin(name string) (*LoginResponse, error) {
 	}
 
 	// Generate tokens
-	accessToken, refreshToken, err := GenerateTokenPair(user.ID, user.Email, user.Name, user.Accesses, config.Get())
+	accessToken, refreshToken, err := GenerateTokenPair(user.ID, user.Email, user.Name, user.Provider, user.Accesses, config.Get(), nil)
 	if err != nil {
 		return nil, errors.New("failed to generate tokens")
 	}
@@ -249,15 +260,6 @@ func (s *AuthService) GuestLogin(name string) (*LoginResponse, error) {
 	}, nil
 }
 
-// @Summary Refresh token
-// @Description Get new access token using refresh token
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body map[string]string true "Refresh Token"
-// @Success 200 {object} TokenResponse
-// @Failure 401 {object} ErrorResponse
-// @Router /auth/refresh [post]
 func (s *AuthService) UpdateRefreshToken(userID, refreshToken string) error {
 	return s.userRepo.UpdateRefreshToken(userID, refreshToken)
 }
@@ -301,7 +303,30 @@ func (s *AuthService) GetUserByID(userID string) (*models.User, error) {
 }
 
 func (s *AuthService) GetUserByEmail(email string) (*models.User, error) {
-	return s.userRepo.GetUserByEmail(email)
+	user, err := s.userRepo.GetUserByEmail(email)
+	if err != nil || user != nil {
+		return user, err
+	}
+	// Backward compat: try old-style Unicode form for users who registered
+	// before Punycode/NFKC canonicalization was introduced.
+	if at := strings.LastIndex(email, "@"); at > -1 {
+		local := email[:at]
+		domain := email[at+1:]
+		if unicodeDomain, decErr := idna.ToUnicode(domain); decErr == nil && unicodeDomain != domain {
+			oldStyle := strings.ToLower(local + "@" + unicodeDomain)
+			u, e := s.userRepo.GetUserByEmail(oldStyle)
+			if e != nil {
+				return nil, e
+			}
+			return u, nil
+		}
+	}
+	return nil, nil
+}
+
+// UpdateUser persists changes to the user record (e.g., setting EmailVerifiedAt).
+func (s *AuthService) UpdateUser(user *models.User) error {
+	return s.userRepo.UpdateUser(user)
 }
 
 // UpdateProfile updates the user's display name.
@@ -315,6 +340,44 @@ func (s *AuthService) UpdateProfile(userID, name string) (*models.User, error) {
 		return nil, err
 	}
 	return user, nil
+}
+
+// ChangeEmail updates the user's email address, clears verification status,
+// and invalidates all existing sessions (forces re-login).
+func (s *AuthService) ChangeEmail(userID, newEmail string) error {
+	user, err := s.userRepo.GetUserByID(userID)
+	if err != nil || user == nil {
+		return errors.New("user not found")
+	}
+
+	newEmail = CanonicalizeEmail(newEmail)
+	if _, err := mail.ParseAddress(newEmail); err != nil {
+		return errors.New("invalid email format")
+	}
+
+	// Check not taken by another user
+	existing, _ := s.GetUserByEmail(newEmail)
+	if existing != nil && existing.ID != userID {
+		return errors.New("email already in use")
+	}
+
+	user.Email = newEmail
+	user.EmailVerifiedAt = nil
+	if err := s.userRepo.UpdateUser(user); err != nil {
+		return err
+	}
+
+	// Invalidate all sessions (force re-login)
+	if err := s.userRepo.ClearRefreshToken(userID); err != nil && err != gorm.ErrRecordNotFound {
+		return errors.New("failed to invalidate sessions")
+	}
+	return nil
+}
+
+// ClearRefreshToken clears the stored refresh token for a user, invalidating
+// all active sessions.
+func (s *AuthService) ClearRefreshToken(userID string) error {
+	return s.userRepo.ClearRefreshToken(userID)
 }
 
 // ChangePassword verifies the current password then sets a new one.
@@ -348,16 +411,39 @@ func (s *AuthService) ChangePassword(userID, currentPassword, newPassword, acces
 	return nil
 }
 
+// ResetPassword sets a new password for the user, atomically clears the refresh token,
+// and revokes all provided access tokens. Designed for password reset flow where the
+// user's current password is not known.
+func (s *AuthService) ResetPassword(userID, newPassword string, accessTokens ...string) error {
+	user, err := s.userRepo.GetUserByID(userID)
+	if err != nil || user == nil {
+		return errors.New("user not found")
+	}
+
+	hashed, err := HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+
+	// Atomically update password and clear refresh_token (invalidates all sessions)
+	if err := s.userRepo.UpdatePassword(userID, string(hashed)); err != nil {
+		return err
+	}
+
+	// Revoke all passed access tokens
+	cfg := config.Get()
+	for _, token := range accessTokens {
+		if token != "" {
+			RevokeAccessToken(token, cfg)
+		}
+	}
+
+	return nil
+}
+
 // @Summary Logout user
 // @Description Invalidate refresh token and logout user
 // @Tags auth
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param refresh_token body string true "Refresh token to invalidate"
-// @Success 200 {object} map[string]string
-// @Failure 401 {object} ErrorResponse
-// @Router /auth/logout [post]
 func (s *AuthService) Logout(userID string, refreshToken string, accessToken string) error {
 	if err := s.BlockRefreshToken(userID, refreshToken); err != nil {
 		return err
@@ -366,16 +452,6 @@ func (s *AuthService) Logout(userID string, refreshToken string, accessToken str
 	return nil
 }
 
-// @Summary Block refresh token
-// @Description Block a refresh token during logout
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param request body LogoutRequest true "Logout request"
-// @Success 200 {object} map[string]string
-// @Failure 401 {object} ErrorResponse
-// @Router /auth/logout [post]
 func (s *AuthService) BlockRefreshToken(userID, refreshToken string) error {
 	// Parse the refresh token to get expiration
 	claims := &Claims{}
@@ -394,6 +470,15 @@ func (s *AuthService) BlockRefreshToken(userID, refreshToken string) error {
 // ErrRefreshTokenMismatch is returned when the presented refresh token does not
 // match the token currently stored for the user (e.g. it was rotated on another device).
 var ErrRefreshTokenMismatch = errors.New("refresh token does not match stored token for user")
+
+// ErrEmailNotVerified is returned when email verification is required but the user's email is not verified.
+type ErrEmailNotVerified struct {
+	Email string
+}
+
+func (e *ErrEmailNotVerified) Error() string {
+	return "please verify your email before signing in"
+}
 
 // Updated refresh token validation
 func (s *AuthService) ValidateRefreshToken(refreshToken string) (*Claims, error) {
@@ -509,7 +594,7 @@ func (s *AuthService) FinishSignupPasskey(userID, email, name, challengeStr stri
 	}
 
 	// Re-check email uniqueness before creating user
-	existing, _ := s.userRepo.GetUserByEmail(email)
+	existing, _ := s.GetUserByEmail(email)
 	if existing != nil {
 		return nil, errors.New("email already registered")
 	}
@@ -541,9 +626,17 @@ func (s *AuthService) FinishSignupPasskey(userID, email, name, challengeStr stri
 		return nil, err
 	}
 
-	// Generate tokens
+	// Email verification gate: when enabled, create user+passkey but don't issue tokens.
+	// The handler will detect the empty token pair and return requiresVerification.
 	cfg := config.Get()
-	accessToken, refreshToken, err := GenerateTokenPair(user.ID, user.Email, user.Name, user.Accesses, cfg)
+	if cfg.Auth.RequireEmailVerification {
+		return &LoginResponse{
+			User:  user,
+			Token: TokenPair{},
+		}, nil
+	}
+
+	accessToken, refreshToken, err := GenerateTokenPair(user.ID, user.Email, user.Name, user.Provider, user.Accesses, cfg, user.EmailVerifiedAt)
 	if err != nil {
 		return nil, errors.New("failed to generate tokens")
 	}
@@ -615,9 +708,14 @@ func (s *AuthService) FinishLoginPasskey(challengeStr string, credentialID, clie
 		return nil, errors.New("account is deactivated")
 	}
 
-	// Generate tokens
+	// Email verification gate
 	cfg := config.Get()
-	accessToken, refreshToken, err := GenerateTokenPair(user.ID, user.Email, user.Name, user.Accesses, cfg)
+	if cfg.Auth.RequireEmailVerification && user.EmailVerifiedAt == nil {
+		return nil, &ErrEmailNotVerified{Email: user.Email}
+	}
+
+	// Generate tokens
+	accessToken, refreshToken, err := GenerateTokenPair(user.ID, user.Email, user.Name, user.Provider, user.Accesses, cfg, user.EmailVerifiedAt)
 	if err != nil {
 		return nil, errors.New("failed to generate tokens")
 	}

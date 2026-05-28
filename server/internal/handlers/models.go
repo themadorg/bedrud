@@ -1,5 +1,24 @@
 package handlers
 
+// BulkIDsRequest is the request body for batch operations.
+type BulkIDsRequest struct {
+	IDs []string `json:"ids"`
+}
+
+// BulkItemResult reports per-ID outcome for batch operations.
+type BulkItemResult struct {
+	Success bool   `json:"success"`
+	Name    string `json:"name,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
+// BulkResult is the response body for batch operations.
+type BulkResult struct {
+	Results        map[string]BulkItemResult `json:"results"`
+	TotalProcessed int                       `json:"totalProcessed"`
+	TotalFailed    int                       `json:"totalFailed"`
+}
+
 // Password length constraints shared across auth and admin handlers.
 const (
 	MinPasswordLength = 12

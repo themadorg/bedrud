@@ -18,6 +18,11 @@ Bedrud supports multiple authentication methods:
 | OAuth | `GET /api/auth/:provider/login` | Social login |
 | Passkeys | `POST /api/auth/passkey/*` | FIDO2/WebAuthn |
 | Token Refresh | `POST /api/auth/refresh` | Renew access token |
+| Resend Verification | `POST /api/auth/verify/resend` | Resend verification email |
+| Verify Email | `GET /api/auth/verify` | Verify email with token (query param, redirect) |
+| Check Verification Status | `GET /api/auth/verify/status` | Check if email is verified |
+| Forgot Password | `POST /api/auth/forgot-password` | Request password reset email |
+| Reset Password | `POST /api/auth/reset-password` | Reset password with token |
 
 ## Token Format
 
@@ -246,6 +251,134 @@ The server redirects the user to the provider's authorization page. After consen
 
 ---
 
+### Resend Verification
+
+Resend the email verification link. Only for unverified local accounts. Enforces cooldown silently via `verificationEmailCooldownMins` — always returns 200 to prevent email enumeration.
+
+```
+POST /api/auth/verify/resend
+```
+
+**Request Body:**
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "message": "If the account exists, a verification email has been sent"
+}
+```
+
+---
+
+### Verify Email
+
+Complete email verification with the token from the verification link.
+
+```
+GET /api/auth/verify?token=<verification-token>
+```
+
+**Response:** Redirects to the frontend dashboard (`/dashboard?emailVerified=true`) on success, or to `/auth/verify?status=...` with error reasons.
+
+**Query Parameters:**
+
+| Param | Required | Description |
+|-------|----------|-------------|
+| `token` | Yes | Verification token from the email link |
+
+---
+
+### Check Verification Status
+
+Check whether the current user's email is verified.
+
+```
+GET /api/auth/verify/status
+```
+
+**Headers:** `Authorization: Bearer <accessToken>`
+
+**Response (200):**
+
+```json
+{
+  "verified": true,
+  "email": "user@example.com"
+}
+```
+
+---
+
+### Forgot Password
+
+Request a password reset email. Requires SMTP to be configured.
+
+```
+POST /api/auth/forgot-password
+```
+
+**Request Body:**
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Response (202):**
+
+```json
+{
+  "message": "password reset email sent if account exists"
+}
+```
+
+The endpoint always returns 202 to prevent email enumeration. The reset link expires after `resetTokenTTLHours`.
+
+---
+
+### Reset Password
+
+Set a new password using the token from the reset email.
+
+```
+POST /api/auth/reset-password
+```
+
+**Request Body:**
+
+```json
+{
+  "token": "reset-token-from-email",
+  "newPassword": "new-secure-password"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "message": "password reset successful"
+}
+```
+
+**Error (400):**
+
+```json
+{
+  "error": "invalid or expired token"
+}
+```
+
+---
+
 ## Error Responses
 
 All auth endpoints return errors in this format:
@@ -260,12 +393,14 @@ All auth endpoints return errors in this format:
 |--------|---------|
 | 400 | Bad request (missing fields, validation error) |
 | 401 | Invalid credentials or expired token |
+| 403 | Email not verified (`requiresVerification: true`) |
 | 409 | Email already registered |
+| 429 | Rate limited — check `Retry-After` header |
 | 500 | Internal server error |
 
 ---
 
 ## See also
 
-- [Authentication Flow](/en/docs/backend/authentication) - how JWT, OAuth, and passkeys work internally
+- [Authentication Flow](/en/docs/backend/authentication) - how JWT, OAuth, passkeys, email verification, and password reset work internally
 - [Passkeys API](/en/docs/api/passkeys) - FIDO2/WebAuthn endpoint reference

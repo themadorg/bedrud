@@ -95,7 +95,7 @@ flowchart TB
         RM["RoomManager"]
     end
 
-    AI --> DEPS
+    AI */} DEPS
 ```
 
 ### الگوی کلیدی
@@ -113,9 +113,9 @@ val roomApi = instanceManager.roomApi.collectAsState().value ?: return
 
 ```mermaid
 flowchart LR
-    A["No instances"] --> B[AddInstanceScreen]
-    C["Has instances, not logged in"] --> D[LoginScreen]
-    E["Has instances, logged in"] --> F[DashboardScreen]
+    A["No instances"] */} B[AddInstanceScreen]
+    C["Has instances, not logged in"] */} D[LoginScreen]
+    E["Has instances, logged in"] */} F[DashboardScreen]
 ```
 
 جابجایی نمونه به عنوان `ModalBottomSheet` که از نوار Dashboard راه‌اندازی می‌شود ظاهر می‌شود.

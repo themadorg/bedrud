@@ -19,15 +19,48 @@ Bedrudは2つのLiveKitデプロイモードをサポートしています:
 
 ```yaml
 livekit:
-  host: "livekit.example.com:7880"
-  api_key: "your-api-key"
-  api_secret: "your-api-secret"
-  embedded: false
+  host: "wss://livekit.example.com:7880"    # Client WebSocket URL (ws:// or wss://)
+  internalHost: "https://livekit.example.com:7880"  # Server-to-server API URL
+  apiKey: "your-api-key"
+  apiSecret: "your-api-secret"
+  external: true          # Skip embedded LiveKit startup
+  skipTLSVerify: false    # Set true if LiveKit uses self-signed certs
 ```
 
 `embedded`が`false`の場合、Bedrudは組み込みLiveKitバイナリの起動をスキップします。APIキーとシークレットは外部サーバーの認証情報と一致する必要があります。
 
 LiveKitクラスターのセットアップと設定については、[LiveKitドキュメント](https://docs.livekit.io)を参照してください。
+
+### Webhookの設定（外部モードのみ）
+
+外部LiveKitサーバーを使用する場合、LiveKitが参加者の切断やルームのクローズをBedrudに通知できるように、Webhookを**必ず**設定する必要があります。Webhookがないと、データベースの状態が古くなります。
+
+**エンドポイント:** `https://<your-domain>/api/livekit/webhook`
+
+**認証:** LiveKitのJWT署名を使用します — 上記で設定したものと同じ`apiKey`/`apiSecret`です。別途シークレットは必要ありません。
+
+**LiveKit Cloud:** 設定 → Webhooks → 新しいWebhookを作成。エンドポイントURLを入力し、APIキーを選択します。
+
+**セルフホストLiveKit:** LiveKit YAML設定（例：`livekit.yaml`）に追加します：
+
+```yaml
+webhook:
+  urls: ["https://bedrud.example.com/api/livekit/webhook"]
+  api_key: "your-api-key"
+```
+
+<Callout type="warning">
+  Webhookが適切に設定されていないと、`participant_disconnected`および`room_finished`イベントがBedrudに配信されません。管理ダッシュボードに古い参加者データが表示される可能性があり、ルームは自動的にクリーンアップされません。
+</Callout>
+
+### LiveKitのバージョン互換性
+
+Bedrudの組み込みLiveKitモードは互換性のある設定を自動生成します。ただし、**外部LiveKitサーバーをセルフホストする場合**、LiveKitのバージョン間の破壊的な変更に注意してください：
+
+- **LiveKit v1.12+** は設定からトップレベルの`tls`フィールドを削除しました。LiveKit YAMLで`tls:`を使用していた場合は削除してください。Bedrudの設定で`internalHost`には`http://`、`host`には`ws://`を設定してください。TURN TLSは`turn:`セクションで引き続きサポートされています。
+- **LiveKit v1.11以前** はトップレベルで`tls:`をサポートしています。`internalHost`には`https://`、`host`には`wss://`を使用してください。
+
+不明な場合は、`livekit-server --version`でLiveKitサーバーのバージョンを確認し、[LiveKitリリースノート](https://github.com/livekit/livekit/releases)を参照してください。
 
 ### 組み込み設定生成 (Embedded Config Generation)
 
@@ -74,30 +107,84 @@ TLSが組み込みモードで有効な場合、Bedrudは一時的なLiveKit YAM
 
 ファイアウォールとポートの要件については、[WebRTC接続性](/ja/docs/architecture/webrtc-connectivity)を参照してください。
 
-## エラーハンドリング
+## Troubleshooting
 
-### LiveKitに接続できない場合
+### Startup & Config Crashes
 
-LiveKitサーバーに接続できない場合、トークン生成は成功する可能性があります（トークンはAPIキーとシークレットを使用してローカルで作成されます）。ただし、クライアントはメディアサーバーに接続できません。症状:
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Container crash-loops, logs `could not resolve external IP` | `use_external_ip: true` without explicit `node_ip` in Docker | Set `node_ip: <lan-ip>` under `rtc:` and `use_external_ip: false` |
+| LiveKit exits with `TURN domain required` on v1.12+ | `turn.tls_port` is set but no `domain` or TLS cert/key | Add `domain:` under `turn:`, provide `cert_file`/`key_file`, or remove `tls_port` for UDP-only TURN |
+| `field tls not found` on startup | LiveKit v1.12+ removed top-level `tls:` config field | Remove `tls:` block from LiveKit YAML; use `http://` / `ws://` in Bedrud config |
+| `LIVEKIT_CONFIG` env var not picked up | Entrypoint doesn't parse env var (pre-v1.7 or custom entrypoint) | LiveKit reads `LIVEKIT_CONFIG` natively since v1.7 — verify version; pass via `--config-body` only if needed |
+| Docker: `--config-body` via `sh -c` fails with `flag provided but not defined: -c` | Image entrypoint is `/livekit-server` directly — `command` gets appended, not wrapped by shell | Don't use a shell wrapper, `LIVEKIT_CONFIG` env var is supported natively by the binary |
+| Docker Compose: `$LIVEKIT_CONFIG` expands to empty string | Compose substitutes `$VAR` from host environment, not container | Use `$$LIVEKIT_CONFIG` to escape docker-compose variable substitution |
+| YAML parsing error from `LIVEKIT_CONFIG` | Incorrect YAML indentation or syntax | Validate: `docker run --rm -e LIVEKIT_CONFIG livekit-server --config-body "$LIVEKIT_CONFIG"` |
 
-- クライアントは有効なjoin tokenを受け取りますが、WebRTC接続がタイムアウトします。
-- LiveKit SDKが`Reconnecting`イベントまたは接続エラーを出力します。
+### Connectivity
 
-**確認:** LiveKitサーバーが実行中であること（`systemctl status livekit`）と、`config.yaml`のホスト/ポートが正しいことを確認してください。
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Admin dashboard shows "LiveKit disconnected" | Bedrud can't reach LiveKit HTTP API | Verify `internalHost` in config; run `curl http://<internalHost>/` from Bedrud host; check firewall |
+| Token generated but client connection times out | LiveKit WebSocket unreachable from browser | Check `host` in `livekit:` config (must be reachable by clients); verify DNS/firewall; test with `wscat` |
+| Embedded LiveKit not starting | Missing binary or permission | Ensure `internal/livekit/bin/livekit-server` exists (even empty file for build); check Bedrud server logs |
+| Port 7880 already in use | Another process on same port | Change `livekit.port` or use different Docker port mapping |
+| Redis connection fails in LiveKit logs | Redis unreachable or wrong address | Verify `redis.address:` in LiveKit YAML; check container network connectivity |
+| `curl http://127.0.0.1:7880` returns connection refused | LiveKit crashed during startup | Check `docker logs` / `journalctl`; look for RTC/TURN validation errors near the bottom of the log |
+| Token expired before client connected | Short JWT validity window | Request a fresh token via `POST /api/room/join` before each connection attempt |
 
-### 埋め込みLiveKitプロセスのクラッシュ
+### Media & TURN
 
-埋め込みモードでLiveKit子プロセスがクラッシュした場合:
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Participants join but no audio/video | UDP port range blocked or wrong `node_ip` | Open UDP 50000-60000; verify `node_ip` is the externally reachable address |
+| Clients behind NAT can't connect | TURN not configured or ports blocked | Enable TURN; open UDP 3478 (and TCP 5349 for TLS); verify TURN domain resolves |
+| `Could not resolve external IP` on startup (non-Docker) | No STUN internet access or DNS failure | Set explicit `node_ip` and `use_external_ip: false` |
+| Self-signed cert errors with external LiveKit | Bedrud's `skipTLSVerify` is `false` | Set `skipTLSVerify: true` in Bedrud's `livekit:` config |
+| Clients connect via relay unnecessarily | `node_ip` is a private IP behind NAT | Set `node_ip` to the public IP or use `use_external_ip: true` with STUN access |
+| TURN relay not used by clients | Direct WebRTC path is working (expected) | Check `chrome://webrtc-internals` — `srflx` candidates = direct path, no TURN needed |
 
-- Bedrud APIサーバーは実行を継続します（ルームの一覧表示、ユーザーのログインは可能）。
-- アクティブなミーティングはメディア接続を失います。
-- 新しい参加リクエストはトークンを生成しますが、クライアントは接続できません。
+### Webhook & State
 
-**確認:** `/var/log/bedrud/bedrud.log`でログを確認するか、クラッシュの詳細については`journalctl -u livekit -f`を実行してください。
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Database shows stale active participants after disconnect | Webhook not configured for external LiveKit | Add `webhook:` block to LiveKit YAML with URL `https://<domain>/api/livekit/webhook` |
+| Participants never marked inactive | Firewall blocking webhook delivery from LiveKit to Bedrud | Check LiveKit logs for webhook delivery errors; ensure port 443/8090 is reachable from LiveKit |
+| Room not cleaned up after all leave | `empty_timeout` / `departure_timeout` too high | Reduce values in LiveKit YAML `room:` section |
 
-### トークンの有効期限
+{/* TODO oncoming feature */}
+### Recording (Egress)
 
-LiveKit join tokenの有効期間は短めに設定されています。クライアントがトークンを受信してから接続までの間に時間がかかりすぎると、トークンが期限切れになります。クライアントは`/api/room/join`経由で新しいトークンを要求する必要があります。
+Bedrud uses LiveKit's [RoomCompositeEgress API](https://docs.livekit.io/egress/overview/) to record rooms as MP4 files.
+
+#### Prerequisites
+
+- **Redis** — LiveKit egress requires Redis for coordinating egress workers. Without Redis, `StartRoomCompositeEgress` returns permission errors.
+- **Egress S3 storage (external mode only)** — For external LiveKit, you **must** configure an `egress:` section in your LiveKit YAML so recordings are stored to durable S3-compatible storage. Otherwise the `FileURL` is a local path unreachable from Bedrud.
+
+  ```yaml
+  egress:
+    s3:
+      access_key: "your-s3-access-key"
+      secret_key: "your-s3-secret-key"
+      endpoint: "http://minio:9000"
+      bucket: "bedrud-recordings"
+      region: "us-east-1"
+      force_path_style: true
+  ```
+
+#### Troubleshooting: Recording
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `twirp error unauthenticated: permissions denied` when starting recording | Egress JWT missing `Room` field in grant | Update `egressAuthContext` to include `Room: roomName` in the `VideoGrant` |
+| `twirp error unauthenticated: permissions denied` even with valid API key | Redis not configured for LiveKit, or egress workers unavailable | Add `redis:` section to LiveKit YAML; ensure Redis is healthy |
+| Recording starts but `FileURL` is a local path (e.g., `/tmp/...`) | No `egress:` S3 config — LiveKit writes to worker temp dir | Add `egress.s3:` block to LiveKit YAML pointing to S3-compatible storage |
+| `process_recording` job fails to download | External LK's file URL points to inaccessible local path | Configure egress S3 so LiveKit produces S3 URLs |
+
+<Callout type="info">
+  See also the [TURN Server Guide](/ja/docs/architecture/turn-server) for TURN-specific troubleshooting, [WebRTC Connectivity](/ja/docs/architecture/webrtc-connectivity) for STUN/ICE/firewall debugging, and [Installation Troubleshooting](/ja/docs/getting-started/installation#troubleshooting) for port/perm/setup issues.
+</Callout>
 
 ## 関連情報
 

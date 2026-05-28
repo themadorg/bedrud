@@ -19,6 +19,12 @@ Bedrudは複数の認証方式に対応しています：
 | Passkeys | `POST /api/auth/passkey/*` | FIDO2/WebAuthn |
 | Token Refresh | `POST /api/auth/refresh` | アクセストークンの更新 |
 
+| Resend Verification | `POST /api/auth/verify/resend` | Resend verification email |
+| Verify Email | `GET /api/auth/verify` | Verify email with token (query param, redirect) |
+| Check Verification Status | `GET /api/auth/verify/status` | Check if email is verified |
+| Forgot Password | `POST /api/auth/forgot-password` | Request password reset email |
+| Reset Password | `POST /api/auth/reset-password` | Reset password with token |
+
 ## トークン形式
 
 認証に成功すると、JWTトークンのペアが返されます：
@@ -246,8 +252,33 @@ GET /api/auth/:provider/login
 
 ---
 
-## エラーレスポンス
+### 確認メールを再送信
 
+確認メールのリンクを再送信します。未確認のローカルアカウントのみ対象。`verificationEmailCooldownMins` によってクールダウンを静かに適用 — メール列挙を防ぐため常に200を返します。
+
+---
+
+### メールを確認
+
+確認リンクのトークンを使用してメール確認を完了します。
+
+---
+
+### パスワードを忘れた場合
+
+パスワードリセットメールをリクエストします。SMTPの設定が必要です。
+
+エンドポイントはメール列挙を防ぐため常に202を返します。リセットリンクは `resetTokenTTLHours` 後に期限切れになります。
+
+---
+
+### パスワードをリセット
+
+リセットメールのトークンを使用して新しいパスワードを設定します。
+
+---
+
+## 
 すべての認証エンドポイントは以下の形式でエラーを返します：
 
 ```json
@@ -260,6 +291,8 @@ GET /api/auth/:provider/login
 |--------|---------|
 | 400 | 不正なリクエスト（フィールド不足、バリデーションエラー） |
 | 401 | 認証情報が無効、またはトークンの有効期限切れ |
+| 403 | Email not verified (`requiresVerification: true`) |
+| 429 | Rate limited — check `Retry-After` header |
 | 409 | メールアドレスはすでに登録されています |
 | 500 | サーバー内部エラー |
 
@@ -267,5 +300,5 @@ GET /api/auth/:provider/login
 
 ## 関連ドキュメント
 
-- [認証フロー](/ja/docs/backend/authentication) - JWT、OAuth、パスキーの内部動作
+- [/ja/docs/backend/authentication](/ja/docs/backend/authentication) - how JWT, OAuth, passkeys, email verification, and password reset work internally
 - [Passkeys API](/ja/docs/api/passkeys) - FIDO2/WebAuthnエンドポイントリファレンス

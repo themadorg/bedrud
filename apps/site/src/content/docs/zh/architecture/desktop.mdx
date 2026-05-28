@@ -1,6 +1,6 @@
 ---
-title: Desktop App
-description: Rust-based desktop application
+title: 桌面应用
+description: 基于 Rust 的桌面应用
 order: 11
 ---
 
@@ -84,10 +84,10 @@ flowchart TB
         STORE[store/<br/>instance.rs • settings.rs]
     end
 
-    SLINT -->|"callbacks /<br/>property bindings"| BRIDGE
-    BRIDGE <-->|"async tasks<br/>+ Weak&lt;AppWindow&gt;"| Core
-    API <--> LIVEKIT
-    AUTH <--> STORE
+    SLINT */}|"callbacks /<br/>property bindings"| BRIDGE
+    BRIDGE <*/}|"async tasks<br/>+ Weak&lt;AppWindow&gt;"| Core
+    API <*/} LIVEKIT
+    AUTH <*/} STORE
 ```
 
 ### 关键设计决策

@@ -95,7 +95,7 @@ flowchart TB
         RM["RoomManager"]
     end
 
-    AI --> DEPS
+    AI */} DEPS
 ```
 
 ### Patrón Clave
@@ -113,9 +113,9 @@ El patrón `?: return` asegura que el composable no se renderice hasta que la in
 
 ```mermaid
 flowchart LR
-    A["No instances"] --> B[AddInstanceScreen]
-    C["Has instances, not logged in"] --> D[LoginScreen]
-    E["Has instances, logged in"] --> F[DashboardScreen]
+    A["No instances"] */} B[AddInstanceScreen]
+    C["Has instances, not logged in"] */} D[LoginScreen]
+    E["Has instances, logged in"] */} F[DashboardScreen]
 ```
 
 El conmutador de instancias aparece como un `ModalBottomSheet` activado desde la barra de herramientas del Dashboard.

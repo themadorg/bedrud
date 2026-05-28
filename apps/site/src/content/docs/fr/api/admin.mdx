@@ -17,8 +17,11 @@ Les points de terminaison d'administration sont sous `/api/admin/`. Tous nécess
 | `/api/admin/users/:id` | DELETE | Supprimer définitivement un utilisateur |
 | `/api/admin/rooms` | GET | Lister toutes les salles (paginé) |
 | `/api/admin/rooms/:roomId` | PUT | Modifier les paramètres d'une salle |
-| `/api/admin/rooms/:roomId` | DELETE | Fermer une salle (suppression en cascade) |
-| `/api/admin/rooms/:roomId/suspend` | POST | Suspendre une salle active |
+| `/api/admin/rooms/:roomId` | DELETE | Supprimer une salle (tâche de fond) |
+| `/api/admin/rooms/:roomId/suspend` | POST | Suspendre une salle (tâche de fond) |
+| `/api/admin/rooms/bulk/suspend` | POST | Suspendre plusieurs salles |
+| `/api/admin/rooms/bulk/close` | POST | Fermer plusieurs salles |
+| `/api/admin/users/bulk/delete` | POST | Supprimer plusieurs utilisateurs |
 | `/api/admin/rooms/:roomId/participants` | GET | Obtenir les données des participants en direct de LiveKit |
 | `/api/admin/rooms/:roomId/participants/:identity/kick` | POST | Expulser un participant d'une salle |
 | `/api/admin/rooms/:roomId/participants/:identity/mute` | POST | Couper le micro d'un participant |
@@ -337,7 +340,7 @@ Tous les champs de paramètres sont optionnels — incluez uniquement ceux que v
 
 ### Fermer une salle
 
-Ferme définitivement une salle avec suppression en cascade. Envoie un message système à tous les participants : « This room has been closed by an administrator ».
+Supprimer définitivement une salle et tous ses participants. La suppression est exécutée en tâche de fond et retourne immédiatement — la salle sera entièrement supprimée en quelques secondes.
 
 ```
 DELETE /api/admin/rooms/:roomId
@@ -349,19 +352,29 @@ DELETE /api/admin/rooms/:roomId
 |---|---|
 | `roomId` | UUID de la salle |
 
-**Réponse (200) :**
+**Réponse (202) :**
 
 ```json
 {
-  "status": "success"
+  "message": "Room deletion queued"
 }
 ```
+
+| Statut | Description |
+|--------|-------------|
+| 202 | Suppression planifiée — sera effectuée sous peu |
+| 404 | Salle introuvable |
+| 500 | Impossible de récupérer la salle ou de planifier la tâche |
+
+> **Remarque :** La fermeture envoie un message système à tous les participants actifs : « This room has been closed by an administrator ».
+> La logique de fermeture appelle `cleanupSvc.CascadeDeleteRoom` qui gère la suppression de la salle LiveKit, le nettoyage des fichiers téléchargés
+> et la suppression de l'enregistrement en base de données.
 
 ---
 
 ### Suspendre une salle
 
-Désactive une salle active et tous ses participants sans supprimer l'enregistrement de la salle. La salle peut être réactivée lorsqu'un participant la rejoint à nouveau.
+Désactiver une salle active, en mettant fin à tous les appels actifs mais en préservant l'enregistrement de la salle. La salle peut être réactivée lorsqu'un participant la rejoint à nouveau. Exécutée en tâche de fond et retourne immédiatement.
 
 ```
 POST /api/admin/rooms/:roomId/suspend
@@ -373,15 +386,70 @@ POST /api/admin/rooms/:roomId/suspend
 |---|---|
 | `roomId` | UUID de la salle |
 
-**Réponse (200) :**
+**Réponse (202) :**
 
 ```json
 {
-  "status": "success"
+  "message": "Room suspend queued"
 }
 ```
 
-**Erreur (400) :** Renvoie `{"error": "Room is not active"}` si la salle est déjà inactive.
+| Statut | Description |
+|--------|-------------|
+| 202 | Suspension planifiée — sera effectuée sous peu |
+| 400 | Salle déjà inactive |
+| 404 | Salle introuvable |
+| 500 | Impossible de récupérer la salle ou de planifier la tâche |
+
+---
+
+### Suspendre plusieurs salles
+
+Planifier la suspension de plusieurs salles à la fois. Les salles déjà suspendues sont ignorées.
+
+```
+POST /api/admin/rooms/bulk/suspend
+```
+
+**Corps de la requête :**
+
+```json
+{
+  "ids": ["room-uuid-1", "room-uuid-2"]
+}
+```
+
+**Réponse (202) :**
+
+```json
+{
+  "results": {
+    "room-uuid-1": {"success": true, "name": "team-standup"},
+    "room-uuid-2": {"success": false, "name": "design-review", "error": "room not found"}
+  },
+  "totalProcessed": 1,
+  "totalFailed": 1
+}
+```
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `results` | object | Résultat par salle, indexé par ID |
+| `results.*.success` | bool | Si l'opération a été planifiée |
+| `results.*.name` | string | Nom de la salle (présent en cas de succès) |
+| `results.*.error` | string | Message d'erreur (présent en cas d'échec) |
+| `totalProcessed` | int | Nombre de salles planifiées avec succès |
+| `totalFailed` | int | Nombre de salles en échec |
+
+### Fermer plusieurs salles
+
+Planifier la suppression définitive de plusieurs salles à la fois. Ne peut pas être annulé.
+
+```
+POST /api/admin/rooms/bulk/close
+```
+
+Même format de requête/réponse que [Suspendre plusieurs salles](#suspendre-plusieurs-salles).
 
 ---
 

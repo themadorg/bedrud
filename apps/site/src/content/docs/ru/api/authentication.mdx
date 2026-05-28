@@ -19,6 +19,12 @@ Bedrud поддерживает несколько методов аутенти
 | Passkeys | `POST /api/auth/passkey/*` | FIDO2/WebAuthn |
 | Обновление токена | `POST /api/auth/refresh` | Обновление access-токена |
 
+| Resend Verification | `POST /api/auth/verify/resend` | Resend verification email |
+| Verify Email | `GET /api/auth/verify` | Verify email with token (query param, redirect) |
+| Check Verification Status | `GET /api/auth/verify/status` | Check if email is verified |
+| Forgot Password | `POST /api/auth/forgot-password` | Request password reset email |
+| Reset Password | `POST /api/auth/reset-password` | Reset password with token |
+
 ## Формат токена
 
 При успешной аутентификации возвращается пара JWT-токенов:
@@ -226,7 +232,33 @@ POST /api/auth/logout
 
 ---
 
-### Вход через OAuth
+### Повторная отправка подтверждения
+
+Повторно отправляет ссылку для подтверждения email. Только для неподтвержденных локальных аккаунтов. Бесшумно применяет охлаждение через `verificationEmailCooldownMins` — всегда возвращает 200 для предотвращения перебора email.
+
+---
+
+### Подтверждение email
+
+Завершает подтверждение email с помощью токена из ссылки подтверждения.
+
+---
+
+### Забыли пароль
+
+Запрашивает письмо для сброса пароля. Требуется настройка SMTP.
+
+Эндпоинт всегда возвращает 202 для предотвращения перебора email. Ссылка для сброса истекает через `resetTokenTTLHours`.
+
+---
+
+### Сброс пароля
+
+Устанавливает новый пароль с помощью токена из письма для сброса.
+
+---
+
+## ### Вход через OAuth
 
 Запуск потока OAuth через социального провайдера.
 
@@ -260,6 +292,8 @@ GET /api/auth/:provider/login
 |--------|---------|
 | 400 | Некорректный запрос (отсутствующие поля, ошибка валидации) |
 | 401 | Неверные учётные данные или истёкший токен |
+| 403 | Email not verified (`requiresVerification: true`) |
+| 429 | Rate limited — check `Retry-After` header |
 | 409 | Email уже зарегистрирован |
 | 500 | Внутренняя ошибка сервера |
 
@@ -267,5 +301,5 @@ GET /api/auth/:provider/login
 
 ## См. также
 
-- [Поток аутентификации](/ru/docs/backend/authentication) - как работают JWT, OAuth и passkeys внутри
+- [/ru/docs/backend/authentication](/ru/docs/backend/authentication) - how JWT, OAuth, passkeys, email verification, and password reset work internally
 - [API Passkeys](/ru/docs/api/passkeys) - справочник по эндпоинтам FIDO2/WebAuthn

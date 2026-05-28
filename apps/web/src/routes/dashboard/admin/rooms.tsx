@@ -1,377 +1,333 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Link } from '@tanstack/react-router'
-import {
-  Activity,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  Globe,
-  Lock,
-  Pin,
-  Power,
-  Search,
-  Trash2,
-} from 'lucide-react'
-import { useState } from 'react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/components/ui/select'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { Plus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
+import { DataTableBulkBar } from '#/components/admin/DataTableBulkBar'
+import { DataTableFacetedFilter } from '#/components/admin/DataTableFacetedFilter'
+import { DataTablePagination } from '#/components/admin/DataTablePagination'
+import { DataTableSearch } from '#/components/admin/DataTableSearch'
+import { DataTableToolbar } from '#/components/admin/DataTableToolbar'
+import { type AdminRoom, RoomTable } from '#/components/admin/RoomTable'
+import { useTableState } from '#/components/admin/useTableState'
+import { Button } from '#/components/ui/button'
 import { api } from '#/lib/api'
-import { cn } from '@/lib/utils'
+import { getErrorMessage } from '#/lib/errors'
+import { useAdminContext } from '#/routes/dashboard/admin.tsx'
+import { CreateRoomDialog, type RoomSettings } from '@/components/dashboard/CreateRoomDialog'
 
-interface AdminRoom {
-  id: string
-  name: string
-  createdBy: string
-  isPublic: boolean
-  isActive: boolean
-  maxParticipants: number
-  createdAt: string
-  settings?: {
-    allowChat: boolean
-    allowVideo: boolean
-    allowAudio: boolean
-    e2ee: boolean
-    isPersistent?: boolean
-  }
+interface RoomsSearch {
+  create?: boolean
 }
 
-export const Route = createFileRoute('/dashboard/admin/rooms')({ component: AdminRoomsPage })
+export const Route = createFileRoute('/dashboard/admin/rooms')({
+  validateSearch: (search: Record<string, unknown>): RoomsSearch => ({
+    create: search.create === true || search.create === 'true',
+  }),
+  component: AdminRoomsPage,
+})
 
-type SortField = 'name' | 'createdAt' | 'maxParticipants'
+const VISIBILITY_OPTS = [
+  { label: 'Public', value: 'public' },
+  { label: 'Private', value: 'private' },
+]
+
+const STATUS_OPTS = [
+  { label: 'Live', value: 'active' },
+  { label: 'Suspended', value: 'suspended' },
+  { label: 'Archived', value: 'archived' },
+]
+
+const CAPACITY_OPTS = [
+  { label: 'Empty', value: 'empty' },
+  { label: '1–5', value: '1-5' },
+  { label: '6–20', value: '6-20' },
+  { label: '20+', value: '20+' },
+]
+
+const CREATED_OPTS = [
+  { label: 'Today', value: 'today' },
+  { label: 'Last 7 days', value: '7d' },
+  { label: 'Last 30 days', value: '30d' },
+]
 
 function AdminRoomsPage() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [search, setSearch] = useState('')
-  const [sortField, setSortField] = useState<SortField>('createdAt')
-  const [sortAsc, setSortAsc] = useState(false)
-  const [confirmSuspend, setConfirmSuspend] = useState<string | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
-  const [editingLimit, setEditingLimit] = useState<string | null>(null)
-  const [limitValue, setLimitValue] = useState(0)
-  const [page, setPage] = useState(1)
-  const [limit, setLimit] = useState(50)
+  const { isReadOnly } = useAdminContext()
+  const [pendingRoomIds, setPendingRoomIds] = useState<Set<string>>(new Set())
+  const [confirmBulkAction, setConfirmBulkAction] = useState<'suspend' | 'close' | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
+
+  const [statusFilter, setStatusFilter] = useState<string[]>([])
+
+  const { create: autoCreate } = Route.useSearch()
+
+  useEffect(() => {
+    if (autoCreate) setCreateOpen(true)
+  }, [autoCreate])
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'rooms', page, limit],
-    queryFn: () => api.get<{ rooms: AdminRoom[]; total: number }>(`/api/admin/rooms?page=${page}&limit=${limit}`),
+    queryKey: ['admin', 'rooms', 'v2', ...statusFilter],
+    queryFn: () => {
+      let url = '/api/admin/rooms?limit=1000'
+      if (statusFilter.length > 0) {
+        url += '&status=' + statusFilter.join(',')
+      }
+      return api.get<{ rooms: AdminRoom[]; total: number; page: number; limit: number }>(url)
+    },
+  })
+
+  const table = useTableState({
+    items: (data?.rooms ?? []) as AdminRoom[],
+    defaultSort: { key: 'createdAt', order: 'desc' },
   })
 
   const suspendRoom = useMutation({
     mutationFn: (id: string) => api.post(`/api/admin/rooms/${id}/suspend`, {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'], exact: false })
-      setConfirmSuspend(null)
+    onSuccess: (_data, roomId) => {
+      setPendingRoomIds((prev) => new Set(prev).add(roomId))
+      toast.success('Room suspension queued')
+      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] })
     },
+    onError: (err) => toast.error(getErrorMessage(err, 'Failed to queue suspension')),
+  })
+
+  const unsuspendRoom = useMutation({
+    mutationFn: (id: string) => api.post(`/api/admin/rooms/${id}/reactivate`, {}),
+    onSuccess: () => {
+      toast.success('Room reactivated')
+      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] })
+    },
+    onError: (err) => toast.error(getErrorMessage(err, 'Failed to reactivate room')),
+  })
+
+  const closeRoom = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/admin/rooms/${id}`),
+    onSuccess: (_data, roomId) => {
+      setPendingRoomIds((prev) => new Set(prev).add(roomId))
+      toast.success('Room close queued')
+      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] })
+    },
+    onError: (err) => toast.error(getErrorMessage(err, 'Failed to close room')),
   })
 
   const deleteRoom = useMutation({
     mutationFn: (id: string) => api.delete(`/api/admin/rooms/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'], exact: false })
-      setConfirmDelete(null)
+    onSuccess: (_data, roomId) => {
+      setPendingRoomIds((prev) => new Set(prev).add(roomId))
+      toast.success('Room deletion queued')
+      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] })
     },
+    onError: (err) => toast.error(getErrorMessage(err, 'Failed to delete room')),
   })
+
+  async function handleCreate(data: {
+    name?: string
+    isPublic: boolean
+    maxParticipants: number
+    settings: RoomSettings
+  }) {
+    await api.post('/api/room/create', data)
+    setCreateOpen(false)
+    queryClient.invalidateQueries({ queryKey: ['admin', 'rooms', 'v2'] })
+  }
 
   const updateLimit = useMutation({
     mutationFn: ({ id, max }: { id: string; max: number }) =>
       api.put(`/api/admin/rooms/${id}`, { maxParticipants: max }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'], exact: false }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] }),
+    onError: (err) => toast.error(getErrorMessage(err, 'Failed to update room limit')),
   })
 
-  function toggleSort(field: SortField) {
-    if (sortField === field) setSortAsc((v) => !v)
-    else {
-      setSortField(field)
-      setSortAsc(true)
-    }
-  }
+  const bulkSuspend = useMutation({
+    mutationFn: (ids: string[]) => api.post('/api/admin/rooms/bulk/suspend', { ids }),
+    onSuccess: () => {
+      toast.success(`${table.selectedIds.size} rooms queued for suspend`)
+      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] })
+      table.clearSelection()
+      setConfirmBulkAction(null)
+    },
+    onError: (err) => {
+      toast.error(getErrorMessage(err, 'Failed to queue bulk suspend'))
+      setConfirmBulkAction(null)
+    },
+  })
 
-  const rooms = (data?.rooms ?? [])
-    .filter((r) => {
-      const q = search.toLowerCase()
-      return !q || r.name.toLowerCase().includes(q)
-    })
-    .sort((a, b) => {
-      let cmp = 0
-      if (sortField === 'name') cmp = a.name.localeCompare(b.name)
-      else if (sortField === 'maxParticipants') cmp = a.maxParticipants - b.maxParticipants
-      else cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      return sortAsc ? cmp : -cmp
-    })
-
-  function SortIcon({ field }: { field: SortField }) {
-    if (sortField !== field) return null
-    return sortAsc ? <ChevronUp className="h-3 w-3 inline ml-0.5" /> : <ChevronDown className="h-3 w-3 inline ml-0.5" />
-  }
+  const bulkClose = useMutation({
+    mutationFn: (ids: string[]) => api.post('/api/admin/rooms/bulk/close', { ids }),
+    onSuccess: () => {
+      toast.success(`${table.selectedIds.size} rooms queued for close`)
+      queryClient.invalidateQueries({ queryKey: ['admin', 'rooms'] })
+      table.clearSelection()
+      setConfirmBulkAction(null)
+    },
+    onError: (err) => {
+      toast.error(getErrorMessage(err, 'Failed to queue bulk close'))
+      setConfirmBulkAction(null)
+    },
+  })
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4">
+    <div className="mx-auto max-w-6xl space-y-4 px-4 pb-8">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-sm font-semibold">Rooms</h1>
           <p className="text-xs text-muted-foreground">{data?.total ?? 0} rooms in this instance</p>
         </div>
-
-        <div className="flex items-center gap-2 border bg-background px-3 py-2.5 w-full sm:w-56 focus-within:ring-2 focus-within:ring-ring">
-          <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search rooms…"
-            className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-          />
-        </div>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          Create room
+        </Button>
       </div>
+
+      {/* Sub-tabs */}
+      <div className="flex gap-0 border-b">
+        <Link
+          to="/dashboard/admin/rooms"
+          className="border-b-2 border-primary px-4 py-2 text-[11px] font-medium text-foreground"
+        >
+          All Rooms
+        </Link>
+        <Link
+          to="/dashboard/admin/rooms/events"
+          className="border-b-2 border-transparent px-4 py-2 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Room events
+        </Link>
+      </div>
+
+      {/* Toolbar */}
+      <DataTableToolbar table={table}>
+        <DataTableSearch
+          value={table.filters.q ?? ''}
+          onChange={(v) => table.setFilter('q', v)}
+          placeholder="Search rooms…"
+        />
+        <DataTableFacetedFilter
+          label="Visibility"
+          options={VISIBILITY_OPTS}
+          values={table.filters.visibility ?? []}
+          onChange={(v) => table.setFilter('visibility', v)}
+        />
+        <DataTableFacetedFilter
+          label="Status"
+          options={STATUS_OPTS}
+          values={statusFilter}
+          onChange={(v) => {
+            table.setFilter('status', v)
+            setStatusFilter(v)
+          }}
+        />
+        <DataTableFacetedFilter
+          label="Capacity"
+          options={CAPACITY_OPTS}
+          values={table.filters.capacity ? [table.filters.capacity as string] : []}
+          onChange={(v) => table.setFilter('capacity', v.length > 0 ? v[0] : null)}
+        />
+        <DataTableFacetedFilter
+          label="Created"
+          options={CREATED_OPTS}
+          values={table.filters.created ? [table.filters.created as string] : []}
+          onChange={(v) => table.setFilter('created', v.length > 0 ? v[0] : null)}
+        />
+        {table.hasActiveFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              table.resetFilters()
+              setStatusFilter([])
+            }}
+            className="h-8 text-xs"
+          >
+            Reset
+          </Button>
+        )}
+      </DataTableToolbar>
+
+      {/* Bulk bar */}
+      <DataTableBulkBar
+        selectedCount={table.selectedIds.size}
+        onClear={table.clearSelection}
+        actions={[
+          {
+            label: `Suspend (${table.selectedIds.size})`,
+            onClick: () => setConfirmBulkAction('suspend'),
+            variant: 'outline',
+          },
+          {
+            label: `Close (${table.selectedIds.size})`,
+            onClick: () => setConfirmBulkAction('close'),
+            variant: 'destructive',
+          },
+        ]}
+      />
 
       {/* Table */}
-      <div className="border overflow-hidden">
-        <div className="overflow-x-auto">
-          <div className="min-w-[640px]">
-            <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] gap-4 border-b bg-muted/30 px-4 py-3.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              <button
-                type="button"
-                className="text-left hover:text-foreground transition-colors"
-                onClick={() => toggleSort('name')}
-                aria-label={`Sort by room name${sortField === 'name' ? (sortAsc ? ' ascending' : ' descending') : ''}`}
+      <RoomTable
+        rooms={table.paginated}
+        isLoading={isLoading}
+        table={table}
+        onSuspend={(id) => suspendRoom.mutate(id)}
+        onUnsuspend={(id) => unsuspendRoom.mutate(id)}
+        onClose={(id) => closeRoom.mutate(id)}
+        onDelete={(id) => deleteRoom.mutate(id)}
+        onUpdateLimit={(id, max) => updateLimit.mutate({ id, max })}
+        onRoomClick={(id) => navigate({ to: '/dashboard/admin/rooms/$roomId', params: { roomId: id } })}
+        isReadOnly={isReadOnly}
+        pendingRoomIds={pendingRoomIds}
+        suspendPending={suspendRoom.isPending}
+        deletePending={deleteRoom.isPending}
+        closePending={closeRoom.isPending}
+      />
+
+      {/* Pagination */}
+      <DataTablePagination
+        total={table.total}
+        page={table.page}
+        limit={table.limit}
+        onPageChange={table.setPage}
+        onLimitChange={table.setLimit}
+      />
+
+      {/* Bulk confirm dialog */}
+      {confirmBulkAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-background border p-6 max-w-md w-full mx-4 space-y-4">
+            <h2 className="text-sm font-semibold">
+              {confirmBulkAction === 'suspend' ? 'Suspend' : 'Close'} {table.selectedIds.size} room
+              {table.selectedIds.size !== 1 ? 's' : ''}?
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              {confirmBulkAction === 'suspend'
+                ? 'This will end any active calls but preserve room data. Rooms can be reactivated later.'
+                : 'This will end all active calls and permanently delete room data. This cannot be undone.'}
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setConfirmBulkAction(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant={confirmBulkAction === 'close' ? 'destructive' : 'default'}
+                size="sm"
+                onClick={() => {
+                  const ids = Array.from(table.selectedIds)
+                  if (confirmBulkAction === 'suspend') bulkSuspend.mutate(ids)
+                  else bulkClose.mutate(ids)
+                }}
+                disabled={bulkSuspend.isPending || bulkClose.isPending}
               >
-                Room <SortIcon field="name" />
-              </button>
-              <span>Visibility</span>
-              <span>Status</span>
-              <button
-                type="button"
-                className="text-left hover:text-foreground transition-colors"
-                onClick={() => toggleSort('maxParticipants')}
-                aria-label={`Sort by capacity${sortField === 'maxParticipants' ? (sortAsc ? ' ascending' : ' descending') : ''}`}
-              >
-                Cap. <SortIcon field="maxParticipants" />
-              </button>
-              <button
-                type="button"
-                className="text-left hover:text-foreground transition-colors hidden sm:block"
-                onClick={() => toggleSort('createdAt')}
-                aria-label={`Sort by created date${sortField === 'createdAt' ? (sortAsc ? ' ascending' : ' descending') : ''}`}
-              >
-                Created <SortIcon field="createdAt" />
-              </button>
-              <span>Suspend</span>
-              <span>Delete</span>
-            </div>
-
-            <div className="divide-y">
-              {isLoading ? (
-                [...Array(4)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] gap-4 px-4 py-4 animate-pulse"
-                  >
-                    {[...Array(7)].map((__, j) => (
-                      <div key={j} className="h-3.5 bg-muted" />
-                    ))}
-                  </div>
-                ))
-              ) : rooms.length === 0 ? (
-                <p className="px-4 py-8 text-center text-xs text-muted-foreground">No rooms found</p>
-              ) : (
-                rooms.map((room) => (
-                  <div
-                    key={room.id}
-                    className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] items-center gap-4 px-4 py-4 hover:bg-muted/30 transition-colors"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      {room.settings?.isPersistent && <Pin className="h-3 w-3 shrink-0 text-primary" />}
-                      <Link
-                        to="/dashboard/admin/rooms/$roomId"
-                        params={{ roomId: room.id }}
-                        className="truncate font-mono text-xs font-medium hover:text-primary transition-colors"
-                      >
-                        {room.name}
-                      </Link>
-                    </div>
-
-                    <span
-                      className={cn(
-                        'flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
-                        room.isPublic
-                          ? 'border-sky-500/30 bg-sky-500/10 text-sky-500'
-                          : 'border-violet-500/30 bg-violet-500/10 text-violet-500',
-                      )}
-                    >
-                      {room.isPublic ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
-                      {room.isPublic ? 'Public' : 'Private'}
-                    </span>
-
-                    <span
-                      className={cn(
-                        'flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
-                        room.isActive
-                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500'
-                          : 'border-border bg-muted text-muted-foreground',
-                      )}
-                    >
-                      {room.isActive && <Activity className="h-3 w-3 animate-pulse" />}
-                      {room.isActive ? 'Live' : 'Suspended'}
-                    </span>
-
-                    {editingLimit === room.id ? (
-                      <input
-                        className="w-14 border border-primary/40 bg-primary/5 px-1.5 py-0.5 text-xs text-center outline-none"
-                        value={limitValue}
-                        type="number"
-                        min={1}
-                        onChange={(e) => setLimitValue(+e.target.value)}
-                        onBlur={() => {
-                          if (limitValue > 0) updateLimit.mutate({ id: room.id, max: limitValue })
-                          setEditingLimit(null)
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            if (limitValue > 0) updateLimit.mutate({ id: room.id, max: limitValue })
-                            setEditingLimit(null)
-                          } else if (e.key === 'Escape') {
-                            setEditingLimit(null)
-                          }
-                        }}
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingLimit(room.id)
-                          setLimitValue(room.maxParticipants)
-                        }}
-                        className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline transition-colors focus-visible:ring-2 focus-visible:ring-ring"
-                        title="Click to edit"
-                      >
-                        {room.maxParticipants}
-                      </button>
-                    )}
-
-                    <p className="hidden sm:block text-[11px] text-muted-foreground whitespace-nowrap">
-                      {new Date(room.createdAt).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </p>
-
-                    {/* Suspend action */}
-                    {confirmSuspend === room.id ? (
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => suspendRoom.mutate(room.id)}
-                          disabled={suspendRoom.isPending}
-                          className="bg-amber-500 px-2 py-1 text-[10px] font-semibold text-white transition-opacity hover:opacity-80 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          Confirm
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmSuspend(null)}
-                          className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors focus-visible:ring-2 focus-visible:ring-ring"
-                          aria-label="Cancel suspend"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmSuspend(room.id)}
-                        disabled={!room.isActive}
-                        className="p-1.5 transition-colors hover:bg-amber-500/10 hover:text-amber-500 disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                        title={room.isActive ? 'Suspend room (end call)' : 'Room already suspended'}
-                        aria-label={room.isActive ? 'Suspend room' : 'Room already suspended'}
-                      >
-                        <Power className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-
-                    {/* Delete action */}
-                    {confirmDelete === room.id ? (
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => deleteRoom.mutate(room.id)}
-                          disabled={deleteRoom.isPending}
-                          className="bg-destructive px-2 py-1 text-[10px] font-semibold text-destructive-foreground transition-opacity hover:opacity-80 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          Delete
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDelete(null)}
-                          className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors focus-visible:ring-2 focus-visible:ring-ring"
-                          aria-label="Cancel delete"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDelete(room.id)}
-                        className="p-1.5 transition-colors hover:bg-destructive/10 hover:text-destructive text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                        title="Permanently delete room"
-                        aria-label="Permanently delete room"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                ))
-              )}
+                {confirmBulkAction === 'suspend' ? 'Suspend' : 'Close'} {table.selectedIds.size} room
+                {table.selectedIds.size !== 1 ? 's' : ''}
+              </Button>
             </div>
           </div>
         </div>
+      )}
 
-        <div className="flex items-center justify-between border-t bg-muted/30 px-4 py-3.5">
-          <p className="text-[11px] text-muted-foreground">
-            Page {page} of {Math.max(1, Math.ceil((data?.total ?? 0) / limit))}
-          </p>
-
-          <div className="flex items-center gap-2">
-            <Select
-              value={String(limit)}
-              onValueChange={(v) => {
-                setLimit(+v)
-                setPage(1)
-              }}
-            >
-              <SelectTrigger className="h-8 w-[72px] text-[11px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="25">25</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="inline-flex items-center justify-center h-8 w-8 border transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-
-            <button
-              type="button"
-              disabled={page * limit >= (data?.total ?? 0)}
-              onClick={() => setPage((p) => p + 1)}
-              className="inline-flex items-center justify-center h-8 w-8 border transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Next page"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
+      <CreateRoomDialog open={createOpen} onOpenChange={setCreateOpen} onCreate={handleCreate} isAdmin />
     </div>
   )
 }

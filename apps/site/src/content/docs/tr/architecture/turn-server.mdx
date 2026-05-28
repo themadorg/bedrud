@@ -47,10 +47,10 @@ flowchart LR
         SFU[LiveKit SFU]
     end
 
-    A -->|"ICE candidates"| N
-    N -->|"Yes"| SFU
-    N -->|"No"| TURN
-    TURN -->|"relayed media"| SFU
+    A */}|"ICE candidates"| N
+    N */}|"Yes"| SFU
+    N */}|"No"| TURN
+    TURN */}|"relayed media"| SFU
     A -.->|"discover public IP"| STUN
 ```
 
@@ -60,14 +60,14 @@ LiveKit bağlantı türlerini sırayla dener. Her geri düşüş gecikme ve sunu
 
 ```mermaid
 flowchart TD
-    A[ICE over UDP<br/>port 50000-60000] -->|"~80% succeed"| S[Connected]
-    A -->|"fail"| B[TURN over UDP<br/>port 3478]
-    B -->|"succeed"| S
-    B -->|"UDP blocked"| C[ICE over TCP<br/>port 7881]
-    C -->|"succeed"| S
-    C -->|"TCP blocked"| D[TURN over TLS<br/>port 5349 / 443]
-    D -->|"succeed"| S
-    D -->|"fail"| E[Connection failed]
+    A[ICE over UDP<br/>port 50000-60000] */}|"~80% succeed"| S[Connected]
+    A */}|"fail"| B[TURN over UDP<br/>port 3478]
+    B */}|"succeed"| S
+    B */}|"UDP blocked"| C[ICE over TCP<br/>port 7881]
+    C */}|"succeed"| S
+    C */}|"TCP blocked"| D[TURN over TLS<br/>port 5349 / 443]
+    D */}|"succeed"| S
+    D */}|"fail"| E[Connection failed]
 ```
 
 | Öncelik | Tür | Port | Tipik senaryo |
@@ -171,10 +171,10 @@ TURN etki alanı ve sunucu etki alanı aynıdır. 443 portu hem HTTPS API hem de
 
 ```mermaid
 flowchart LR
-    C[Client] --> LB[Layer 4<br/>Load Balancer]
-    LB -->|"HTTPS :443"| API[Bedrud API<br/>:8090]
-    LB -->|"TURN/TLS :5349"| LK1[LiveKit Node 1<br/>:7880]
-    LB -->|"TURN/TLS :5349"| LK2[LiveKit Node 2<br/>:7880]
+    C[Client] */} LB[Layer 4<br/>Load Balancer]
+    LB */}|"HTTPS :443"| API[Bedrud API<br/>:8090]
+    LB */}|"TURN/TLS :5349"| LK1[LiveKit Node 1<br/>:7880]
+    LB */}|"TURN/TLS :5349"| LK2[LiveKit Node 2<br/>:7880]
 
     C -.->|"TURN/UDP :3478"| LK1
 ```
@@ -213,11 +213,11 @@ flowchart TB
         LK[LiveKit SFU]
     end
 
-    C --> P443 --> API
-    C --> P3478 --> LK
-    C --> P7881 --> LK
-    C --> P5349 --> LK
-    C --> PRANGE --> LK
+    C */} P443 */} API
+    C */} P3478 */} LK
+    C */} P7881 */} LK
+    C */} P5349 */} LK
+    C */} PRANGE */} LK
 ```
 
 | Port | Protokol | Hizmet | Gerekli | Notlar |

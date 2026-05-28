@@ -50,20 +50,16 @@ export function MeetingControls({ onNavigate }: MeetingControlsProps) {
     <>
       <ControlsBar onLeave={handleLeaveRequest} />
       <Dialog open={endDialogOpen} onOpenChange={setEndDialogOpen}>
-        <DialogContent
-          className="sm:max-w-sm"
-          style={{ background: '#0f0f1e', border: '1px solid rgba(255,255,255,0.08)' }}
-        >
+        <DialogContent className="sm:max-w-sm bg-[#0f0f1e] border-white/[0.08]">
           <DialogHeader>
-            <DialogTitle style={{ color: 'white' }}>Leave meeting?</DialogTitle>
-            <DialogDescription style={{ color: 'rgba(255,255,255,0.45)' }}>
+            <DialogTitle className="text-white">Leave meeting?</DialogTitle>
+            <DialogDescription className="text-white/50">
               You created this meeting. End it for everyone, or just slip out.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-col gap-2 sm:flex-col">
             <Button
-              className="w-full gap-2"
-              style={{ background: 'rgba(239,68,68,0.85)', color: 'white', border: 'none' }}
+              className="w-full gap-2 bg-red-500/85 text-white border-none hover:bg-red-500/90"
               onClick={handleEndMeeting}
               disabled={isEnding}
             >
@@ -72,12 +68,7 @@ export function MeetingControls({ onNavigate }: MeetingControlsProps) {
             </Button>
             <Button
               variant="outline"
-              className="w-full gap-2"
-              style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: 'rgba(255,255,255,0.8)',
-              }}
+              className="w-full gap-2 bg-white/[0.05] border-white/10 text-white/80 hover:bg-white/[0.1] hover:text-white"
               onClick={handleLeaveMeeting}
             >
               <LogOut className="h-4 w-4" />
@@ -85,8 +76,7 @@ export function MeetingControls({ onNavigate }: MeetingControlsProps) {
             </Button>
             <Button
               variant="ghost"
-              className="w-full"
-              style={{ color: 'rgba(255,255,255,0.4)' }}
+              className="w-full text-white/50 hover:text-white/70"
               onClick={() => setEndDialogOpen(false)}
             >
               Cancel

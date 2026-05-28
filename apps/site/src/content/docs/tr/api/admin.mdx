@@ -17,8 +17,11 @@ Yönetici uç noktaları `/api/admin/` altındadır. Tümü **superadmin** eriş
 | `/api/admin/users/:id` | DELETE | Bir kullanıcıyı kalıcı olarak sil |
 | `/api/admin/rooms` | GET | Tüm odaları listele (sayfalandırmalı) |
 | `/api/admin/rooms/:roomId` | PUT | Herhangi bir odanın ayarlarını güncelle |
-| `/api/admin/rooms/:roomId` | DELETE | Bir odayı kapat (kademeli silme) |
-| `/api/admin/rooms/:roomId/suspend` | POST | Aktif bir odayı askıya al |
+| `/api/admin/rooms/:roomId` | DELETE | Bir odayı sil (arka plan işi) |
+| `/api/admin/rooms/:roomId/suspend` | POST | Bir odayı askıya al (arka plan işi) |
+| `/api/admin/rooms/bulk/suspend` | POST | Toplu oda askıya al |
+| `/api/admin/rooms/bulk/close` | POST | Toplu oda kapat |
+| `/api/admin/users/bulk/delete` | POST | Toplu kullanıcı sil |
 | `/api/admin/rooms/:roomId/participants` | GET | LiveKit'ten canlı katılımcı verilerini al |
 | `/api/admin/rooms/:roomId/participants/:identity/kick` | POST | Herhangi bir katılımcıyı odadan at |
 | `/api/admin/rooms/:roomId/participants/:identity/mute` | POST | Herhangi bir katılımcının sesini kapat |
@@ -337,7 +340,7 @@ Tüm ayar alanları isteğe bağlıdır — yalnızca değiştirmek istediklerin
 
 ### Odayı Kapat
 
-Bir odayı kademeli silme ile kalıcı olarak kapat. Tüm katılımcılara bir sistem mesajı gönderir: "This room has been closed by an administrator".
+Bir odayı ve tüm katılımcılarını kalıcı olarak sil. Bir arka plan işine kuyruğa alınır ve hemen döner — oda birkaç saniye içinde tamamen silinecektir.
 
 ```
 DELETE /api/admin/rooms/:roomId
@@ -349,19 +352,29 @@ DELETE /api/admin/rooms/:roomId
 |---|---|
 | `roomId` | Oda UUID'si |
 
-**Yanıt (200):**
+**Yanıt (202):**
 
 ```json
 {
-  "status": "success"
+  "message": "Room deletion queued"
 }
 ```
+
+| Durum | Açıklama |
+|--------|-------------|
+| 202 | Silme kuyruğa alındı — kısa süre içinde tamamlanacak |
+| 404 | Oda bulunamadı |
+| 500 | Oda alınamadı veya iş kuyruğa eklenemedi |
+
+> **Not:** Kapatma, tüm aktif katılımcılara bir sistem mesajı gönderir: "This room has been closed by an administrator".
+> Kapatma mantığı, LiveKit oda kaldırma, sohbet yükleme temizliği
+> ve veritabanı kaydını silme işlemlerini yürüten `cleanupSvc.CascadeDeleteRoom`'u çağırır.
 
 ---
 
 ### Odayı Askıya Al
 
-Oda kaydını silmeden aktif bir odayı ve tüm katılımcılarını devre dışı bırak. Bir katılımcı tekrar katıldığında oda yeniden aktifleştirilebilir.
+Aktif bir odayı devre dışı bırak, tüm aktif aramaları sonlandır ancak oda kaydını koru. Bir katılımcı tekrar katıldığında oda yeniden aktifleştirilebilir. Bir arka plan işi olarak çalışır ve hemen döner.
 
 ```
 POST /api/admin/rooms/:roomId/suspend
@@ -373,15 +386,70 @@ POST /api/admin/rooms/:roomId/suspend
 |---|---|
 | `roomId` | Oda UUID'si |
 
-**Yanıt (200):**
+**Yanıt (202):**
 
 ```json
 {
-  "status": "success"
+  "message": "Room suspend queued"
 }
 ```
 
-**Hata (400):** Oda zaten aktif değilse `{"error": "Room is not active"}` döndürür.
+| Durum | Açıklama |
+|--------|-------------|
+| 202 | Askıya alma kuyruğa alındı — kısa süre içinde tamamlanacak |
+| 400 | Oda zaten aktif değil |
+| 404 | Oda bulunamadı |
+| 500 | Oda alınamadı veya iş kuyruğa eklenemedi |
+
+---
+
+### Toplu Oda Askıya Al
+
+Birden fazla oda için askıya alma işlemini aynı anda kuyruğa al. Zaten askıya alınmış odalar atlanır.
+
+```
+POST /api/admin/rooms/bulk/suspend
+```
+
+**İstek Gövdesi:**
+
+```json
+{
+  "ids": ["room-uuid-1", "room-uuid-2"]
+}
+```
+
+**Yanıt (202):**
+
+```json
+{
+  "results": {
+    "room-uuid-1": {"success": true, "name": "team-standup"},
+    "room-uuid-2": {"success": false, "name": "design-review", "error": "room not found"}
+  },
+  "totalProcessed": 1,
+  "totalFailed": 1
+}
+```
+
+| Alan | Tür | Açıklama |
+|-------|------|-------------|
+| `results` | object | ID'ye göre indekslenmiş oda başına sonuç |
+| `results.*.success` | bool | İşlemin kuyruğa alınıp alınmadığı |
+| `results.*.name` | string | Oda adı (başarı durumunda mevcut) |
+| `results.*.error` | string | Hata mesajı (hata durumunda mevcut) |
+| `totalProcessed` | int | Başarıyla kuyruğa alınan oda sayısı |
+| `totalFailed` | int | Başarısız olan oda sayısı |
+
+### Toplu Oda Kapat
+
+Birden fazla oda için kalıcı silme işlemini aynı anda kuyruğa al. Geri alınamaz.
+
+```
+POST /api/admin/rooms/bulk/close
+```
+
+İstek/yanıt formatı [Toplu Oda Askıya Al](#toplu-oda-askıya-al) ile aynıdır.
 
 ---
 

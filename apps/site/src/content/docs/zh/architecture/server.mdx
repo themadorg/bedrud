@@ -1,6 +1,6 @@
 ---
-title: Server Architecture
-description: Backend server design and components
+title: 服务器架构
+description: 后端服务器设计与组件
 order: 7
 ---
 
@@ -64,11 +64,11 @@ server/
 
 ```mermaid
 flowchart TB
-    HTTP[HTTP Request] --> Middleware
-    Middleware["Middleware<br/>JWT validation, CORS, logging"] --> Handlers
-    Handlers["Handlers<br/>Parse requests, call services, format responses"] --> Services
-    Services["Services<br/>Business logic (auth, room management)"] --> Repository
-    Repository["Repository<br/>Database queries via GORM"] --> Database
+    HTTP[HTTP Request] */} Middleware
+    Middleware["Middleware<br/>JWT validation, CORS, logging"] */} Handlers
+    Handlers["Handlers<br/>Parse requests, call services, format responses"] */} Services
+    Services["Services<br/>Business logic (auth, room management)"] */} Repository
+    Repository["Repository<br/>Database queries via GORM"] */} Database
     Database["Database<br/>SQLite (dev) or PostgreSQL (production)"]
 ```
 

@@ -1,5 +1,6 @@
 import { useParticipants } from '@livekit/components-react'
-import { Video } from 'lucide-react'
+
+import { cn } from '#/lib/utils'
 import { ParticipantTile } from './ParticipantTile'
 
 interface ParticipantGridProps {
@@ -14,51 +15,20 @@ function gridCols(count: number): string {
   return 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
 }
 
-const gridArea: React.CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  paddingTop: 'calc(56px + env(safe-area-inset-top, 0px))',
-  paddingBottom: 'calc(88px + env(safe-area-inset-bottom, 0px))',
-  zIndex: 0,
-}
-
 export function ParticipantGrid({ pinnedIdentities, onTogglePin }: ParticipantGridProps) {
   const participants = useParticipants()
 
-  if (participants.length === 0) {
-    return (
-      <div style={gridArea} className="flex flex-col items-center justify-center gap-5">
-        <div
-          style={{
-            width: 80,
-            height: 80,
-            borderRadius: '50%',
-            background: 'color-mix(in oklab, var(--primary) 10%, transparent)',
-            border: '1px solid color-mix(in oklab, var(--primary) 20%, transparent)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Video size={32} style={{ color: 'color-mix(in oklab, var(--primary) 55%, transparent)' }} />
-        </div>
-        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>Waiting for others to join…</p>
-      </div>
-    )
-  }
-
   return (
-    <div style={gridArea}>
+    <div
+      id="meet-grid"
+      className="absolute inset-0 z-0 pt-[calc(56px+env(safe-area-inset-top))] pb-[calc(88px+env(safe-area-inset-bottom))]"
+    >
       <div
-        className={gridCols(participants.length)}
-        style={{
-          display: 'grid',
-          height: '100%',
-          width: '100%',
-          gridAutoRows: '1fr',
-          gap: participants.length === 1 ? 0 : 3,
-          padding: participants.length === 1 ? 0 : 3,
-        }}
+        className={cn(
+          'grid h-full w-full grid-auto-rows-[1fr]',
+          gridCols(participants.length),
+          participants.length === 1 ? 'gap-0 p-0' : 'gap-[3px] p-[3px]',
+        )}
       >
         {participants.map((p, i) => (
           <ParticipantTile

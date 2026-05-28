@@ -51,12 +51,22 @@ logger:
   outputPath: ""                # Log file path (empty = stdout)
 
 livekit:
-  host: "http://localhost:8090/livekit"  # External LiveKit URL
-  internalHost: "http://127.0.0.1:7880"  # Internal LiveKit URL
-  apiKey: "devkey"              # LiveKit API key
-  apiSecret: "devsecret"        # LiveKit API secret
+  host: "ws://localhost:7880"   # Client WebSocket URL (ws:// for plain, wss:// for TLS). Env: LIVEKIT_HOST
+  internalHost: "http://127.0.0.1:7880"  # Server-to-server API URL (http:// or https://). Env: LIVEKIT_INTERNAL_HOST
+  apiKey: "devkey"              # LiveKit API key (auto-generated as gen-<32hex> if empty). Env: LIVEKIT_API_KEY
+  apiSecret: "devsecret"        # LiveKit API secret (64-char hex auto-generated if empty). Env: LIVEKIT_API_SECRET
+  external: false               # true = use external LiveKit, false = embedded. Env: LIVEKIT_EXTERNAL
+  skipTLSVerify: false          # Skip TLS verification for self-signed LiveKit certs. Env: LIVEKIT_SKIP_TLS_VERIFY
   # configPath: "/etc/bedrud/livekit.yaml"  # Path to LiveKit YAML. Env: LIVEKIT_CONFIG_PATH
-  # When server TLS is enabled, TURN/TLS is auto-configured for embedded mode.
+  # nodeIP: "203.0.113.1"       # Explicit node IP for embedded LiveKit RTC (disables STUN). Env: LIVEKIT_NODE_IP
+  #
+  # Webhook (disconnect detection):
+  #   Embedded LiveKit: auto-configures webhook URL -> local API.
+  #   External LiveKit (Cloud): configure URL in LiveKit dashboard -> https://<domain>/api/livekit/webhook
+  #   External LiveKit (self-hosted): add to LiveKit YAML:
+  #     webhook:
+  #       urls: ["https://<domain>/api/livekit/webhook"]
+  #       api_key: <your-api-key>
 
 auth:
   jwtSecret: "your-jwt-secret"           # Secret for signing JWT tokens
@@ -64,6 +74,16 @@ auth:
   sessionSecret: "your-session-secret"    # Secret for session cookies
   frontendURL: "http://localhost:8090"    # Frontend URL (for OAuth redirects)
   passkeyChallengeTTL: 5                # Passkey challenge expiry in minutes
+  # resetTokenTTLHours controls how long password reset links remain valid.
+  # 0 means use default (1 hour). Env: AUTH_RESET_TOKEN_TTL_HOURS
+  resetTokenTTLHours: 1                # Password reset token expiry in hours
+
+  # Email verification (when enabled, users must verify before using the app)
+  # Requires SMTP to be configured — see email section below
+  requireEmailVerification: false        # When true, gate access behind email verification. Env: AUTH_REQUIRE_EMAIL_VERIFICATION
+  verificationEmailCooldownMins: 2       # Min time between verification resends. Env: AUTH_VERIFICATION_COOLDOWN_MINS
+  verificationTokenTTLHours: 24          # How long verification links stay valid. Env: AUTH_VERIFICATION_TOKEN_TTL_HOURS
+  unverifiedAccountTTLHours: 48          # Auto-delete unverified accounts (0 = disabled). Env: AUTH_UNVERIFIED_ACCOUNT_TTL_HOURS
 
   # OAuth providers (optional)
   google:
@@ -87,12 +107,48 @@ rateLimit:
   authWindowSecs: 60         # Auth rate limit window in seconds
   guestMaxRequests: 5        # Max guest join requests per window. 0 = disable
   guestWindowSecs: 60        # Guest rate limit window in seconds
+  authResendMaxRequests: 3   # Max verification resend requests per window. 0 = disable. Env: RATELIMIT_AUTH_RESEND_MAX
+  authResendWindowSecs: 60   # Resend rate limit window in seconds. Env: RATELIMIT_AUTH_RESEND_WINDOW
 
 chat:
   maxUploadBytesPerUser: 524288000       # Per-user upload quota (500 MB). 0 = unlimited. Env: CHAT_MAX_UPLOAD_BYTES_PER_USER
   globalDiskThresholdBytes: 0            # Global storage ceiling across all users. 0 = unlimited. Env: CHAT_GLOBAL_DISK_THRESHOLD_BYTES
   maxMessageCount: 10000                 # Max chat messages kept per room (0 = unlimited). Env: CHAT_MAX_MESSAGE_COUNT
   messageTTLHours: 2160                  # Purge messages older than this in hours (0 = forever). 2160 = 90 days. Env: CHAT_MESSAGE_TTL_HOURS
+
+recording:
+  maxFileSizeMB: 2048           # Max recording file size in MB (0 = unlimited). Env: RECORDING_MAX_FILE_SIZE_MB
+  storageDir: "./data/recordings"  # Local storage path for disk-backed recordings. Env: RECORDING_STORAGE_DIR
+  maxRecordingsPerRoom: 100     # Max total recordings per room (0 = unlimited). Env: RECORDING_MAX_PER_ROOM
+
+queue:
+  pollInterval: 500          # ms between job polls. Env: QUEUE_POLL_INTERVAL
+  maxAttempts: 3             # max retries before failed. Env: QUEUE_MAX_ATTEMPTS
+  concurrency: 1             # worker goroutines. Env: QUEUE_CONCURRENCY
+
+email:
+  smtpHost: ""               # SMTP server hostname. Env: EMAIL_SMTP_HOST
+  smtpPort: 587              # SMTP port (STARTTLS). Env: EMAIL_SMTP_PORT
+  username: ""               # SMTP username. Env: EMAIL_USERNAME
+  password: ""               # SMTP password. Env: EMAIL_PASSWORD
+  fromAddress: ""            # Sender email address. Env: EMAIL_FROM_ADDRESS
+  fromName: "Bedrud"         # Sender display name. Env: EMAIL_FROM_NAME
+  tlsSkipVerify: false       # Skip TLS certificate validation. Env: EMAIL_TLS_SKIP_VERIFY
+  smtpsMode: false           # Direct TLS (SMTPS, port 465). Env: EMAIL_SMTPS_MODE
+  # templates:                 # Email branding and per-template overrides (optional)
+  #   instanceName: "Bedrud"   # Instance name in email headers/footers
+  #   supportEmail: ""         # Contact email for support links
+  #   instanceUrl: ""          # Link to instance homepage
+  #   headerBgColor: "#1a1a2e" # Header background color (hex)
+  #   buttonBgColor: "#e11d48" # Call-to-action button color (hex)
+  #   subjectLines:            # Per-template subject overrides
+  #     welcome: ""
+  #     password_reset: ""
+  #     verify_email: ""
+  #   preheaderText:           # Per-template preheader overrides
+  #     welcome: ""
+  #     password_reset: ""
+  #     verify_email: ""
 ```
 
 ### Key Settings
@@ -119,12 +175,14 @@ The `allowedOrigins` string (comma-separated) must include the URL where your fr
 
 #### Rate Limiting
 
-Rate limiting protects auth endpoints from brute-force and DoS attacks. Two buckets:
+Rate limiting protects auth endpoints from brute-force and DoS attacks. Four buckets:
 
 - **Auth endpoints** (login, register, refresh, passkey login/signup) — default: 10 requests per 60 seconds per IP
 - **Guest join** — default: 5 requests per 60 seconds per IP
+- **General API** — default: 30 requests per 60 seconds per IP
+- **Verification resend** — default: 3 requests per 60 seconds per IP (separate from auth bucket)
 
-Omit the `rateLimit` section to keep defaults. Set `authMaxRequests: 0` or `guestMaxRequests: 0` to disable.
+Omit the `rateLimit` section to keep defaults. Set any `*MaxRequests: 0` to disable that bucket.
 
 #### Chat History
 
@@ -137,11 +195,101 @@ Bedrud applies advisory retention limits to in-room chat messages. Since LiveKit
   Chat messages in Bedrud are transmitted exclusively through LiveKit data channels and are not stored on the server. The retention limits above control how many messages the frontend keeps in memory and sessionStorage. A dedicated chat history service (with server-side persistence) would be needed for true history across sessions — this is tracked as a future enhancement.
 </Callout>
 
+{/* TODO oncoming feature: recordings */}
+#### Recordings
+
+🚧 Recording settings are planned for a future release.
+
+Room recording is controlled by the `RecordingsEnabled` system setting (toggle in admin Settings → General). When enabled:
+
+- Moderators can start/stop composite MP4 recordings from the meeting controls bar
+- Recordings are stored alongside chat uploads using the configured storage backend (disk/S3)
+- Each room has a per-room `recordingsAllowed` toggle that must also be enabled
+- Failed/pending recordings over 7 days old are automatically cleaned up daily
+- Non-persistent rooms have a configurable per-room recording cap (`maxRecordingsPerRoom`) to prevent abuse
+- After a room is deleted, the recording creator can still access their recordings from the same room URL
+
+**YAML Reference:**
+
+- **`maxFileSizeMB`** — maximum file size for a single recording in MB. 0 = unlimited. Default: 2048. Env: `RECORDING_MAX_FILE_SIZE_MB`
+- **`storageDir`** — directory for disk-backed recordings. Only used when S3 is not configured. Default: `./data/recordings`. Env: `RECORDING_STORAGE_DIR`
+- **`maxRecordingsPerRoom`** — caps total recordings per room (all statuses: completed, failed, etc.). 0 = unlimited. Only enforced for non-persistent rooms. Default: 100. Env: `RECORDING_MAX_PER_ROOM`
+
+See the [Recordings Guide](/en/docs/guides/recordings) for full details.
+
+#### Queue (Job System)
+
+The internal job queue processes asynchronous background tasks like user/room deletion, suspension, and chat uploads.
+
+- **`pollInterval`** — how often the worker checks for new jobs (in ms). Lower values reduce latency at the cost of more database queries.
+- **`maxAttempts`** — maximum retry attempts before a job is marked as failed. Retries use exponential backoff (`2^attempt * 5s`, capped at 1h).
+- **`concurrency`** — number of worker goroutines. Increase for higher throughput on PostgreSQL. SQLite is limited to single-worker (one connection).
+
+#### Email Verification
+
+Email verification gates local (non-OAuth) registration and login behind email confirmation. When `requireEmailVerification: true`:
+
+- **Registration:** user must verify their email before first login
+- **Login:** unverified users get a `403` with `"requiresVerification": true` — they must click the link from their inbox
+- **Resend:** unverified users can request a new verification email via `POST /api/auth/verify/resend` (rate-limited by `verificationEmailCooldownMins`)
+- **Auto-cleanup:** accounts that never verify are automatically deleted after `unverifiedAccountTTLHours`
+- **Email change:** changing email triggers a new verification flow (user stays logged in, new token issued with `EmailVerifiedAt=nil`)
+
+Guest users are exempt from email verification — they have no email and are not affected.
+
+<Callout type="warning">
+  Email verification requires SMTP to be configured. If `requireEmailVerification: true` but `email.smtpHost` is empty, the server logs a warning at startup and verification emails cannot be sent.
+</Callout>
+
+#### Password Reset
+
+Users can reset their password via email. The flow requires SMTP to be configured:
+
+1. User requests reset via `POST /api/auth/forgot-password` with their email
+2. Server sends email with a reset link containing a time-limited token
+3. User opens link, sets new password via `POST /api/auth/reset-password`
+
+The reset token expires after `resetTokenTTLHours` (default 1 hour). Rate limiting applies to the forgot-password endpoint (shared with auth rate limit bucket).
+
+#### Email Notifications
+
+Bedrud sends transactional emails (welcome, password change confirmation, room invites) via SMTP. Emails are processed asynchronously through the internal job queue — the HTTP request completes immediately, and the email is sent by a background worker.
+
+- **`smtpHost`** / **`smtpPort`** — SMTP server address. Port 587 (STARTTLS) is the default. Set `smtpsMode: true` for direct TLS on port 465.
+- **`username`** / **`password`** — SMTP authentication credentials. Uses PLAIN auth; requires STARTTLS or SMTPS mode (credentials are never sent over unencrypted connections).
+- **`fromAddress`** / **`fromName`** — sender identity for outgoing emails. Leave `fromAddress` empty to use `noreply@bedrud` (may be rejected by strict mail servers).
+- **`tlsSkipVerify`** — set to `true` if your SMTP server uses a self-signed certificate. Default: `false`.
+- **`smtpsMode`** — enable direct TLS (SMTPS) instead of STARTTLS. Use for port 465. Default: `false`.
+
+<Callout type="info">
+  Emails are only sent when SMTP is configured (`smtpHost` is non-empty). When SMTP is not set up, email jobs are silently marked done and the rendered message body is logged at WARN level for debugging.
+</Callout>
+
+**Available email templates:**
+
+| Template | Trigger | Data Keys |
+|----------|---------|-----------|
+| `welcome` | Registration | `Name`, `LoginURL` |
+| `password_changed` | Password change | `IPAddress` |
+| `password_reset` | Password reset flow | `ResetURL`, `IPAddress` |
+| `room_invite` | Room invite | `InviterName`, `RoomName`, `JoinURL` |
+| `verify_email` | Email verification | `VerifyURL` |
+
+Templates are embedded at build time but branding can be customized at runtime via `email.templates.*` config (instance name, colors, subject lines, preheader text). See [Email Configuration](#email-notifications). Unknown template names fall back to a generic notification template with key-value data.
+
+Each template has two embedded variants: `.html` (rich HTML) and `.txt` (plain text fallback for non-HTML email clients). The appropriate variant is selected automatically based on the recipient's email client capabilities.
+
 ---
 
 ## LiveKit Configuration
 
 **Location:** `server/config/livekit.yaml` (development) or `/etc/bedrud/livekit.yaml` (production)
+
+Bedrud can run an embedded LiveKit server (single binary) or connect to an external LiveKit instance. The embedded mode auto-generates a temporary config file with room settings, TURN, and webhook URL.
+
+<Callout type="info">
+  If `livekit.apiKey` is not set in config, Bedrud generates a random keypair (`gen-<32hex>` / 64-char hex) at startup. The embedded LiveKit server and the webhook handler both use the same generated key — everything works out of the box with no manual configuration.
+</Callout>
 
 ```yaml
 port: 7880                      # LiveKit HTTP/WebSocket port
@@ -149,13 +297,14 @@ port: 7880                      # LiveKit HTTP/WebSocket port
 rtc:
   port_range_start: 50000       # UDP port range start
   port_range_end: 60000         # UDP port range end
-  use_external_ip: true         # Use external IP for RTC
+  use_external_ip: true         # Use STUN to detect public IP; requires internet
+  # node_ip: 203.0.113.1        # Explicit node IP (disables STUN). Required in containers when use_external_ip fails.
 
 turn:
   enabled: true
-  domain: "localhost"
-  tls_port: 5349
-  udp_port: 3478
+  # domain: "turn.example.com"  # Required when tls_port is set (for TLS cert verification)
+  # tls_port: 5349              # TLS port; requires cert_file, key_file, and domain
+  udp_port: 3478                # UDP port (no TLS cert needed)
 
 keys:
   devkey: "devsecret"           # Must match server config
@@ -190,6 +339,39 @@ TURN is a last-resort relay - most clients (~80%) connect directly via UDP and n
 **TLS requirement:** TURN/TLS (port 5349) needs a valid TLS certificate. For production, set `turn.tls_port: 443` and point `cert_file`/`key_file` to your certificate, or place a Layer 4 load balancer in front with `external_tls: true`.
 
 See the [TURN Server Guide](/en/docs/architecture/turn-server) for architecture, config details, bandwidth calculations, and troubleshooting.
+
+### Webhook (Disconnect Detection)
+
+Bedrud receives webhook events from LiveKit to detect when participants disconnect unexpectedly (e.g., browser crash, network drop) and mark them as inactive in the database.
+
+**Endpoint:** `POST /api/livekit/webhook`
+
+**Authentication:** Uses LiveKit's JWT signing with the same `apiKey`/`apiSecret`. No separate secret needed.
+
+**Embedded LiveKit:** When Bedrud manages its own LiveKit server (default), the webhook URL is **auto-configured** in the generated LiveKit YAML. No user action needed.
+
+**External LiveKit** (Cloud or self-hosted with `external: true`): Manually configure the webhook URL:
+
+- **LiveKit Cloud:** Settings → Webhooks → Create new webhook with URL `https://<your-domain>/api/livekit/webhook`
+- **Self-hosted LiveKit:** Add to your LiveKit YAML config:
+  ```yaml
+  webhook:
+    urls: ["https://<your-domain>/api/livekit/webhook"]
+    api_key: <your-api-key>
+  ```
+
+**LiveKit version note:** LiveKit v1.12+ removed the top-level `tls` config field. If self-hosting external LiveKit ≥v1.12, omit `tls:` from your LiveKit YAML and use `http://` for `internalHost` / `ws://` for `host` in Bedrud's config. TURN TLS is still supported via `turn.cert_file`/`turn.key_file`.
+
+**Events handled:**
+
+| Event | Action |
+|-------|--------|
+| `participant_disconnected` | Marks participant as inactive in `room_participants` |
+| `room_finished` | Marks all participants + room as inactive |
+
+<Callout type="info">
+  If `apiKey` is left empty in config, a random keypair is generated at startup. The embedded LiveKit server and webhook handler both use the same generated key — no manual configuration needed.
+</Callout>
 
 ### Room Settings
 
@@ -247,9 +429,11 @@ export LIVEKIT_API_SECRET=prodsecret
 | `DB_PATH` | `database.path` | SQLite file path or PostgreSQL connection string |
 | `LIVEKIT_HOST` | `livekit.host` | External LiveKit URL |
 | `LIVEKIT_INTERNAL_HOST` | `livekit.internalHost` | Internal LiveKit URL |
-| `LIVEKIT_API_KEY` | `livekit.apiKey` | LiveKit API key |
-| `LIVEKIT_API_SECRET` | `livekit.apiSecret` | LiveKit API secret |
+| `LIVEKIT_API_KEY` | `livekit.apiKey` | LiveKit API key (auto-generated as `gen-<32hex>` if empty) |
+| `LIVEKIT_API_SECRET` | `livekit.apiSecret` | LiveKit API secret (64-char hex auto-generated if empty) |
 | `LIVEKIT_CONFIG_PATH` | `livekit.configPath` | Path to external LiveKit YAML config |
+| `LIVEKIT_EXTERNAL` | `livekit.external` | Use external LiveKit instead of embedded (`true`/`false`) |
+| `LIVEKIT_SKIP_TLS_VERIFY` | `livekit.skipTLSVerify` | Skip TLS verification for self-signed LiveKit certs |
 | `LIVEKIT_NODE_IP` | `livekit.nodeIP` | Explicit node IP for embedded LiveKit RTC (disables STUN) |
 | `SERVER_CERT_ALGORITHM` | `server.certAlgorithm` | Key algorithm for cert generation: `ed25519`, `ecdsa256`, `rsa2048`, `rsa4096` |
 | `SERVER_MAX_PARTICIPANTS_LIMIT` | `server.maxParticipantsLimit` | Hard ceiling for room capacity (default 1000) |
@@ -258,7 +442,23 @@ export LIVEKIT_API_SECRET=prodsecret
 | `CHAT_GLOBAL_DISK_THRESHOLD_BYTES` | `chat.globalDiskThresholdBytes` | Global upload storage ceiling in bytes (default 0 = unlimited) |
 | `CHAT_MAX_MESSAGE_COUNT` | `chat.maxMessageCount` | Max chat messages kept per room (default 10000, 0 = unlimited) |
 | `CHAT_MESSAGE_TTL_HOURS` | `chat.messageTTLHours` | Max age of chat messages in hours (default 2160 = 90 days, 0 = forever) |
+| `QUEUE_POLL_INTERVAL` | `queue.pollInterval` | Job poll interval in ms (default 500) |
+| `QUEUE_MAX_ATTEMPTS` | `queue.maxAttempts` | Max job retries before marking failed (default 3) |
+| `QUEUE_CONCURRENCY` | `queue.concurrency` | Worker goroutine count (default 1) |
+| `EMAIL_SMTP_HOST` | `email.smtpHost` | SMTP server hostname |
+| `EMAIL_SMTP_PORT` | `email.smtpPort` | SMTP server port (default 587) |
+| `EMAIL_USERNAME` | `email.username` | SMTP username |
+| `EMAIL_PASSWORD` | `email.password` | SMTP password |
+| `EMAIL_FROM_ADDRESS` | `email.fromAddress` | From email address |
+| `EMAIL_FROM_NAME` | `email.fromName` | From display name (default "Bedrud") |
+| `EMAIL_TLS_SKIP_VERIFY` | `email.tlsSkipVerify` | Skip TLS certificate validation for self-signed SMTP certs |
+| `EMAIL_SMTPS_MODE` | `email.smtpsMode` | Enable direct TLS (SMTPS) mode for port 465 |
 | `JWT_SECRET` | `auth.jwtSecret` | Secret for signing JWT tokens |
+| `AUTH_REQUIRE_EMAIL_VERIFICATION` | `auth.requireEmailVerification` | Gate access behind email verification (`true`/`false`) |
+| `AUTH_VERIFICATION_COOLDOWN_MINS` | `auth.verificationEmailCooldownMins` | Min time between verification email resends (minutes) |
+| `AUTH_VERIFICATION_TOKEN_TTL_HOURS` | `auth.verificationTokenTTLHours` | How long verification links remain valid (hours) |
+| `AUTH_UNVERIFIED_ACCOUNT_TTL_HOURS` | `auth.unverifiedAccountTTLHours` | Auto-delete unverified accounts after N hours (0 = disabled) |
+| `AUTH_RESET_TOKEN_TTL_HOURS` | `auth.resetTokenTTLHours` | Password reset token expiry in hours (default 1) |
 | `AUTH_FRONTEND_URL` | `auth.frontendURL` | Frontend URL for OAuth redirects |
 | `AUTH_PASSKEY_CHALLENGE_TTL` | `auth.passkeyChallengeTTL` | Passkey challenge expiry in minutes |
 | `CORS_ALLOWED_ORIGINS` | `cors.allowedOrigins` | Comma-separated allowed origins |
@@ -271,6 +471,8 @@ export LIVEKIT_API_SECRET=prodsecret
 | `RATELIMIT_AUTH_WINDOW` | `rateLimit.authWindowSecs` | Auth rate limit window in seconds |
 | `RATELIMIT_GUEST_MAX` | `rateLimit.guestMaxRequests` | Max guest join requests per window |
 | `RATELIMIT_GUEST_WINDOW` | `rateLimit.guestWindowSecs` | Guest rate limit window in seconds |
+| `RATELIMIT_AUTH_RESEND_MAX` | `rateLimit.authResendMaxRequests` | Max verification resend requests per window |
+| `RATELIMIT_AUTH_RESEND_WINDOW` | `rateLimit.authResendWindowSecs` | Resend rate limit window in seconds |
 
 ---
 

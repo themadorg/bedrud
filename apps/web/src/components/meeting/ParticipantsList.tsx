@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { getPalette } from '#/lib/participant-palette'
 import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
 import { ParticipantContextMenu, ParticipantMenuButton } from '@/components/meeting/ParticipantContextMenu'
+import { useFocusTrap } from './useFocusTrap'
 
 interface Props {
   onClose: () => void
@@ -22,52 +23,28 @@ function parseMeta(raw: string | undefined): ParticipantMeta {
   }
 }
 
-const panel: React.CSSProperties = {
-  position: 'absolute',
-  right: 0,
-  top: 0,
-  bottom: 0,
-  width: 'min(288px, 100vw)',
-  zIndex: 30,
-  display: 'flex',
-  flexDirection: 'column',
-  background: 'rgba(10,10,22,0.94)',
-  backdropFilter: 'blur(24px)',
-  borderLeft: '1px solid rgba(255,255,255,0.07)',
-  paddingTop: 'env(safe-area-inset-top, 0px)',
-  paddingBottom: 'calc(88px + env(safe-area-inset-bottom, 0px))',
-}
-
 export function ParticipantsList({ onClose }: Props) {
   const participants = useParticipants()
   const { adminId } = useMeetingRoomContext()
+  const trapRef = useFocusTrap({ enabled: true, onClose })
 
   return (
-    <aside className="meet-panel" style={panel}>
+    <aside
+      ref={trapRef}
+      className="absolute right-0 top-0 bottom-0 z-30 flex flex-col bg-[#0a0a16]/94 backdrop-blur-2xl border-l border-white/[0.07] pt-[env(safe-area-inset-top)] pb-[calc(88px+env(safe-area-inset-bottom))]"
+      style={{ width: 'min(288px, 100vw)' }}
+    >
       {/* Header */}
-      <div
-        style={{
-          height: 52,
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 16px',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <Users size={14} style={{ color: 'color-mix(in oklab, var(--sky-300) 70%, transparent)' }} />
-          <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600 }}>Participants</span>
+      <div className="h-[52px] shrink-0 flex items-center justify-between px-4 border-b border-white/[0.06]">
+        <div className="flex items-center gap-[7px]">
+          <Users size={14} className="text-[color-mix(in_oklab,var(--accent-400)_70%,transparent)]" />
+          <span className="text-white/80 text-[13px] font-semibold">Participants</span>
           <span
+            className="rounded-md px-[6px] py-px text-[11px] font-semibold"
             style={{
               background: 'color-mix(in oklab, var(--primary) 18%, transparent)',
               border: '1px solid color-mix(in oklab, var(--primary) 25%, transparent)',
-              color: 'color-mix(in oklab, var(--sky-300) 80%, transparent)',
-              borderRadius: 6,
-              padding: '1px 6px',
-              fontSize: 11,
-              fontWeight: 600,
+              color: 'color-mix(in oklab, var(--accent-400) 80%, transparent)',
             }}
           >
             {participants.length}
@@ -76,19 +53,7 @@ export function ParticipantsList({ onClose }: Props) {
         <button
           type="button"
           onClick={onClose}
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 7,
-            background: 'transparent',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'rgba(255,255,255,0.35)',
-            cursor: 'pointer',
-            transition: 'background 0.15s, color 0.15s',
-          }}
+          className="w-7 h-7 rounded-[7px] bg-transparent border-none flex items-center justify-center text-white/50 cursor-pointer transition-[background,color] duration-150"
           aria-label="Close participants"
         >
           <X size={15} />
@@ -96,7 +61,7 @@ export function ParticipantsList({ onClose }: Props) {
       </div>
 
       {/* List */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 8px' }}>
+      <div className="flex-1 overflow-y-auto p-2">
         {participants.map((p) => (
           <ParticipantRow key={p.identity} p={p} adminId={adminId} />
         ))}
@@ -124,101 +89,48 @@ function ParticipantRow({ p, adminId }: RowProps): React.ReactElement {
   const row = (
     // biome-ignore lint/a11y/noStaticElementInteractions: hover highlight is visual only, not interactive
     <div
-      className="group"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        padding: '7px 8px',
-        borderRadius: 10,
-        transition: 'background 0.12s',
-        cursor: 'default',
-      }}
+      className="group flex items-center gap-2.5 px-2 py-[7px] rounded-xl transition-[background] duration-[0.12s] cursor-default"
       onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
       {/* Avatar */}
       <div
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: '50%',
-          background: palette.avatar,
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 13,
-          fontWeight: 700,
-          color: 'white',
-        }}
+        className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[13px] font-bold text-white"
+        style={{ background: palette.avatar }}
       >
         {initial}
       </div>
 
       {/* Name + badges */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span
-            style={{
-              color: 'rgba(255,255,255,0.82)',
-              fontSize: 13,
-              fontWeight: 500,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
+      <div className="flex-1 min-w-0 flex flex-col gap-[3px]">
+        <div className="flex items-center gap-[5px]">
+          <span className="text-white/[0.82] text-[13px] font-medium overflow-hidden text-ellipsis whitespace-nowrap">
             {displayName}
           </span>
-          {p.isLocal && <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11, flexShrink: 0 }}>you</span>}
+          {p.isLocal && <span className="text-white/50 text-[11px] shrink-0">you</span>}
         </div>
 
         {(isRoomAdmin || isMod || isGuest) && (
-          <div style={{ display: 'flex', gap: 4 }}>
+          <div className="flex gap-1">
             {isRoomAdmin && (
               <span
+                className="text-[10px] font-semibold tracking-wide rounded px-[5px] py-px"
                 style={{
-                  fontSize: 10,
-                  fontWeight: 600,
-                  letterSpacing: '0.04em',
-                  color: 'var(--sky-300)',
+                  color: 'var(--accent-400)',
                   background: 'color-mix(in oklab, var(--primary) 20%, transparent)',
                   border: '1px solid color-mix(in oklab, var(--primary) 30%, transparent)',
-                  borderRadius: 4,
-                  padding: '1px 5px',
                 }}
               >
                 Admin
               </span>
             )}
             {isMod && (
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: '#6ee7b7',
-                  background: 'rgba(16,185,129,0.15)',
-                  border: '1px solid rgba(16,185,129,0.25)',
-                  borderRadius: 4,
-                  padding: '1px 5px',
-                }}
-              >
+              <span className="text-[10px] font-semibold text-emerald-300 bg-emerald-500/15 border border-emerald-500/25 rounded px-[5px] py-px">
                 Mod
               </span>
             )}
             {isGuest && (
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 500,
-                  color: 'rgba(255,255,255,0.35)',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 4,
-                  padding: '1px 5px',
-                }}
-              >
+              <span className="text-[10px] font-medium text-white/50 bg-white/[0.05] border border-white/10 rounded px-[5px] py-px">
                 Guest
               </span>
             )}
@@ -227,17 +139,17 @@ function ParticipantRow({ p, adminId }: RowProps): React.ReactElement {
       </div>
 
       {/* Status icons */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-        {meta.deafened && <VolumeX size={13} style={{ color: '#f87171' }} />}
+      <div className="flex items-center gap-1 shrink-0">
+        {meta.deafened && <VolumeX size={13} className="shrink-0 text-red-400" />}
         {p.isMicrophoneEnabled ? (
-          <Mic size={13} style={{ color: 'rgba(255,255,255,0.3)' }} />
+          <Mic size={13} className="shrink-0 text-white/50" />
         ) : (
-          <MicOff size={13} style={{ color: '#f87171' }} />
+          <MicOff size={13} className="shrink-0 text-red-400" />
         )}
         {p.isCameraEnabled ? (
-          <Video size={13} style={{ color: 'rgba(255,255,255,0.3)' }} />
+          <Video size={13} className="shrink-0 text-white/50" />
         ) : (
-          <VideoOff size={13} style={{ color: 'rgba(255,255,255,0.18)' }} />
+          <VideoOff size={13} className="shrink-0 text-white/50" />
         )}
 
         <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150">

@@ -506,6 +506,7 @@
       "guides/appliance": "وضع الجهاز",
       "guides/admin-dashboard": "لوحة تحكم المشرف",
       "guides/behind-proxy": "خلف بروكسي/CDN",
+      "guides/roles": "أدوار المستخدم",
       contributing: "المساهمة",
     },
     mdx: {

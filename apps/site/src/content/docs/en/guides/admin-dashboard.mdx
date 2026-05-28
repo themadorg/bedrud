@@ -161,6 +161,17 @@ Tokens control who can register when in Invite-only mode.
 - **Token List:** Shows all tokens with their status. Unused tokens have a green "Active" badge, used tokens show "Used" in gray.
 - **Copy Token:** Click the copy button to copy the 32-character token value to your clipboard.
 - **Revoke:** Delete a token to prevent it from being used.
+- **Recordings Toggle:** Under the token list, toggle **Allow room recordings** on/off. When disabled, all recording API endpoints return 403 system-wide.
+
+### Webhooks Tab
+
+The Webhooks tab lets superadmins register HTTP callbacks for real-time room and recording events.
+
+- **Add Webhook:** Enter a URL, select event types, and optionally set a custom HMAC secret.
+- **Event Types:** `room.ended`, `participant.joined`, `participant.left`, `recording.completed`.
+- **Test:** Send a test ping to verify connectivity.
+- **Rotate:** Generate a new HMAC signing secret (old one immediately invalidated).
+- **Status Column:** Shows last HTTP status code and timestamp of last delivery.
 
 ### Authentication Tab
 

@@ -206,7 +206,7 @@ func buildCleanupService(cfg *config.Config, roomRepo *repository.RoomRepository
 		s3Deleter = storage.NewS3Deleter(cfg.Chat.Uploads.S3)
 	}
 	tracker := storage.NewChatUploadTracker(database.GetDB(), uploadDir, s3Deleter)
-	return services.NewRoomCleanupService(roomRepo, client, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, tracker)
+	return services.NewRoomCleanupService(roomRepo, nil, client, nil, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, tracker)
 }
 
 func truncate(s string, n int) string {

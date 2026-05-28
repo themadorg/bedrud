@@ -1,9 +1,10 @@
+// TODO oncoming feature
 import '@livekit/components-styles/components'
 import { LiveKitRoom, RoomAudioRenderer, useTracks } from '@livekit/components-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import type { AudioCaptureOptions } from 'livekit-client'
-import { Track } from 'livekit-client'
+import { DisconnectReason, Track } from 'livekit-client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '#/lib/api'
@@ -25,6 +26,8 @@ import { MeetingPanels } from '@/components/meeting/MeetingPanels'
 import { MeetingSoundEffects } from '@/components/meeting/MeetingSoundEffects'
 import { ParticipantGrid } from '@/components/meeting/ParticipantGrid'
 import { SecureContextBanner } from '@/components/meeting/SecureContextBanner'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 interface JoinResponse {
   id: string
@@ -32,10 +35,29 @@ interface JoinResponse {
   token: string
   livekitHost: string
   adminId: string
-  sessionStartedAt?: number
+  settings?: {
+    recordingsAllowed: boolean
+  }
+  activeRecordingId?: string
+}
+
+interface ArchivedOwnedResponse {
+  status: 'archived_owned'
+  name: string
+  mode: string
+  settings: {
+    allowChat: boolean
+    allowVideo: boolean
+    allowAudio: boolean
+    requireApproval: boolean
+    e2ee: boolean
+    isPersistent: boolean
+    recordingsAllowed: boolean
+  }
 }
 
 export const Route = createFileRoute('/m/$meetId')({
+  head: () => ({ meta: [{ title: 'Meeting — Bedrud' }] }),
   component: MeetingPage,
 })
 
@@ -78,6 +100,11 @@ function MeetingPage() {
   const [guestInput, setGuestInput] = useState('')
   const [wasKicked, setWasKicked] = useState(false)
   const [wasRoomDeleted, setWasRoomDeleted] = useState(false)
+  const [archivedRoom, setArchivedRoom] = useState<{
+    name: string
+    mode: string
+    settings: ArchivedOwnedResponse['settings']
+  } | null>(null)
   const redirectTargetRef = useRef({ to: '/auth/login', search: { redirect: undefined } as { redirect?: string } })
   const deletionTypeRef = useRef<'user_deleted' | 'room_closed'>('room_closed')
 
@@ -90,7 +117,7 @@ function MeetingPage() {
       checkUserStatus().then((exists) => {
         if (exists) {
           toast.success('Room closed', { id: toastId, description: 'This room is no longer available.' })
-          navigate({ to: '/dashboard', search: { redirect: undefined } })
+          navigate({ to: '/dashboard' })
         } else {
           toast.error('Account deleted', { id: toastId, description: 'Your account has been deleted.' })
           useAuthStore.getState().clear()
@@ -99,7 +126,7 @@ function MeetingPage() {
       })
     } else {
       toast.error('Room closed', { description: 'This room is no longer available.' })
-      setTimeout(() => navigate({ to: '/dashboard', search: { redirect: undefined } }), 5000)
+      setTimeout(() => navigate({ to: '/dashboard' }), 5000)
     }
   }, [navigate])
 
@@ -165,12 +192,101 @@ function MeetingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joinData, mergeAudioPrefs, mergeVideoPrefs, tokens])
 
+  const [currentToken, setCurrentToken] = useState<string | null>(null)
+  const [showReconnectBanner, setShowReconnectBanner] = useState(false)
+  const [fatalReconnectError, setFatalReconnectError] = useState<string | null>(null)
+  const isDisconnectedRef = useRef(false)
+  const disconnectedAtRef = useRef(0)
+  const reconnectAttemptRef = useRef(0)
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const attemptReconnect = useCallback(() => {
+    if (!meetId) return
+
+    const attempt = ++reconnectAttemptRef.current
+    const backoff = Math.min(1000 * 2 ** (attempt - 1), 30000)
+
+    console.log(`[reconnect] attempt=${attempt} backoff=${backoff}ms`)
+
+    api
+      .post<{ token: string }>('/api/room/refresh-token', { roomName: meetId })
+      .then(({ token }) => {
+        if (!isDisconnectedRef.current) {
+          console.log('[reconnect] already reconnected natively, caching token')
+          setCurrentToken(token)
+          return
+        }
+        console.log(`[reconnect] attempt=${attempt} succeeded`)
+        setCurrentToken(token)
+      })
+      .catch((err: Error) => {
+        const status = Number(err.message?.split(':')[0])
+        if (status === 410) {
+          console.log('[reconnect] fatal: room gone')
+          setFatalReconnectError('Room is no longer available.')
+          return
+        }
+        if (status === 403) {
+          console.log('[reconnect] fatal: access denied')
+          setFatalReconnectError('Access denied.')
+          return
+        }
+        console.log(`[reconnect] attempt=${attempt} failed, retry in ${backoff}ms`)
+        retryTimerRef.current = setTimeout(attemptReconnect, backoff)
+      })
+  }, [meetId])
+
+  const handleDisconnected = useCallback(
+    (reason?: DisconnectReason) => {
+      if (reason === DisconnectReason.CLIENT_INITIATED) return
+
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current)
+        retryTimerRef.current = null
+      }
+
+      isDisconnectedRef.current = true
+      disconnectedAtRef.current = Date.now()
+      reconnectAttemptRef.current = 0
+      setShowReconnectBanner(false)
+      setFatalReconnectError(null)
+
+      console.log(`[reconnect] disconnected reason=${reason}`)
+
+      setTimeout(() => {
+        if (isDisconnectedRef.current) {
+          setShowReconnectBanner(true)
+        }
+      }, 5000)
+
+      attemptReconnect()
+    },
+    [attemptReconnect],
+  )
+
+  const handleReconnected = useCallback(() => {
+    console.log('[reconnect] connected')
+    isDisconnectedRef.current = false
+    disconnectedAtRef.current = 0
+    reconnectAttemptRef.current = 0
+    setShowReconnectBanner(false)
+    setFatalReconnectError(null)
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
+  }, [])
+
   const addRecent = useRecentRoomsStore((s) => s.add)
   const queryClient = useQueryClient()
   const invalidatedRef = useRef(false)
 
   useEffect(() => {
     return () => {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current)
+        retryTimerRef.current = null
+      }
       if (!invalidatedRef.current) {
         invalidatedRef.current = true
         queryClient.invalidateQueries({ queryKey: ['rooms'] })
@@ -185,6 +301,12 @@ function MeetingPage() {
       api
         .post<JoinResponse>('/api/room/join', { roomName: meetId })
         .then((data) => {
+          // Archived room owned by current user — show recreate dialog
+          if ((data as unknown as ArchivedOwnedResponse).status === 'archived_owned') {
+            const ar = data as unknown as ArchivedOwnedResponse
+            setArchivedRoom({ name: ar.name, mode: ar.mode, settings: ar.settings })
+            return
+          }
           addRecent(meetId)
           setJoinData(data)
         })
@@ -204,26 +326,12 @@ function MeetingPage() {
   // Still on server or waiting for client mount — show neutral spinner to avoid SSR flash
   if (!mounted) {
     return (
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: '#07070f',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 14,
-        }}
-      >
+      <div className="fixed inset-0 bg-[#07070f] flex flex-col items-center justify-center gap-3.5">
         <div
+          className="w-12 h-12 rounded-full animate-[meet-connecting-spin_0.9s_linear_infinite]"
           style={{
-            width: 48,
-            height: 48,
-            borderRadius: '50%',
             border: '2px solid color-mix(in oklab, var(--primary) 30%, transparent)',
             borderTopColor: 'var(--primary)',
-            animation: 'meet-connecting-spin 0.9s linear infinite',
           }}
         />
       </div>
@@ -231,89 +339,102 @@ function MeetingPage() {
   }
 
   // Show guest name dialog for unauthenticated users
-  if (!tokens && guestName === null) {
+  // Guard with mounted to avoid SSR flash — localStorage unavailable on server,
+  // so guestName is always null and tokens always null during SSR.
+  if (mounted && !tokens && guestName === null) {
     return (
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: '#07070f',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
+      <div className="fixed inset-0 bg-[#07070f] flex items-center justify-center">
         <div
-          style={{
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 16,
-            padding: '32px 28px',
-            width: 'min(340px, calc(100vw - 32px))',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 20,
-          }}
+          className="bg-white/[0.04] border border-white/[0.08] rounded-2xl px-7 py-8 flex flex-col gap-5"
+          style={{ width: 'min(340px, calc(100vw - 32px))' }}
         >
           <div>
-            <p style={{ color: 'white', fontSize: 17, fontWeight: 600, margin: 0 }}>Join as guest</p>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, margin: '6px 0 0' }}>
-              Enter your name to join <span style={{ color: 'var(--sky-300)' }}>{meetId}</span>
+            <p className="text-white text-[17px] font-semibold m-0">Join as guest</p>
+            <p className="text-white/40 text-[13px] mt-1.5 m-0">
+              Enter your name to join <span className="text-teal-400">{meetId}</span>
             </p>
           </div>
-          <input
+          <Input
             value={guestInput}
             onChange={(e) => setGuestInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && guestInput.trim()) setGuestName(guestInput.trim())
             }}
             placeholder="Your name"
-            style={{
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 9,
-              padding: '10px 14px',
-              color: 'white',
-              fontSize: 14,
-              outline: 'none',
-            }}
+            className="bg-white/[0.06] border-white/[0.12] text-white placeholder:text-white/40 h-auto py-2.5"
           />
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button
+          <div className="flex gap-2.5">
+            <Button
               type="button"
               disabled={!guestInput.trim()}
               onClick={() => setGuestName(guestInput.trim())}
-              style={{
-                flex: 1,
-                padding: '10px 0',
-                borderRadius: 9,
-                border: 'none',
-                background: guestInput.trim()
-                  ? 'var(--primary)'
-                  : 'color-mix(in oklab, var(--primary) 30%, transparent)',
-                color: 'white',
-                fontSize: 14,
-                fontWeight: 500,
-                cursor: guestInput.trim() ? 'pointer' : 'not-allowed',
-              }}
+              className="flex-1 py-2.5 rounded-lg"
             >
               Join
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => navigate({ to: '/auth/login', search: { redirect: `/m/${meetId}` } })}
-              style={{
-                padding: '10px 14px',
-                borderRadius: 9,
-                border: '1px solid rgba(255,255,255,0.1)',
-                background: 'transparent',
-                color: 'rgba(255,255,255,0.5)',
-                fontSize: 13,
-                cursor: 'pointer',
-              }}
+              className="px-3.5 py-2.5 rounded-lg border border-white/10 text-white/50 text-[13px]"
             >
               Sign in
-            </button>
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Archived room owned by current user — show recreate dialog
+  if (archivedRoom) {
+    return (
+      <div className="fixed inset-0 bg-[#07070f] flex items-center justify-center">
+        <div
+          className="bg-white/[0.04] border border-white/[0.08] rounded-2xl px-7 py-8 flex flex-col gap-5"
+          style={{ width: 'min(380px, calc(100vw - 32px))' }}
+        >
+          <div>
+            <p className="text-white text-[17px] font-semibold m-0">This meeting has ended</p>
+            <p className="text-white/40 text-[13px] mt-1.5 m-0">
+              <span className="text-teal-400">{archivedRoom.name}</span> was created by you. Start a new meeting with
+              this name?
+            </p>
+          </div>
+          <div className="flex gap-2.5">
+            <Button
+              type="button"
+              onClick={() => {
+                api
+                  .post<{ name: string }>('/api/room/create', {
+                    name: archivedRoom.name,
+                    mode: archivedRoom.mode,
+                    settings: archivedRoom.settings,
+                  })
+                  .then((room) => {
+                    setArchivedRoom(null)
+                    addRecent(room.name)
+                    api
+                      .post<JoinResponse>('/api/room/join', { roomName: room.name })
+                      .then((data) => {
+                        setJoinData(data)
+                      })
+                      .catch((err: Error) => setJoinError(err.message))
+                  })
+                  .catch((err: Error) => setJoinError(err.message))
+              }}
+              className="flex-1 py-2.5 rounded-lg"
+            >
+              Start new meeting
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => navigate({ to: '/dashboard' })}
+              className="px-3.5 py-2.5 rounded-lg border border-white/10 text-white/50 text-[13px]"
+            >
+              Dashboard
+            </Button>
           </div>
         </div>
       </div>
@@ -321,7 +442,18 @@ function MeetingPage() {
   }
 
   if (joinError) {
-    return <ErrorPage variant="room-error" error={joinError} showBack={false} />
+    return (
+      <ErrorPage
+        variant="room-error"
+        error={joinError}
+        showBack={false}
+        onRetry={() => {
+          setJoinError(null)
+          setJoinData(null)
+          setArchivedRoom(null)
+        }}
+      />
+    )
   }
 
   if (!joinData) {
@@ -353,7 +485,12 @@ function MeetingPage() {
     )
   }
 
-  const { id, token, livekitHost: wsUrl, name: roomName, adminId, sessionStartedAt } = joinData
+  const { id, token: originalToken, livekitHost: wsUrl, name: roomName, adminId } = joinData
+  const token = currentToken ?? originalToken
+
+  if (fatalReconnectError) {
+    return <ErrorPage variant="room-error" title="Disconnected" description={fatalReconnectError} showBack />
+  }
 
   if (wasKicked) {
     return <ErrorPage variant="kicked" showBack={false} />
@@ -390,15 +527,45 @@ function MeetingPage() {
 
   return (
     <MeetingErrorBoundary>
-      <LiveKitRoom token={token} serverUrl={wsUrl} connect audio={audioConstraints} video={false}>
+      <LiveKitRoom
+        token={token}
+        serverUrl={wsUrl}
+        connect
+        audio={audioConstraints}
+        video={false}
+        onDisconnected={handleDisconnected}
+        onConnected={handleReconnected}
+      >
         <RoomAudioRenderer />
         {/* LiveKitRoom renders as display:contents — this div is the actual viewport container */}
+        {showReconnectBanner && (
+          <div className="fixed top-0 left-0 right-0 z-[9999] bg-yellow-500/15 border-b border-yellow-500/30 px-4 py-2 text-center text-[13px] text-amber-400 backdrop-blur-sm">
+            Reconnecting…
+          </div>
+        )}
         <div className="fixed inset-0 overflow-hidden" style={{ background: '#07070f' }}>
+          {/* Skip links */}
+          <a
+            href="#meet-grid"
+            className="fixed -top-40 left-2 z-[9999] rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-black focus:top-2 transition-all duration-150 pointer-events-none focus:pointer-events-auto"
+          >
+            Skip to video grid
+          </a>
+          <a
+            href="#meet-controls"
+            className="fixed -top-40 left-2 z-[9999] rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-black focus:top-[38px] transition-all duration-150 pointer-events-none focus:pointer-events-auto"
+          >
+            Skip to controls
+          </a>
           <SecureContextBanner />
           <MeetingProvider
             roomId={id}
             roomName={roomName}
             adminId={adminId ?? ''}
+            // TODO oncoming feature
+            recordingsAllowed={false}
+            // TODO oncoming feature
+            activeRecordingId={undefined}
             onRoomDeletionMessage={handleRoomDeletionMessage}
           >
             <BeforeUnloadLock />
@@ -409,11 +576,10 @@ function MeetingPage() {
             {/* Ambient depth gradients */}
             <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
               <div
+                className="absolute rounded-full"
                 style={{
-                  position: 'absolute',
                   width: 900,
                   height: 900,
-                  borderRadius: '50%',
                   background:
                     'radial-gradient(circle, color-mix(in oklab, var(--primary) 5.5%, transparent) 0%, transparent 65%)',
                   top: '-300px',
@@ -421,11 +587,10 @@ function MeetingPage() {
                 }}
               />
               <div
+                className="absolute rounded-full"
                 style={{
-                  position: 'absolute',
                   width: 700,
                   height: 700,
-                  borderRadius: '50%',
                   background: 'radial-gradient(circle, rgba(6,182,212,0.04) 0%, transparent 65%)',
                   bottom: '-200px',
                   right: '-150px',
@@ -437,21 +602,15 @@ function MeetingPage() {
 
             {/* Vignettes for header/controls legibility */}
             <div
-              className="pointer-events-none absolute left-0 right-0 top-0 z-10"
-              style={{
-                height: 'calc(96px + env(safe-area-inset-top, 0px))',
-                background: 'linear-gradient(to bottom, rgba(7,7,15,0.65) 0%, transparent 100%)',
-              }}
+              className="pointer-events-none absolute left-0 right-0 top-0 z-10 h-[calc(96px+env(safe-area-inset-top))]"
+              style={{ background: 'linear-gradient(to bottom, rgba(7,7,15,0.65) 0%, transparent 100%)' }}
             />
             <div
-              className="pointer-events-none absolute bottom-0 left-0 right-0 z-10"
-              style={{
-                height: 'calc(128px + env(safe-area-inset-bottom, 0px))',
-                background: 'linear-gradient(to top, rgba(7,7,15,0.6) 0%, transparent 100%)',
-              }}
+              className="pointer-events-none absolute bottom-0 left-0 right-0 z-10 h-[calc(128px+env(safe-area-inset-bottom))]"
+              style={{ background: 'linear-gradient(to top, rgba(7,7,15,0.6) 0%, transparent 100%)' }}
             />
 
-            <MeetingHeader meetId={meetId} sessionStartedAt={sessionStartedAt} />
+            <MeetingHeader meetId={meetId} />
 
             {/* Side panels */}
             <MeetingPanels navigate={() => navigate({ to: '/dashboard' })} />

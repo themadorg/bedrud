@@ -726,6 +726,7 @@
       "guides/appliance": "Appliance Mode",
       "guides/admin-dashboard": "Admin Dashboard",
       "guides/behind-proxy": "Behind a Proxy/CDN",
+      "guides/roles": "User Roles",
       contributing: "Contributing",
     },
   },

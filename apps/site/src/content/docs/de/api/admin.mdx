@@ -17,8 +17,11 @@ Admin-Endpunkte befinden sich unter `/api/admin/`. Alle erfordern die Zugriffseb
 | `/api/admin/users/:id` | DELETE | Benutzer dauerhaft löschen |
 | `/api/admin/rooms` | GET | Alle Räume auflisten (paginiert) |
 | `/api/admin/rooms/:roomId` | PUT | Raumeinstellungen bearbeiten |
-| `/api/admin/rooms/:roomId` | DELETE | Raum schließen (Kaskadenlöschung) |
-| `/api/admin/rooms/:roomId/suspend` | POST | Aktiven Raum aussetzen |
+| `/api/admin/rooms/:roomId` | DELETE | Raum löschen (Hintergrundjob) |
+| `/api/admin/rooms/:roomId/suspend` | POST | Raum aussetzen (Hintergrundjob) |
+| `/api/admin/rooms/bulk/suspend` | POST | Räume massenhaft aussetzen |
+| `/api/admin/rooms/bulk/close` | POST | Räume massenhaft schließen |
+| `/api/admin/users/bulk/delete` | POST | Benutzer massenhaft löschen |
 | `/api/admin/rooms/:roomId/participants` | GET | Live-Teilnehmerdaten von LiveKit abrufen |
 | `/api/admin/rooms/:roomId/participants/:identity/kick` | POST | Teilnehmer aus einem Raum entfernen |
 | `/api/admin/rooms/:roomId/participants/:identity/mute` | POST | Audio eines Teilnehmers stummschalten |
@@ -337,7 +340,7 @@ Alle Einstellungsfelder sind optional – geben Sie nur die Felder an, die Sie �
 
 ### Raum schließen
 
-Einen Raum dauerhaft mit Kaskadenlöschung schließen. Sendet eine Systemnachricht an alle Teilnehmer: „This room has been closed by an administrator".
+Einen Raum dauerhaft löschen. Der Löschvorgang wird als Hintergrundjob ausgeführt und kehrt sofort zurück — der Raum wird innerhalb weniger Sekunden vollständig gelöscht.
 
 ```
 DELETE /api/admin/rooms/:roomId
@@ -349,19 +352,29 @@ DELETE /api/admin/rooms/:roomId
 |---|---|
 | `roomId` | Raum-UUID |
 
-**Antwort (200):**
+**Antwort (202):**
 
 ```json
 {
-  "status": "success"
+  "message": "Room deletion queued"
 }
 ```
+
+| Status | Beschreibung |
+|--------|-------------|
+| 202 | Löschung vorgemerkt — wird in Kürze abgeschlossen |
+| 404 | Raum nicht gefunden |
+| 500 | Raum konnte nicht abgerufen oder Job nicht eingeplant werden |
+
+> **Hinweis:** Beim Schließen wird eine Systemnachricht an alle aktiven Teilnehmer gesendet: „This room has been closed by an administrator".
+> Die Schließlogik ruft `cleanupSvc.CascadeDeleteRoom` auf, das die LiveKit-Raumentfernung, Chat-Upload-Bereinigung
+> und das Löschen des Datenbankeintrags übernimmt.
 
 ---
 
 ### Raum aussetzen
 
-Einen aktiven Raum und alle seine Teilnehmer deaktivieren, ohne den Raumdatensatz zu löschen. Der Raum kann wieder aktiviert werden, wenn ein Teilnehmer erneut beitritt.
+Einen aktiven Raum deaktivieren und alle aktiven Anrufe beenden, ohne den Raumdatensatz zu löschen. Der Raum kann wieder aktiviert werden, wenn ein Teilnehmer erneut beitritt. Wird als Hintergrundjob ausgeführt und kehrt sofort zurück.
 
 ```
 POST /api/admin/rooms/:roomId/suspend
@@ -373,15 +386,70 @@ POST /api/admin/rooms/:roomId/suspend
 |---|---|
 | `roomId` | Raum-UUID |
 
-**Antwort (200):**
+**Antwort (202):**
 
 ```json
 {
-  "status": "success"
+  "message": "Room suspend queued"
 }
 ```
 
-**Fehler (400):** Gibt `{"error": "Room is not active"}` zurück, wenn der Raum bereits inaktiv ist.
+| Status | Beschreibung |
+|--------|-------------|
+| 202 | Aussetzung vorgemerkt — wird in Kürze abgeschlossen |
+| 400 | Raum bereits inaktiv |
+| 404 | Raum nicht gefunden |
+| 500 | Raum konnte nicht abgerufen oder Job nicht eingeplant werden |
+
+---
+
+### Räume massenhaft aussetzen
+
+Aussetzung für mehrere Räume gleichzeitig einplanen. Bereits ausgesetzte Räume werden übersprungen.
+
+```
+POST /api/admin/rooms/bulk/suspend
+```
+
+**Anfrage-Body:**
+
+```json
+{
+  "ids": ["room-uuid-1", "room-uuid-2"]
+}
+```
+
+**Antwort (202):**
+
+```json
+{
+  "results": {
+    "room-uuid-1": {"success": true, "name": "team-standup"},
+    "room-uuid-2": {"success": false, "name": "design-review", "error": "room not found"}
+  },
+  "totalProcessed": 1,
+  "totalFailed": 1
+}
+```
+
+| Feld | Typ | Beschreibung |
+|-------|------|-------------|
+| `results` | object | Pro-Raum-Ergebnis, nach ID gruppiert |
+| `results.*.success` | bool | Ob der Vorgang eingeplant wurde |
+| `results.*.name` | string | Raumname (bei Erfolg vorhanden) |
+| `results.*.error` | string | Fehlermeldung (bei Fehler vorhanden) |
+| `totalProcessed` | int | Anzahl erfolgreich eingeplanter Räume |
+| `totalFailed` | int | Anzahl fehlgeschlagener Räume |
+
+### Räume massenhaft schließen
+
+Dauerhafte Löschung für mehrere Räume gleichzeitig einplanen. Kann nicht rückgängig gemacht werden.
+
+```
+POST /api/admin/rooms/bulk/close
+```
+
+Gleiches Anfrage-/Antwortformat wie [Räume massenhaft aussetzen](#räume-massenhaft-aussetzen).
 
 ---
 

@@ -54,7 +54,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: server/go.sum
 
       - name: Build and embed frontend
@@ -465,6 +465,11 @@ jobs:
           java-version: "17"
 
       - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "9.5.0"
+
+      - name: Generate Gradle Wrapper jar
+        run: gradle wrapper --gradle-version 9.5.0
 
       - name: Decode keystore
         env:

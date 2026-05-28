@@ -11,11 +11,13 @@ import (
 	"bedrud/internal/testutil"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -23,17 +25,18 @@ import (
 func testCleanupSvc(t *testing.T, roomRepo *repository.RoomRepository, uploadTracker *storage.ChatUploadTracker) *services.RoomCleanupService {
 	t.Helper()
 	client := lkutil.NewClient(&config.LiveKitConfig{Host: "http://localhost:7880", APIKey: "test", APISecret: "testsecret1234567890123456789012"})
-	return services.NewRoomCleanupService(roomRepo, client, "test", "testsecret1234567890123456789012", uploadTracker)
+	return services.NewRoomCleanupService(roomRepo, nil, client, nil, "test", "testsecret1234567890123456789012", uploadTracker)
 }
 
 func testUsersHandler(userRepo *repository.UserRepository, roomRepo *repository.RoomRepository, passkeyRepo *repository.PasskeyRepository, prefsRepo *repository.UserPreferencesRepository, cleanupSvc *services.RoomCleanupService) *UsersHandler {
-	return NewUsersHandler(userRepo, roomRepo, passkeyRepo, prefsRepo, cleanupSvc)
+	return NewUsersHandler(userRepo, roomRepo, passkeyRepo, prefsRepo, cleanupSvc, nil)
 }
 
 // --- Helper ---
 
 func setupUsersTestApp(t *testing.T) (*fiber.App, *repository.UserRepository) {
 	t.Helper()
+	config.SetForTest(&config.Config{})
 	db := testutil.SetupTestDB(t)
 	userRepo := repository.NewUserRepository(db)
 	roomRepo := repository.NewRoomRepository(db)
@@ -58,6 +61,8 @@ func setupUsersTestApp(t *testing.T) (*fiber.App, *repository.UserRepository) {
 	app.Get("/admin/users", usersHandler.ListUsers)
 	app.Put("/admin/users/:id/status", usersHandler.UpdateUserStatus)
 	app.Put("/admin/users/:id/password", usersHandler.SetUserPassword)
+	app.Post("/admin/users/:id/verify", usersHandler.AdminVerifyEmail)
+	app.Post("/admin/users/:id/verify/resend", usersHandler.AdminResendVerification)
 
 	return app, userRepo
 }
@@ -384,6 +389,7 @@ func TestUsersHandler_GetUserDetail_Found(t *testing.T) {
 }
 
 func TestUsersHandler_GetUserDetail_NotFound(t *testing.T) {
+
 	db := testutil.SetupTestDB(t)
 	uRepo := repository.NewUserRepository(db)
 	rRepo := repository.NewRoomRepository(db)
@@ -572,6 +578,142 @@ func TestUsersHandler_SetUserPassword_Forbidden(t *testing.T) {
 	}
 }
 
+func TestUsersHandler_ListUserSessions_Found(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	uRepo := repository.NewUserRepository(db)
+	rRepo := repository.NewRoomRepository(db)
+	pkRepo := repository.NewPasskeyRepository(db)
+	prRepo := repository.NewUserPreferencesRepository(db)
+	ut := storage.NewChatUploadTracker(db, t.TempDir(), nil)
+	cleanupSvc := testCleanupSvc(t, rRepo, ut)
+	h := testUsersHandler(uRepo, rRepo, pkRepo, prRepo, cleanupSvc)
+
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user", &auth.Claims{UserID: "admin", Accesses: []string{"superadmin"}})
+		return c.Next()
+	})
+	app.Get("/admin/users/:id/sessions", h.ListUserSessions)
+
+	_ = uRepo.CreateUser(&models.User{ID: "session-user", Email: "sess@ex.com", Name: "Session", Provider: "local", IsActive: true})
+	room, _ := rRepo.CreateRoom("session-user", "session-room", false, "standard", 0, &models.RoomSettings{})
+	_ = rRepo.AddParticipant(room.ID, "session-user")
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/users/session-user/sessions?page=1&limit=20", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var result map[string]interface{}
+	_ = json.Unmarshal(body, &result)
+	if result["sessions"] == nil {
+		t.Fatal("expected 'sessions' field")
+	}
+	if result["total"] == nil {
+		t.Fatal("expected 'total' field")
+	}
+	sessions := result["sessions"].([]interface{})
+	if len(sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(sessions))
+	}
+	s := sessions[0].(map[string]interface{})
+	if s["roomName"] != "session-room" {
+		t.Fatalf("expected roomName 'session-room', got %v", s["roomName"])
+	}
+	if s["isActive"] != true {
+		t.Fatal("expected isActive true")
+	}
+}
+
+func TestUsersHandler_ListUserSessions_NotFound(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	uRepo := repository.NewUserRepository(db)
+	rRepo := repository.NewRoomRepository(db)
+	pkRepo := repository.NewPasskeyRepository(db)
+	prRepo := repository.NewUserPreferencesRepository(db)
+	ut := storage.NewChatUploadTracker(db, t.TempDir(), nil)
+	cleanupSvc := testCleanupSvc(t, rRepo, ut)
+	h := testUsersHandler(uRepo, rRepo, pkRepo, prRepo, cleanupSvc)
+
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user", &auth.Claims{UserID: "admin", Accesses: []string{"superadmin"}})
+		return c.Next()
+	})
+	app.Get("/admin/users/:id/sessions", h.ListUserSessions)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/users/nonexistent/sessions", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestUsersHandler_ListUserSessions_Empty(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	uRepo := repository.NewUserRepository(db)
+	rRepo := repository.NewRoomRepository(db)
+	pkRepo := repository.NewPasskeyRepository(db)
+	prRepo := repository.NewUserPreferencesRepository(db)
+	ut := storage.NewChatUploadTracker(db, t.TempDir(), nil)
+	cleanupSvc := testCleanupSvc(t, rRepo, ut)
+	h := testUsersHandler(uRepo, rRepo, pkRepo, prRepo, cleanupSvc)
+
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user", &auth.Claims{UserID: "admin", Accesses: []string{"superadmin"}})
+		return c.Next()
+	})
+	app.Get("/admin/users/:id/sessions", h.ListUserSessions)
+
+	_ = uRepo.CreateUser(&models.User{ID: "alone-user", Email: "alone@ex.com", Name: "Alone", Provider: "local", IsActive: true})
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/users/alone-user/sessions", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var result map[string]interface{}
+	_ = json.Unmarshal(body, &result)
+	sessions := result["sessions"].([]interface{})
+	if len(sessions) != 0 {
+		t.Fatalf("expected 0 sessions, got %d", len(sessions))
+	}
+}
+
+func TestUsersHandler_ListUserSessions_Forbidden(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	uRepo := repository.NewUserRepository(db)
+	rRepo := repository.NewRoomRepository(db)
+	pkRepo := repository.NewPasskeyRepository(db)
+	prRepo := repository.NewUserPreferencesRepository(db)
+	ut := storage.NewChatUploadTracker(db, t.TempDir(), nil)
+	cleanupSvc := testCleanupSvc(t, rRepo, ut)
+	h := testUsersHandler(uRepo, rRepo, pkRepo, prRepo, cleanupSvc)
+
+	app := fiber.New()
+	// Non-superadmin claims
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user", &auth.Claims{UserID: "moderator", Accesses: []string{"moderator"}})
+		return c.Next()
+	})
+	app.Get("/admin/users/:id/sessions", h.ListUserSessions)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/users/any-user/sessions", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", resp.StatusCode)
+	}
+}
+
 func TestUserDetails_Structure(t *testing.T) {
 	d := UserDetails{
 		ID:        "u1",
@@ -586,3 +728,172 @@ func TestUserDetails_Structure(t *testing.T) {
 		t.Fatal("unexpected UserDetails values")
 	}
 }
+
+// --- AdminVerifyEmail Tests ---
+
+func TestAdminVerifyEmail_Success(t *testing.T) {
+	app, userRepo := setupUsersTestApp(t)
+
+	_ = userRepo.CreateUser(&models.User{
+		ID: "verify-target", Email: "verify@ex.com", Name: "Verify Target",
+		Provider: "local", IsActive: true, Accesses: models.StringArray{"user"},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/users/verify-target/verify", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	user, _ := userRepo.GetUserByID("verify-target")
+	if user == nil || user.EmailVerifiedAt == nil {
+		t.Fatal("expected EmailVerifiedAt to be set after admin verify")
+	}
+}
+
+func TestAdminVerifyEmail_AlreadyVerified(t *testing.T) {
+	app, userRepo := setupUsersTestApp(t)
+	now := time.Now()
+
+	_ = userRepo.CreateUser(&models.User{
+		ID: "already-verified", Email: "alr@ex.com", Name: "Already",
+		Provider: "local", IsActive: true, Accesses: models.StringArray{"user"},
+		EmailVerifiedAt: &now,
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/users/already-verified/verify", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 (already verified), got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminVerifyEmail_NotFound(t *testing.T) {
+	app, _ := setupUsersTestApp(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/users/nonexistent/verify", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+// --- AdminResendVerification Tests ---
+
+func TestAdminResendVerification_Success(t *testing.T) {
+	app, userRepo := setupUsersTestApp(t)
+
+	_ = userRepo.CreateUser(&models.User{
+		ID: "resend-target", Email: "resend@ex.com", Name: "Resend Target",
+		Provider: "local", IsActive: true, Accesses: models.StringArray{"user"},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/users/resend-target/verify/resend", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	// With no SMTP config, the queue will enqueue but delivery fails gracefully
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(respBody))
+	}
+}
+
+func TestAdminResendVerification_NotFound(t *testing.T) {
+	app, _ := setupUsersTestApp(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/users/nonexistent/verify/resend", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+// -------------------------------------------------------------------------
+// Pagination Edge Case Tests
+// -------------------------------------------------------------------------
+
+func TestListUsers_Pagination(t *testing.T) {
+	app, userRepo := setupUsersTestApp(t)
+
+	// Seed 5 users
+	for i := 0; i < 5; i++ {
+		userRepo.CreateUser(&models.User{
+			ID:       fmt.Sprintf("pag-user-%d", i),
+			Email:    fmt.Sprintf("pag%d@ex.com", i),
+			Name:     fmt.Sprintf("User %d", i),
+			Provider: "local",
+			IsActive: true,
+		})
+	}
+
+	t.Run("page=0 defaults to 1", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/admin/users?page=0", http.NoBody)
+		resp, _ := app.Test(req, -1)
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+		var body map[string]any
+		json.NewDecoder(resp.Body).Decode(&body)
+		page, _ := body["page"].(float64)
+		if page != 1 {
+			t.Fatalf("expected page 1, got %f", page)
+		}
+	})
+
+	t.Run("limit=0 defaults to 50", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/admin/users?limit=0", http.NoBody)
+		resp, _ := app.Test(req, -1)
+		defer resp.Body.Close()
+		var body map[string]any
+		json.NewDecoder(resp.Body).Decode(&body)
+		users, _ := body["users"].([]any)
+		if len(users) != 5 {
+			t.Fatalf("expected 5 users with limit=0, got %d", len(users))
+		}
+	})
+
+	t.Run("limit=-1 defaults to 50", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/admin/users?limit=-1", http.NoBody)
+		resp, _ := app.Test(req, -1)
+		defer resp.Body.Close()
+		var body map[string]any
+		json.NewDecoder(resp.Body).Decode(&body)
+		users, _ := body["users"].([]any)
+		if len(users) != 5 {
+			t.Fatalf("expected 5 users with limit=-1, got %d", len(users))
+		}
+	})
+
+	t.Run("limit > 100 clamped to 50", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/admin/users?limit=200", http.NoBody)
+		resp, _ := app.Test(req, -1)
+		defer resp.Body.Close()
+		var body map[string]any
+		json.NewDecoder(resp.Body).Decode(&body)
+		l, _ := body["limit"].(float64)
+		if l != 50 {
+			t.Fatalf("expected limit clamped to 50, got %f", l)
+		}
+	})
+
+	t.Run("page > total returns empty", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/admin/users?page=999", http.NoBody)
+		resp, _ := app.Test(req, -1)
+		defer resp.Body.Close()
+		var body map[string]any
+		json.NewDecoder(resp.Body).Decode(&body)
+		users, _ := body["users"].([]any)
+		if len(users) != 0 {
+			t.Fatalf("expected empty users for page beyond total, got %d", len(users))
+		}
+	})
+}
+
+
+

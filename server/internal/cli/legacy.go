@@ -46,7 +46,7 @@ func dispatchLegacy(args []string) bool {
 			if *skip {
 				os.Setenv("BEDRUD_SKIP_MIGRATE", "1")
 			}
-			if err := server.Run(path); err != nil {
+			if err := server.Run(path, Version); err != nil {
 				fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
 				os.Exit(1)
 			}

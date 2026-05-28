@@ -1,0 +1,114 @@
+---
+title: Roles de Usuario
+description: Control de acceso basado en roles con 5 niveles — superadmin, admin, moderador, usuario, invitado
+order: 36
+---
+
+Bedrud implementa un sistema de roles de 5 niveles para el control de acceso. Cada rol se asigna a un conjunto de cadenas de acceso almacenadas en el registro del usuario y aplicadas tanto en la capa de API (middleware del backend) como en la capa de UI (guardas del frontend y renderizado condicional).
+
+## Jerarquía de Roles
+
+| Rol | Array de Acceso | Peso Backend | Descripción |
+|-----|----------------|--------------|-------------|
+| Superadmin | `['superadmin', 'user']` | 4 | Acceso completo al sistema, todas las capacidades de administración |
+| Admin | `['admin', 'user']` | 3 | Acceso completo de administración, igual que superadmin |
+| Moderador | `['moderator', 'user']` | 2 | Vista de administración de solo lectura, sin mutaciones |
+| Usuario | `['user']` | 1 | Usuario registrado estándar |
+| Invitado | `['guest']` | 0 | Participante no registrado, solo unirse |
+
+## Aplicación en Backend
+
+Los niveles de acceso se aplican mediante el middleware `RequireAccess` en cada ruta de administración. El middleware verifica el array de accesos del usuario contra el nivel mínimo requerido:
+
+- Las rutas que requieren acceso `superadmin` rechazan admin, moderador, usuario e invitado
+- Las rutas que requieren acceso `admin` permiten superadmin y admin
+- Las rutas que requieren acceso `moderator` permiten superadmin, admin y moderador
+
+El backend almacena los accesos como una cadena separada por comas en la base de datos (columna `accesses` en la tabla `users`). El tipo GORM `StringArray` maneja la serialización y deserialización.
+
+## Integración Frontend
+
+### Tipo de Usuario
+
+La interfaz `User` en `user.store.ts` incluye dos campos booleanos derivados del array de accesos:
+
+```ts
+interface User {
+  // ...
+  isSuperAdmin: boolean  // accesses.includes('superadmin')
+  isAdmin: boolean       // accesses.includes('admin') || accesses.includes('superadmin')
+  accesses: string[]     // raw access list from backend
+}
+```
+
+### Guardia de Administración
+
+El diseño de administración (`/dashboard/admin`) permite el paso a superadmin, admin y moderador. Los moderadores reciben una variable de contexto `isReadOnly=true`:
+
+```tsx
+// routes/dashboard/admin.tsx
+const canAccess = user?.isSuperAdmin || accesses.includes('admin') || accesses.includes('moderator')
+```
+
+El hook `useAdminContext()` proporciona la bandera `isReadOnly` a todas las rutas hijas:
+
+```tsx
+const { isReadOnly } = useAdminContext()
+```
+
+### Qué Pueden Ver vs Hacer los Moderadores
+
+| Página | Ver | Mutar |
+|--------|-----|-------|
+| Estadísticas generales | ✅ Estadísticas completas | N/A |
+| Lista de usuarios | ✅ Lista completa | ❌ Sin acciones masivas |
+| Detalle de usuario | ✅ Perfil completo | ❌ Sin estado/rol/eliminar/cerrar sesión |
+| Lista de salas | ✅ Lista completa | ❌ Sin suspender/eliminar/editar límite |
+| Detalle de sala | ✅ Información completa | ❌ Sin suspender/eliminar/expulsar/silenciar |
+| Configuración | ❌ Redirigido | ❌ |
+
+### Selector de Roles
+
+La interfaz de administración proporciona un menú desplegable `<Select>` tanto en la tabla de lista de usuarios como en la página de detalle del usuario, reemplazando el interruptor binario de superadmin anterior. Opciones disponibles:
+
+| Opción | Guarda como |
+|--------|-------------|
+| Superadmin | `['superadmin', 'user']` |
+| Admin | `['admin', 'user']` |
+| Moderador | `['moderator', 'user']` |
+| Usuario | `['user']` |
+| Invitado | `['guest']` |
+
+El menú desplegable envía una solicitud `PUT /api/admin/users/:id/accesses` con el array de accesos completo.
+
+## Gestión CLI
+
+Los comandos `bedrud user promote` y `bedrud user demote` aceptan una bandera `--role`:
+
+```bash
+# Promote to superadmin (default)
+bedrud user promote --email user@example.com
+
+# Promote to admin
+bedrud user promote --email user@example.com --role admin
+
+# Promote to moderator
+bedrud user promote --email user@example.com --role moderator
+
+# Demote specific role
+bedrud user demote --email user@example.com --role admin
+```
+
+Valores `--role` válidos: `superadmin`, `admin`, `moderator`, `user`, `guest`.
+
+## Ubicaciones del Código
+
+| Archivo | Propósito |
+|---------|-----------|
+| `server/internal/models/user.go` | Constantes de niveles de acceso del backend |
+| `server/internal/middleware/` | Middleware `RequireAccess` |
+| `server/internal/usercli/usercli.go` | Funciones de gestión de roles CLI |
+| `apps/web/src/lib/user.store.ts` | Tipo de usuario del frontend |
+| `apps/web/src/routes/dashboard/admin.tsx` | Guardia de administración + contexto isReadOnly |
+| `apps/web/src/components/admin/UserTable.tsx` | Menú desplegable de selector de roles + insignias |
+| `apps/web/src/components/admin/RoomTable.tsx` | Enmascaramiento de tabla de salas de solo lectura |

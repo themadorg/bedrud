@@ -9,6 +9,7 @@ import (
 	"bedrud/internal/testutil"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -18,19 +19,20 @@ import (
 )
 
 // setupRoomTestApp builds a Fiber app wired to the RoomHandler with an in-memory DB.
-// The LiveKit client points at a non-existent host so calls fail gracefully.
+// The LiveKit client is mocked for testing.
 func setupRoomTestApp(t *testing.T) (*fiber.App, *repository.RoomRepository, *auth.Claims) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	roomRepo := repository.NewRoomRepository(db)
 	settingsRepo := repository.NewSettingsRepository(db)
 
+	lkMock := testutil.NewMockRoomService()
 	lkCfg := config.LiveKitConfig{
-		Host:      "http://localhost:9999", // nothing running here
+		Host:      "http://localhost:9999",
 		APIKey:    "test-key",
 		APISecret: "test-secret",
 	}
-	handler := NewRoomHandler(&lkCfg, &config.ChatConfig{}, roomRepo, settingsRepo, nil, nil)
+	handler := NewRoomHandler(lkMock, &lkCfg, &config.ChatConfig{}, roomRepo, nil, nil, settingsRepo, nil, nil, nil)
 
 	claims := &auth.Claims{
 		UserID:   "creator-user",
@@ -63,6 +65,10 @@ func setupRoomTestApp(t *testing.T) (*fiber.App, *repository.RoomRepository, *au
 // setupAdminRoomTestApp builds a Fiber app with real cleanupSvc wired for
 // testing AdminCloseRoom and AdminSuspendRoom endpoints.
 func setupAdminRoomTestApp(t *testing.T) (*fiber.App, *repository.RoomRepository) {
+	return setupAdminRoomTestAppWithUserRepo(t, nil)
+}
+
+func setupAdminRoomTestAppWithUserRepo(t *testing.T, userRepo *repository.UserRepository) (*fiber.App, *repository.RoomRepository) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	roomRepo := repository.NewRoomRepository(db)
@@ -70,12 +76,13 @@ func setupAdminRoomTestApp(t *testing.T) (*fiber.App, *repository.RoomRepository
 	uploadTracker := storage.NewChatUploadTracker(db, t.TempDir(), nil)
 	cleanupSvc := testCleanupSvc(t, roomRepo, uploadTracker)
 
+	lkMock := testutil.NewMockRoomService()
 	lkCfg := config.LiveKitConfig{
 		Host:      "http://localhost:9999",
 		APIKey:    "test-key",
 		APISecret: "test-secret",
 	}
-	handler := NewRoomHandler(&lkCfg, &config.ChatConfig{}, roomRepo, settingsRepo, uploadTracker, cleanupSvc)
+	handler := NewRoomHandler(lkMock, &lkCfg, &config.ChatConfig{}, roomRepo, userRepo, nil, settingsRepo, nil, uploadTracker, cleanupSvc)
 
 	claims := &auth.Claims{
 		UserID:   "admin-user",
@@ -94,6 +101,11 @@ func setupAdminRoomTestApp(t *testing.T) (*fiber.App, *repository.RoomRepository
 	app.Post("/admin/rooms/:roomId/close", handler.AdminCloseRoom)
 	app.Post("/admin/rooms/:roomId/suspend", handler.AdminSuspendRoom)
 	app.Post("/admin/rooms/:roomId/reactivate", handler.AdminReactivateRoom)
+	app.Post("/admin/rooms/:roomId/token", handler.AdminGenerateToken)
+	app.Get("/admin/livekit/stats", handler.AdminLiveKitStats)
+	app.Post("/admin/rooms/:roomId/participants/:identity/kick", handler.AdminKickParticipant)
+	app.Post("/admin/rooms/:roomId/participants/:identity/mute", handler.AdminMuteParticipant)
+	app.Get("/admin/stats", handler.GetAdminStats)
 
 	db.Create(&models.User{
 		ID: "admin-user", Email: "admin@ex.com", Name: "Admin",
@@ -169,6 +181,55 @@ func TestRoomHandler_GuestJoinRoom_EmptyName(t *testing.T) {
 	}
 }
 
+func TestGuestJoinRoom_NullByteName(t *testing.T) {
+	app, _, _ := setupRoomTestApp(t)
+
+	body, _ := json.Marshal(map[string]string{
+		"roomName":  "some-room",
+		"guestName": "\x00",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/rooms/guest-join", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for null byte name, got %d", resp.StatusCode)
+	}
+}
+
+func TestGuestJoinRoom_ControlCharsOnly(t *testing.T) {
+	app, _, _ := setupRoomTestApp(t)
+
+	body, _ := json.Marshal(map[string]string{
+		"roomName":  "some-room",
+		"guestName": "\x00\x1b\x07",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/rooms/guest-join", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for control chars only, got %d", resp.StatusCode)
+	}
+}
+
+func TestGuestJoinRoom_NullByteInName(t *testing.T) {
+	app, _, _ := setupRoomTestApp(t)
+
+	body, _ := json.Marshal(map[string]string{
+		"roomName":  "nonexistent-room",
+		"guestName": "Bob\x00Smith",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/rooms/guest-join", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	// After sanitization: "BobSmith" (valid). Should pass validation and fail at room lookup with 404.
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404 (null byte stripped, name passed validation), got %d", resp.StatusCode)
+	}
+}
+
 func TestRoomHandler_DeleteRoom_NotFound(t *testing.T) {
 	app, _, _ := setupRoomTestApp(t)
 
@@ -190,8 +251,9 @@ func TestRoomHandler_DeleteRoom_Forbidden(t *testing.T) {
 	otherClaims := &auth.Claims{UserID: "other-user", Email: "other@ex.com", Accesses: []string{"user"}}
 	app2 := fiber.New()
 	rr := roomRepo
+	lkMock := testutil.NewMockRoomService()
 	lkCfg := config.LiveKitConfig{Host: "http://localhost:9999", APIKey: "k", APISecret: "s"}
-	handler := NewRoomHandler(&lkCfg, &config.ChatConfig{}, rr, nil, nil, nil)
+	handler := NewRoomHandler(lkMock, &lkCfg, &config.ChatConfig{}, rr, nil, nil, nil, nil, nil, nil)
 	app2.Use(func(c *fiber.Ctx) error { c.Locals("user", otherClaims); return c.Next() })
 	app2.Delete("/rooms/:roomId", handler.DeleteRoom)
 
@@ -232,6 +294,78 @@ func TestRoomHandler_AdminListRooms_WithRooms(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
+}
+
+func TestRoomHandler_AdminListRooms_Pagination(t *testing.T) {
+	app, roomRepo, _ := setupRoomTestApp(t)
+
+	// Seed 5 rooms
+	for i := 0; i < 5; i++ {
+		_, _ = roomRepo.CreateRoom("creator-user", fmt.Sprintf("page-room-%d", i), true, "standard", 0, &models.RoomSettings{})
+	}
+
+	t.Run("page=0 defaults to 1", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/admin/rooms?page=0", http.NoBody)
+		resp, _ := app.Test(req, -1)
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+		var body map[string]any
+		json.NewDecoder(resp.Body).Decode(&body)
+		page, _ := body["page"].(float64)
+		if page != 1 {
+			t.Fatalf("expected page 1, got %f", page)
+		}
+	})
+
+	t.Run("limit=0 defaults to 50", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/admin/rooms?limit=0", http.NoBody)
+		resp, _ := app.Test(req, -1)
+		defer resp.Body.Close()
+		var body map[string]any
+		json.NewDecoder(resp.Body).Decode(&body)
+		rooms, _ := body["rooms"].([]any)
+		if len(rooms) != 5 {
+			t.Fatalf("expected 5 rooms with limit=0, got %d", len(rooms))
+		}
+	})
+
+	t.Run("limit=-1 defaults to 50", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/admin/rooms?limit=-1", http.NoBody)
+		resp, _ := app.Test(req, -1)
+		defer resp.Body.Close()
+		var body map[string]any
+		json.NewDecoder(resp.Body).Decode(&body)
+		rooms, _ := body["rooms"].([]any)
+		if len(rooms) != 5 {
+			t.Fatalf("expected 5 rooms with limit=-1, got %d", len(rooms))
+		}
+	})
+
+	t.Run("limit > 100 clamped to 50", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/admin/rooms?limit=200", http.NoBody)
+		resp, _ := app.Test(req, -1)
+		defer resp.Body.Close()
+		var body map[string]any
+		json.NewDecoder(resp.Body).Decode(&body)
+		l, _ := body["limit"].(float64)
+		if l != 50 {
+			t.Fatalf("expected limit clamped to 50, got %f", l)
+		}
+	})
+
+	t.Run("page > total returns empty", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/admin/rooms?page=999", http.NoBody)
+		resp, _ := app.Test(req, -1)
+		defer resp.Body.Close()
+		var body map[string]any
+		json.NewDecoder(resp.Body).Decode(&body)
+		rooms, _ := body["rooms"].([]any)
+		if len(rooms) != 0 {
+			t.Fatalf("expected empty rooms for page beyond total, got %d", len(rooms))
+		}
+	})
 }
 
 func TestRoomHandler_AdminUpdateRoom_NotFound(t *testing.T) {
@@ -331,6 +465,138 @@ func TestRoomHandler_AdminGetRoomParticipants_LiveKitUnavailable(t *testing.T) {
 	}
 }
 
+func TestAdminSuspendRoom_NotFound(t *testing.T) {
+	app, _ := setupAdminRoomTestApp(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/nonexistent/suspend", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminSuspendRoom_Success(t *testing.T) {
+	app, roomRepo := setupAdminRoomTestApp(t)
+
+	room, _ := roomRepo.CreateRoom("admin-user", "suspend-me", true, "standard", 0, &models.RoomSettings{})
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/suspend", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminSuspendRoom_AlreadyInactive(t *testing.T) {
+	app, roomRepo := setupAdminRoomTestApp(t)
+
+	room, _ := roomRepo.CreateRoom("admin-user", "already-suspended", true, "standard", 0, &models.RoomSettings{})
+	room.IsActive = false
+	roomRepo.UpdateRoom(room)
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/suspend", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 (already inactive), got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminReactivateRoom_NotFound(t *testing.T) {
+	app, _ := setupAdminRoomTestApp(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/nonexistent/reactivate", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminReactivateRoom_Success(t *testing.T) {
+	app, roomRepo := setupAdminRoomTestApp(t)
+
+	room, _ := roomRepo.CreateRoom("admin-user", "reactivate-me", true, "standard", 0, &models.RoomSettings{})
+	room.IsActive = false
+	roomRepo.UpdateRoom(room)
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/reactivate", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	// Verify room is active again
+	updated, _ := roomRepo.GetRoom(room.ID)
+	if updated == nil || !updated.IsActive {
+		t.Fatal("expected room to be active after reactivation")
+	}
+}
+
+func TestAdminReactivateRoom_AlreadyActive(t *testing.T) {
+	app, roomRepo := setupAdminRoomTestApp(t)
+
+	room, _ := roomRepo.CreateRoom("admin-user", "already-active", true, "standard", 0, &models.RoomSettings{})
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/reactivate", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 (already active), got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminGenerateToken_NotImplemented(t *testing.T) {
+	app, roomRepo := setupAdminRoomTestApp(t)
+
+	room, _ := roomRepo.CreateRoom("admin-user", "token-test", true, "standard", 0, &models.RoomSettings{})
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/token", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotImplemented {
+		t.Fatalf("expected 501 (not implemented), got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminLiveKitStats_Success(t *testing.T) {
+	app, _ := setupAdminRoomTestApp(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/livekit/stats", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(respBody))
+	}
+}
+
+func TestAdminKickParticipant_NotFound(t *testing.T) {
+	app, _ := setupAdminRoomTestApp(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/nonexistent/participants/victim/kick", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminMuteParticipant_NotFound(t *testing.T) {
+	app, _ := setupAdminRoomTestApp(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/nonexistent/participants/victim/mute", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
 // setupJoinTestApp creates a minimal Fiber app with JoinRoom and GuestJoinRoom wired
 // and the authenticated user set to the given claims.
 func setupJoinTestApp(t *testing.T, claims *auth.Claims) (*fiber.App, *repository.RoomRepository) {
@@ -338,12 +604,13 @@ func setupJoinTestApp(t *testing.T, claims *auth.Claims) (*fiber.App, *repositor
 	db := testutil.SetupTestDB(t)
 	roomRepo := repository.NewRoomRepository(db)
 
+	lkMock := testutil.NewMockRoomService()
 	lkCfg := config.LiveKitConfig{
 		Host:      "http://localhost:9999",
 		APIKey:    "test-key",
 		APISecret: "test-secret",
 	}
-	handler := NewRoomHandler(&lkCfg, &config.ChatConfig{}, roomRepo, nil, nil, nil)
+	handler := NewRoomHandler(lkMock, &lkCfg, &config.ChatConfig{}, roomRepo, nil, nil, nil, nil, nil, nil)
 
 	app := fiber.New()
 	app.Use(func(c *fiber.Ctx) error {
@@ -426,12 +693,13 @@ func setupModTestApp(t *testing.T, claims *auth.Claims) (*fiber.App, *repository
 	db := testutil.SetupTestDB(t)
 	roomRepo := repository.NewRoomRepository(db)
 
+	lkMock := testutil.NewMockRoomService()
 	lkCfg := config.LiveKitConfig{
 		Host:      "http://localhost:9999",
 		APIKey:    "test-key",
 		APISecret: "test-secret",
 	}
-	handler := NewRoomHandler(&lkCfg, &config.ChatConfig{}, roomRepo, nil, nil, nil)
+	handler := NewRoomHandler(lkMock, &lkCfg, &config.ChatConfig{}, roomRepo, nil, nil, nil, nil, nil, nil)
 
 	app := fiber.New()
 	app.Use(func(c *fiber.Ctx) error {
@@ -637,8 +905,9 @@ func TestRoomHandler_UpdateSettings_StripsIsPersistent(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	roomRepo := repository.NewRoomRepository(db)
 
+	lkMock := testutil.NewMockRoomService()
 	lkCfg := config.LiveKitConfig{Host: "http://localhost:9999", APIKey: "k", APISecret: "s"}
-	handler := NewRoomHandler(&lkCfg, &config.ChatConfig{}, roomRepo, nil, nil, nil)
+	handler := NewRoomHandler(lkMock, &lkCfg, &config.ChatConfig{}, roomRepo, nil, nil, nil, nil, nil, nil)
 
 	claims := &auth.Claims{UserID: "creator-user", Email: "creator@ex.com", Name: "Creator", Accesses: []string{"user"}}
 
@@ -796,20 +1065,17 @@ func TestRoomHandler_AdminSuspendRoom_AlreadyInactive(t *testing.T) {
 
 	room, _ := roomRepo.CreateRoom("admin-user", "suspend-twice", false, "standard", 0, &models.RoomSettings{})
 
-	// First suspend should succeed
-	req1 := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/suspend", http.NoBody)
-	resp1, _ := app.Test(req1, -1)
-	resp1.Body.Close()
-	if resp1.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 on first suspend, got %d", resp1.StatusCode)
+	// Manually deactivate room (suspend endpoint is now async)
+	if err := roomRepo.UpdateRoom(&models.Room{ID: room.ID, IsActive: false}); err != nil {
+		t.Fatal(err)
 	}
 
-	// Second suspend should fail — room is already inactive
-	req2 := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/suspend", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
-	if resp2.StatusCode != http.StatusBadRequest {
-		t.Fatalf("expected 400 for already inactive room, got %d", resp2.StatusCode)
+	// Suspend should fail — room is already inactive
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/suspend", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for already inactive room, got %d", resp.StatusCode)
 	}
 }
 
@@ -821,18 +1087,9 @@ func TestRoomHandler_AdminSuspendRoom_Success(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/suspend", http.NoBody)
 	resp, _ := app.Test(req, -1)
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusAccepted {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	// Room should exist in DB but be marked inactive
-	updated, _ := roomRepo.GetRoom(room.ID)
-	if updated == nil {
-		t.Fatal("room should still exist after suspend (not hard-deleted)")
-	}
-	if updated.IsActive {
-		t.Fatal("room should be inactive after suspend")
+		t.Fatalf("expected 202, got %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 }
 
@@ -844,15 +1101,9 @@ func TestRoomHandler_AdminCloseRoom_Success(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/close", http.NoBody)
 	resp, _ := app.Test(req, -1)
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusAccepted {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	// Room should be hard-deleted from DB
-	updated, _ := roomRepo.GetRoom(room.ID)
-	if updated != nil {
-		t.Fatal("room should be hard-deleted after close (GetRoom should return nil)")
+		t.Fatalf("expected 202, got %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 }
 
@@ -861,27 +1112,13 @@ func TestRoomHandler_AdminCloseRoom_SuspendedRoom(t *testing.T) {
 
 	room, _ := roomRepo.CreateRoom("admin-user", "close-suspended", false, "standard", 0, &models.RoomSettings{})
 
-	// Suspend first
-	req1 := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/suspend", http.NoBody)
-	resp1, _ := app.Test(req1, -1)
-	resp1.Body.Close()
-	if resp1.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 on suspend, got %d", resp1.StatusCode)
-	}
-
-	// Now close the suspended room — should hard-delete it
-	req2 := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/close", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
-	if resp2.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp2.Body)
-		t.Fatalf("expected 200 when closing suspended room, got %d: %s", resp2.StatusCode, string(bodyBytes))
-	}
-
-	// Room should be hard-deleted
-	updated, _ := roomRepo.GetRoom(room.ID)
-	if updated != nil {
-		t.Fatal("room should be hard-deleted even if it was previously suspended")
+	// Close regardless of active state — now async
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/close", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 202, got %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 }
 
@@ -894,7 +1131,8 @@ func TestRoomHandler_JoinRoom_SuspendedRoomRejected(t *testing.T) {
 	}
 	app, roomRepo := setupJoinTestApp(t, claims)
 
-	room, _ := roomRepo.CreateRoom("susp-test-user", "susp-room", true, "standard", 0, &models.RoomSettings{})
+	// Room created by a different user — susp-test-user is NOT the creator
+	room, _ := roomRepo.CreateRoom("owner", "susp-room", true, "standard", 0, &models.RoomSettings{})
 	roomRepo.SetRoomIdle(room.ID)
 
 	body, _ := json.Marshal(map[string]string{"roomName": "susp-room"})
@@ -930,20 +1168,19 @@ func TestRoomHandler_JoinRoom_ActiveRoomOk(t *testing.T) {
 func TestRoomHandler_AdminReactivateRoom_Success(t *testing.T) {
 	app, roomRepo := setupAdminRoomTestApp(t)
 
+	// Create room, then manually suspend it via repo (suspend endpoint is now async)
 	room, _ := roomRepo.CreateRoom("admin-user", "reactivate-me", false, "standard", 0, &models.RoomSettings{})
-
-	// Suspend first
-	req1 := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/suspend", http.NoBody)
-	resp1, _ := app.Test(req1, -1)
-	resp1.Body.Close()
+	if err := roomRepo.UpdateRoom(&models.Room{ID: room.ID, IsActive: false}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Reactivate
-	req2 := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/reactivate", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
-	if resp2.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp2.Body)
-		t.Fatalf("expected 200 on reactivate, got %d: %s", resp2.StatusCode, string(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/reactivate", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200 on reactivate, got %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	updated, _ := roomRepo.GetRoom(room.ID)
@@ -1047,3 +1284,29 @@ func TestRoomHandler_AdminCloseRoom_EmptyRoomID(t *testing.T) {
 		t.Fatalf("expected 404, got %d", resp.StatusCode)
 	}
 }
+
+func TestGetAdminStats_Success(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	userRepo := repository.NewUserRepository(db)
+	app, roomRepo := setupAdminRoomTestAppWithUserRepo(t, userRepo)
+
+	userRepo.CreateUser(&models.User{ID: "stat-u1", Email: "s1@ex.com", Name: "S1", Provider: "local", IsActive: true, Accesses: models.StringArray{"user"}})
+	userRepo.CreateUser(&models.User{ID: "stat-u2", Email: "s2@ex.com", Name: "S2", Provider: "local", IsActive: true, Accesses: models.StringArray{"user"}})
+	roomRepo.CreateRoom("stat-u1", "stat-room-1", true, "standard", 0, &models.RoomSettings{})
+	roomRepo.CreateRoom("stat-u2", "stat-room-2", false, "standard", 0, &models.RoomSettings{})
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/stats", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+	if result["totalRooms"] == nil || result["totalUsers"] == nil {
+		t.Fatal("expected totalRooms and totalUsers in stats response")
+	}
+}
+

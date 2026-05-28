@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { Fingerprint } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '#/lib/api'
@@ -18,6 +19,14 @@ interface AuthResponse {
   tokens: { accessToken: string; refreshToken: string }
 }
 
+interface VerificationRequiredResponse {
+  requiresVerification: true
+  email: string
+  message: string
+}
+
+type SignupResponse = AuthResponse | VerificationRequiredResponse
+
 interface Props {
   onSuccess: (res: AuthResponse) => void
 }
@@ -25,6 +34,7 @@ interface Props {
 export function PasskeyButton({ onSuccess }: Props) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [verificationEmail, setVerificationEmail] = useState<string | null>(null)
 
   async function handleLogin() {
     setIsLoading(true)
@@ -91,16 +101,51 @@ export function PasskeyButton({ onSuccess }: Props) {
       })) as PublicKeyCredential
 
       const att = cred.response as AuthenticatorAttestationResponse
-      const res = await api.post<AuthResponse>('/api/auth/passkey/signup/finish', {
+      const res = await api.post<SignupResponse>('/api/auth/passkey/signup/finish', {
         clientDataJSON: bufferToBase64(att.clientDataJSON),
         attestationObject: bufferToBase64(att.attestationObject),
       })
-      onSuccess(res)
+
+      if ('requiresVerification' in res && res.requiresVerification) {
+        setVerificationEmail(res.email)
+        return
+      }
+
+      onSuccess(res as AuthResponse)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Passkey signup failed')
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (verificationEmail) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Fingerprint className="h-5 w-5" />
+            Verify your email
+          </CardTitle>
+          <CardDescription>
+            We sent a verification email to <span className="font-medium">{verificationEmail}</span>. Please check your
+            inbox and click the link to complete signup.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-xs text-muted-foreground">
+            Didn't receive it?{' '}
+            <Link
+              to="/auth/login"
+              search={{ redirect: undefined }}
+              className="underline underline-offset-4 hover:no-underline"
+            >
+              Sign in to resend
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (

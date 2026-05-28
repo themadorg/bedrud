@@ -1,0 +1,82 @@
+---
+title: Recordings
+description: Room recording configuration and usage
+order: 38
+---
+
+> 🚧 **Recording is a planned feature.** This guide describes functionality that will be available in a future release.
+
+Bedrud can record room audio and video using LiveKit's composite egress feature. Recordings are stored as MP4 files alongside chat uploads.
+
+## Architecture
+
+Recording uses a three-layer authorization system:
+
+```
+System Setting (RecordingsEnabled)
+  └── Room Setting (recordingsAllowed)
+       └── User Permission (moderator or creator)
+```
+
+Recordings flow through a lifecycle managed by a background job queue:
+
+1. **Start** — Moderator starts recording. LiveKit begins composite egress.
+2. **Stop** — Moderator stops recording. Recording enters `processing` state.
+3. **Process** — Background job downloads the file from LiveKit and stores it.
+4. **Complete** — Webhook dispatched (`recording.completed`). File ready for download.
+
+## Enabling Recordings
+
+### System-wide Toggle
+
+1. Navigate to **Settings → General** in the admin dashboard.
+2. Toggle **Allow room recordings** on.
+3. When disabled, all recording API endpoints return 403.
+
+### Per-Room Permission
+
+Each room has a `recordingsAllowed` setting. Room creators can toggle this in the room settings panel. Only rooms with this enabled show the recording button to moderators.
+
+## Starting a Recording
+
+Only room moderators, creators, and superadmins can start recordings.
+
+1. Join the room.
+2. If you're a moderator and recordings are allowed, the record button appears in the controls bar.
+3. Click the record button to start. A pulsing indicator shows when recording is active.
+4. The recording captures all audio and video in a composite MP4 file.
+
+## Stopping a Recording
+
+1. Click the record button again to stop.
+2. The recording enters **processing** state while the file is downloaded from LiveKit.
+3. Once processed, the recording appears in the room's recording list with a download link.
+
+## Viewing Recordings
+
+Recordings are listed in the room's info panel. Each entry shows:
+
+- Recording status (pending, started, processing, completed, failed)
+- Duration
+- Download link (completed recordings only)
+- Creation timestamp
+
+## Stale Recording Cleanup
+
+Failed and pending recordings older than 7 days are automatically deleted nightly at 03:00 by the scheduler. No manual cleanup needed.
+
+## Configuration Reference
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `RecordingsEnabled` | bool | `false` | System-wide recording toggle |
+
+## Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+|---------|-------------|-----|
+| Record button missing | Not a moderator, or room has recordings disabled | Check `isModerator` — only mods can record |
+| `403 recordings disabled` | System-wide toggle is off | Enable in admin Settings → General |
+| `403 recordings not allowed for this room` | Per-room toggle is off | Enable in room settings |
+| Recording stuck in `pending` | LiveKit egress client unavailable | Check server logs for egress client errors |
+| Recording stuck in `processing` | Background job failed | Check queue logs for `process_recording` handler errors |

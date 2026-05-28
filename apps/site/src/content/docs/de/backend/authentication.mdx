@@ -74,6 +74,41 @@ Bedrud unterstützt passwortlose Authentifizierung über den FIDO2-Standard (Web
 ### 4. Gast-Anmeldung
 Ermöglicht Benutzern, sofort mit nur einem Namen an einem Meeting teilzunehmen. Der Server erstellt einen temporären Benutzer-Datensatz mit der Rolle `guest`.
 
+
+## E-Mail-Verifizierung
+
+Wenn `requireEmailVerification: true` in der Konfiguration gesetzt ist, erfordern die lokale (Nicht-OAuth) Registrierung und Anmeldung eine E-Mail-Bestätigung:
+
+- **Registrierung** erstellt den Benutzer, setzt aber `EmailVerifiedAt` auf `nil`. Der Benutzer kann sich erst nach Verifizierung anmelden.
+- **Anmeldung** gibt `403` mit `{"requiresVerification": true}` für nicht verifizierte Konten zurück.
+- **Erneutes Senden** via `POST /api/auth/verify/resend` — ratenbegrenzt durch `verificationEmailCooldownMins` und einen separaten Rate-Limit-Bucket (`authResendMaxRequests`).
+- **Auto-Bereinigung** löscht nicht verifizierte Konten nach `unverifiedAccountTTLHours` (Standard 48h, 0 zum Deaktivieren).
+- **E-Mail-Änderung** löst einen neuen Verifizierungsvorgang aus. Der Benutzer bleibt angemeldet; ein neues Token wird ausgestellt.
+
+Gastbenutzer sind ausgenommen — sie haben keine E-Mail.
+
+## Passwort-Zurücksetzen
+
+Passwort-Zurücksetzen-Ablauf (erfordert SMTP):
+
+1. `POST /api/auth/forgot-password` mit `{"email": "..."}` — der Server sendet einen Link zum Zurücksetzen an die E-Mail
+2. `POST /api/auth/reset-password` mit `{"token": "...", "newPassword": "..."}` — setzt ein neues Passwort
+
+Die Token-Lebensdauer wird durch `resetTokenTTLHours` gesteuert (Standard 1 Stunde). Der Forgot-Password-Endpunkt teilt sich den Auth-Rate-Limit-Bucket.
+
+## Abklingzeit & Ratenbegrenzung
+
+Bedrud verwendet vier separate Rate-Limit-Buckets:
+| Bucket | Endpunkte | Standard | Fenster |
+|--------|-----------|----------|--------|
+| Auth | login, register, refresh, passkey, forgot-password | 10 | 60s |
+| Gast | guest-login | 5 | 60s |
+| API | allgemeine API | 30 | 60s |
+| Erneut senden | verify/resend | 3 | 60s |
+
+Bucket auf `0` gesetzt = deaktiviert. Alle Limits pro Remote-IP. Bei Überschreitung wird `429 Too Many Requests` mit `Retry-After`-Header zurückgegeben.
+
+
 ## Interoperabilität & CORS
 Bedrud ist so konzipiert, dass es von mehreren Origins aus erreichbar ist, was für die Entwicklung (React-Dev-Server) und die Produktion (verschiedene Subdomains) unerlässlich ist.
 

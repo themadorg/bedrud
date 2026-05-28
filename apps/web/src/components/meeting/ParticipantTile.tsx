@@ -3,10 +3,10 @@ import type { Participant, RemoteParticipant } from 'livekit-client'
 import { ParticipantEvent, Track } from 'livekit-client'
 import { MicOff, Pin, VolumeX } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-
 import { selectVolume, useParticipantOverridesStore } from '#/lib/participant-overrides.store'
 import { getPalette } from '#/lib/participant-palette'
 import { useLongPress } from '#/lib/useLongPress'
+import { cn } from '#/lib/utils'
 import { useVideoPreferencesStore } from '#/lib/video-preferences.store'
 import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
 import { ParticipantContextMenu, ParticipantMenuButton } from '@/components/meeting/ParticipantContextMenu'
@@ -61,9 +61,17 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
     const effective = isSelfDeafened ? 0 : volume
 
     if (effective <= 1) {
-      // Normal range — native volume handles it, reset gain if active
+      // Normal range — native volume handles it, tear down gain graph
       remote.setVolume(effective)
-      if (gainRef.current) gainRef.current.gain.gain.value = 1
+      if (gainRef.current) {
+        gainRef.current.ctx.close().catch(() => {})
+        elementSourceUsed.delete(
+          (remote.getTrackPublication(Track.Source.Microphone)?.track?.attachedElements?.[0] as
+            | HTMLMediaElement
+            | undefined) ?? ({} as HTMLMediaElement),
+        )
+        gainRef.current = null
+      }
     } else {
       // Boost: set native volume to 1, let GainNode amplify beyond
       remote.setVolume(1)
@@ -136,11 +144,9 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
   return (
     <ParticipantContextMenu participant={participant} isPinned={isPinned} onTogglePin={onTogglePin}>
       <div
-        className={`meet-tile group${isSpeaking ? ' meet-speaking' : ''}`}
+        className={cn('meet-tile group', isSpeaking && 'meet-speaking')}
         {...longPressHandlers}
         style={{
-          position: 'relative',
-          overflow: 'hidden',
           borderRadius: totalCount === 1 ? 0 : 10,
           background: `radial-gradient(ellipse 90% 70% at 50% 35%, ${palette.tile}, #08080f 72%)`,
           animationDelay: `${index * 0.04}s`,
@@ -151,44 +157,26 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
              so right-click bubbles to the Radix ContextMenuTrigger instead */
           // biome-ignore lint/a11y/noStaticElementInteractions: wrapper prevents native <video> context menu so Radix ContextMenu works
           <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              transform: participant.isLocal && mirrorWebcam ? 'scaleX(-1)' : undefined,
-            }}
+            className="absolute inset-0"
+            style={{ transform: participant.isLocal && mirrorWebcam ? 'scaleX(-1)' : undefined }}
             onContextMenu={(e) => e.preventDefault()}
           >
             <VideoTrack
               trackRef={{ participant, source: Track.Source.Camera, publication: cameraTrack }}
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+              className="absolute inset-0 w-full h-full object-cover"
             />
           </div>
         ) : (
           /* No video: gradient avatar */
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 14,
-            }}
-          >
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3.5">
             <div
+              className="flex items-center justify-center shrink-0 text-white font-bold"
               style={{
                 width: avatarPx,
                 height: avatarPx,
                 borderRadius: '50%',
                 background: palette.avatar,
-                flexShrink: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
                 fontSize: fontSizePx,
-                fontWeight: 700,
-                color: 'white',
                 boxShadow: isSpeaking
                   ? `0 0 0 3px rgba(255,255,255,0.18), 0 0 ${avatarPx * 0.6}px ${palette.glow}`
                   : `0 0 ${avatarPx * 0.4}px ${palette.glow}`,
@@ -200,27 +188,23 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
 
             {/* Name label + mute indicator (only when large enough to be readable) */}
             {totalCount <= 2 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: 500 }}>
+              <div className="flex items-center gap-1.5">
+                <span className="text-white/60 text-sm font-medium">
                   {displayName}
-                  {participant.isLocal && (
-                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, marginLeft: 6 }}>you</span>
-                  )}
+                  {participant.isLocal && <span className="text-white/50 text-xs ml-1.5">you</span>}
                 </span>
-                {isDeafened && <VolumeX size={13} style={{ color: '#f87171', flexShrink: 0 }} />}
-                {!participant.isMicrophoneEnabled && <MicOff size={13} style={{ color: '#f87171', flexShrink: 0 }} />}
+                {isDeafened && <VolumeX size={13} className="shrink-0 text-red-400" />}
+                {!participant.isMicrophoneEnabled && <MicOff size={13} className="shrink-0 text-red-400" />}
               </div>
             )}
 
             {/* Waveform bars — always visible, animated when speaking */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 18 }}>
+            <div className="flex items-end gap-[3px] h-[18px]">
               {[0, 1, 2, 3, 4].map((i) => (
                 <span
                   key={i}
+                  className="inline-block w-[3px] rounded-sm"
                   style={{
-                    display: 'inline-block',
-                    width: 3,
-                    borderRadius: 2,
                     transformOrigin: 'bottom center',
                     ...(isSpeaking
                       ? {
@@ -243,48 +227,21 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
 
         {/* Name + mute badge at bottom-left — for video tiles or dense grids */}
         {(hasCameraVideo || totalCount > 2) && (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 8,
-              left: 8,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              background: 'rgba(0,0,0,0.6)',
-              backdropFilter: 'blur(8px)',
-              borderRadius: 7,
-              padding: '3px 8px',
-              maxWidth: 'calc(100% - 50px)',
-            }}
-          >
-            <span
-              style={{
-                color: 'white',
-                fontSize: 12,
-                fontWeight: 500,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
+          <div className="absolute bottom-2 left-2 flex items-center gap-[5px] bg-black/60 backdrop-blur-sm rounded-[7px] px-2 py-[3px] max-w-[calc(100%-50px)]">
+            <span className="text-white text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap">
               {displayName}
-              {participant.isLocal && (
-                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginLeft: 4 }}>you</span>
-              )}
+              {participant.isLocal && <span className="text-white/50 text-[11px] ml-1">you</span>}
             </span>
-            {isDeafened && <VolumeX size={11} style={{ color: '#f87171', flexShrink: 0 }} />}
+            {isDeafened && <VolumeX size={11} className="shrink-0 text-red-400" />}
             {!participant.isMicrophoneEnabled ? (
-              <MicOff size={11} style={{ color: '#f87171', flexShrink: 0 }} />
+              <MicOff size={11} className="shrink-0 text-red-400" />
             ) : (
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1.5, height: 12, flexShrink: 0 }}>
+              <div className="flex items-end gap-[1.5px] h-3 shrink-0">
                 {[0, 1, 2].map((i) => (
                   <span
                     key={i}
+                    className="inline-block w-[2px] rounded-px"
                     style={{
-                      display: 'inline-block',
-                      width: 2,
-                      borderRadius: 1,
                       transformOrigin: 'bottom center',
                       ...(isSpeaking
                         ? {
@@ -311,36 +268,24 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
           <button
             type="button"
             onClick={onTogglePin}
-            className={isPinned ? undefined : 'group-hover:opacity-100'}
+            className={cn(
+              'absolute top-2 right-2 w-[30px] h-[30px] rounded-lg flex items-center justify-center cursor-pointer transition-[opacity,background] duration-150',
+              isPinned ? '' : 'opacity-0 group-hover:opacity-100',
+            )}
             style={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              width: 30,
-              height: 30,
-              borderRadius: 8,
               background: isPinned ? 'color-mix(in oklab, var(--primary) 70%, transparent)' : 'rgba(0,0,0,0.55)',
               backdropFilter: 'blur(8px)',
-              border: `1px solid ${isPinned ? 'color-mix(in oklab, var(--sky-300) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              border: `1px solid ${isPinned ? 'color-mix(in oklab, var(--accent-400) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`,
               color: isPinned ? '#e0e7ff' : 'rgba(255,255,255,0.8)',
-              cursor: 'pointer',
-              opacity: isPinned ? 1 : 0,
-              transition: 'opacity 0.15s ease, background 0.15s ease',
             }}
             aria-label={isPinned ? 'Unpin participant' : 'Pin participant'}
           >
-            <Pin size={13} style={{ fill: isPinned ? 'currentColor' : 'none' }} />
+            <Pin size={13} className={isPinned ? 'fill-current' : ''} />
           </button>
         )}
 
         {/* 3-dot button — top-left corner (pin button is top-right) */}
-        <div
-          className="opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-          style={{ position: 'absolute', top: 8, left: 8 }}
-        >
+        <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
           <ParticipantMenuButton participant={participant} isPinned={isPinned} onTogglePin={onTogglePin} />
         </div>
       </div>

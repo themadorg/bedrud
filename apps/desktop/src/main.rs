@@ -19,6 +19,10 @@ fn main() -> anyhow::Result<()> {
     env_logger::init();
     log::info!("[main] starting bedrud-desktop");
 
+    if let Err(e) = keyring::use_native_store(true) {
+        log::warn!("[main] failed to initialize native keyring store: {}; session persistence disabled", e);
+    }
+
     let rt = Arc::new(Runtime::new()?);
 
     let instances = InstanceManager::load()?;

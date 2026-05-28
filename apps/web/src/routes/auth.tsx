@@ -12,6 +12,8 @@ export const Route = createFileRoute('/auth')({
   component: AuthLayout,
 })
 
+// Waveform is a purely decorative CSS-animated visualization.
+// No shadcn equivalent exists — this is a custom presentational component.
 function Waveform() {
   const bars = [3, 6, 9, 5, 8, 4, 7, 10, 6, 4, 8, 5, 9, 3, 7]
   return (
@@ -38,10 +40,6 @@ function AuthLayout() {
           from { transform: scaleY(0.3); opacity: 0.3; }
           to   { transform: scaleY(1);   opacity: 1;   }
         }
-        @keyframes blob {
-          0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-          50%       { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
-        }
       `}</style>
 
       {/* ── Left brand panel (always dark) ─────────────────────────────── */}
@@ -63,31 +61,7 @@ function AuthLayout() {
           aria-hidden
         />
 
-        {/* Aurora blobs */}
-        <div
-          className="pointer-events-none absolute -left-20 -top-20 h-80 w-80 blur-3xl"
-          style={{
-            background:
-              'radial-gradient(circle, color-mix(in oklab, var(--primary) 19%, transparent), transparent 70%)',
-            animation: 'blob 9s ease-in-out infinite',
-          }}
-        />
-        <div
-          className="pointer-events-none absolute -bottom-16 -right-16 h-72 w-72 blur-3xl"
-          style={{
-            background:
-              'radial-gradient(circle, color-mix(in oklab, var(--accent-600) 15%, transparent), transparent 70%)',
-            animation: 'blob 12s ease-in-out 3s infinite',
-          }}
-        />
-        <div
-          className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-48 w-48 blur-2xl"
-          style={{
-            background:
-              'radial-gradient(circle, color-mix(in oklab, var(--accent-800) 8%, transparent), transparent 70%)',
-            animation: 'blob 15s ease-in-out 6s infinite',
-          }}
-        />
+        {/* Single static radial glow — no animated blobs per DESIGN.md */}
 
         {/* Logo */}
         <div className="relative flex items-center gap-3">
@@ -110,15 +84,7 @@ function AuthLayout() {
             <p className="text-2xl font-bold leading-snug text-white">
               Voice-first meetings,
               <br />
-              <span
-                className="bg-clip-text text-transparent"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(135deg, var(--accent-300) 0%, var(--accent-400) 50%, var(--accent-300) 100%)',
-                }}
-              >
-                built for humans.
-              </span>
+              <span className="text-[var(--accent-300)]">built for humans.</span>
             </p>
             <p className="text-sm leading-relaxed text-white/40">
               Instant rooms. No installs. Just open a room and start talking — with anyone, anywhere.
@@ -146,7 +112,7 @@ function AuthLayout() {
           rel="noopener noreferrer"
           className="relative text-xs text-white/20 transition-colors hover:text-white/40"
         >
-          © {new Date().getFullYear()} Bedrud
+          <span suppressHydrationWarning>© {new Date().getFullYear()} Bedrud</span>
         </a>
       </div>
 

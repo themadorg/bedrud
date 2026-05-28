@@ -1,6 +1,6 @@
 ---
-title: Rooms API
-description: Room management endpoints
+title: 房间 API
+description: 房间管理端点
 order: 24
 ---
 
@@ -16,7 +16,19 @@ order: 24
 | `/api/room/:roomId/kick/:identity` | POST | 踢出参与者（管理员） |
 | `/api/room/:roomId/mute/:identity` | POST | 静音参与者（管理员） |
 | `/api/room/:roomId/video/:identity/off` | POST | 关闭参与者视频（管理员） |
-
+| `/api/room/:roomId` | DELETE | 删除自己的房间（后台任务） |
+| `/api/room/:roomId/settings` | PUT | 更新房间设置 |
+| `/api/room/:roomId/chat/upload` | POST | 上传聊天图片 |
+| `/api/room/:roomId/ban/:identity` | POST | 封禁参与者 |
+| `/api/room/:roomId/promote/:identity` | POST | 提升为管理员 |
+| `/api/room/:roomId/demote/:identity` | POST | 降级参与者 |
+| `/api/room/:roomId/block/:identity` | POST | 阻止参与者聊天 |
+| `/api/room/:roomId/deafen/:identity` | POST | 让参与者静音 |
+| `/api/room/:roomId/ask/:identity/:action` | POST | 要求参与者取消静音/打开摄像头 |
+| `/api/room/:roomId/spotlight/:identity` | POST | 聚焦参与者 |
+| `/api/room/:roomId/participant/:identity/info` | GET | 获取参与者信息 |
+| `/api/room/guest-join` | POST | 以访客身份加入公共房间 |
+| `/api/room/:roomId/screenshare/:identity/stop` | POST | 停止屏幕共享 |
 ---
 
 ## Endpoints
@@ -218,6 +230,42 @@ POST /api/room/:roomId/mute/:identity
   "status": "success"
 }
 ```
+
+---
+
+### 删除房间
+
+删除你创建的房间。这将永久移除房间及其所有关联数据。作为后台任务执行并立即返回。
+
+```
+DELETE /api/room/:roomId
+```
+
+**路径参数：**
+
+| 参数 | 描述 |
+|---|---|
+| `roomId` | 房间 UUID |
+
+**Headers：** `Authorization: Bearer <accessToken>`
+
+**响应 (202)：**
+
+```json
+{
+  "message": "Room deletion queued"
+}
+```
+
+| 状态 | 描述 |
+|--------|-------------|
+| 202 | 删除已排队——即将完成 |
+| 403 | 不是房间创建者（只有创建者可以删除） |
+| 404 | 房间未找到 |
+| 409 | 删除正在进行中 |
+| 500 | 服务器错误 |
+
+如果房间处于活跃状态，所有参与者将被断开连接并看到 "This room has been ended by the creator"。
 
 ---
 

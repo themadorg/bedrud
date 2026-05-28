@@ -506,6 +506,7 @@
       "guides/appliance": "Modo appliance",
       "guides/admin-dashboard": "Panel de Administración",
       "guides/behind-proxy": "Detrás de un proxy/CDN",
+      "guides/roles": "Roles de usuario",
       contributing: "Contribuir",
     },
   },

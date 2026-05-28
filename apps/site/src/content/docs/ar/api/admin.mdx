@@ -17,8 +17,11 @@ order: 25
 | `/api/admin/users/:id` | DELETE | حذف مستخدم نهائياً |
 | `/api/admin/rooms` | GET | عرض جميع الغرف (مقسمة لصفحات) |
 | `/api/admin/rooms/:roomId` | PUT | تحديث إعدادات أي غرفة |
-| `/api/admin/rooms/:roomId` | DELETE | إغلاق غرفة (حذف متسلسل) |
-| `/api/admin/rooms/:roomId/suspend` | POST | تعليق غرفة نشطة |
+| `/api/admin/rooms/:roomId` | DELETE | حذف غرفة (مهمة خلفية) |
+| `/api/admin/rooms/:roomId/suspend` | POST | تعليق غرفة (مهمة خلفية) |
+| `/api/admin/rooms/bulk/suspend` | POST | تعليق جماعي للغرف |
+| `/api/admin/rooms/bulk/close` | POST | إغلاق جماعي للغرف |
+| `/api/admin/users/bulk/delete` | POST | حذف جماعي للمستخدمين |
 | `/api/admin/rooms/:roomId/participants` | GET | جلب بيانات المشاركين المباشرين من LiveKit |
 | `/api/admin/rooms/:roomId/participants/:identity/kick` | POST | طرد أي مشارك من غرفة |
 | `/api/admin/rooms/:roomId/participants/:identity/mute` | POST | كتم صوت أي مشارك |
@@ -337,7 +340,7 @@ PUT /api/admin/rooms/:roomId
 
 ### إغلاق غرفة
 
-إغلاق غرفة نهائياً مع حذف متسلسل. يُرسل رسالة نظام لجميع المشاركين: "This room has been closed by an administrator".
+حذف غرفة وجميع المشاركين فيها نهائياً. يتم وضعها في قائمة انتظار المهام الخلفية وتعود فوراً — سيتم حذف الغرفة بالكامل في غضون ثوانٍ.
 
 ```
 DELETE /api/admin/rooms/:roomId
@@ -349,19 +352,29 @@ DELETE /api/admin/rooms/:roomId
 |---|---|
 | `roomId` | UUID الغرفة |
 
-**الاستجابة (200):**
+**الاستجابة (202):**
 
 ```json
 {
-  "status": "success"
+  "message": "Room deletion queued"
 }
 ```
+
+| الحالة | الوصف |
+|--------|-------------|
+| 202 | تم وضع الحذف في قائمة الانتظار — سيُكتمل قريباً |
+| 404 | الغرفة غير موجودة |
+| 500 | فشل في جلب الغرفة أو إدراج المهمة في قائمة الانتظار |
+
+> **ملاحظة:** عند الإغلاق، يتم إرسال رسالة نظام لجميع المشاركين النشطين: "This room has been closed by an administrator".
+> منطق الإغلاق يستدعي `cleanupSvc.CascadeDeleteRoom` الذي يتولى إزالة غرفة LiveKit، تنظيف ملفات الدردشة المرفوعة
+> وحذف سجل قاعدة البيانات.
 
 ---
 
 ### تعليق غرفة
 
-إلغاء تنشيط غرفة نشطة وجميع المشاركين فيها دون حذف سجل الغرفة. يمكن إعادة تنشيط الغرفة عند انضمام مشارك مرة أخرى.
+إلغاء تنشيط غرفة نشطة، وإنهاء جميع المكالمات النشطة مع الحفاظ على سجل الغرفة. يمكن إعادة تنشيط الغرفة عند انضمام مشارك مرة أخرى. تُنفذ كمهمة خلفية وتعود فوراً.
 
 ```
 POST /api/admin/rooms/:roomId/suspend
@@ -373,15 +386,70 @@ POST /api/admin/rooms/:roomId/suspend
 |---|---|
 | `roomId` | UUID الغرفة |
 
-**الاستجابة (200):**
+**الاستجابة (202):**
 
 ```json
 {
-  "status": "success"
+  "message": "Room suspend queued"
 }
 ```
 
-**خطأ (400):** يُرجع `{"error": "Room is not active"}` إذا كانت الغرفة غير نشطة بالفعل.
+| الحالة | الوصف |
+|--------|-------------|
+| 202 | تم وضع التعليق في قائمة الانتظار — سيُكتمل قريباً |
+| 400 | الغرفة غير نشطة بالفعل |
+| 404 | الغرفة غير موجودة |
+| 500 | فشل في جلب الغرفة أو إدراج المهمة في قائمة الانتظار |
+
+---
+
+### تعليق جماعي للغرف
+
+وضع تعليق لعدة غرف في قائمة الانتظار دفعة واحدة. يتم تخطي الغرف المعلقة بالفعل.
+
+```
+POST /api/admin/rooms/bulk/suspend
+```
+
+**نص الطلب:**
+
+```json
+{
+  "ids": ["room-uuid-1", "room-uuid-2"]
+}
+```
+
+**الاستجابة (202):
+
+```json
+{
+  "results": {
+    "room-uuid-1": {"success": true, "name": "team-standup"},
+    "room-uuid-2": {"success": false, "name": "design-review", "error": "room not found"}
+  },
+  "totalProcessed": 1,
+  "totalFailed": 1
+}
+```
+
+| الحقل | النوع | الوصف |
+|-------|------|-------------|
+| `results` | object | نتيجة لكل غرفة مفهرسة بالمعرف |
+| `results.*.success` | bool | ما إذا تم وضع العملية في قائمة الانتظار |
+| `results.*.name` | string | اسم الغرفة (موجود عند النجاح) |
+| `results.*.error` | string | رسالة الخطأ (موجودة عند الفشل) |
+| `totalProcessed` | int | عدد الغرف التي تمت بنجاح في قائمة الانتظار |
+| `totalFailed` | int | عدد الغرف الفاشلة |
+
+### إغلاق جماعي للغرف
+
+وضع حذف دائم لعدة غرف في قائمة الانتظار دفعة واحدة. لا يمكن التراجع عنه.
+
+```
+POST /api/admin/rooms/bulk/close
+```
+
+نفس تنسيق الطلب/الاستجابة مثل [تعليق جماعي للغرف](#تعليق-جماعي-للغرف).
 
 ---
 

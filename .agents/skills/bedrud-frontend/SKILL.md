@@ -12,6 +12,19 @@ Path alias: `#/*` → `./src/*`. Never `../src/*`.
 
 ---
 
+## Shadcn/UI Compliance (Overhaul Complete 2026-05-16)
+
+All 4 phases complete. Key rules:
+- **Prefer shadcn wrappers** over raw HTML: `Button`, `Input`, `Label`, `Select`, `Switch`, `Tabs`, `Dialog`, `RadioGroup`, `Card`, `Badge`, `Separator`, `Skeleton` from `@/components/ui/`
+- **No inline `style={}`** for static values. Use Tailwind classes. Keep inline only for: `color-mix` (no Tailwind equivalent), palette-based colors, computed dimensions from props
+- **Use `cn()`** from `@/lib/utils` for dynamic className composition — no template-literal classNames
+- **Meeting room** uses dark theme (`bg-[#0c0c16]/90`, `text-white/*`, `border-white/[0.07]`) with shared styles in `components/meeting/meeting.css`
+- **Gradient text banned** (`bg-clip-text text-transparent`) — use `text-primary` instead
+- **Aurora blobs banned** — one static radial glow per page max
+- **No hardcoded hex** for structural UI — use CSS var tokens
+
+See `apps/web/AGENTS.md` for full design system reference.
+
 ## Entrypoints
 
 ### `src/router.tsx`
@@ -20,7 +33,7 @@ Path alias: `#/*` → `./src/*`. Never `../src/*`.
 
 ### `src/routes/__root.tsx` — App shell
 
-`QueryClientProvider` wrapper. `QueryClient` config: `retry: 1`, `staleTime: 30_000`. Inline theme script prevents dark-mode flash (reads localStorage before hydrate). Auth init: fire-and-forget `useAuthStore.getState().initialize()` on mount (non-blocking).
+`QueryClientProvider` + `ErrorBoundary` wrapper (class component render crash safety net, keyed by `pathname+search` for auto-reset on navigation). `QueryClient` config: `retry: 1`, `staleTime: 30_000`. Inline theme script prevents dark-mode flash (reads localStorage before hydrate). Auth init: fire-and-forget `useAuthStore.getState().initialize()` on mount (non-blocking).
 
 ### `src/routeTree.gen.ts`
 
@@ -49,11 +62,14 @@ __root__                          (root layout — QueryClient, theme, auth init
 │   ├── /dashboard/settings       (dashboard/settings.tsx — layout)
 │   │   ├── /dashboard/settings/           (dashboard/settings/index.tsx)
 │   │   ├── /dashboard/settings/security   (dashboard/settings/security.tsx)
-│   │   └── /dashboard/settings/audio      (dashboard/settings/audio.tsx)
+│   │   ├── /dashboard/settings/audio      (dashboard/settings/audio.tsx)
+│   │   └── /dashboard/settings/video      (dashboard/settings/video.tsx)
 │   └── /dashboard/admin          (dashboard/admin.tsx — layout + guard)
 │       ├── /dashboard/admin/              (dashboard/admin/index.tsx)
+│       ├── /dashboard/admin/queue         (dashboard/admin/queue.tsx)
 │       ├── /dashboard/admin/rooms         (dashboard/admin/rooms.tsx)
 │       ├── /dashboard/admin/rooms/$roomId (dashboard/admin/rooms_.$roomId.tsx)
+│       ├── /dashboard/admin/rooms/events  (dashboard/admin/rooms_.events.tsx)
 │       ├── /dashboard/admin/users         (dashboard/admin/users.tsx)
 │       ├── /dashboard/admin/users/$userId (dashboard/admin/users_.$userId.tsx)
 │       └── /dashboard/admin/settings      (dashboard/admin/settings.tsx)
@@ -77,16 +93,19 @@ __root__                          (root layout — QueryClient, theme, auth init
 | 11 | `dashboard/settings/index.tsx` | `/dashboard/settings` | Leaf | — | — | Profile. Edit name (`PUT /api/auth/me`). Read-only: ID, provider, role, admin badge |
 | 12 | `dashboard/settings/security.tsx` | `/dashboard/settings/security` | Leaf | — | — | Password change (`PUT /api/auth/password`). "Managed by provider" for OAuth accounts |
 | 13 | `dashboard/settings/audio.tsx` | `/dashboard/settings/audio` | Leaf | — | — | Noise suppression (Off/Browser/RNNoise/Krisp), echo cancel, AGC, mic test with volume meter, input gain, noise gate, muted beep. Syncs `GET/PUT /api/auth/preferences` |
-| 14 | `dashboard/admin.tsx` | `/dashboard/admin` | Layout+Guard | `beforeLoad`: redirect `/dashboard` if not admin + client `useEffect` check | — | Guard only. Renders `<Outlet />` |
-| 15 | `dashboard/admin/index.tsx` | `/dashboard/admin` | Leaf | — | — | Admin overview. Stat cards, room creation area chart (7d, Recharts), recent signups, room breakdown |
-| 16 | `dashboard/admin/rooms.tsx` | `/dashboard/admin/rooms` | Leaf | — | — | Rooms table: search, sort, pagination, inline-editable max participants, persistent pin indicator, force-close |
-| 17 | `dashboard/admin/rooms_.$roomId.tsx` | `/dashboard/admin/rooms/$roomId` | Leaf | — | — | Room detail. Stats, live bitrate chart (3s poll, Recharts), participants table with mute/kick, persistent toggle |
-| 18 | `dashboard/admin/users.tsx` | `/dashboard/admin/users` | Leaf | — | — | Users table: search, sort, pagination, active/banned toggle, admin promote/demote |
-| 19 | `dashboard/admin/users_.$userId.tsx` | `/dashboard/admin/users/$userId` | Leaf | — | — | User detail. Hero card, promote/demote/ban actions, room activity chart, rooms table |
-| 20 | `dashboard/admin/settings.tsx` | `/dashboard/admin/settings` | Leaf | — | — | System settings. 7 tabs: General (reg mode + invite tokens), Auth (passkeys + OAuth), LiveKit, Server, CORS, Chat uploads, Logging |
-| 21 | `m.$meetId.tsx` | `/m/$meetId` | Leaf | — | — | Live meeting. `LiveKitRoom` + `MeetingProvider` + `BeforeUnloadLock` + `KickDetector` + `AskActionBanner` + `AudioProcessorManager` + `MeetingSoundEffects` + `MeetingHeader` + `MeetingPanels` + `MeetingLayout` (FocusLayout vs ParticipantGrid). Audio constraints from `useAudioPreferencesStore` |
+| 14 | `dashboard/settings/video.tsx` | `/dashboard/settings/video` | Leaf | — | — | Video prefs: mirror webcam toggle. Syncs `GET/PUT /api/auth/preferences` |
+| 15 | `dashboard/admin.tsx` | `/dashboard/admin` | Layout+Guard | `beforeLoad`: redirect `/dashboard` if not admin + client `useEffect` check | — | Guard only. Renders `<Outlet />` |
+| 16 | `dashboard/admin/index.tsx` | `/dashboard/admin` | Leaf | — | — | Admin overview. Stat cards, room creation area chart (7d, Recharts), recent signups, room breakdown |
+| 17 | `dashboard/admin/queue.tsx` | `/dashboard/admin/queue` | Leaf | — | — | Queue stats dashboard: pending/active/done/failed counts, failure diagnostics, processed rates |
+| 18 | `dashboard/admin/rooms.tsx` | `/dashboard/admin/rooms` | Leaf | — | — | Rooms table: search, sort, pagination, inline-editable max participants, persistent pin indicator, force-close |
+| 19 | `dashboard/admin/rooms_.$roomId.tsx` | `/dashboard/admin/rooms/$roomId` | Leaf | — | — | Room detail. Stats, live bitrate chart (3s poll, Recharts), participants table with mute/kick, persistent toggle |
+| 20 | `dashboard/admin/rooms_.events.tsx` | `/dashboard/admin/rooms/events` | Leaf | — | — | Room events log: filter by type (created, joined, etc.), pagination, search |
+| 21 | `dashboard/admin/users.tsx` | `/dashboard/admin/users` | Leaf | — | — | Users table: search, sort, pagination, active/banned toggle, admin promote/demote |
+| 22 | `dashboard/admin/users_.$userId.tsx` | `/dashboard/admin/users/$userId` | Leaf | — | — | User detail. Hero card, promote/demote/ban actions, room activity chart, rooms table |
+| 23 | `dashboard/admin/settings.tsx` | `/dashboard/admin/settings` | Leaf | — | — | System settings. 7 tabs: General (reg mode + invite tokens), Auth (passkeys + OAuth), LiveKit, Server, CORS, Chat uploads, Logging |
+| 24 | `m.$meetId.tsx` | `/m/$meetId` | Leaf | — | — | Live meeting. `LiveKitRoom` + `MeetingProvider` + `BeforeUnloadLock` + `KickDetector` + `AskActionBanner` + `AudioProcessorManager` + `MeetingSoundEffects` + `MeetingHeader` + `MeetingPanels` + `MeetingLayout` (FocusLayout vs ParticipantGrid). Audio constraints from `useAudioPreferencesStore` |
 
-**Counts:** 21 files. 5 layouts. 16 leaves. 4 guards. 1 loader. 3 dynamic routes.
+**Counts:** 24 files. 5 layouts. 19 leaves. 4 guards. 1 loader. 3 dynamic routes.
 
 ---
 
@@ -156,6 +175,17 @@ RecentRoom: { name: string, joinedAt: number }
 ```
 
 Actions: `add(name)` — prepend, dedup, cap 20. `remove(name)`, `clear()`.
+
+### `src/lib/video-preferences.store.ts` — `useVideoPreferencesStore`
+
+```
+State: VideoPreferences  // persisted, key "video-preferences"
+VideoPreferences: {
+  mirrorWebcam: boolean   // default true
+}
+```
+
+Actions: `setMirrorWebcam(enabled)`, `merge(partial)`.
 
 ### `src/lib/participant-overrides.store.ts` — `useParticipantOverridesStore`
 
@@ -266,6 +296,8 @@ All synthesized via Web Audio API. Singleton AudioContext.
 | `useLongPress` | `src/lib/useLongPress.ts` | `callback, ms=500` | `{ onPointerDown/Move/Up/Leave/Cancel }` | Long-press for touch (not mouse). Cancel if drift >10px |
 | `usePinnedParticipants` | `src/lib/usePinnedParticipants.ts` | — | `{ pinned: Set, toggle, unpin, clear }` | Pinned participant identities |
 | `useChatPersistence` | `src/components/meeting/chat/useChatPersistence.ts` | `roomId` | `[initialMsgs, persist]` | sessionStorage chat persistence. Key `chat:{roomId}`. Survives refresh, cleared on tab close |
+| `useAdminOverview` | `src/lib/use-admin-overview.ts` | — | `AdminOverviewData` | Admin dashboard stats: room creation chart (7d), recent signups count |
+| `useQueueStats` | `src/lib/use-queue-stats.ts` | — | `{ data: QueueStats, isLoading }` | `GET /api/admin/queue` polling for queue health dashboard |
 
 ---
 
@@ -277,6 +309,7 @@ All synthesized via Web Audio API. Singleton AudioContext.
 |-----------|------|-------|---------|------|
 | `ErrorPage` | `ErrorPage.tsx` | `variant?: 'not-found'|'room-error'|'kicked'|'session'|'server'`, `title?`, `description?`, `error?`, `showHome?`, `showBack?` | Full-page error with variant-specific icon + nav | `Link`, lucide, `cn` |
 | `parseApiError` | `ErrorPage.tsx` | `error` | Friendly error string parser | — |
+| `ErrorBoundary` | `ErrorBoundary.tsx` | `children`, `variant?`, `onError?` | Class component. Catches React render/lifecycle errors, shows `ErrorPage` fallback. Reset via React key | `ErrorPage` |
 | `ThemeToggle` | `ThemeToggle.tsx` | — | Dark/light toggle. View Transition API radial clip animation | `Button` (ui) |
 
 ### Auth — `src/components/auth/`
@@ -300,8 +333,55 @@ All synthesized via Web Audio API. Singleton AudioContext.
 |-----------|------|-------|---------|------|
 | `UserTable` | `UserTable.tsx` | `users: User[]`, `isLoading`, `onToggleStatus` | Users table: provider badge, role, active toggle, skeleton | Badge, Skeleton, Switch, Table (ui) |
 | `RoomTable` | `RoomTable.tsx` | `rooms: Room[]`, `isLoading` | Rooms table: visibility badge, status, max participants, skeleton | Badge, Skeleton, Table (ui) |
+| `QueueStatsPage` | `queue-stats.tsx` | — | Queue health dashboard: pending/active/done/failed counts, rates, recent failures | `useQueueStats`, Card (ui) |
+| `RoomEventsTable` | `RoomEventsTable.tsx` | — | Room events log with type filter, pagination, search | DataTable*, Button (ui) |
+| `RecentSignupsTable` | `RecentSignupsTable.tsx` | — | Recent user signups table for admin overview | — |
+| `AdminBulkBar` | `AdminBulkBar.tsx` | `selected: Set`, `onBulkAction` | Bulk action bar for room/user tables | Button (ui) |
+| `AdminControlBar` | `AdminControlBar.tsx` | `selected`, `status`, `onBulkClose`, `onBulkSuspend` | Admin room list control bar with bulk actions | Button, Select (ui) |
+| `AlertConfirmDialog` | `AlertConfirmDialog.tsx` | `open`, `title`, `message`, `onConfirm`, `variant` | Confirmation dialog for destructive actions | Dialog, Button (ui) |
+| `RowActionsDropdown` | `RowActionsDropdown.tsx` | `actions: Action[]` | Row-level actions dropdown for tables | DropdownMenu (ui) |
+| `DataTableSearch` | `DataTableSearch.tsx` | `value`, `onChange`, `placeholder` | Search input for data tables | Input (ui) |
+| `DataTablePagination` | `DataTablePagination.tsx` | `page`, `total`, `onPageChange` | Pagination controls for data tables | Button (ui) |
+| `DataTableFacetedFilter` | `DataTableFacetedFilter.tsx` | `options`, `value`, `onChange` | Faceted filter dropdown | Select (ui) |
+| `DataTableFilterChips` | `DataTableFilterChips.tsx` | `filters`, `onRemove` | Active filter chips display | Badge (ui) |
+| `DataTableToolbar` | `DataTableToolbar.tsx` | `children` | Toolbar container for search + filters | — |
+| `DataTableBulkBar` | `DataTableBulkBar.tsx` | `selected`, `onClear` | Bulk selection indicator bar | Button (ui) |
+| `useTableState` | `useTableState.ts` | `initial` | Hook: pagination, sorting, search, filter state | — |
+
+#### `overview/` — Admin dashboard overview components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `KpiCard` | `kpi-card.tsx` | Single KPI metric card (value, label, trend) |
+| `KpiRow` | `kpi-row.tsx` | Horizontal row of KPI cards |
+| `ActivityChart` | `activity-chart.tsx` | Room creation area chart (7d, Recharts) |
+| `HealthStrip` | `health-strip.tsx` | Server health indicators |
+| `NeedsAttention` | `needs-attention.tsx` | Items needing admin attention |
+| `RecentEvents` | `recent-events.tsx` | Recent system events feed |
+| `RecentSignups` | `recent-signups.tsx` | Recent user signups widget |
+| `RoomComposition` | `room-composition.tsx` | Room type/status breakdown |
+| `DetailTable` | `detail-table.tsx` | Generic detail table for overview |
+| (index) | `index.tsx` | Overview page layout composing all widgets |
+
+#### `settings/` — Admin settings tab components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `GeneralTab` | `general-tab.tsx` | Registration mode, invite tokens |
+| `AuthTab` | `auth-tab.tsx` | Passkeys, OAuth provider config |
+| `LiveKitTab` | `livekit-tab.tsx` | LiveKit host, API key/secret |
+| `ServerTab` | `server-tab.tsx` | Port, TLS, ACME, proxy settings |
+| `CORSTab` | `cors-tab.tsx` | CORS origins, headers, methods |
+| `ChatTab` | `chat-tab.tsx` | Upload backend, max size, S3 config |
+| `LoggingTab` | `logging-tab.tsx` | Log level |
+| `InviteTokensSection` | `invite-tokens-section.tsx` | Invite token list + create + delete |
+| `shared.tsx` | `shared.tsx` | Shared helpers, masked input fields |
+| `types.ts` | `types.ts` | Settings tab type definitions |
+| `index.ts` | `index.ts` | Settings page composition (tabs + sections) |
 
 ### Meeting — `src/components/meeting/`
+
+**Note:** All meeting components were converted from 100% inline styles to Tailwind classes in Phase 3 overhaul. Inline `style={}` only for: `color-mix` backgrounds/borders, palette-based avatar colors, computed dimensions (`avatarPx`), and `isSpeaking` animation delays. Shared styles in `meeting.css`.
 
 | Component | File | Props | Purpose | Deps |
 |-----------|------|-------|---------|------|
@@ -330,6 +410,8 @@ All synthesized via Web Audio API. Singleton AudioContext.
 | `BeforeUnloadLock` | `BeforeUnloadLock.tsx` | — | Null-render. Prevent tab close during meeting | — |
 | `AudioProcessorManager` | `AudioProcessorManager.tsx` | — | Null-render. Attach noise suppression on connect, switch mode mid-meeting, apply echo cancel live, cleanup unmount | — |
 | `DeviceSelector` | `DeviceSelector.tsx` | `kind: 'audioinput'|'videoinput'|'audiooutput'` | Dropdown: media device selection. localStorage persistence. Auto-restore on connect. Live device change | Button, DropdownMenu (ui) |
+| `MeetingErrorBoundary` | `MeetingErrorBoundary.tsx` | `children` | Error boundary wrapping LiveKit room. Resets on reconnect | `ErrorPage` |
+| `SecureContextBanner` | `SecureContextBanner.tsx` | — | Warning banner when not in secure context (HTTP). Audio/Video blocked | — |
 
 ### Chat — `src/components/meeting/chat/`
 
@@ -343,6 +425,10 @@ All synthesized via Web Audio API. Singleton AudioContext.
 ### UI Primitives — `src/components/ui/`
 
 20 shadcn/ui files (Radix-based). No custom logic.
+
+**Available shadcn components:**`avatar`, `badge`, `button`, `card`, `checkbox`, `context-menu`, `dialog`, `dropdown-menu`, `input`, `label`, `radio-group`, `scroll-area`, `select`, `separator`, `sheet`, `skeleton`, `switch`, `table`, `tabs`, `tooltip`.
+
+Add new: `cd apps/web && bunx shadcn@latest add <name>`
 
 | File | Radix Primitive |
 |------|----------------|
@@ -417,6 +503,15 @@ SystemMessage: { type: 'system', event: SystemEventName, actor?, target?, messag
 - Keyframes: `meet-speaker-glow`, `meet-speak-bar`, `meet-panel-in`, `meet-tile-in`, `meet-ptt-pulse`, `meet-connecting-spin`, `chat-toast-in`, `hero-float-a/b/c`
 - Utility classes: `.meet-speaking`, `.meet-panel`, `.meet-tile`, `.meet-ptt`, `.meet-connecting`, `.strip-scroll`, `.chat-toast`, `.hero-blob-a/b/c`, `.feature-card`
 
+### `src/components/meeting/meeting.css`
+
+Meeting-specific shared styles (not in global CSS to avoid polluting non-meeting pages):
+- `.meet-tile` — base tile with `position: relative; overflow: hidden`
+- `.meet-tile.meet-speaking` — speaking glow via primary-colored box-shadow
+- `@keyframes meet-speak-bar` — waveform animation (4px ↔ 18px pulse)
+- `@keyframes meet-connecting-spin` — loading spinner rotation
+- `.meet-chat-scroll` — custom thin scrollbar for chat panel
+
 ### `src/theme.example-blue.css`
 
 Alternative blue+rose theme template. Copy to `theme.css` to rebrand.
@@ -452,10 +547,17 @@ PasskeyButton → Button, Card, Input, Label, Tabs (ui)
 ThemeToggle → Button (ui)
 UserTable → Badge, Skeleton, Switch, Table (ui)
 RoomTable → Badge, Skeleton, Table (ui)
+QueueStatsPage → useQueueStats, Card (ui)
+RoomEventsTable → DataTable*, Button (ui)
+AdminBulkBar → Button (ui)
+AdminControlBar → Button, Select (ui)
+RowActionsDropdown → DropdownMenu (ui)
+
+ErrorBoundary → ErrorPage
 
 Standalone (no custom deps):
-  ErrorPage, OAuthButtons, AskActionBanner, BeforeUnloadLock,
-  AudioProcessorManager, KickDetector, MeetingHeader, SpotlightView,
+  ErrorPage, OAuthButtons, AskActionBanner, BeforeUnloadLock, MeetingErrorBoundary,
+  AudioProcessorManager, KickDetector, MeetingHeader, SpotlightView, SecureContextBanner,
   ScreenShareTile, MeetingProvider
 ```
 
@@ -519,6 +621,7 @@ react 19, livekit-client 2.18, @livekit/components-react 2.9, zustand 5, @tansta
 
 ```
 src/routes/__root.tsx → router.tsx → routeTree.gen.ts (auto)
+  ├── components/ → ErrorBoundary → ErrorPage
   ├── lib/api.ts → lib/auth.store.ts → lib/user.store.ts
   ├── lib/theme.store.ts
   ├── lib/audio-preferences.store.ts → lib/audio-processor.service.ts → lib/rnnoise-processor.ts

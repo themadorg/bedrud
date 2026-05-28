@@ -22,6 +22,7 @@ bedrud/
 │   │   ├── auth/        # JWT, Passkeys, OAuth logic
 │   │   ├── handlers/    # HTTP Controllers
 │   │   ├── models/      # Database Schemas
+│   │   ├── queue/       # Async job queue (delete, upload, suspend)
 │   │   ├── repository/  # GORM Data Access Layer
 │   │   └── livekit/     # Media Server Management
 │   ├── frontend/        # (Generated) Compiled web assets
@@ -50,7 +51,8 @@ bedrud/
 - **`/middleware`**: Custom Fiber middleware for authentication checks, logging, and CORS.
 - **`/server`**: The glue code that brings everything together. It initializes the database, repositories, and starts the Fiber server.
 - **`/install`**: Logic for the `bedrud install` command which automates init service (systemd/OpenRC/SysV) and TLS setup on Linux.
-- **`/scheduler`**: Background tasks (if any).
+- **`/queue`**: Async job queue. Polls `jobs` table, dispatches to handlers for room deletion, user deletion, suspensions, and chat uploads. Handlers in `internal/queue/handler_*.go`. Two DB backends (PostgreSQL `SKIP LOCKED`, SQLite 2-step). Retries with exponential backoff. Default 500ms poll, 1 worker goroutine.
+- **`/scheduler`**: Background tasks (cleanup, idle room detection). Runs daily cleanup of old done/failed jobs at 03:00.
 - **`/utils`**: Small helper functions (e.g., password hashing, random strings).
 
 ### `/migrations`

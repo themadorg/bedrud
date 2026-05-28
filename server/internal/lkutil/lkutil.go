@@ -66,6 +66,23 @@ func SendSystemMessage(ctx context.Context, client livekit.RoomService, roomName
 	})
 }
 
+// NewEgressClient creates a LiveKit EgressService client for managing recordings.
+func NewEgressClient(lkCfg *config.LiveKitConfig) (livekit.Egress, error) {
+	apiHost := lkCfg.InternalHost
+	if apiHost == "" {
+		apiHost = lkCfg.Host
+	}
+	httpClient := http.DefaultClient
+	if lkCfg.SkipTLSVerify && strings.HasPrefix(apiHost, "https") {
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+	}
+	return livekit.NewEgressProtobufClient(apiHost, httpClient), nil
+}
+
 func SendSystemMessageWithDeletedIdentity(ctx context.Context, client livekit.RoomService, roomName, event, message, deletedIdentity string) {
 	b, _ := json.Marshal(SystemMessage{
 		Type:            "system",

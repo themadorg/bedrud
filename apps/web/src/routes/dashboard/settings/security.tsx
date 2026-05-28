@@ -3,12 +3,122 @@ import { AlertCircle, Check, Loader2, Lock, LogIn } from 'lucide-react'
 import React, { useState } from 'react'
 import { api } from '#/lib/api'
 import { useUserStore } from '#/lib/user.store'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/dashboard/settings/security')({
   component: SecurityPage,
 })
+
+function AccountForm({
+  user,
+  onStatus,
+}: {
+  user: { id: string; email: string; name: string } | null
+  onStatus: (s: { type: 'success' | 'error'; message: string } | null) => void
+}) {
+  const [isLoading, setIsLoading] = useState(false)
+  const [accountStatus, setAccountStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const fd = new FormData(e.currentTarget)
+    const name = (fd.get('name') as string).trim()
+    const email = (fd.get('email') as string).trim()
+
+    if (name.length < 2) {
+      setAccountStatus({ type: 'error', message: 'Name must be at least 2 characters' })
+      return
+    }
+
+    setIsLoading(true)
+    setAccountStatus(null)
+    onStatus(null)
+    try {
+      const body: Record<string, string> = { name }
+      if (email && email !== user?.email) {
+        body.email = email
+      }
+      const res = await api.put<any>('/api/auth/me', body)
+      const msg: { type: 'success' | 'error'; message: string } = res.requiresVerification
+        ? { type: 'success', message: 'Verification email sent to new address. Please check your inbox.' }
+        : body.email
+          ? { type: 'success', message: 'Account updated.' }
+          : { type: 'success', message: 'Profile updated.' }
+      setAccountStatus(msg)
+    } catch (err) {
+      setAccountStatus({ type: 'error', message: err instanceof Error ? err.message : 'Failed to update profile' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="settings-name" className="text-xs font-medium text-muted-foreground">
+          Display name
+        </Label>
+        <Input
+          id="settings-name"
+          name="name"
+          defaultValue={user?.name ?? ''}
+          required
+          minLength={2}
+          onChange={() => {
+            setAccountStatus(null)
+            onStatus(null)
+          }}
+          className="h-9 text-sm"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="settings-email" className="text-xs font-medium text-muted-foreground">
+          Email
+        </Label>
+        <Input
+          id="settings-email"
+          name="email"
+          type="email"
+          defaultValue={user?.email ?? ''}
+          onChange={() => {
+            setAccountStatus(null)
+            onStatus(null)
+          }}
+          className="h-9 text-sm"
+        />
+        <p className="text-[10px] text-muted-foreground">
+          Changing your email will send a verification link to the new address. You will need to verify it before you
+          can sign in again.
+        </p>
+      </div>
+      {accountStatus && (
+        <div
+          className={cn(
+            'flex items-center gap-2 border px-3 py-2 text-xs',
+            accountStatus.type === 'success'
+              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+              : 'border-destructive/30 bg-destructive/10 text-destructive',
+          )}
+        >
+          {accountStatus.type === 'success' ? (
+            <Check className="h-3.5 w-3.5 shrink-0" />
+          ) : (
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          )}
+          {accountStatus.message}
+        </div>
+      )}
+      <Button type="submit" variant="default" size="sm" disabled={isLoading} className="gap-1.5">
+        {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+        Save
+      </Button>
+    </form>
+  )
+}
 
 function Alert({ type, message }: { type: 'success' | 'error'; message: string }) {
   return (
@@ -67,14 +177,25 @@ function SecurityPage() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="flex flex-col gap-6">
+      {/* Account section (name + email) */}
+      <Card>
+        <CardHeader className="border-b px-5 py-3">
+          <CardTitle className="text-sm font-semibold">Account</CardTitle>
+          <CardDescription className="text-xs text-muted-foreground">Update your profile and email</CardDescription>
+        </CardHeader>
+        <CardContent className="p-5">
+          <AccountForm user={user} onStatus={setStatus} />
+        </CardContent>
+      </Card>
+
       {/* Password section */}
-      <div className="border bg-card/50">
-        <div className="border-b px-5 py-3">
-          <p className="text-sm font-semibold">Password</p>
-          <p className="text-xs text-muted-foreground">Change your account password</p>
-        </div>
-        <div className="p-5">
+      <Card>
+        <CardHeader className="border-b px-5 py-3">
+          <CardTitle className="text-sm font-semibold">Password</CardTitle>
+          <CardDescription className="text-xs text-muted-foreground">Change your account password</CardDescription>
+        </CardHeader>
+        <CardContent className="p-5">
           {isOAuthOnly ? (
             <div className="flex items-start gap-2.5 border px-3 py-3 text-xs">
               <LogIn className="h-3.5 w-3.5 shrink-0 mt-0.5 text-muted-foreground" />
@@ -86,9 +207,9 @@ function SecurityPage() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="space-y-1.5">
-                <label htmlFor="currentPassword" className="text-xs font-medium text-muted-foreground">
+                <Label htmlFor="currentPassword" className="text-xs font-medium text-muted-foreground">
                   Current password
-                </label>
+                </Label>
                 <Input
                   id="currentPassword"
                   name="currentPassword"
@@ -100,9 +221,9 @@ function SecurityPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label htmlFor="newPassword" className="text-xs font-medium text-muted-foreground">
+                <Label htmlFor="newPassword" className="text-xs font-medium text-muted-foreground">
                   New password
-                </label>
+                </Label>
                 <Input
                   id="newPassword"
                   name="newPassword"
@@ -114,9 +235,9 @@ function SecurityPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label htmlFor="confirmPassword" className="text-xs font-medium text-muted-foreground">
+                <Label htmlFor="confirmPassword" className="text-xs font-medium text-muted-foreground">
                   Confirm new password
-                </label>
+                </Label>
                 <Input
                   id="confirmPassword"
                   name="confirmPassword"
@@ -128,26 +249,22 @@ function SecurityPage() {
                 />
               </div>
               {status && <Alert {...status} />}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="inline-flex items-center gap-1.5 bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
+              <Button type="submit" variant="default" size="sm" disabled={isLoading} className="gap-1.5">
                 {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Lock className="h-3 w-3" />}
                 Update password
-              </button>
+              </Button>
             </form>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Security info */}
-      <div className="border bg-card/50">
-        <div className="border-b px-5 py-3">
-          <p className="text-sm font-semibold">Security info</p>
-          <p className="text-xs text-muted-foreground">Your authentication details</p>
-        </div>
-        <div className="divide-y p-5">
+      <Card>
+        <CardHeader className="border-b px-5 py-3">
+          <CardTitle className="text-sm font-semibold">Security info</CardTitle>
+          <CardDescription className="text-xs text-muted-foreground">Your authentication details</CardDescription>
+        </CardHeader>
+        <CardContent className="divide-y p-5">
           <div className="flex items-center justify-between py-3 first:pt-0">
             <span className="text-xs text-muted-foreground">Auth method</span>
             <span className="text-xs font-medium capitalize">{user?.provider ?? '—'}</span>
@@ -160,8 +277,8 @@ function SecurityPage() {
             <span className="text-xs text-muted-foreground">Two-factor auth</span>
             <span className="text-xs font-medium text-muted-foreground">Not available</span>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

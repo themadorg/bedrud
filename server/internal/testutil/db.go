@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"bedrud/internal/database"
 	"bedrud/internal/models"
 	"testing"
 
@@ -33,10 +34,24 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		&models.InviteToken{},
 		&models.UserPreferences{},
 		&models.ChatUpload{},
+		&models.Job{},
+		&models.Webhook{},
+		&models.Recording{},
 	)
 	if err != nil {
 		t.Fatalf("failed to migrate test database: %v", err)
 	}
+
+	// SQLite :memory: is per-connection. Limit to 1 to prevent pool from
+	// opening a new connection that sees a fresh (empty) database.
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("failed to get underlying sql.DB: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+
+	// Register as global database for handlers that call database.GetDB()
+	database.SetForTest(db)
 
 	return db
 }

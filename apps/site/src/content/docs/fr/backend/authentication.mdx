@@ -81,6 +81,41 @@ Bedrud supporte l'authentification sans mot de passe via le standard FIDO2 (WebA
 
 Permet aux utilisateurs de rejoindre une réunion instantanément avec juste un nom. Le serveur crée un enregistrement utilisateur temporaire avec le rôle `guest`.
 
+
+## Vérification des e-mails
+
+Lorsque `requireEmailVerification: true` est défini dans la configuration, l'inscription et la connexion locales (non OAuth) nécessitent une confirmation par e-mail :
+
+- **Inscription** crée l'utilisateur mais définit `EmailVerifiedAt` à `nil`. L'utilisateur ne peut pas se connecter tant qu'il n'est pas vérifié.
+- **Connexion** renvoie `403` avec `{"requiresVerification": true}` pour les comptes non vérifiés.
+- **Renvoyer** via `POST /api/auth/verify/resend` — limité par `verificationEmailCooldownMins` et un compartiment de limite de débit séparé (`authResendMaxRequests`).
+- **Nettoyage automatique** supprime les comptes non vérifiés après `unverifiedAccountTTLHours` (48h par défaut, 0 pour désactiver).
+- **Changement d'e-mail** déclenche un nouveau flux de vérification. L'utilisateur reste connecté ; un nouveau jeton est émis.
+
+Les utilisateurs invités sont exemptés — ils n'ont pas d'e-mail.
+
+## Réinitialisation du mot de passe
+
+Processus de réinitialisation du mot de passe (nécessite SMTP) :
+
+1. `POST /api/auth/forgot-password` avec `{"email": "..."}` — le serveur envoie un lien de réinitialisation par e-mail
+2. `POST /api/auth/reset-password` avec `{"token": "...", "newPassword": "..."}` — définit un nouveau mot de passe
+
+La durée de vie du jeton de réinitialisation est contrôlée par `resetTokenTTLHours` (1 heure par défaut). Le point d'accès forgot-password partage le compartiment de limite de débit Auth.
+
+## Limitation de débit & Refroidissement
+
+Bedrud utilise quatre compartiments de limite de débit distincts :
+| Compartiment | Points d'accès | Défaut | Fenêtre |
+|--------|-----------|---------|--------|
+| Auth | login, register, refresh, passkey, forgot-password | 10 | 60s |
+| Invité | guest-login | 5 | 60s |
+| API | API générale | 30 | 60s |
+| Renvoi | verify/resend | 3 | 60s |
+
+Compartiment à `0` = désactivé. Toutes les limites par IP distante. Les requêtes excessives renvoient `429 Too Many Requests` avec l'en-tête `Retry-After`.
+
+
 ## Interopérabilité & CORS
 
 Bedrud est conçu pour être accessible depuis plusieurs origines, ce qui est crucial pour le développement (serveur dev React) et la production (sous-domaines différents).

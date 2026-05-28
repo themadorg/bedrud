@@ -21,6 +21,19 @@ const BASE_URL = (import.meta.env['VITE_API_URL'] as string | undefined) ?? ''
  *    The server must validate this header on state-changing requests (POST, PUT,
  *    PATCH, DELETE) when no Authorization header is present.
  */
+export class ApiError extends Error {
+  status: number
+  body: string
+  parsedBody: Record<string, unknown> | null
+  constructor(status: number, body: string, parsedBody: Record<string, unknown> | null, message: string) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.body = body
+    this.parsedBody = parsedBody
+  }
+}
+
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') return null
   // Try meta tag first (server-rendered pages)
@@ -67,8 +80,10 @@ function redirectToAuth() {
 async function request<T>(path: string, options: RequestOptions = {}, isRetry = false): Promise<T> {
   const tokens = useAuthStore.getState().tokens
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> | undefined),
+  }
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json'
   }
 
   if (tokens?.accessToken) {
@@ -87,13 +102,20 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
     ...options,
     headers,
     credentials: 'include', // always send HTTP-only cookies
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body:
+      options.body instanceof FormData
+        ? options.body
+        : options.body !== undefined
+          ? JSON.stringify(options.body)
+          : undefined,
   })
 
   // On 401, try to silently refresh once, then retry the original request.
   // Skip the interceptor on the refresh endpoint itself to avoid infinite loops,
   // and skip on retries (already refreshed once).
-  if (res.status === 401 && !isRetry && path !== '/api/auth/refresh') {
+  // Also skip if no access token was sent — 401 on an unauthenticated request
+  // (e.g. login with wrong credentials) means auth failed, not session expired.
+  if (res.status === 401 && !isRetry && path !== '/api/auth/refresh' && tokens?.accessToken) {
     if (!refreshPromise) {
       refreshPromise = doRefresh().finally(() => {
         refreshPromise = null
@@ -114,7 +136,18 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
 
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(`${res.status}: ${text}`)
+    let parsed: Record<string, unknown> | null = null
+    let userMsg = `Request failed with status ${res.status}`
+    try {
+      const json = JSON.parse(text) as Record<string, unknown>
+      parsed = json
+      if (typeof json.error === 'string') userMsg = json.error
+      else if (typeof json.message === 'string') userMsg = json.message
+    } catch {
+      // Non-JSON response — use raw text if short
+      if (text.length < 200) userMsg = text
+    }
+    throw new ApiError(res.status, text, parsed, userMsg)
   }
 
   return res.json() as Promise<T>

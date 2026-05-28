@@ -1,0 +1,114 @@
+---
+title: User Roles
+description: Role-based access control with 5 tiers — superadmin, admin, moderator, user, guest
+order: 36
+---
+
+Bedrud implements a 5-tier role system for access control. Each role maps to a set of access strings stored on the user record and enforced at both the API layer (backend middleware) and the UI layer (frontend guards and conditional rendering).
+
+## Role Hierarchy
+
+| Role | Access Array | Backend Weight | Description |
+|------|-------------|----------------|-------------|
+| Superadmin | `['superadmin', 'user']` | 4 | Full system access, all admin capabilities |
+| Admin | `['admin', 'user']` | 3 | Full admin access, same as superadmin |
+| Moderator | `['moderator', 'user']` | 2 | Read-only admin view, no mutations |
+| User | `['user']` | 1 | Standard registered user |
+| Guest | `['guest']` | 0 | Unregistered participant, join-only |
+
+## Backend Enforcement
+
+Access levels are enforced via the `RequireAccess` middleware on every admin route. The middleware checks the user's accesses array against the minimum required level:
+
+- Routes requiring `superadmin` access reject admin, moderator, user, and guest
+- Routes requiring `admin` access allow superadmin and admin
+- Routes requiring `moderator` access allow superadmin, admin, and moderator
+
+The backend stores accesses as a comma-separated string in the database (`accesses` column on the `users` table). The `StringArray` GORM type handles serialization and deserialization.
+
+## Frontend Integration
+
+### User Type
+
+The `User` interface in `user.store.ts` includes two boolean fields derived from the accesses array:
+
+```ts
+interface User {
+  // ...
+  isSuperAdmin: boolean  // accesses.includes('superadmin')
+  isAdmin: boolean       // accesses.includes('admin') || accesses.includes('superadmin')
+  accesses: string[]     // raw access list from backend
+}
+```
+
+### Admin Guard
+
+The admin layout (`/dashboard/admin`) lets through superadmin, admin, and moderator. Moderators receive an `isReadOnly=true` context variable:
+
+```tsx
+// routes/dashboard/admin.tsx
+const canAccess = user?.isSuperAdmin || accesses.includes('admin') || accesses.includes('moderator')
+```
+
+The `useAdminContext()` hook provides the `isReadOnly` flag to all child routes:
+
+```tsx
+const { isReadOnly } = useAdminContext()
+```
+
+### What Moderators Can See vs Do
+
+| Page | View | Mutate |
+|------|------|--------|
+| Overview stats | ✅ Full stats | N/A |
+| Users list | ✅ Full list | ❌ No bulk actions |
+| User detail | ✅ Full profile | ❌ No status/role/delete/logout |
+| Rooms list | ✅ Full list | ❌ No suspend/delete/edit cap |
+| Room detail | ✅ Full info | ❌ No suspend/delete/kick/mute |
+| Settings | ❌ Redirected | ❌ |
+
+### Role Selector
+
+The admin UI provides a `<Select>` dropdown on both the users list table and the user detail page, replacing the previous binary superadmin toggle. Available options:
+
+| Option | Saves as |
+|--------|----------|
+| Superadmin | `['superadmin', 'user']` |
+| Admin | `['admin', 'user']` |
+| Moderator | `['moderator', 'user']` |
+| User | `['user']` |
+| Guest | `['guest']` |
+
+The dropdown sends a `PUT /api/admin/users/:id/accesses` request with the full access array.
+
+## CLI Management
+
+The `bedrud user promote` and `bedrud user demote` commands accept a `--role` flag:
+
+```bash
+# Promote to superadmin (default)
+bedrud user promote --email user@example.com
+
+# Promote to admin
+bedrud user promote --email user@example.com --role admin
+
+# Promote to moderator
+bedrud user promote --email user@example.com --role moderator
+
+# Demote specific role
+bedrud user demote --email user@example.com --role admin
+```
+
+Valid `--role` values: `superadmin`, `admin`, `moderator`, `user`, `guest`.
+
+## Code Locations
+
+| File | Purpose |
+|------|---------|
+| `server/internal/models/user.go` | Backend access level constants |
+| `server/internal/middleware/` | `RequireAccess` middleware |
+| `server/internal/usercli/usercli.go` | CLI role management functions |
+| `apps/web/src/lib/user.store.ts` | Frontend User type |
+| `apps/web/src/routes/dashboard/admin.tsx` | Admin guard + isReadOnly context |
+| `apps/web/src/components/admin/UserTable.tsx` | Role selector dropdown + badges |
+| `apps/web/src/components/admin/RoomTable.tsx` | Read-only room table masking |

@@ -1,6 +1,6 @@
 ---
-title: Android App
-description: Native Android application
+title: Android 应用
+description: 原生 Android 应用
 order: 9
 ---
 
@@ -95,7 +95,7 @@ flowchart TB
         RM["RoomManager"]
     end
 
-    AI --> DEPS
+    AI */} DEPS
 ```
 
 ### 关键模式
@@ -113,9 +113,9 @@ val roomApi = instanceManager.roomApi.collectAsState().value ?: return
 
 ```mermaid
 flowchart LR
-    A["No instances"] --> B[AddInstanceScreen]
-    C["Has instances, not logged in"] --> D[LoginScreen]
-    E["Has instances, logged in"] --> F[DashboardScreen]
+    A["No instances"] */} B[AddInstanceScreen]
+    C["Has instances, not logged in"] */} D[LoginScreen]
+    E["Has instances, logged in"] */} F[DashboardScreen]
 ```
 
 实例切换器作为从仪表板工具栏触发的 `ModalBottomSheet` 出现。

@@ -1,0 +1,114 @@
+---
+title: أدوار المستخدمين
+description: التحكم في الوصول المبني على الأدوار مع 5 مستويات — مشرف عام، مشرف، مراقب، مستخدم، ضيف
+order: 36
+---
+
+يطبق Bedrud نظام أدوار من 5 مستويات للتحكم في الوصول. كل دور يرتبط بمجموعة من سلاسل الوصول المخزنة في سجل المستخدم ويتم تطبيقها على كل من طبقة API (الوسيط في الخلفية) وطبقة UI (حراس الواجهة الأمامية والعرض المشروط).
+
+## تسلسل الأدوار
+
+| الدور | مصفوفة الوصول | وزن الخلفية | الوصف |
+|-------|--------------|-------------|-------|
+| مشرف عام | `['superadmin', 'user']` | 4 | وصول كامل للنظام، جميع إمكانيات الإدارة |
+| مشرف | `['admin', 'user']` | 3 | وصول إداري كامل، مثل المشرف العام |
+| مراقب | `['moderator', 'user']` | 2 | عرض إداري للقراءة فقط، بدون تعديلات |
+| مستخدم | `['user']` | 1 | مستخدم مسجل قياسي |
+| ضيف | `['guest']` | 0 | مشارك غير مسجل، انضمام فقط |
+
+## التطبيق في الخلفية
+
+يتم تطبيق مستويات الوصول عبر وسيط `RequireAccess` على كل مسار إداري. يتحقق الوسيط من مصفوفة وصول المستخدم مقابل الحد الأدنى المطلوب:
+
+- المسارات التي تتطلب وصول `superadmin` ترفض المشرف والمراقب والمستخدم والضيف
+- المسارات التي تتطلب وصول `admin` تسمح للمشرف العام والمشرف
+- المسارات التي تتطلب وصول `moderator` تسمح للمشرف العام والمشرف والمراقب
+
+يخزن الخلفية الوصول كسلسلة مفصولة بفواصل في قاعدة البيانات (عمود `accesses` في جدول `users`). نوع GORM `StringArray` يتولى التسلسل وإلغاء التسلسل.
+
+## تكامل الواجهة الأمامية
+
+### نوع المستخدم
+
+تتضمن واجهة `User` في `user.store.ts` حقلين منطقيين مشتقين من مصفوفة الوصول:
+
+```ts
+interface User {
+  // ...
+  isSuperAdmin: boolean  // accesses.includes('superadmin')
+  isAdmin: boolean       // accesses.includes('admin') || accesses.includes('superadmin')
+  accesses: string[]     // raw access list from backend
+}
+```
+
+### حارس الإدارة
+
+يسمح تخطيط الإدارة (`/dashboard/admin`) للمشرف العام والمشرف والمراقب بالمرور. يتلقى المراقبون متغير سياق `isReadOnly=true`:
+
+```tsx
+// routes/dashboard/admin.tsx
+const canAccess = user?.isSuperAdmin || accesses.includes('admin') || accesses.includes('moderator')
+```
+
+يوفر hook `useAdminContext()` علامة `isReadOnly` لجميع المسارات الفرعية:
+
+```tsx
+const { isReadOnly } = useAdminContext()
+```
+
+### ما يمكن للمراقبين رؤيته مقابل فعله
+
+| الصفحة | عرض | تعديل |
+|--------|-----|-------|
+| إحصائيات عامة | ✅ إحصائيات كاملة | غير متاح |
+| قائمة المستخدمين | ✅ قائمة كاملة | ❌ لا إجراءات جماعية |
+| تفاصيل المستخدم | ✅ ملف كامل | ❌ لا حالة/دور/حذف/تسجيل خروج |
+| قائمة الغرف | ✅ قائمة كاملة | ❌ لا تعليق/حذف/تعديل سقف |
+| تفاصيل الغرفة | ✅ معلومات كاملة | ❌ لا تعليق/حذف/طرد/كتم |
+| الإعدادات | ❌ إعادة توجيه | ❌ |
+
+### منتقي الدور
+
+توفر واجهة الإدارة قائمة منسدلة `<Select>` في كل من جدول قائمة المستخدمين وصفحة تفاصيل المستخدم، لتحل محل مفتاح المشرف العام الثنائي السابق. الخيارات المتاحة:
+
+| الخيار | يحفظ كـ |
+|--------|---------|
+| مشرف عام | `['superadmin', 'user']` |
+| مشرف | `['admin', 'user']` |
+| مراقب | `['moderator', 'user']` |
+| مستخدم | `['user']` |
+| ضيف | `['guest']` |
+
+ترسل القائمة المنسدلة طلب `PUT /api/admin/users/:id/accesses` مع مصفوفة الوصول الكاملة.
+
+## إدارة سطر الأوامر
+
+تقبل أوامر `bedrud user promote` و `bedrud user demote` علامة `--role`:
+
+```bash
+# Promote to superadmin (default)
+bedrud user promote --email user@example.com
+
+# Promote to admin
+bedrud user promote --email user@example.com --role admin
+
+# Promote to moderator
+bedrud user promote --email user@example.com --role moderator
+
+# Demote specific role
+bedrud user demote --email user@example.com --role admin
+```
+
+قيم `--role` الصالحة: `superadmin`، `admin`، `moderator`، `user`، `guest`.
+
+## مواقع الكود
+
+| الملف | الغرض |
+|-------|-------|
+| `server/internal/models/user.go` | ثوابت مستوى الوصول في الخلفية |
+| `server/internal/middleware/` | وسيط `RequireAccess` |
+| `server/internal/usercli/usercli.go` | وظائف إدارة الأدوار في سطر الأوامر |
+| `apps/web/src/lib/user.store.ts` | نوع User في الواجهة الأمامية |
+| `apps/web/src/routes/dashboard/admin.tsx` | حارس الإدارة + سياق isReadOnly |
+| `apps/web/src/components/admin/UserTable.tsx` | قائمة منسدلة منتقي الدور + شارات |
+| `apps/web/src/components/admin/RoomTable.tsx` | إخفاء جدول الغرف للقراءة فقط |

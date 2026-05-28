@@ -74,6 +74,41 @@ Bedrud, FIDO2 standardı (WebAuthn) aracılığıyla parolasız kimlik doğrulam
 ### 4. Misafir Girişi
 Kullanıcıların yalnızca bir adla anında bir toplantıya katılmasına olanak tanır. Sunucu `guest` rolüyle geçici bir kullanıcı kaydı oluşturur.
 
+
+## E-posta Doğrulama
+
+Yapılandırmada `requireEmailVerification: true` olduğunda, yerel (OAuth olmayan) kayıt ve giriş işlemleri e-posta onayı gerektirir:
+
+- **Kayıt** kullanıcıyı oluşturur ancak `EmailVerifiedAt`'i `nil` olarak ayarlar. Kullanıcı doğrulanana kadar giriş yapamaz.
+- **Giriş** doğrulanmamış hesaplar için `403` ve `{"requiresVerification": true}` döndürür.
+- **Yeniden gönder** `POST /api/auth/verify/resend` ile — `verificationEmailCooldownMins` ve ayrı bir hız sınırlama kovası (`authResendMaxRequests`) tarafından sınırlanır.
+- **Otomatik temizlik** `unverifiedAccountTTLHours` (varsayılan 48s, 0 devre dışı) sonrasında doğrulanmamış hesapları siler.
+- **E-posta değişikliği** yeni bir doğrulama akışı başlatır. Kullanıcı oturumu açık kalır; yeni jeton düzenlenir.
+
+Misafir kullanıcılar muaftır — e-postaları yoktur.
+
+## Şifre Sıfırlama
+
+Şifre sıfırlama akışı (SMTP gerektirir):
+
+1. `POST /api/auth/forgot-password` ile `{"email": "..."}` — sunucu e-postaya sıfırlama bağlantısı gönderir
+2. `POST /api/auth/reset-password` ile `{"token": "...", "newPassword": "..."}` — yeni şifre belirler
+
+Sıfırlama jetonu TTL'si `resetTokenTTLHours` (varsayılan 1 saat) tarafından kontrol edilir. Forgot-password uç noktası, auth hız sınırlama kovasını paylaşır.
+
+## Soğuma Süresi & Hız Sınırlama
+
+Bedrud dört ayrı hız sınırlama kovası kullanır:
+| Kova | Uç Noktalar | Varsayılan | Pencere |
+|--------|-----------|---------|--------|
+| Auth | login, register, refresh, passkey, forgot-password | 10 | 60s |
+| Misafir | guest-login | 5 | 60s |
+| API | genel API | 30 | 60s |
+| Yeniden Gönder | verify/resend | 3 | 60s |
+
+Kova `0` = devre dışı. Tüm limitler uzak IP başınadır. Aşılan istekler `429 Too Many Requests` ve `Retry-After` başlığı döndürür.
+
+
 ## Birlikte Çalışabilirlik ve CORS
 Bedrud, birden fazla kökenden erişilebilir olacak şekilde tasarlanmıştır; bu, geliştirme (React geliştirme sunucusu) ve üretim (farklı alt alan adları) için kritik öneme sahiptir.
 

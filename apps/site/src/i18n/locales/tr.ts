@@ -539,6 +539,7 @@
       "guides/appliance": "Cihaz Modu",
       "guides/admin-dashboard": "Yönetici Paneli",
       "guides/behind-proxy": "Bir Proxy/CDN Arkasında",
+      "guides/roles": "Kullanıcı Rolleri",
       contributing: "Katkıda Bulunma",
     },
   },

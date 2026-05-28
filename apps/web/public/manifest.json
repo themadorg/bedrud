@@ -1,15 +1,28 @@
 {
+  "id": "/",
   "short_name": "Bedrud",
   "name": "Bedrud",
+  "description": "Private video meetings",
   "icons": [
+    {
+      "src": "/favicon-16x16.png",
+      "type": "image/png",
+      "sizes": "16x16"
+    },
+    {
+      "src": "/favicon-32x32.png",
+      "type": "image/png",
+      "sizes": "32x32"
+    },
     {
       "src": "/favicon.svg",
       "type": "image/svg+xml",
-      "sizes": "any"
+      "sizes": "any",
+      "purpose": "any"
     },
     {
       "src": "/favicon.ico",
-      "sizes": "48x48 32x32 16x16",
+      "sizes": "48x48",
       "type": "image/x-icon"
     },
     {
@@ -21,6 +34,21 @@
       "src": "/logo512.png",
       "type": "image/png",
       "sizes": "512x512"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-wide.png",
+      "sizes": "1920x1080",
+      "form_factor": "wide",
+      "type": "image/png",
+      "label": "Bedrud dashboard"
+    },
+    {
+      "src": "/screenshot-narrow.png",
+      "sizes": "2048x2732",
+      "type": "image/png",
+      "label": "Bedrud mobile view"
     }
   ],
   "start_url": ".",

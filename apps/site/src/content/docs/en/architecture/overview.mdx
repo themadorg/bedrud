@@ -21,13 +21,15 @@ flowchart TB
         Router["Fiber HTTP Router<br/>/api/auth/* /api/room/* /api/admin/*"]
         DB["GORM / SQLite<br/>(or PostgreSQL)"]
         LKSDK["LiveKit Protocol SDK<br/>(token generation, room management)"]
+        Queue["Job Queue<br/>(async deletion, uploads)"]
         LiveKit["Embedded LiveKit<br/>Media Server (WebRTC)"]
     end
 
-    Clients -->|"REST API + WebSocket"| Router
-    Router --> DB
-    Router --> LKSDK
-    LKSDK --> LiveKit
+    Clients */}|"REST API + WebSocket"| Router
+    Router */} DB
+    Router */} LKSDK
+    Router -.->|"enqueue jobs"| Queue
+    LKSDK */} LiveKit
 ```
 
 ## Components
@@ -40,6 +42,7 @@ The Go backend is the core of Bedrud. It handles:
 - **Static file serving** - the compiled web frontend is embedded via `//go:embed`
 - **LiveKit integration** - generates tokens and manages rooms via the LiveKit Protocol SDK
 - **Embedded LiveKit server** - the media server binary runs as a child process
+- **Async job queue** - background worker processes room deletion, user deletion, suspensions, and chat uploads without blocking API responses
 
 The server uses the **Fiber** web framework (similar to Express.js in Node.js) and **GORM** as the ORM layer. It supports SQLite for development and PostgreSQL for production.
 
@@ -118,12 +121,12 @@ sequenceDiagram
 
     Client->>Server: POST /api/auth/login
     Server->>Database: verify credentials
-    Database-->>Server: credentials valid
-    Server-->>Client: access + refresh JWT
+    Database*/}>Server: credentials valid
+    Server*/}>Client: access + refresh JWT
 
     Client->>Server: GET /api/room/list
     Note right of Server: "Authorization: Bearer <access_token>"
-    Server-->>Client: room list
+    Server*/}>Client: room list
 ```
 
 All authenticated requests use JWT tokens in the `Authorization` header. The web frontend's `authFetch` wrapper handles token attachment and automatic refresh.
@@ -156,9 +159,9 @@ sequenceDiagram
     C->>LK: Host + STUN + TURN candidates
 
     alt Direct path (UDP)
-        C-->>LK: Media via UDP 50000-60000
+        C*/}>LK: Media via UDP 50000-60000
     else TURN relay
-        C-->>LK: Media via TURN relay
+        C*/}>LK: Media via TURN relay
     end
 
     Note over C,LK: Audio/video tracks flow through SFU

@@ -168,7 +168,7 @@ bedrud user [--config <yol>] <alt-komut> [bayraklar]
 Yerel kimlik doğrulama ile yeni bir kullanıcı oluşturur (bcrypt ile hashlenmiş parola).
 
 ```bash
-bedrud user [--config <yol>] create --email <e-posta> --password <parola> --name <ad>
+bedrud user [--config <yol>] create --email <e-posta> --password <parola> --name <ad> [--admin]
 ```
 
 **Gerekli bayraklar:**
@@ -176,7 +176,10 @@ bedrud user [--config <yol>] create --email <e-posta> --password <parola> --name
 - `--password`: Kullanıcı parolası, depolanmadan önce bcrypt ile hashlenir
 - `--name`: Kullanıcı görünen adı
 
-**Erişim seviyesi:** `user` (süper yönetici değil). Yönetici hakları vermek için `promote` kullanın.
+**İsteğe bağlı bayraklar:**
+- `--admin`: Kullanıcıyı süper yönetici olarak oluştur
+
+**Erişim seviyesi:** Varsayılan olarak `user`. Tek komutta süper yönetici oluşturmak için `--admin` kullanın.
 
 #### `delete`
 
@@ -188,19 +191,49 @@ bedrud user [--config <yol>] delete --email <e-posta>
 
 #### `promote`
 
-Bir kullanıcıya `superadmin` erişimi verir.
+Bir kullanıcının rolünü erişim dizisini değiştirerek ayarlar. Varsayılan: `superadmin`.
 
 ```bash
-bedrud user [--config <yol>] promote --email <e-posta>
+bedrud user [--config <yol>] promote --email <e-posta> [--role <rol>]
 ```
+
+| Bayrak  | Varsayılan   | Açıklama                                                     |
+|---------|--------------|--------------------------------------------------------------|
+| `--role` | `superadmin` | Hedef rol: `superadmin`, `admin`, `moderator`, `user`, `guest` |
+
+Örnekler:
+
+```bash
+# Superadmin yetkisi ver (varsayılan)
+bedrud user promote --email admin@example.com
+
+# Admin yetkisi ver
+bedrud user promote --email admin@example.com --role admin
+
+# Moderator yetkisi ver
+bedrud user promote --email mod@example.com --role moderator
+```
+
+Her rol belirli bir erişim dizisine eşlenir:
+- `superadmin` → `['superadmin', 'user']`
+- `admin` → `['admin', 'user']`
+- `moderator` → `['moderator', 'user']`
+- `user` → `['user']`
+- `guest` → `['guest']`
 
 #### `demote`
 
-Bir kullanıcıdan `superadmin` erişimini kaldırır (`user` seviyesine döner).
+Bir kullanıcıdan belirli bir rolü kaldırır. Varsayılan: `superadmin`.
 
 ```bash
-bedrud user [--config <yol>] demote --email <e-posta>
+bedrud user [--config <yol>] demote --email <e-posta> [--role <rol>]
 ```
+
+| Bayrak  | Varsayılan   | Açıklama                                           |
+|---------|--------------|----------------------------------------------------|
+| `--role` | `superadmin` | Kaldırılacak rol: `superadmin`, `admin`, `moderator` |
+
+Kaldırma işleminden sonra kullanıcının hiçbir rolü kalmazsa, otomatik olarak `user` erişimi eklenir.
 
 **Uygulama:** `server/internal/usercli/usercli.go`
 
@@ -308,10 +341,11 @@ bedrud install --fresh --domain example.com --email admin@example.com
 ### Kullanıcı yönetimi
 
 ```bash
-# İlk yönetici kullanıcısını oluştur
-bedrud user [--config <yol>] create --email admin@example.com --password secret123 --name "Admin User"
+# İlk yönetici kullanıcısını oluştur (tek komut)
+bedrud user [--config <yol>] create --email admin@example.com --password secret123 --name "Admin User" --admin
 
-# Süper yönetici erişimi ver
+# Veya normal kullanıcı oluşturup yükselt
+bedrud user [--config <yol>] create --email admin@example.com --password secret123 --name "Admin User"
 bedrud user [--config <yol>] promote --email admin@example.com
 
 # Normal kullanıcı oluştur

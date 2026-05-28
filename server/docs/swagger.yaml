@@ -12,11 +12,12 @@ definitions:
       password:
         type: string
     type: object
-  auth.LogoutRequest:
+  auth.LoginResponse:
     properties:
-      refresh_token:
-        example: eyJhbGciOiJ...
-        type: string
+      tokens:
+        $ref: '#/definitions/auth.TokenPair'
+      user:
+        $ref: '#/definitions/models.User'
     type: object
   auth.RegisterRequest:
     properties:
@@ -25,6 +26,13 @@ definitions:
       name:
         type: string
       password:
+        type: string
+    type: object
+  auth.TokenPair:
+    properties:
+      accessToken:
+        type: string
+      refreshToken:
         type: string
     type: object
   auth.TokenResponse:
@@ -42,10 +50,99 @@ definitions:
       user:
         $ref: '#/definitions/handlers.UserResponse'
     type: object
+  handlers.BulkIDsRequest:
+    properties:
+      ids:
+        items:
+          type: string
+        type: array
+    type: object
+  handlers.BulkItemResult:
+    properties:
+      error:
+        type: string
+      name:
+        type: string
+      success:
+        type: boolean
+    type: object
+  handlers.BulkResult:
+    properties:
+      results:
+        additionalProperties:
+          $ref: '#/definitions/handlers.BulkItemResult'
+        type: object
+      totalFailed:
+        type: integer
+      totalProcessed:
+        type: integer
+    type: object
+  handlers.CreateRoomRequest:
+    properties:
+      isPublic:
+        type: boolean
+      maxParticipants:
+        type: integer
+      mode:
+        type: string
+      name:
+        type: string
+      settings:
+        $ref: '#/definitions/models.RoomSettings'
+    type: object
   handlers.ErrorResponse:
     properties:
       error:
         example: Error message
+        type: string
+    type: object
+  handlers.GuestJoinRoomRequest:
+    properties:
+      guestName:
+        type: string
+      roomName:
+        type: string
+    type: object
+  handlers.JoinRoomRequest:
+    properties:
+      roomName:
+        type: string
+    type: object
+  handlers.LogoutRequest:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  handlers.RecordingDTO:
+    properties:
+      createdAt:
+        type: string
+      createdBy:
+        type: string
+      downloadStatus:
+        type: string
+      durationMs:
+        type: integer
+      error:
+        type: string
+      fileSize:
+        type: integer
+      fileUrl:
+        type: string
+      id:
+        type: string
+      recordingType:
+        type: string
+      roomId:
+        type: string
+      roomName:
+        type: string
+      status:
+        type: string
+    type: object
+  handlers.RefreshLiveKitTokenRequest:
+    properties:
+      roomName:
         type: string
     type: object
   handlers.RefreshRequest:
@@ -55,10 +152,8 @@ definitions:
         type: string
     type: object
   handlers.UserDetails:
-    description: Detailed information about a user
     properties:
       accesses:
-        description: '@Description List of user''s access levels'
         example:
         - user
         - admin
@@ -66,39 +161,33 @@ definitions:
           type: string
         type: array
       createdAt:
-        description: '@Description Account creation timestamp'
         example: "2025-01-01 12:00:00"
         type: string
       email:
-        description: '@Description User''s email address'
         example: user@example.com
         type: string
+      emailVerifiedAt:
+        example: "2025-01-01 12:00:00"
+        type: string
       id:
-        description: '@Description User''s unique identifier'
         example: 123e4567-e89b-12d3-a456-426614174000
         type: string
       isActive:
-        description: '@Description Whether the user account is active'
         example: true
         type: boolean
       isAdmin:
-        description: '@Description Whether the user has admin access'
         example: false
         type: boolean
       name:
-        description: '@Description User''s display name'
         example: John Doe
         type: string
       provider:
-        description: '@Description Authentication provider'
         example: local
         type: string
     type: object
   handlers.UserListResponse:
-    description: Response containing a list of users
     properties:
       users:
-        description: '@Description List of user details'
         items:
           $ref: '#/definitions/handlers.UserDetails'
         type: array
@@ -121,18 +210,525 @@ definitions:
         example: google
         type: string
     type: object
-  handlers.UserStatusUpdateRequest:
-    description: Request body for updating user status
+  handlers.createWebhookRequest:
+    properties:
+      events:
+        items:
+          type: string
+        type: array
+      name:
+        type: string
+      url:
+        type: string
+    type: object
+  handlers.updateWebhookRequest:
+    properties:
+      events:
+        items:
+          type: string
+        type: array
+      isActive:
+        type: boolean
+      name:
+        type: string
+      url:
+        type: string
+    type: object
+  handlers.webhookDTO:
+    properties:
+      createdAt:
+        type: string
+      createdBy:
+        type: string
+      events:
+        items:
+          type: string
+        type: array
+      id:
+        type: string
+      isActive:
+        type: boolean
+      lastSeen:
+        type: string
+      name:
+        type: string
+      secret:
+        description: only returned once on create/rotate
+        type: string
+      updatedAt:
+        type: string
+      url:
+        type: string
+    type: object
+  models.AttentionItem:
+    properties:
+      daysLeft:
+        type: integer
+      message:
+        type: string
+      roomId:
+        type: string
+      severity:
+        description: error, warning, info
+        type: string
+      type:
+        description: tls_expiry, stale_room, empty_room, auth_spike
+        type: string
+    type: object
+  models.DayActivity:
+    properties:
+      date:
+        type: string
+      participants:
+        type: integer
+      roomsActive:
+        type: integer
+      roomsCreated:
+        type: integer
+    type: object
+  models.FailedJobSummary:
+    properties:
+      age:
+        type: string
+      attempts:
+        type: integer
+      error:
+        type: string
+      id:
+        type: string
+      type:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.InstanceInfo:
+    properties:
+      name:
+        type: string
+      startedAt:
+        type: string
+      uptimeSeconds:
+        type: integer
+      version:
+        type: string
+    type: object
+  models.InviteToken:
+    properties:
+      createdAt:
+        type: string
+      createdBy:
+        type: string
+      email:
+        type: string
+      expiresAt:
+        type: string
+      id:
+        type: string
+      token:
+        type: string
+      usedAt:
+        type: string
+      usedBy:
+        type: string
+    type: object
+  models.KpiEntry:
+    properties:
+      activeNow:
+        type: integer
+      delta:
+        type: integer
+      deltaLabel:
+        type: string
+      deltaPercent:
+        type: integer
+      peakToday:
+        type: integer
+      value:
+        type: integer
+    type: object
+  models.OverviewHealth:
+    properties:
+      alertsCount:
+        type: integer
+      dbStatus:
+        description: connected, error
+        type: string
+      realtime:
+        description: connected, disconnected
+        type: string
+      status:
+        description: healthy, degraded, down
+        type: string
+      tls:
+        $ref: '#/definitions/models.TLSStatus'
+      uptimeSeconds:
+        type: integer
+    type: object
+  models.OverviewKPIs:
+    properties:
+      activeSessions:
+        $ref: '#/definitions/models.KpiEntry'
+      onlineNow:
+        $ref: '#/definitions/models.KpiEntry'
+      pendingActions:
+        $ref: '#/definitions/models.KpiEntry'
+      totalRooms:
+        $ref: '#/definitions/models.KpiEntry'
+      totalUsers:
+        $ref: '#/definitions/models.KpiEntry'
+    type: object
+  models.OverviewResponse:
+    properties:
+      activityTrend:
+        items:
+          $ref: '#/definitions/models.DayActivity'
+        type: array
+      health:
+        $ref: '#/definitions/models.OverviewHealth'
+      instanceInfo:
+        $ref: '#/definitions/models.InstanceInfo'
+      kpis:
+        $ref: '#/definitions/models.OverviewKPIs'
+      needsAttention:
+        items:
+          $ref: '#/definitions/models.AttentionItem'
+        type: array
+      recentRoomEvents:
+        items:
+          $ref: '#/definitions/models.RoomEvent'
+        type: array
+      recentSignups:
+        items:
+          $ref: '#/definitions/models.RecentUser'
+        type: array
+      roomComposition:
+        $ref: '#/definitions/models.RoomComposition'
+    type: object
+  models.QueueStats:
     properties:
       active:
-        example: true
+        type: integer
+      done24h:
+        type: integer
+      failRate:
+        type: number
+      failed24h:
+        type: integer
+      failedEmail24h:
+        type: integer
+      failedPerMin:
+        type: number
+      lastSendError:
+        type: string
+      lastSendErrorAt:
+        type: string
+      maxDepth:
+        type: integer
+      oldestPending:
+        type: string
+      pending:
+        type: integer
+      pendingEmail:
+        type: integer
+      processedPerMin:
+        type: number
+      recentFailures:
+        items:
+          $ref: '#/definitions/models.FailedJobSummary'
+        type: array
+      total:
+        type: integer
+    type: object
+  models.RecentUser:
+    properties:
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      provider:
+        type: string
+    type: object
+  models.Room:
+    properties:
+      adminId:
+        description: Room creator/admin
+        type: string
+      createdAt:
+        type: string
+      createdBy:
+        type: string
+      deletedAt:
+        description: Set when room is archived
+        type: string
+      expiresAt:
+        type: string
+      id:
+        type: string
+      isActive:
+        type: boolean
+      isPublic:
+        type: boolean
+      lastActivityAt:
+        description: Updated on participant join; used for stale-room detection
+        type: string
+      maxParticipants:
+        type: integer
+      mode:
+        description: Room mode (e.g. 'standard')
+        type: string
+      name:
+        type: string
+      settings:
+        $ref: '#/definitions/models.RoomSettings'
+      updatedAt:
+        type: string
+    type: object
+  models.RoomComposition:
+    properties:
+      live:
+        type: integer
+      persistent:
+        type: integer
+      private:
+        type: integer
+      public:
+        type: integer
+      stale:
+        type: integer
+    type: object
+  models.RoomEvent:
+    properties:
+      roomId:
+        type: string
+      roomName:
+        type: string
+      timestamp:
+        type: string
+      type:
+        description: room_created, room_joined
+        type: string
+      userId:
+        type: string
+      userName:
+        type: string
+    type: object
+  models.RoomSettings:
+    properties:
+      allowAudio:
+        type: boolean
+      allowChat:
+        type: boolean
+      allowVideo:
+        type: boolean
+      e2ee:
+        type: boolean
+      isPersistent:
+        type: boolean
+      recordingsAllowed:
+        description: TODO oncoming feature
+        type: boolean
+      requireApproval:
         type: boolean
     type: object
-  handlers.UserStatusUpdateResponse:
-    description: Response for user status update
+  models.SystemSettings:
     properties:
-      message:
-        example: User status updated successfully
+      behindProxy:
+        type: boolean
+      chatMaxMessageCount:
+        description: Chat message retention
+        type: integer
+      chatMessageTTLHours:
+        type: integer
+      chatUploadBackend:
+        description: Chat uploads
+        type: string
+      chatUploadDiskDir:
+        type: string
+      chatUploadInlineMax:
+        type: integer
+      chatUploadMaxBytes:
+        type: integer
+      chatUploadS3AccessKey:
+        type: string
+      chatUploadS3Bucket:
+        type: string
+      chatUploadS3Endpoint:
+        type: string
+      chatUploadS3PublicUrl:
+        type: string
+      chatUploadS3Region:
+        type: string
+      chatUploadS3SecretKey:
+        type: string
+      corsAllowCredentials:
+        type: boolean
+      corsAllowedHeaders:
+        type: string
+      corsAllowedMethods:
+        type: string
+      corsAllowedOrigins:
+        description: CORS
+        type: string
+      corsMaxAge:
+        type: integer
+      emailButtonBg:
+        type: string
+      emailFromAddress:
+        type: string
+      emailFromName:
+        type: string
+      emailHeaderBg:
+        type: string
+      emailInstanceName:
+        description: Email branding
+        type: string
+      emailInstanceUrl:
+        type: string
+      emailPassword:
+        type: string
+      emailPreheaderChanged:
+        type: string
+      emailPreheaderInvite:
+        type: string
+      emailPreheaderReset:
+        type: string
+      emailPreheaderVerify:
+        description: Per-template preheader text overrides
+        type: string
+      emailPreheaderWelcome:
+        type: string
+      emailSmtpHost:
+        description: SMTP settings in DB (empty = fall back to config.yaml)
+        type: string
+      emailSmtpPort:
+        type: integer
+      emailSmtpsMode:
+        type: boolean
+      emailSubjectChanged:
+        type: string
+      emailSubjectInvite:
+        type: string
+      emailSubjectReset:
+        type: string
+      emailSubjectVerify:
+        description: Per-template subject line overrides (empty = use config.yaml
+          or hardcoded default)
+        type: string
+      emailSubjectWelcome:
+        type: string
+      emailSupportEmail:
+        type: string
+      emailTlsSkipVerify:
+        type: boolean
+      emailUsername:
+        type: string
+      frontendUrl:
+        type: string
+      githubClientId:
+        type: string
+      githubClientSecret:
+        type: string
+      githubRedirectUrl:
+        type: string
+      globalDiskThresholdBytes:
+        type: integer
+      googleClientId:
+        type: string
+      googleClientSecret:
+        type: string
+      googleRedirectUrl:
+        type: string
+      guestLoginEnabled:
+        type: boolean
+      id:
+        type: integer
+      jwtSecret:
+        type: string
+      livekitApiKey:
+        type: string
+      livekitApiSecret:
+        type: string
+      livekitExternal:
+        type: boolean
+      livekitHost:
+        description: LiveKit
+        type: string
+      logLevel:
+        description: Logger
+        type: string
+      maxParticipantsLimit:
+        description: Room limits
+        type: integer
+      maxRoomsPerUser:
+        type: integer
+      maxUploadBytesPerUser:
+        description: Upload quotas
+        type: integer
+      passkeysEnabled:
+        description: Auth
+        type: boolean
+      recordingMaxDurationMins:
+        description: 0 = unlimited
+        type: integer
+      recordingMaxFileSizeMB:
+        description: 0 = unlimited
+        type: integer
+      recordingsEnabled:
+        description: |-
+          TODO oncoming feature: recordings
+          RecordingsEnabled, RecordingMaxDurationMins, RecordingMaxFileSizeMB
+        type: boolean
+      registrationEnabled:
+        type: boolean
+      serverCertFile:
+        type: string
+      serverDomain:
+        type: string
+      serverEmail:
+        type: string
+      serverEnableTls:
+        type: boolean
+      serverHost:
+        type: string
+      serverKeyFile:
+        type: string
+      serverName:
+        description: Instance
+        type: string
+      serverPort:
+        description: Server
+        type: string
+      serverUseAcme:
+        type: boolean
+      sessionSecret:
+        type: string
+      tokenDuration:
+        type: integer
+      tokenRegistrationOnly:
+        type: boolean
+      twitterClientId:
+        type: string
+      twitterClientSecret:
+        type: string
+      twitterRedirectUrl:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.TLSStatus:
+    properties:
+      daysRemaining:
+        type: integer
+      enabled:
+        type: boolean
+      expiryDate:
+        type: string
+      status:
+        description: valid, expiring, expired, unknown
         type: string
     type: object
   models.User:
@@ -147,15 +743,38 @@ definitions:
         type: string
       email:
         type: string
+      emailVerifiedAt:
+        type: string
       id:
         type: string
       isActive:
         type: boolean
       name:
         type: string
+      passwordChangedAt:
+        type: string
       provider:
         type: string
       updatedAt:
+        type: string
+    type: object
+  utils.CertInfo:
+    properties:
+      daysRemaining:
+        type: integer
+      issuer:
+        type: string
+      notAfter:
+        type: string
+      notBefore:
+        type: string
+      sans:
+        items:
+          type: string
+        type: array
+      status:
+        type: string
+      subject:
         type: string
     type: object
 host: localhost:8090
@@ -172,6 +791,997 @@ info:
   title: Bedrud Backend API
   version: "1.0"
 paths:
+  /admin/invite-tokens:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of registration invite tokens. Superadmin access
+        required.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 50
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{tokens, total}'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to fetch tokens
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: List invite tokens
+      tags:
+      - admin
+    post:
+      consumes:
+      - application/json
+      description: Create a new registration invite token. Superadmin access required.
+      parameters:
+      - description: '{email?: string, expiresInHours?: int}'
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created token
+          schema:
+            $ref: '#/definitions/models.InviteToken'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to create token
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Create invite token
+      tags:
+      - admin
+  /admin/invite-tokens/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a registration invite token. Superadmin access required.
+      parameters:
+      - description: Token ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: success}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to delete token
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Delete invite token
+      tags:
+      - admin
+  /admin/livekit/stats:
+    get:
+      consumes:
+      - application/json
+      description: Get LiveKit server statistics. Superadmin access required.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{totalParticipants, totalPublishers, activeRooms, rooms}'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: LiveKit stats
+      tags:
+      - admin
+  /admin/online-count:
+    get:
+      consumes:
+      - application/json
+      description: Get total online participants and publishers across all active
+        LiveKit rooms. Superadmin access required.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{totalParticipants, totalPublishers, activeRooms, rooms}'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Get online count
+      tags:
+      - admin
+  /admin/overview:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Aggregated system stats for the admin dashboard: health status, KPI metrics,
+        7-day activity trend, room composition breakdown, and recent user/room activity.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.OverviewResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Admin dashboard overview
+      tags:
+      - admin
+  /admin/queue:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Real-time queue status including pending/active/done/failed counts,
+        processed rates, and recent failure diagnostics.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.QueueStats'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Queue statistics
+      tags:
+      - admin
+  /admin/recordings:
+    get:
+      consumes:
+      - application/json
+      description: List all recordings with optional filters. Superadmin access required.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 1000
+        description: Items per page
+        in: query
+        maximum: 1000
+        name: perPage
+        type: integer
+      - description: Filter by room ID
+        in: query
+        maxLength: 36
+        name: roomId
+        type: string
+      - description: Filter by status (completed, processing, failed, deleting)
+        in: query
+        name: status
+        type: string
+      - description: Filter by ISO 8601 timestamp
+        in: query
+        name: createdAfter
+        type: string
+      - description: Filter by ISO 8601 timestamp
+        in: query
+        name: createdBefore
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{recordings, total, page, limit}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid filter parameters
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Admin access required
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to list recordings
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Admin list recordings
+      tags:
+      - admin
+  /admin/recordings/bulk/delete:
+    post:
+      consumes:
+      - application/json
+      description: Mark recordings as deleting and enqueue async deletion jobs. Superadmin
+        access required. Max 500 IDs per request.
+      parameters:
+      - description: Recording IDs to delete
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.BulkIDsRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Deletion queued
+          schema:
+            $ref: '#/definitions/handlers.BulkResult'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Admin access required
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to process
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Bulk delete recordings
+      tags:
+      - admin
+  /admin/rooms:
+    get:
+      consumes:
+      - application/json
+      description: List all rooms with filters (search, status, visibility, occupancy,
+        date range). Superadmin access required.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 50
+        description: Items per page
+        in: query
+        maximum: 100
+        name: limit
+        type: integer
+      - description: Search by room name or ID
+        in: query
+        name: search
+        type: string
+      - description: 'Comma-separated: active, suspended, archived'
+        in: query
+        name: status
+        type: string
+      - description: 'Comma-separated: public, private'
+        in: query
+        name: visibility
+        type: string
+      - description: 'Filter by participant count: empty, 1-5, 6-20, 20+'
+        in: query
+        name: occupancy
+        type: string
+      - description: Filter by creator user ID
+        in: query
+        name: createdBy
+        type: string
+      - default: createdAt
+        description: 'Sort field: name, createdAt, maxParticipants, participantsCount,
+          lastActivityAt, createdBy'
+        in: query
+        name: sort
+        type: string
+      - default: desc
+        description: 'Sort direction: asc, desc'
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{rooms, total, page, limit}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid filter
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to list rooms
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Admin list rooms
+      tags:
+      - admin
+  /admin/rooms/{roomId}:
+    delete:
+      consumes:
+      - application/json
+      description: Permanently delete a room by ID. Enqueues room deletion and returns
+        immediately.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Deletion queued
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Room already inactive
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Close room (admin)
+      tags:
+      - admin
+    put:
+      consumes:
+      - application/json
+      description: Update room name or settings. Superadmin access required.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Room update fields
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{message: room updated}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to update room
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Admin update room
+      tags:
+      - admin
+  /admin/rooms/{roomId}/participants:
+    get:
+      consumes:
+      - application/json
+      description: Get live participant data from LiveKit for a specific room. Superadmin
+        access required.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{participants, room}'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Get room participants
+      tags:
+      - admin
+  /admin/rooms/{roomId}/participants/{identity}/kick:
+    post:
+      consumes:
+      - application/json
+      description: Kick a participant from a room. Superadmin access required.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: success}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room or participant not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Admin kick participant
+      tags:
+      - admin
+  /admin/rooms/{roomId}/participants/{identity}/mute:
+    post:
+      consumes:
+      - application/json
+      description: Mute a participant in a room. Superadmin access required.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: success}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room or participant not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Admin mute participant
+      tags:
+      - admin
+  /admin/rooms/{roomId}/reactivate:
+    post:
+      consumes:
+      - application/json
+      description: Reactivate a suspended room. Superadmin access required.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Reactivated room
+          schema:
+            $ref: '#/definitions/models.Room'
+        "400":
+          description: Room not suspended
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to reactivate
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Reactivate room
+      tags:
+      - admin
+  /admin/rooms/{roomId}/suspend:
+    post:
+      consumes:
+      - application/json
+      description: Suspend a room, ending all active calls but preserving room data.
+        Enqueues suspension and returns immediately.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Suspension queued
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Room already inactive
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Suspend room (admin)
+      tags:
+      - admin
+  /admin/rooms/{roomId}/token:
+    post:
+      consumes:
+      - application/json
+      description: Generate a LiveKit token for a room. Not yet implemented.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "501":
+          description: '{error: not yet implemented}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Admin generate token (NYI)
+      tags:
+      - admin
+  /admin/rooms/bulk/close:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Room IDs to close
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.BulkIDsRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/handlers.BulkResult'
+      summary: Bulk close rooms
+      tags:
+      - admin
+  /admin/rooms/bulk/suspend:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Room IDs to suspend
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.BulkIDsRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/handlers.BulkResult'
+      summary: Bulk suspend rooms
+      tags:
+      - admin
+  /admin/rooms/events:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of room activity events (room created, user
+        joined) (requires superadmin access)
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 50
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Search by room name or user name
+        in: query
+        name: q
+        type: string
+      - description: 'Comma-separated event types: room_created,room_joined'
+        in: query
+        name: type
+        type: string
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: dateFrom
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: dateTo
+        type: string
+      - default: desc
+        description: 'Sort direction: asc, desc'
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{events, total, page, limit}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid parameters
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List room events
+      tags:
+      - admin
+  /admin/settings:
+    get:
+      consumes:
+      - application/json
+      description: Get effective system settings. Superadmin access required. Secret
+        fields are masked.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Settings with masked secrets
+          schema:
+            $ref: '#/definitions/models.SystemSettings'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to fetch settings
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Get system settings
+      tags:
+      - admin
+    put:
+      consumes:
+      - application/json
+      description: Update system settings via partial JSON merge. Superadmin access
+        required. Secrets sent as "••••••••" are preserved.
+      parameters:
+      - description: Partial settings JSON
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated settings with masked secrets
+          schema:
+            $ref: '#/definitions/models.SystemSettings'
+        "400":
+          description: Validation error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to save settings
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Update system settings
+      tags:
+      - admin
+  /admin/settings/send-test-email:
+    post:
+      consumes:
+      - application/json
+      description: Send a synchronous test email to verify SMTP configuration. Superadmin
+        access required.
+      parameters:
+      - description: '{to: string} - recipient email'
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Test email sent
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request or SMTP error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "408":
+          description: SMTP connection timed out
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to load settings
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Send test email
+      tags:
+      - admin
+  /admin/settings/validate:
+    post:
+      consumes:
+      - application/json
+      description: Run connectivity checks against external services (LiveKit, S3,
+        email, TLS) without saving. Superadmin access required.
+      parameters:
+      - description: Partial settings to validate
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{checks: {livekit, s3, tls, email}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid input
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Validate settings connectivity
+      tags:
+      - admin
+  /admin/stats:
+    get:
+      consumes:
+      - application/json
+      description: Aggregate system statistics for admin dashboard KPI strip (total
+        users, rooms, active now, etc.). Superadmin access required.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Dashboard stats
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Admin dashboard stats
+      tags:
+      - admin
   /admin/users:
     get:
       consumes:
@@ -201,30 +1811,121 @@ paths:
       summary: List all users
       tags:
       - admin
-  /admin/users/{id}/status:
-    put:
+  /admin/users/{id}:
+    delete:
       consumes:
       - application/json
-      description: Activate or deactivate a user (requires superadmin access)
+      description: Permanently delete a user and all associated data (requires superadmin
+        access). Cannot delete your own account. Returns 202 Accepted — deletion runs
+        in background.
       parameters:
       - description: User ID
         in: path
         name: id
         required: true
         type: string
-      - description: Status update
-        in: body
-        name: request
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Deletion queued
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Cannot delete own account
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a user
+      tags:
+      - admin
+    get:
+      consumes:
+      - application/json
+      description: Get detailed user information including room count and metadata.
+        Superadmin access required.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
         required: true
-        schema:
-          $ref: '#/definitions/handlers.UserStatusUpdateRequest'
+        type: string
       produces:
       - application/json
       responses:
         "200":
-          description: Status updated successfully
+          description: User details with room count
           schema:
-            $ref: '#/definitions/handlers.UserStatusUpdateResponse'
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to fetch user
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Get user detail
+      tags:
+      - admin
+  /admin/users/{id}/accesses:
+    put:
+      consumes:
+      - application/json
+      description: Update user access levels (requires superadmin access). Invalidates
+        all existing sessions by clearing their refresh token.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Access levels to assign
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            accesses:
+              items:
+                type: string
+              type: array
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Accesses updated
+          schema:
+            additionalProperties: true
+            type: object
         "400":
           description: Invalid request
           schema:
@@ -247,13 +1948,688 @@ paths:
             $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - BearerAuth: []
+      summary: Update user accesses
+      tags:
+      - admin
+  /admin/users/{id}/force-logout:
+    post:
+      consumes:
+      - application/json
+      description: Revoke all active sessions for a user by clearing their refresh
+        token (superadmin only)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Sessions revoked
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Force logout a user
+      tags:
+      - admin
+  /admin/users/{id}/password:
+    put:
+      consumes:
+      - application/json
+      description: Force-set a user's password. Superadmin only. Invalidates all existing
+        sessions by clearing their refresh token.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: New password (12-128 characters)
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            password:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Password updated
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid password
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set user password (admin)
+      tags:
+      - admin
+  /admin/users/{id}/sessions:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated room participation history for a user (superadmin
+        only)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 50
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{sessions, total, page, limit}'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List user room sessions
+      tags:
+      - admin
+  /admin/users/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: Activate or deactivate a user account. Superadmin access required.
+        Cannot change own status.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: '{isActive: bool, reason?: string}'
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{message: status updated}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Cannot change own status or invalid input
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to update status
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
       summary: Update user status
+      tags:
+      - admin
+  /admin/users/{id}/verify:
+    post:
+      consumes:
+      - application/json
+      description: Force-verify a user's email address. Superadmin access required.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{message: email verified}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Email already verified
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to verify
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Admin verify email
+      tags:
+      - admin
+  /admin/users/{id}/verify/resend:
+    post:
+      consumes:
+      - application/json
+      description: Resend the email verification link for a user. Superadmin access
+        required.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{message: verification email sent}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Email already verified
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to send
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Admin resend verification
+      tags:
+      - admin
+  /admin/users/bulk/ban:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: User IDs to ban
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.BulkIDsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.BulkResult'
+      summary: Bulk ban users
+      tags:
+      - admin
+  /admin/users/bulk/delete:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: User IDs to delete
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.BulkIDsRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Bulk delete users
+      tags:
+      - admin
+  /admin/users/bulk/promote:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: User IDs to promote
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.BulkIDsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.BulkResult'
+      summary: Bulk promote users to admin
+      tags:
+      - admin
+  /admin/users/recent:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of recently registered users (requires superadmin
+        access)
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 50
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Search by name or email
+        in: query
+        name: q
+        type: string
+      - description: 'Comma-separated providers: local,google,github,guest'
+        in: query
+        name: provider
+        type: string
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: dateFrom
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: dateTo
+        type: string
+      - default: createdAt
+        description: 'Sort field: createdAt, name'
+        in: query
+        name: sort
+        type: string
+      - default: desc
+        description: 'Sort direction: asc, desc'
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{users, total, page, limit}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid parameters
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List recent signups
+      tags:
+      - admin
+  /admin/webhooks:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of webhook endpoints. Superadmin access required.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 50
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{webhooks, total, page, limit}'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to list webhooks
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: List webhooks
+      tags:
+      - admin
+    post:
+      consumes:
+      - application/json
+      description: Create a new webhook endpoint with a generated secret. Superadmin
+        access required.
+      parameters:
+      - description: Webhook configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createWebhookRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created webhook with plaintext secret
+          schema:
+            $ref: '#/definitions/handlers.webhookDTO'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to create webhook
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Create webhook
+      tags:
+      - admin
+  /admin/webhooks/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a webhook endpoint. Superadmin access required.
+      parameters:
+      - description: Webhook ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: deleted}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Webhook not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to delete webhook
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Delete webhook
+      tags:
+      - admin
+    put:
+      consumes:
+      - application/json
+      description: Update webhook name, URL, events, or active status. Superadmin
+        access required.
+      parameters:
+      - description: Webhook ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Webhook fields to update
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateWebhookRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated webhook
+          schema:
+            $ref: '#/definitions/handlers.webhookDTO'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Webhook not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to update webhook
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Update webhook
+      tags:
+      - admin
+  /admin/webhooks/{id}/rotate-secret:
+    post:
+      consumes:
+      - application/json
+      description: Generate a new crypto-random secret for a webhook endpoint. Superadmin
+        access required.
+      parameters:
+      - description: Webhook ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{secret: ...}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Webhook not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to rotate secret
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Rotate webhook secret
+      tags:
+      - admin
+  /admin/webhooks/{id}/test:
+    post:
+      consumes:
+      - application/json
+      description: Send a ping event to test webhook connectivity and latency. Superadmin
+        access required.
+      parameters:
+      - description: Webhook ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status, httpStatus, latencyMs, error?}'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Webhook not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Test webhook
+      tags:
+      - admin
+  /api/admin/cert-info:
+    get:
+      description: Get TLS certificate metadata (subject, issuer, expiry, SANs, status).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.CertInfo'
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Certificate status
       tags:
       - admin
   /api/cert:
     get:
       description: Get the server's TLS certificate in PEM format. Only available
-        when TLS is enabled.
+        when TLS is enabled. Public endpoint — certs are transmitted during TLS handshake.
       produces:
       - application/x-pem-file
       responses:
@@ -349,6 +2725,60 @@ paths:
       summary: Begin OAuth authentication
       tags:
       - auth
+  /auth/forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: Send password reset email. Always returns 202 to prevent email
+        enumeration. Requires SMTP configuration.
+      parameters:
+      - description: Email address
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Request password reset
+      tags:
+      - auth
+  /auth/guest-login:
+    post:
+      consumes:
+      - application/json
+      description: Join as a guest without creating an account. Guests have limited
+        permissions.
+      parameters:
+      - description: Guest name
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Guest login
+      tags:
+      - auth
   /auth/login:
     post:
       consumes:
@@ -379,14 +2809,14 @@ paths:
     post:
       consumes:
       - application/json
-      description: Block a refresh token during logout
+      description: Invalidate refresh token and logout the current user.
       parameters:
       - description: Logout request
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/auth.LogoutRequest'
+          $ref: '#/definitions/handlers.LogoutRequest'
       produces:
       - application/json
       responses:
@@ -400,9 +2830,7 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/auth.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Block refresh token
+      summary: Logout user
       tags:
       - auth
   /auth/me:
@@ -424,6 +2852,261 @@ paths:
       security:
       - BearerAuth: []
       summary: Get user profile
+      tags:
+      - auth
+    put:
+      consumes:
+      - application/json
+      description: Update user name or email. Email change triggers verification flow
+        and issues new tokens.
+      parameters:
+      - description: Profile update fields
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Update profile
+      tags:
+      - auth
+  /auth/passkey/login/begin:
+    post:
+      description: Start FIDO2/WebAuthn authentication ceremony.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Begin passkey login
+      tags:
+      - auth
+  /auth/passkey/login/finish:
+    post:
+      consumes:
+      - application/json
+      description: Complete FIDO2/WebAuthn authentication with authenticator response.
+      parameters:
+      - description: WebAuthn authentication response
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Finish passkey login
+      tags:
+      - auth
+  /auth/passkey/register/begin:
+    post:
+      description: Start FIDO2/WebAuthn registration ceremony for the authenticated
+        user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Begin passkey registration
+      tags:
+      - auth
+  /auth/passkey/register/finish:
+    post:
+      consumes:
+      - application/json
+      description: Complete FIDO2/WebAuthn registration with authenticator response.
+      parameters:
+      - description: WebAuthn registration response
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Finish passkey registration
+      tags:
+      - auth
+  /auth/passkey/signup/begin:
+    post:
+      consumes:
+      - application/json
+      description: Start FIDO2/WebAuthn registration for a new user (no session required).
+      parameters:
+      - description: Signup info
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Begin passkey signup
+      tags:
+      - auth
+  /auth/passkey/signup/finish:
+    post:
+      consumes:
+      - application/json
+      description: Complete FIDO2/WebAuthn registration for a new user.
+      parameters:
+      - description: WebAuthn registration response
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Finish passkey signup
+      tags:
+      - auth
+  /auth/password:
+    put:
+      consumes:
+      - application/json
+      description: Change the current user's password. Requires current password for
+        verification.
+      parameters:
+      - description: Current and new password
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Change password
+      tags:
+      - auth
+  /auth/preferences:
+    get:
+      description: Retrieve the authenticated user's preferences as a JSON blob.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Get user preferences
+      tags:
+      - auth
+    put:
+      consumes:
+      - application/json
+      description: Update the authenticated user's preferences as a JSON blob (max
+        4 KB).
+      parameters:
+      - description: Preferences JSON string
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Update user preferences
       tags:
       - auth
   /auth/refresh:
@@ -482,6 +3165,138 @@ paths:
       summary: Register new user
       tags:
       - auth
+  /auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: Set a new password using the reset token from the email.
+      parameters:
+      - description: Reset token and new password
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Reset password with token
+      tags:
+      - auth
+  /auth/settings:
+    get:
+      consumes:
+      - application/json
+      description: Get public settings visible to unauthenticated visitors (registration,
+        OAuth providers, etc.)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Public settings
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Failed to fetch settings
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Get public settings
+      tags:
+      - system
+  /auth/verify:
+    post:
+      consumes:
+      - application/json
+      description: Complete email verification with token from verification link.
+        Returns tokens so frontend can auto-login.
+      parameters:
+      - description: Verification token
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.TokenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Verify email
+      tags:
+      - auth
+  /auth/verify/resend:
+    post:
+      consumes:
+      - application/json
+      description: Resend the email verification link. Always returns 200 to prevent
+        email enumeration. Silent cooldown via verificationEmailCooldownMins.
+      parameters:
+      - description: Email address
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Resend verification email
+      tags:
+      - auth
+  /auth/verify/status:
+    get:
+      description: Returns whether the current user's email is verified.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Check email verification status
+      tags:
+      - auth
   /health:
     get:
       description: Get the health status of the service
@@ -496,6 +3311,36 @@ paths:
       summary: Health check endpoint
       tags:
       - health
+  /livekit/webhook:
+    post:
+      consumes:
+      - application/json
+      description: Receive webhook events from LiveKit server (room start/end, participant
+        join/leave, egress). Uses LiveKit JWT signature for auth, not app middleware.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: ok}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid signature
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: LiveKit webhook receiver
+      tags:
+      - system
   /ready:
     get:
       description: Get the readiness status of the service
@@ -510,6 +3355,1352 @@ paths:
       summary: Readiness check endpoint
       tags:
       - health
+  /room/{roomId}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a room you created. Enqueues room deletion and returns immediately.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Deletion queued
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Not the room creator
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Deletion already in progress
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete room
+      tags:
+      - rooms
+  /room/{roomId}/ask/{identity}/{action}:
+    post:
+      consumes:
+      - application/json
+      description: Ask a participant to unmute or enable camera. Action must be "unmute"
+        or "camera". Moderator access required.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      - description: 'Action: unmute or camera'
+        in: path
+        name: action
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: success}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Unknown action or cannot target yourself
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Ask participant action
+      tags:
+      - rooms
+  /room/{roomId}/ban/{identity}:
+    post:
+      consumes:
+      - application/json
+      description: Ban a participant from the room. Room admin or superadmin only.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: success}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Cannot target yourself
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Cannot ban the room admin or insufficient permissions
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Participant not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to ban
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Ban participant
+      tags:
+      - rooms
+  /room/{roomId}/chat/{identity}/block:
+    post:
+      consumes:
+      - application/json
+      description: Block a participant from sending chat messages. Moderator access
+        required.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: success}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Cannot target yourself
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Participant not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to update participant
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Block participant chat
+      tags:
+      - rooms
+  /room/{roomId}/chat/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload an image for in-room chat. Authenticated room participants
+        only.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Image file to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{url, filename, size, ...}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Upload error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Not a participant
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "413":
+          description: File too large
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to upload
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Upload chat image
+      tags:
+      - rooms
+  /room/{roomId}/deafen/{identity}:
+    post:
+      consumes:
+      - application/json
+      description: Deafen a participant in the room. Moderator access required.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: success}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Cannot target yourself
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Deafen participant
+      tags:
+      - rooms
+  /room/{roomId}/demote/{identity}:
+    post:
+      consumes:
+      - application/json
+      description: Demote a moderator back to regular participant. Room admin or superadmin
+        only.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: success}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Cannot target yourself
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Participant not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to update participant
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Demote participant
+      tags:
+      - rooms
+  /room/{roomId}/kick/{identity}:
+    post:
+      consumes:
+      - application/json
+      description: Kick a participant from the room. Room admin or superadmin only.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: success}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Cannot target yourself
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Participant not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to remove participant
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Kick participant
+      tags:
+      - rooms
+  /room/{roomId}/mute/{identity}:
+    post:
+      consumes:
+      - application/json
+      description: Mute a participant's audio tracks. Room admin or superadmin only.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: success}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Cannot target yourself
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Cannot mute the room admin or insufficient permissions
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Participant not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to mute
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Mute participant
+      tags:
+      - rooms
+  /room/{roomId}/participant/{identity}/info:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed participant info including track status. Self-access
+        or moderator access required.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{identity, name, state, joinedAt, tracks}'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Participant not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Get participant info
+      tags:
+      - rooms
+  /room/{roomId}/promote/{identity}:
+    post:
+      consumes:
+      - application/json
+      description: Promote a participant to moderator. Room admin or superadmin only.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: success}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Cannot target yourself
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Participant not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to update participant
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Promote participant
+      tags:
+      - rooms
+  /room/{roomId}/screenshare/{identity}/stop:
+    post:
+      consumes:
+      - application/json
+      description: Force-stop a participant's screen sharing. Moderator access required.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: success}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Cannot target yourself
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Participant not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Stop screen share
+      tags:
+      - rooms
+  /room/{roomId}/settings:
+    put:
+      consumes:
+      - application/json
+      description: Update room settings (isPublic, maxParticipants, recordings, etc.).
+        Room creator or superadmin only.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Room settings to update
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{message: settings updated}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid body
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Not the room creator
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to update settings
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Update room settings
+      tags:
+      - rooms
+  /room/{roomId}/spotlight/{identity}:
+    post:
+      consumes:
+      - application/json
+      description: Spotlight (pin) a participant for all room members. Moderator access
+        required.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: success}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Spotlight participant
+      tags:
+      - rooms
+  /room/{roomId}/stage/{identity}/bring:
+    post:
+      consumes:
+      - application/json
+      description: Bring a participant to the stage. Not yet implemented.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "501":
+          description: '{error: not yet implemented}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Bring to stage
+      tags:
+      - rooms
+  /room/{roomId}/stage/{identity}/remove:
+    post:
+      consumes:
+      - application/json
+      description: Remove a participant from the stage. Not yet implemented.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "501":
+          description: '{error: not yet implemented}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Remove from stage
+      tags:
+      - rooms
+  /room/{roomId}/undeafen/{identity}:
+    post:
+      consumes:
+      - application/json
+      description: Undeafen a participant in the room. Moderator access required.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: success}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Cannot target yourself
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Undeafen participant
+      tags:
+      - rooms
+  /room/{roomId}/video/{identity}/off:
+    post:
+      consumes:
+      - application/json
+      description: Disable a participant's video tracks. Moderator access required.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: success}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Cannot target yourself
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Participant not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to disable video
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Disable participant video
+      tags:
+      - rooms
+  /room/archived:
+    get:
+      consumes:
+      - application/json
+      description: List archived/deleted rooms belonging to the authenticated user,
+        with recording counts.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 50
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{rooms, total, page, limit}'
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to list archived rooms
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: List archived rooms
+      tags:
+      - rooms
+  /room/create:
+    post:
+      consumes:
+      - application/json
+      description: Create a new meeting room with optional settings.
+      parameters:
+      - description: Room creation parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateRoomRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: '{id, name, token, ...}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Email not verified
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to create room
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Create room
+      tags:
+      - rooms
+  /room/guest-join:
+    post:
+      consumes:
+      - application/json
+      description: Join a room as a guest without creating an account.
+      parameters:
+      - description: Guest name and room name
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.GuestJoinRoomRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{id, name, token, adminId, livekitHost}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request or guest name required
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to join room
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Guest join room
+      tags:
+      - rooms
+  /room/join:
+    post:
+      consumes:
+      - application/json
+      description: Join an existing room as an authenticated user.
+      parameters:
+      - description: Room name
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.JoinRoomRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{id, name, token, adminId, livekitHost}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Email not verified
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to join room
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Join room
+      tags:
+      - rooms
+  /room/list:
+    get:
+      consumes:
+      - application/json
+      description: List all rooms created by the authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of rooms
+          schema:
+            items:
+              $ref: '#/definitions/models.Room'
+            type: array
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to list rooms
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: List rooms
+      tags:
+      - rooms
+  /room/refresh-token:
+    post:
+      consumes:
+      - application/json
+      description: Generate a new LiveKit token for an existing room session.
+      parameters:
+      - description: Room name
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RefreshLiveKitTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{token}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to refresh token
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Refresh LiveKit token
+      tags:
+      - rooms
+  /rooms/{id}/recording/start:
+    post:
+      consumes:
+      - application/json
+      description: Start a composite recording for a room. Moderator access required.
+      parameters:
+      - description: Room ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Recording started
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid room ID
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Recordings disabled / not allowed / not moderator
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Active recording already exists
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Recording service not available
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Start recording
+      tags:
+      - rooms
+  /rooms/{id}/recording/stop:
+    post:
+      consumes:
+      - application/json
+      description: Stop the active recording for a room. Moderator access required.
+      parameters:
+      - description: Room ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'Recording stopped, status: processing'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid room ID
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Not moderator
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room or recording not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Recording service not available
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Stop recording
+      tags:
+      - rooms
+  /rooms/{id}/recordings:
+    delete:
+      consumes:
+      - application/json
+      description: Delete all recording files and DB records for a room. Room creator
+        or superadmin only.
+      parameters:
+      - description: Room ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Recordings cleared
+          schema:
+            additionalProperties: true
+            type: object
+        "207":
+          description: Cleared with some file deletion failures
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid room ID
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Not the room creator
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to clear recordings
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Clear room recordings
+      tags:
+      - rooms
+    get:
+      consumes:
+      - application/json
+      description: List recordings for a room. Participants, room admin, and superadmin
+        can view.
+      parameters:
+      - description: Room ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        maximum: 100
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{recordings, total, page, limit}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid room ID
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to list recordings
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: List recordings
+      tags:
+      - rooms
+  /rooms/{id}/recordings/{recordingId}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a single recording file and DB record. Room creator or superadmin
+        only.
+      parameters:
+      - description: Room ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Recording ID
+        in: path
+        name: recordingId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Recording cleared
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid room ID
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Not the room creator
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room or recording not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to clear recording
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Clear single recording
+      tags:
+      - rooms
+  /rooms/{id}/recordings/{rid}:
+    get:
+      consumes:
+      - application/json
+      description: Get details for a single recording.
+      parameters:
+      - description: Room ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Recording ID
+        in: path
+        name: rid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Recording details
+          schema:
+            $ref: '#/definitions/handlers.RecordingDTO'
+        "400":
+          description: Invalid room ID
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Recording not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to get recording
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Get recording
+      tags:
+      - rooms
+  /rooms/{id}/recordings/{rid}/wait:
+    get:
+      consumes:
+      - application/json
+      description: Long-poll endpoint. Blocks up to 15s, returns when egress is confirmed
+        started or failed.
+      parameters:
+      - description: Room ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Recording ID
+        in: path
+        name: rid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{status: active}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid room ID
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Recording not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "408":
+          description: Timeout waiting for egress
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to check recording
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Wait for recording readiness
+      tags:
+      - rooms
 securityDefinitions:
   BearerAuth:
     description: Enter the token with the `Bearer ` prefix, e.g. "Bearer abcde12345"

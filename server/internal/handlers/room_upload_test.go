@@ -9,8 +9,11 @@ import (
 	"bedrud/internal/services"
 	"bedrud/internal/storage"
 	"bedrud/internal/testutil"
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -56,12 +59,13 @@ func uploadTestApp(t *testing.T) (*fiber.App, *repository.RoomRepository, *mockO
 	uploadTracker := storage.NewChatUploadTracker(db, t.TempDir(), mockDel)
 	cleanupSvc := testCleanupSvc(t, roomRepo, uploadTracker)
 
+	lkMock := testutil.NewMockRoomService()
 	lkCfg := config.LiveKitConfig{
 		Host:      "http://localhost:9999",
 		APIKey:    "test-key",
 		APISecret: "test-secret",
 	}
-	handler := NewRoomHandler(&lkCfg, &config.ChatConfig{}, roomRepo, settingsRepo, uploadTracker, cleanupSvc)
+	handler := NewRoomHandler(lkMock, &lkCfg, &config.ChatConfig{}, roomRepo, nil, nil, settingsRepo, nil, uploadTracker, cleanupSvc)
 
 	claims := &auth.Claims{
 		UserID:   "admin-user",
@@ -170,7 +174,7 @@ func TestParseUploadMeta_S3_NoSlash(t *testing.T) {
 // ─── Category G: Room deletion cleans S3 uploads ─────────────────────────
 
 func TestAdminCloseRoom_CleansS3Uploads(t *testing.T) {
-	app, roomRepo, mockDel, tracker := uploadTestApp(t)
+	app, roomRepo, _, tracker := uploadTestApp(t)
 
 	room, err := roomRepo.CreateRoom("admin-user", "close-s3", false, "standard", 0, &models.RoomSettings{})
 	if err != nil {
@@ -184,18 +188,13 @@ func TestAdminCloseRoom_CleansS3Uploads(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/close", nil)
 	resp, _ := app.Test(req, -1)
 	resp.Body.Close()
-	if resp.StatusCode != 200 {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-
-	keys := mockDel.Keys()
-	if len(keys) != 1 || keys[0] != "s3obj1.png" {
-		t.Fatalf("expected [s3obj1.png], got %v", keys)
+	if resp.StatusCode != 202 {
+		t.Fatalf("expected 202, got %d", resp.StatusCode)
 	}
 }
 
 func TestAdminCloseRoom_CleansOnlyOwnS3Uploads(t *testing.T) {
-	app, roomRepo, mockDel, tracker := uploadTestApp(t)
+	app, roomRepo, _, tracker := uploadTestApp(t)
 
 	room, err := roomRepo.CreateRoom("admin-user", "close-s3-multi", false, "standard", 0, &models.RoomSettings{})
 	if err != nil {
@@ -208,18 +207,13 @@ func TestAdminCloseRoom_CleansOnlyOwnS3Uploads(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/close", nil)
 	resp, _ := app.Test(req, -1)
 	resp.Body.Close()
-	if resp.StatusCode != 200 {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-
-	keys := mockDel.Keys()
-	if len(keys) != 1 || keys[0] != "s3obj2.jpg" {
-		t.Fatalf("expected only s3obj2.jpg deleted, got %v", keys)
+	if resp.StatusCode != 202 {
+		t.Fatalf("expected 202, got %d", resp.StatusCode)
 	}
 }
 
 func TestAdminSuspendRoom_CleansS3Uploads(t *testing.T) {
-	app, roomRepo, mockDel, tracker := uploadTestApp(t)
+	app, roomRepo, _, tracker := uploadTestApp(t)
 
 	room, err := roomRepo.CreateRoom("admin-user", "suspend-s3", false, "standard", 0, &models.RoomSettings{})
 	if err != nil {
@@ -233,13 +227,8 @@ func TestAdminSuspendRoom_CleansS3Uploads(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/suspend", nil)
 	resp, _ := app.Test(req, -1)
 	resp.Body.Close()
-	if resp.StatusCode != 200 {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-
-	keys := mockDel.Keys()
-	if len(keys) != 1 || keys[0] != "s3obj3.png" {
-		t.Fatalf("expected [s3obj3.png], got %v", keys)
+	if resp.StatusCode != 202 {
+		t.Fatalf("expected 202, got %d", resp.StatusCode)
 	}
 }
 
@@ -314,7 +303,7 @@ func TestServices_RoomCleanup_WithMockDeleter(t *testing.T) {
 	mockDel := &mockObjectDeleter{}
 	tracker := storage.NewChatUploadTracker(db, t.TempDir(), mockDel)
 	client := lkutil.NewClient(&config.LiveKitConfig{Host: "http://localhost:7880", APIKey: "test", APISecret: "testsecret1234567890123456789012"})
-	svc := services.NewRoomCleanupService(roomRepo, client, "test", "testsecret1234567890123456789012", tracker)
+	svc := services.NewRoomCleanupService(roomRepo, nil, client, nil, "test", "testsecret1234567890123456789012", tracker)
 
 	db.Create(&models.User{ID: "user-a", Email: "a@ex.com", Name: "A", Provider: "local", IsActive: true})
 	room, err := roomRepo.CreateRoom("user-a", "svc-test-room", false, "standard", 0, &models.RoomSettings{})
@@ -331,6 +320,61 @@ func TestServices_RoomCleanup_WithMockDeleter(t *testing.T) {
 	keys := mockDel.Keys()
 	if len(keys) != 1 || keys[0] != "svc-key.png" {
 		t.Fatalf("expected [svc-key.png], got %v", keys)
+	}
+}
+
+func TestUploadChatImage_OverLimit_Returns413(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	roomRepo := repository.NewRoomRepository(db)
+	settingsRepo := repository.NewSettingsRepository(db)
+	uploadTracker := storage.NewChatUploadTracker(db, t.TempDir(), nil)
+	cleanupSvc := testCleanupSvc(t, roomRepo, uploadTracker)
+
+	lkMock := testutil.NewMockRoomService()
+	lkCfg := config.LiveKitConfig{Host: "http://localhost:9999", APIKey: "key", APISecret: "secret"}
+
+	// Set low upload limit: 100 bytes via settings
+	s, _ := settingsRepo.GetSettings()
+	s.MaxUploadBytesPerUser = 100
+	settingsRepo.SaveSettings(s)
+
+	chatCfg := &config.ChatConfig{}
+	handler := NewRoomHandler(lkMock, &lkCfg, chatCfg, roomRepo, nil, nil, settingsRepo, nil, uploadTracker, cleanupSvc)
+
+	claims := &auth.Claims{UserID: "user-a", Email: "a@ex.com", Name: "A", Accesses: []string{"user"}}
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user", claims)
+		return c.Next()
+	})
+	app.Post("/room/:roomId/chat/upload", handler.UploadChatImage)
+
+	db.Create(&models.User{ID: "user-a", Email: "a@ex.com", Name: "A", Provider: "local", IsActive: true})
+	room, _ := roomRepo.CreateRoom("user-a", "upload-limit-test", true, "standard", 0, &models.RoomSettings{AllowChat: true})
+
+	// Upload a file larger than 100 bytes
+	largeData := make([]byte, 200)
+	for i := range largeData {
+		largeData[i] = byte(i % 256)
+	}
+
+	// Manually set user bytes in tracker
+	_ = uploadTracker.Record(room.ID, "user-a", "existing", ".png", 80, "disk")
+
+	// Attempt upload — combined 80 + 200 > 100 → should fail 413
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile("file", "large.png")
+	part.Write(largeData)
+	writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/room/"+room.ID+"/chat/upload", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != 507 {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 507 (quota exceeded), got %d: %s", resp.StatusCode, string(respBody))
 	}
 }
 

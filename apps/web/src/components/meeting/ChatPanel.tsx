@@ -1,28 +1,15 @@
 import { MessageSquare, X } from 'lucide-react'
 import { useCallback, useEffect, useRef } from 'react'
+import { toast } from 'sonner'
 import type { ChatAttachment } from '#/components/meeting/MeetingContext'
 import { useMeetingChatContext, useMeetingRoomContext } from '#/components/meeting/MeetingContext'
+import { api } from '#/lib/api'
 import { ChatInput, type ChatInputHandle } from './chat/ChatInput'
 import { ChatMessageList } from './chat/ChatMessageList'
+import { useFocusTrap } from './useFocusTrap'
 
 interface Props {
   onClose: () => void
-}
-
-const panel: React.CSSProperties = {
-  position: 'absolute',
-  right: 0,
-  top: 0,
-  bottom: 0,
-  width: 'min(320px, 100vw)',
-  zIndex: 30,
-  display: 'flex',
-  flexDirection: 'column',
-  background: 'rgba(10,10,22,0.94)',
-  backdropFilter: 'blur(24px)',
-  borderLeft: '1px solid rgba(255,255,255,0.07)',
-  paddingTop: 'env(safe-area-inset-top, 0px)',
-  paddingBottom: 'calc(env(safe-area-inset-bottom, 0px))',
 }
 
 export function ChatPanel({ onClose }: Props) {
@@ -41,53 +28,29 @@ export function ChatPanel({ onClose }: Props) {
     async (file: File): Promise<ChatAttachment> => {
       const form = new FormData()
       form.append('file', file)
-      const res = await fetch(`/api/room/${roomId}/chat/upload`, {
-        method: 'POST',
-        body: form,
-        credentials: 'include',
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error((body as { error?: string }).error ?? `Upload failed (${res.status})`)
-      }
-      return res.json() as Promise<ChatAttachment>
+      return api.post<ChatAttachment>(`/api/room/${roomId}/chat/upload`, form)
     },
     [roomId],
   )
 
+  const trapRef = useFocusTrap({ enabled: true, onClose })
+
   return (
-    <aside className="meet-panel" style={panel}>
+    <aside
+      ref={trapRef}
+      className="absolute right-0 top-0 bottom-0 z-30 flex flex-col bg-[#0a0a16]/94 backdrop-blur-2xl border-l border-white/[0.07] pt-[env(safe-area-inset-top)] pb-[calc(env(safe-area-inset-bottom))]"
+      style={{ width: 'min(320px, 100vw)' }}
+    >
       {/* Header */}
-      <div
-        style={{
-          height: 52,
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 16px',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <MessageSquare size={14} style={{ color: 'color-mix(in oklab, var(--sky-300) 70%, transparent)' }} />
-          <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600 }}>Chat</span>
+      <div className="h-[52px] shrink-0 flex items-center justify-between px-4 border-b border-white/[0.06]">
+        <div className="flex items-center gap-[7px]">
+          <MessageSquare size={14} className="text-[color-mix(in_oklab,var(--accent-400)_70%,transparent)]" />
+          <span className="text-white/80 text-[13px] font-semibold">Chat</span>
         </div>
         <button
           type="button"
           onClick={onClose}
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 7,
-            background: 'transparent',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'rgba(255,255,255,0.35)',
-            cursor: 'pointer',
-          }}
+          className="w-7 h-7 rounded-[7px] bg-transparent border-none flex items-center justify-center text-white/50 cursor-pointer"
           aria-label="Close chat"
         >
           <X size={15} />
@@ -100,7 +63,24 @@ export function ChatPanel({ onClose }: Props) {
         systemMessages={systemMessages}
         onScrollUnreadChange={noop}
         onDrop={(file) => {
-          void uploadAndSend(file).then((att) => sendChat('', [att]))
+          void uploadAndSend(file)
+            .then((att) => sendChat('', [att]))
+            .catch((err) => {
+              const message = err instanceof Error ? err.message : 'Upload failed'
+              try {
+                const jsonMatch = message.match(/\{.*\}/)
+                if (jsonMatch) {
+                  const parsed = JSON.parse(jsonMatch[0]) as { error?: string }
+                  if (parsed.error) {
+                    toast.error(parsed.error)
+                    return
+                  }
+                }
+              } catch {
+                // ignore parse error
+              }
+              toast.error(message)
+            })
         }}
       />
 

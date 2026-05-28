@@ -1,6 +1,6 @@
 ---
-title: Database & Models
-description: Data models and database schema
+title: 数据库与模型
+description: 数据模型与数据库架构
 order: 17
 ---
 
@@ -11,6 +11,20 @@ Bedrud 使用 **GORM** 作为 ORM，同时支持 SQLite 和 PostgreSQL。
 - **PostgreSQL：** 推荐用于用户量较大的生产环境。
 
 你可以在 `config.yaml` 文件的 `database:` 部分配置数据库类型和连接详情。
+
+## SQLite 文件布局
+
+使用 SQLite 时，Bedrud 会启用 **WAL（Write-Ahead Log）模式**以获得更好的并发读取性能。这会在主数据库文件旁边产生两个额外文件：
+
+| 文件 | 用途 |
+|------|------|
+| `bedrud-local.db` | 主数据库文件 |
+| `bedrud-local.db-shm` | 共享内存文件 — 协调读写访问 |
+| `bedrud-local.db-wal` | Write-Ahead Log — 新写入先到这里，随后检查点到主数据库 |
+
+**这些文件是正常的。** 它们在服务器启动时自动创建，在正常关闭时自动清理。如果服务器崩溃，SQLite 会自动恢复 — 不会丢失数据。
+
+要禁用 WAL 模式（不推荐），请在 SQLite 配置中设置 `PRAGMA journal_mode=DELETE;`，但并发读取速度会变慢。
 
 ## 核心模型
 

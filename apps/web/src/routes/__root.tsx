@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createRootRoute, HeadContent, Scripts } from '@tanstack/react-router'
 import { useEffect } from 'react'
+import { Toaster } from 'sonner'
 import { useAuthStore } from '#/lib/auth.store'
 import { applyTheme, useThemeStore } from '#/lib/theme.store'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import appCss from '../styles.css?url'
 
 // Inline script that runs before first paint to avoid theme flash.
@@ -59,11 +61,17 @@ function RootDocument({ children }: { children: React.ReactNode }) {
     return () => mq.removeEventListener('change', handler)
   }, [])
 
-  // Fire-and-forget: restore session via HTTP-only cookie refresh.
+  // Restore session via HTTP-only cookie refresh.
   // Runs in the background — does NOT block initial render.
   // Protected routes await the result in their beforeLoad guards.
+  // Errors are logged so network failures don't silently swallow auth init.
   useEffect(() => {
-    void useAuthStore.getState().initialize()
+    useAuthStore
+      .getState()
+      .initialize()
+      .catch((err) => {
+        console.error('Auth initialization failed:', err)
+      })
   }, [])
 
   return (
@@ -72,7 +80,16 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="font-sans antialiased">
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          Skip to main content
+        </a>
+        <ErrorBoundary variant="server">
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+          <Toaster richColors closeButton />
+        </ErrorBoundary>
         <Scripts />
       </body>
     </html>

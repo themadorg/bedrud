@@ -56,6 +56,30 @@ export interface AdminUser {
   createdAt: string;
 }
 
+// TODO oncoming feature
+export interface RecordingItem {
+  id: string;
+  recordingType: string;
+  durationMs: number;
+  fileSize: number;
+  fileUrl?: string;
+  status: 'pending' | 'started' | 'processing' | 'completed' | 'failed';
+  error?: string;
+  downloadStatus: 'processing' | 'ready' | 'failed';
+  roomId: string;
+  roomName: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+// TODO oncoming feature
+export interface AdminRecordingsResponse {
+  recordings: RecordingItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface Message {
   sender: string;
   text?: string;

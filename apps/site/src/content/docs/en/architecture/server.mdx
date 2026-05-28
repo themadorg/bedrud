@@ -36,18 +36,27 @@ server/
 │   ├── database/              # Database initialization and migrations
 │   ├── handlers/              # HTTP request handlers (controller layer)
 │   │   ├── auth_handler.go    # Auth endpoints
+│   │   ├── recording_handler.go # Recording start/stop/list/get
 │   │   ├── room.go            # Room endpoints
 │   │   └── users.go           # User management endpoints
 │   ├── middleware/             # Fiber middleware
-│   │   └── auth.go            # JWT validation, permission checks
+│   │   ├── auth.go            # JWT validation, permission checks
+│   │   └── recordings_enabled.go # Recordings sys-setting gate
 │   ├── models/                # GORM models (database schemas)
 │   │   ├── user.go            # User model
+│   │   ├── webhook.go         # Webhook model
+│   │   ├── recording.go       # Recording model
 │   │   ├── room.go            # Room model
 │   │   └── passkey.go         # Passkey model
 │   ├── repository/            # Data access layer (SQL via GORM)
 │   │   ├── user_repository.go
+│   │   ├── webhook_repository.go
+│   │   ├── recording_repository.go
 │   │   ├── room_repository.go
 │   │   └── passkey_repository.go
+│   ├── services/               # Business logic layer
+│   │   ├── recording_service.go # Recording gate chain + LK egress
+│   │   └── room_cleanup.go     # Room deletion/suspend cascade
 │   ├── livekit/               # Embedded LiveKit server management
 │   ├── scheduler/             # Background job scheduling
 │   └── utils/                 # TLS and other utilities
@@ -64,11 +73,11 @@ The server follows a layered architecture:
 
 ```mermaid
 flowchart TB
-    HTTP[HTTP Request] --> Middleware
-    Middleware["Middleware<br/>JWT validation, CORS, logging"] --> Handlers
-    Handlers["Handlers<br/>Parse requests, call services, format responses"] --> Services
-    Services["Services<br/>Business logic (auth, room management)"] --> Repository
-    Repository["Repository<br/>Database queries via GORM"] --> Database
+    HTTP[HTTP Request] */} Middleware
+    Middleware["Middleware<br/>JWT validation, CORS, logging"] */} Handlers
+    Handlers["Handlers<br/>Parse requests, call services, format responses"] */} Services
+    Services["Services<br/>Business logic (auth, room management)"] */} Repository
+    Repository["Repository<br/>Database queries via GORM"] */} Database
     Database["Database<br/>SQLite (dev) or PostgreSQL (production)"]
 ```
 
@@ -97,6 +106,29 @@ When a user joins a room, the server:
 2. Creates a LiveKit access token signed with the API secret
 3. Returns the token to the client
 4. The client connects directly to LiveKit using the token
+
+### Recordings & LiveKit Egress
+
+Room recording uses a three-layer authorization architecture:
+
+1. **Middleware** (`RecordingsEnabled`) — checks system-level `SystemSettings.RecordingsEnabled`
+2. **Service** (`RecordingService`) — checks room-level `Room.Settings.RecordingsAllowed` + LK egress client availability
+3. **Handler** (`RecordingHandler`) — checks user is room moderator via `isRoomModerator()`
+
+Recording flow:
+- `POST /api/rooms/:id/recording/start` → moderator check → `RecordingService.StartRecording()` → LK `StartRoomCompositeEgress()`
+- `POST /api/rooms/:id/recording/stop` → moderator check → `RecordingService.StopRecording()` → LK `StopEgress()` → transition to `processing`
+- A background job (`process_recording`) downloads the file from LiveKit and stores it
+- On completion, `recording.completed` webhook event is dispatched
+
+### Webhooks
+
+Webhook system allows superadmins to register HTTP callbacks for real-time events. Events include `room.ended`, `participant.joined`, `participant.left`, and `recording.completed`.
+
+- **Storage:** `Webhook` model in database, CRUD via `WebhookRepository`
+- **Dispatch:** Background job (`dispatch_webhook`) sends HMAC-SHA256 signed POST requests with 10s timeout
+- **Secrets:** Per-webhook HMAC secret, rotatable via admin panel
+- See the [Webhooks API](/en/docs/api/webhooks) for endpoint details.
 
 ### Swagger Documentation
 

@@ -168,7 +168,7 @@ bedrud user [--config <path>] <subcommand> [flags]
 أنشئ مستخدماً جديداً بمصادقة محلية (كلمة مرور مشفّرة بـ bcrypt).
 
 ```bash
-bedrud user [--config <path>] create --email <email> --password <password> --name <name>
+bedrud user [--config <path>] create --email <email> --password <password> --name <name> [--admin]
 ```
 
 **العلامات المطلوبة:**
@@ -176,7 +176,10 @@ bedrud user [--config <path>] create --email <email> --password <password> --nam
 - `--password`: كلمة مرور المستخدم، تُشفّر بـ bcrypt قبل التخزين
 - `--name`: اسم العرض للمستخدم
 
-**مستوى الوصول:** `user` (ليس superadmin). استخدم `promote` لمنح صلاحيات المدير.
+**العلامات الاختيارية:**
+- `--admin`: إنشاء المستخدم كـ superadmin
+
+**مستوى الوصول:** `user` افتراضياً. استخدم `--admin` لإنشاء superadmin بأمر واحد.
 
 #### `delete`
 
@@ -188,19 +191,49 @@ bedrud user [--config <path>] delete --email <email>
 
 #### `promote`
 
-امنح وصول `superadmin` لمستخدم.
+تعيين دور المستخدم عن طريق استبدال مصفوفة الصلاحيات. الإفتراضي: `superadmin`.
 
 ```bash
-bedrud user [--config <path>] promote --email <email>
+bedrud user [--config <path>] promote --email <email> [--role <role>]
 ```
+
+| العلامة  | الإفتراضي    | الوصف                                                      |
+|----------|--------------|------------------------------------------------------------|
+| `--role` | `superadmin` | الدور المستهدف: `superadmin`, `admin`, `moderator`, `user`, `guest` |
+
+أمثلة:
+
+```bash
+# منح صلاحيات superadmin (الإفتراضي)
+bedrud user promote --email admin@example.com
+
+# منح صلاحيات admin
+bedrud user promote --email admin@example.com --role admin
+
+# منح صلاحيات moderator
+bedrud user promote --email mod@example.com --role moderator
+```
+
+كل دور يتوافق مع مصفوفة صلاحيات محددة:
+- `superadmin` → `['superadmin', 'user']`
+- `admin` → `['admin', 'user']`
+- `moderator` → `['moderator', 'user']`
+- `user` → `['user']`
+- `guest` → `['guest']`
 
 #### `demote`
 
-أزِل وصول `superadmin` من مستخدم (يعود إلى مستوى `user`).
+إزالة دور معين من مستخدم. الإفتراضي: `superadmin`.
 
 ```bash
-bedrud user [--config <path>] demote --email <email>
+bedrud user [--config <path>] demote --email <email> [--role <role>]
 ```
+
+| العلامة  | الإفتراضي    | الوصف                                              |
+|----------|--------------|----------------------------------------------------|
+| `--role` | `superadmin` | الدور المراد إزالته: `superadmin`, `admin`, `moderator` |
+
+إذا لم تبقى أي أدوار بعد الإزالة، يتم إضافة صلاحية `user` تلقائياً.
 
 **التنفيذ:** `server/internal/usercli/usercli.go`
 
@@ -267,10 +300,11 @@ bedrud install --fresh --domain example.com --email admin@example.com
 ### إدارة المستخدمين
 
 ```bash
-# إنشاء أول مستخدم مدير
-bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User"
+# إنشاء أول مستخدم مدير (أمر واحد)
+bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User" --admin
 
-# منح وصول superadmin
+# أو إنشاء مستخدم عادي ثم ترقيته
+bedrud user [--config <path>] create --email admin@example.com --password secret123 --name "Admin User"
 bedrud user [--config <path>] promote --email admin@example.com
 
 # إنشاء مستخدم عادي

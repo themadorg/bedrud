@@ -19,6 +19,12 @@ Bedrud از چندین روش احراز هویت پشتیبانی می‌کند
 | کلیدهای عبور | `POST /api/auth/passkey/*` | FIDO2/WebAuthn |
 | تازه‌سازی توکن | `POST /api/auth/refresh` | تمدید توکن دسترسی |
 
+| Resend Verification | `POST /api/auth/verify/resend` | Resend verification email |
+| Verify Email | `GET /api/auth/verify` | Verify email with token (query param, redirect) |
+| Check Verification Status | `GET /api/auth/verify/status` | Check if email is verified |
+| Forgot Password | `POST /api/auth/forgot-password` | Request password reset email |
+| Reset Password | `POST /api/auth/reset-password` | Reset password with token |
+
 ## فرمت توکن
 
 احراز هویت موفق جفت توکن JWT برمی‌گرداند:
@@ -246,8 +252,33 @@ GET /api/auth/:provider/login
 
 ---
 
-## پاسخ‌های خطا
+### ارسال مجدد تأیید
 
+لینک تأیید ایمیل را دوباره ارسال می‌کند. فقط برای حساب‌های محلی تأییدنشده. به صورت بی‌صدا از طریق `verificationEmailCooldownMins` خنک‌سازی را اعمال می‌کند — برای جلوگیری از شمارش ایمیل همیشه 200 برمی‌گرداند.
+
+---
+
+### تأیید ایمیل
+
+تأیید ایمیل را با توکن موجود در لینک تأیید تکمیل می‌کند.
+
+---
+
+### فراموشی رمز عبور
+
+ایمیل بازنشانی رمز عبور را درخواست می‌کند. نیاز به تنظیم SMTP دارد.
+
+نقطه پایانی برای جلوگیری از شمارش ایمیل همیشه 202 برمی‌گرداند. لینک بازنشانی پس از `resetTokenTTLHours` منقضی می‌شود.
+
+---
+
+### بازنشانی رمز عبور
+
+با استفاده از توکن ایمیل بازنشانی، رمز عبور جدیدی تنظیم می‌کند.
+
+---
+
+## 
 تمام نقاط پایانی احراز هویت خطاها را با این فرمت برمی‌گردانند:
 
 ```json
@@ -260,6 +291,8 @@ GET /api/auth/:provider/login
 |--------|---------|
 | 400 | درخواست نامعتبر (فیلدهای گم‌شده، خطای اعتبارسنجی) |
 | 401 | اعتبارنامه نامعتبر یا توکن منقضی شده |
+| 403 | Email not verified (`requiresVerification: true`) |
+| 429 | Rate limited — check `Retry-After` header |
 | 409 | ایمیل قبلاً ثبت‌نام شده است |
 | 500 | خطای داخلی سرور |
 
@@ -267,5 +300,5 @@ GET /api/auth/:provider/login
 
 ## مشاهده همچنین
 
-- [جریان احراز هویت](/fa/docs/backend/authentication) - نحوه کار داخلی JWT، OAuth و کلیدهای عبور
+- [/fa/docs/backend/authentication](/fa/docs/backend/authentication) - how JWT, OAuth, passkeys, email verification, and password reset work internally
 - [API کلیدهای عبور](/fa/docs/api/passkeys) - مرجع نقاط پایانی FIDO2/WebAuthn

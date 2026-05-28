@@ -105,7 +105,7 @@ func webpDimensions(data []byte) (width, height int) {
 
 // sniffMime returns the content type of the data, restricted to allowed image types.
 // Returns an error if the type is not a permitted image format.
-func sniffMime(data []byte) (string, error) {
+func SniffMime(data []byte) (string, error) {
 	// WebP detection: RIFF....WEBP (http.DetectContentType does not detect WebP)
 	if len(data) >= 12 &&
 		data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F' &&
@@ -166,7 +166,7 @@ func NewChatUploadStore(cfg *config.ChatUploadConfig) ChatUploadStore {
 type diskStore struct{ dir string }
 
 func (s *diskStore) Store(data []byte) (*ChatAttachment, error) {
-	mime, err := sniffMime(data)
+	mime, err := SniffMime(data)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +201,7 @@ func (s *diskStore) Store(data []byte) (*ChatAttachment, error) {
 type inlineStore struct{}
 
 func (s *inlineStore) Store(data []byte) (*ChatAttachment, error) {
-	mime, err := sniffMime(data)
+	mime, err := SniffMime(data)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +253,7 @@ func (s *s3Store) Store(data []byte) (*ChatAttachment, error) {
 		return (&inlineStore{}).Store(data)
 	}
 
-	mime, err := sniffMime(data)
+	mime, err := SniffMime(data)
 	if err != nil {
 		return nil, err
 	}
@@ -283,12 +283,16 @@ func (s *s3Store) Store(data []byte) (*ChatAttachment, error) {
 
 // putObject performs an AWS SigV4-signed PUT request to the S3 endpoint.
 func (s *s3Store) putObject(key, contentType string, data []byte) error {
-	region := s.cfg.Region
+	return s3PutObject(s.cfg.Endpoint, s.cfg.Bucket, s.cfg.Region, s.cfg.AccessKey, s.cfg.SecretKey, key, contentType, data)
+}
+
+// s3PutObject uploads data to an S3-compatible bucket using AWS SigV4.
+func s3PutObject(endpoint, bucket, region, accessKey, secretKey, key, contentType string, data []byte) error {
 	if region == "" {
 		region = "auto"
 	}
-	endpoint := strings.TrimRight(s.cfg.Endpoint, "/")
-	url := endpoint + "/" + s.cfg.Bucket + "/" + key
+	endpoint = strings.TrimRight(endpoint, "/")
+	url := endpoint + "/" + bucket + "/" + key
 
 	now := time.Now().UTC()
 	datestamp := now.Format("20060102")
@@ -304,13 +308,12 @@ func (s *s3Store) putObject(key, contentType string, data []byte) error {
 	req.Header.Set("x-amz-content-sha256", payloadHash)
 	req.Header.Set("x-amz-date", amzdate)
 
-	// Build canonical request.
 	signedHeaders := "content-type;host;x-amz-content-sha256;x-amz-date"
 	canonicalHeaders := fmt.Sprintf(
 		"content-type:%s\nhost:%s\nx-amz-content-sha256:%s\nx-amz-date:%s\n",
 		contentType, req.URL.Host, payloadHash, amzdate,
 	)
-	canonicalURI := "/" + s.cfg.Bucket + "/" + key
+	canonicalURI := "/" + bucket + "/" + key
 	canonicalRequest := strings.Join([]string{
 		"PUT", canonicalURI, "", canonicalHeaders, signedHeaders, payloadHash,
 	}, "\n")
@@ -321,12 +324,12 @@ func (s *s3Store) putObject(key, contentType string, data []byte) error {
 		fmt.Sprintf("%x", sha256.Sum256([]byte(canonicalRequest))),
 	}, "\n")
 
-	signingKey := s.deriveSigningKey(datestamp, region)
-	signature := fmt.Sprintf("%x", s.hmacSHA256(signingKey, stringToSign))
+	signingKey := s3DeriveSigningKey(secretKey, datestamp, region)
+	signature := fmt.Sprintf("%x", s3HMACSHA256(signingKey, stringToSign))
 
 	authHeader := fmt.Sprintf(
 		"AWS4-HMAC-SHA256 Credential=%s/%s, SignedHeaders=%s, Signature=%s",
-		s.cfg.AccessKey, credScope, signedHeaders, signature,
+		accessKey, credScope, signedHeaders, signature,
 	)
 	req.Header.Set("Authorization", authHeader)
 
@@ -337,39 +340,22 @@ func (s *s3Store) putObject(key, contentType string, data []byte) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		_ = body // body is intentionally discarded to avoid leaking it to the client; logged upstream
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return fmt.Errorf("s3 returned status %d", resp.StatusCode)
 	}
 	return nil
 }
 
-func (s *s3Store) hmacSHA256(key []byte, data string) []byte {
-	h := hmac.New(sha256.New, key)
-	h.Write([]byte(data))
-	return h.Sum(nil)
-}
-
-func (s *s3Store) deriveSigningKey(datestamp, region string) []byte {
-	kDate := s.hmacSHA256([]byte("AWS4"+s.cfg.SecretKey), datestamp)
-	kRegion := s.hmacSHA256(kDate, region)
-	kService := s.hmacSHA256(kRegion, "s3")
-	return s.hmacSHA256(kService, "aws4_request")
-}
-
-// deleteObject removes an object from the S3 bucket using AWS Signature V4.
-// Errors are returned to the caller (ChatUploadTracker logs a warning and continues).
-func (s *s3Store) deleteObject(key string) error {
-	if s.cfg.Endpoint == "" || s.cfg.Bucket == "" || s.cfg.AccessKey == "" {
+// s3DeleteObject removes an object from an S3-compatible bucket using AWS SigV4.
+func s3DeleteObject(endpoint, bucket, region, accessKey, secretKey, key string) error {
+	if endpoint == "" || bucket == "" || accessKey == "" {
 		return fmt.Errorf("s3 not configured")
 	}
-
-	region := s.cfg.Region
 	if region == "" {
 		region = "auto"
 	}
-	endpoint := strings.TrimRight(s.cfg.Endpoint, "/")
-	url := endpoint + "/" + s.cfg.Bucket + "/" + key
+	endpoint = strings.TrimRight(endpoint, "/")
+	url := endpoint + "/" + bucket + "/" + key
 
 	now := time.Now().UTC()
 	datestamp := now.Format("20060102")
@@ -388,7 +374,7 @@ func (s *s3Store) deleteObject(key string) error {
 		"host:%s\nx-amz-content-sha256:%s\nx-amz-date:%s\n",
 		req.URL.Host, emptyPayloadHash, amzdate,
 	)
-	canonicalURI := "/" + s.cfg.Bucket + "/" + key
+	canonicalURI := "/" + bucket + "/" + key
 	canonicalRequest := strings.Join([]string{
 		"DELETE", canonicalURI, "", canonicalHeaders, signedHeaders, emptyPayloadHash,
 	}, "\n")
@@ -399,12 +385,12 @@ func (s *s3Store) deleteObject(key string) error {
 		fmt.Sprintf("%x", sha256.Sum256([]byte(canonicalRequest))),
 	}, "\n")
 
-	signingKey := s.deriveSigningKey(datestamp, region)
-	signature := fmt.Sprintf("%x", s.hmacSHA256(signingKey, stringToSign))
+	signingKey := s3DeriveSigningKey(secretKey, datestamp, region)
+	signature := fmt.Sprintf("%x", s3HMACSHA256(signingKey, stringToSign))
 
 	authHeader := fmt.Sprintf(
 		"AWS4-HMAC-SHA256 Credential=%s/%s, SignedHeaders=%s, Signature=%s",
-		s.cfg.AccessKey, credScope, signedHeaders, signature,
+		accessKey, credScope, signedHeaders, signature,
 	)
 	req.Header.Set("Authorization", authHeader)
 
@@ -415,9 +401,37 @@ func (s *s3Store) deleteObject(key string) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return fmt.Errorf("s3 delete returned status %d", resp.StatusCode)
 	}
 	return nil
+}
+
+func s3HMACSHA256(key []byte, data string) []byte {
+	h := hmac.New(sha256.New, key)
+	h.Write([]byte(data))
+	return h.Sum(nil)
+}
+
+func s3DeriveSigningKey(secretKey, datestamp, region string) []byte {
+	kDate := s3HMACSHA256([]byte("AWS4"+secretKey), datestamp)
+	kRegion := s3HMACSHA256(kDate, region)
+	kService := s3HMACSHA256(kRegion, "s3")
+	return s3HMACSHA256(kService, "aws4_request")
+}
+
+func (s *s3Store) hmacSHA256(key []byte, data string) []byte {
+	return s3HMACSHA256(key, data)
+}
+
+func (s *s3Store) deriveSigningKey(datestamp, region string) []byte {
+	return s3DeriveSigningKey(s.cfg.SecretKey, datestamp, region)
+}
+
+// deleteObject removes an object from the S3 bucket using AWS Signature V4.
+// Errors are returned to the caller (ChatUploadTracker logs a warning and continues).
+func (s *s3Store) deleteObject(key string) error {
+	return s3DeleteObject(s.cfg.Endpoint, s.cfg.Bucket, s.cfg.Region, s.cfg.AccessKey, s.cfg.SecretKey, key)
 }
 
 // DeleteObject implements ObjectDeleter.

@@ -17,8 +17,11 @@ Admin endpoints are under `/api/admin/`. All require the **superadmin** access l
 | `/api/admin/users/:id` | DELETE | Permanently delete a user |
 | `/api/admin/rooms` | GET | List all rooms (paginated) |
 | `/api/admin/rooms/:roomId` | PUT | Update any room's settings |
-| `/api/admin/rooms/:roomId` | DELETE | Close a room (cascade delete) |
-| `/api/admin/rooms/:roomId/suspend` | POST | Suspend an active room |
+| `/api/admin/rooms/:roomId` | DELETE | Delete a room (background job) |
+| `/api/admin/rooms/:roomId/suspend` | POST | Suspend a room (background job) |
+| `/api/admin/rooms/bulk/suspend` | POST | Bulk suspend rooms |
+| `/api/admin/rooms/bulk/close` | POST | Bulk close rooms |
+| `/api/admin/users/bulk/delete` | POST | Bulk delete users |
 | `/api/admin/rooms/:roomId/participants` | GET | Get live participant data from LiveKit |
 | `/api/admin/rooms/:roomId/participants/:identity/kick` | POST | Kick any participant from a room |
 | `/api/admin/rooms/:roomId/participants/:identity/mute` | POST | Mute any participant's audio |
@@ -30,6 +33,12 @@ Admin endpoints are under `/api/admin/`. All require the **superadmin** access l
 | `/api/admin/online-count` | GET | Total active participants |
 | `/api/admin/livekit/stats` | GET | Aggregate LiveKit server stats |
 | `/api/admin/cert-info` | GET | TLS certificate metadata |
+| `/api/admin/webhooks` | GET | List all webhooks |
+| `/api/admin/webhooks` | POST | Create a new webhook |
+| `/api/admin/webhooks/:id` | PUT | Update a webhook |
+| `/api/admin/webhooks/:id` | DELETE | Delete a webhook |
+| `/api/admin/webhooks/:id/rotate-secret` | POST | Rotate HMAC signing secret |
+| `/api/admin/webhooks/:id/test` | POST | Send a test webhook event |
 
 ## Access Levels
 
@@ -337,7 +346,7 @@ All settings fields are optional — only include the ones you want to change.
 
 ### Close Room
 
-Permanently close a room with cascade deletion. Sends a system message to all participants: "This room has been closed by an administrator".
+Permanently delete a room and all its participants. Enqueues a background job and returns immediately — the room will be fully deleted within seconds.
 
 ```
 DELETE /api/admin/rooms/:roomId
@@ -349,19 +358,29 @@ DELETE /api/admin/rooms/:roomId
 |---|---|
 | `roomId` | Room UUID |
 
-**Response (200):**
+**Response (202):**
 
 ```json
 {
-  "status": "success"
+  "message": "Room deletion queued"
 }
 ```
+
+| Status | Description |
+|--------|-------------|
+| 202 | Deletion queued — will complete shortly |
+| 404 | Room not found |
+| 500 | Failed to fetch room or enqueue job |
+
+> **Note:** Close sends a system message to all active participants: "This room has been closed by an administrator".
+> The closing logic calls `cleanupSvc.CascadeDeleteRoom` which handles LiveKit room removal, chat upload cleanup,
+> and database record deletion.
 
 ---
 
 ### Suspend Room
 
-Deactivate an active room and all its participants without deleting the room record. The room can be re-activated when a participant joins again.
+Deactivate an active room, ending all active calls but preserving the room record. The room can be re-activated when a participant joins again. Enqueues a background job and returns immediately.
 
 ```
 POST /api/admin/rooms/:roomId/suspend
@@ -373,15 +392,70 @@ POST /api/admin/rooms/:roomId/suspend
 |---|---|
 | `roomId` | Room UUID |
 
-**Response (200):**
+**Response (202):**
 
 ```json
 {
-  "status": "success"
+  "message": "Room suspend queued"
 }
 ```
 
-**Error (400):** Returns `{"error": "Room is not active"}` if the room is already inactive.
+| Status | Description |
+|--------|-------------|
+| 202 | Suspension queued — will complete shortly |
+| 400 | Room already inactive |
+| 404 | Room not found |
+| 500 | Failed to fetch room or enqueue job |
+
+---
+
+### Bulk Suspend Rooms
+
+Enqueue suspension for multiple rooms at once. Existing already-suspended rooms are skipped.
+
+```
+POST /api/admin/rooms/bulk/suspend
+```
+
+**Request Body:**
+
+```json
+{
+  "ids": ["room-uuid-1", "room-uuid-2"]
+}
+```
+
+**Response (202):**
+
+```json
+{
+  "results": {
+    "room-uuid-1": {"success": true, "name": "team-standup"},
+    "room-uuid-2": {"success": false, "name": "design-review", "error": "room not found"}
+  },
+  "totalProcessed": 1,
+  "totalFailed": 1
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `results` | object | Per-room result keyed by ID |
+| `results.*.success` | bool | Whether the operation was queued |
+| `results.*.name` | string | Room name (present on success) |
+| `results.*.error` | string | Error message (present on failure) |
+| `totalProcessed` | int | Number of rooms successfully queued |
+| `totalFailed` | int | Number of rooms that failed |
+
+### Bulk Close Rooms
+
+Enqueue permanent deletion for multiple rooms at once. Cannot be undone.
+
+```
+POST /api/admin/rooms/bulk/close
+```
+
+Same request/response shape as [Bulk Suspend Rooms](#bulk-suspend-rooms).
 
 ---
 

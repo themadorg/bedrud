@@ -1,5 +1,5 @@
 use anyhow::Result;
-use keyring::Entry;
+use keyring_core::Entry;
 
 const SERVICE: &str = "bedrud-desktop";
 

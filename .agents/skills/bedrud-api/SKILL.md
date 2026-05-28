@@ -370,6 +370,40 @@ AdminUpdateRoomSettingsInput {
 
 ---
 
+## Admin — Queue
+
+All routes: `Protected()` + `RequireAccess(superadmin)`. Prefix: `/api/admin`.
+
+| Method | Path | Handler | Res |
+|--------|------|---------|-----|
+| GET | `/api/admin/queue` | `adminQueueHandler.GetQueueStats` | `QueueStats` |
+
+### Queue Stats Response
+
+```json
+{
+    "pending": 3,
+    "active": 1,
+    "done24h": 150,
+    "failed24h": 2,
+    "total": 200,
+    "maxDepth": 50,
+    "oldestPending": "2025-01-01T12:00:00Z",
+    "recentFailures": [
+        {"id": "...", "type": "room_delete", "error": "...", "attempts": 3, "updatedAt": "...", "age": "10m ago"}
+    ],
+    "processedPerMin": 5.2,
+    "failedPerMin": 0.1,
+    "failRate": 0.013
+}
+```
+
+### Queue Types
+
+7 job types: `user_delete`, `room_delete`, `room_suspend`, `chat_upload_s3` (active) + `send_email`, `dispatch_webhook`, `process_recording` (stubs). Worker polls every 500ms, retries with exponential backoff (max 3 attempts).
+
+---
+
 ## Admin — Settings
 
 All routes: `Protected()` + `RequireAccess(superadmin)`. Prefix: `/api/admin`.
@@ -675,6 +709,33 @@ type ChatAttachment struct {
 }
 ```
 
+### models.QueueStats
+
+```go
+type QueueStats struct {
+    Pending         int64              `json:"pending"`
+    Active          int64              `json:"active"`
+    Done24h         int64              `json:"done24h"`
+    Failed24h       int64              `json:"failed24h"`
+    Total           int64              `json:"total"`
+    MaxDepth        int64              `json:"maxDepth"`
+    OldestPending   *time.Time         `json:"oldestPending,omitempty"`
+    RecentFailures  []FailedJobSummary `json:"recentFailures,omitempty"`
+    ProcessedPerMin float64            `json:"processedPerMin"`
+    FailedPerMin    float64            `json:"failedPerMin"`
+    FailRate        float64            `json:"failRate"`
+}
+
+type FailedJobSummary struct {
+    ID        string    `json:"id"`
+    Type      string    `json:"type"`
+    Error     string    `json:"error"`
+    Attempts  int       `json:"attempts"`
+    UpdatedAt time.Time `json:"updatedAt"`
+    Age       string    `json:"age"`
+}
+```
+
 ---
 
 ## Source File Index
@@ -703,6 +764,14 @@ type ChatAttachment struct {
 | ChatUpload model | `internal/models/chat_upload.go` |
 | Shared LiveKit helpers (NewClient, AuthContext, SendSystemMessage) | `internal/lkutil/lkutil.go` |
 | User handler (DeleteUser, Shutdown) | `internal/handlers/users.go` |
+| Admin queue handler (GetQueueStats) | `internal/handlers/admin_queue.go` |
+| Job GORM model | `internal/models/job.go` |
+| QueueStats model | `internal/models/queue_stats.go` |
+| Queue engine (Enqueue, Worker, Handler) | `internal/queue/queue.go` |
+| Queue worker (claim loop, retry) | `internal/queue/worker.go` |
+| Queue job types (7 payloads) | `internal/queue/job.go` |
+| Queue handlers (room/user delete, suspend, upload, stubs) | `internal/queue/handler_*.go` |
+| RoomCleanupService (CascadeDeleteRoom, SuspendRoom) | `internal/services/room_cleanup.go` |
 
 ---
 

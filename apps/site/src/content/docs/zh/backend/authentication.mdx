@@ -1,6 +1,6 @@
 ---
-title: Authentication
-description: Auth implementation details
+title: 认证
+description: 认证实现详情
 order: 18
 ---
 
@@ -73,6 +73,41 @@ Bedrud 通过 FIDO2 标准（WebAuthn）支持无密码认证。
 
 ### 4. 访客登录
 允许用户仅通过输入名称即可立即加入会议。服务器创建一个具有 `guest` 角色的临时用户记录。
+
+
+## 电子邮件验证
+
+当配置中 `requireEmailVerification: true` 时，本地（非OAuth）注册和登录需要电子邮件确认：
+
+- **注册** 创建用户但将 `EmailVerifiedAt` 设置为 `nil`。用户必须验证后才能登录。
+- **登录** 对未验证账户返回 `403` 及 `{"requiresVerification": true}`。
+- **重新发送** 通过 `POST /api/auth/verify/resend` — 受 `verificationEmailCooldownMins` 和单独的速率限制桶（`authResendMaxRequests`）限制。
+- **自动清理** 在 `unverifiedAccountTTLHours`（默认48小时，0为禁用）后删除未验证账户。
+- **修改邮箱** 触发新的验证流程。用户保持登录状态；颁发新令牌。
+
+访客用户例外——他们没有电子邮件。
+
+## 密码重置
+
+密码重置流程（需要SMTP）：
+
+1. `POST /api/auth/forgot-password` 带上 `{"email": "..."}` — 服务器发送重置链接到邮箱
+2. `POST /api/auth/reset-password` 带上 `{"token": "...", "newPassword": "..."}` — 设置新密码
+
+重置令牌TTL由 `resetTokenTTLHours` 控制（默认1小时）。forgot-password端点共享认证速率限制桶。
+
+## 冷却与速率限制
+
+Bedrud 使用四个独立的速率限制桶：
+| 桶 | 端点 | 默认值 | 窗口 |
+|--------|-----------|---------|--------|
+| 认证 | login, register, refresh, passkey, forgot-password | 10 | 60s |
+| 访客 | guest-login | 5 | 60s |
+| API | 通用API | 30 | 60s |
+| 重新发送 | verify/resend | 3 | 60s |
+
+桶设置为 `0` = 禁用。所有限制按远程IP计算。超出限制的请求返回 `429 Too Many Requests` 及 `Retry-After` 头部。
+
 
 ## 互操作性与 CORS
 Bedrud 设计为可从多个来源访问，这对于开发环境（React 开发服务器）和生产环境（不同子域名）至关重要。

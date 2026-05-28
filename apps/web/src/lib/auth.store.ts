@@ -67,12 +67,8 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
     _init.promise = (async () => {
       const wasRemembered = Boolean(localStorage.getItem(REMEMBER_KEY)) || Boolean(sessionStorage.getItem(REMEMBER_KEY))
 
-      if (!wasRemembered) {
-        set({ initialized: true })
-        return
-      }
-
       // Try cookie-based refresh first (primary path).
+      // Always attempt this — email verification sets cookies but not REMEMBER_KEY.
       try {
         const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
           method: 'POST',
@@ -90,24 +86,24 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
         // Network error — fall through to persisted token
       }
 
-      // Fallback: use the persisted access token. It may still be valid
-      // (24h TTL) even if the refresh cookie was lost.
-      const storage = localStorage.getItem(REMEMBER_KEY) ? localStorage : sessionStorage
-      const persistedAT = storage.getItem(ACCESS_TOKEN_KEY)
-      if (persistedAT) {
-        // Validate by calling /api/auth/me
-        try {
-          const meRes = await fetch(`${BASE_URL}/api/auth/me`, {
-            headers: { Authorization: `Bearer ${persistedAT}` },
-            credentials: 'include',
-          })
-          if (meRes.ok) {
-            get().setTokens({ accessToken: persistedAT, refreshToken: null })
-            set({ initialized: true })
-            return
+      // Fallback: use the persisted access token (only if user was previously logged in).
+      if (wasRemembered) {
+        const storage = localStorage.getItem(REMEMBER_KEY) ? localStorage : sessionStorage
+        const persistedAT = storage.getItem(ACCESS_TOKEN_KEY)
+        if (persistedAT) {
+          try {
+            const meRes = await fetch(`${BASE_URL}/api/auth/me`, {
+              headers: { Authorization: `Bearer ${persistedAT}` },
+              credentials: 'include',
+            })
+            if (meRes.ok) {
+              get().setTokens({ accessToken: persistedAT, refreshToken: null })
+              set({ initialized: true })
+              return
+            }
+          } catch {
+            // Token expired — fall through to clear
           }
-        } catch {
-          // Token expired — fall through to clear
         }
       }
 

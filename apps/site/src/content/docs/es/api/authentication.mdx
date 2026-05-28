@@ -19,6 +19,12 @@ Bedrud admite múltiples métodos de autenticación:
 | Passkeys | `POST /api/auth/passkey/*` | FIDO2/WebAuthn |
 | Renovación de Token | `POST /api/auth/refresh` | Renovar token de acceso |
 
+| Resend Verification | `POST /api/auth/verify/resend` | Resend verification email |
+| Verify Email | `GET /api/auth/verify` | Verify email with token (query param, redirect) |
+| Check Verification Status | `GET /api/auth/verify/status` | Check if email is verified |
+| Forgot Password | `POST /api/auth/forgot-password` | Request password reset email |
+| Reset Password | `POST /api/auth/reset-password` | Reset password with token |
+
 ## Formato de Token
 
 La autenticación exitosa devuelve un par de tokens JWT:
@@ -226,7 +232,33 @@ POST /api/auth/logout
 
 ---
 
-### Inicio de Sesión OAuth
+### Reenviar verificación
+
+Reenvía el enlace de verificación por correo electrónico. Solo para cuentas locales no verificadas. Aplica silenciosamente el tiempo de espera mediante `verificationEmailCooldownMins` — siempre devuelve 200 para evitar la enumeración de correos.
+
+---
+
+### Verificar correo electrónico
+
+Completa la verificación del correo electrónico con el token del enlace de verificación.
+
+---
+
+### Olvidé mi contraseña
+
+Solicita un correo electrónico de restablecimiento de contraseña. Requiere SMTP configurado.
+
+El endpoint siempre devuelve 202 para evitar la enumeración de correos. El enlace de restablecimiento expira después de `resetTokenTTLHours`.
+
+---
+
+### Restablecer contraseña
+
+Establece una nueva contraseña usando el token del correo de restablecimiento.
+
+---
+
+## ### Inicio de Sesión OAuth
 
 Inicia un flujo OAuth con un proveedor social.
 
@@ -260,6 +292,8 @@ Todos los endpoints de autenticación devuelven errores en este formato:
 |--------|-------------|
 | 400 | Solicitud incorrecta (campos faltantes, error de validación) |
 | 401 | Credenciales inválidas o token expirado |
+| 403 | Email not verified (`requiresVerification: true`) |
+| 429 | Rate limited — check `Retry-After` header |
 | 409 | Correo ya registrado |
 | 500 | Error interno del servidor |
 
@@ -267,5 +301,5 @@ Todos los endpoints de autenticación devuelven errores en este formato:
 
 ## Véase también
 
-- [Flujo de Autenticación](/es/docs/backend/authentication) - cómo funcionan JWT, OAuth y passkeys internamente
+- [/es/docs/backend/authentication](/es/docs/backend/authentication) - how JWT, OAuth, passkeys, email verification, and password reset work internally
 - [API de Passkeys](/es/docs/api/passkeys) - referencia de endpoints FIDO2/WebAuthn

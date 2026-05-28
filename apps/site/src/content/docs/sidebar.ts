@@ -197,6 +197,19 @@ export const sections: SidebarSection[] = [
         description: "FIDO2/WebAuthn integration",
         order: 26,
       },
+      {
+        slug: "api/webhooks",
+        title: "Webhooks API",
+        description: "Webhook CRUD and event management",
+        order: 27,
+      },
+      // TODO oncoming feature
+      // {
+      //   slug: "api/recordings",
+      //   title: "Recordings API",
+      //   description: "Recording start/stop/list/get endpoints",
+      //   order: 28,
+      // },
     ],
   },
   {
@@ -259,6 +272,26 @@ export const sections: SidebarSection[] = [
           "Manage users, rooms, settings, and invite tokens from the web UI",
         order: 35,
       },
+      {
+        slug: "guides/roles",
+        title: "User Roles",
+        description:
+          "Role-based access control with 5 tiers: superadmin, admin, moderator, user, guest",
+        order: 36,
+      },
+      {
+        slug: "guides/webhooks",
+        title: "Webhooks",
+        description: "Configure and manage webhook events",
+        order: 37,
+      },
+      // TODO oncoming feature
+      // {
+      //   slug: "guides/recordings",
+      //   title: "Recordings",
+      //   description: "Room recording configuration and usage",
+      //   order: 38,
+      // },
     ],
   },
   {
@@ -269,7 +302,7 @@ export const sections: SidebarSection[] = [
         slug: "contributing",
         title: "Contributing",
         description: "How to contribute to Bedrud",
-        order: 36,
+        order: 41,
       },
     ],
   },

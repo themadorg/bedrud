@@ -77,7 +77,7 @@ func GenerateRandomRoomName() (string, error) {
 
 type Room struct {
 	ID              string       `json:"id" gorm:"primaryKey;type:varchar(36)"`
-	Name            string       `json:"name" gorm:"uniqueIndex;not null;type:varchar(255)"`
+	Name            string       `json:"name" gorm:"index;not null;type:varchar(255)"`
 	CreatedBy       string       `json:"createdBy" gorm:"type:varchar(36);not null"`
 	IsActive        bool         `json:"isActive" gorm:"not null;default:true"`
 	MaxParticipants int          `json:"maxParticipants" gorm:"not null;default:20"`
@@ -88,6 +88,8 @@ type Room struct {
 	IsPublic        bool         `json:"isPublic" gorm:"not null;default:false"`
 	Settings        RoomSettings `json:"settings" gorm:"embedded;embeddedPrefix:settings_"`
 	Mode            string       `json:"mode" gorm:"not null;default:'standard';type:varchar(20)"` // Room mode (e.g. 'standard')
+	LastActivityAt  *time.Time   `json:"lastActivityAt" gorm:"index"`                              // Updated on participant join; used for stale-room detection
+	DeletedAt       *time.Time   `json:"deletedAt,omitempty" gorm:"index"`                         // Set when room is archived
 }
 
 // RoomSettings represents the global settings for a room
@@ -98,6 +100,8 @@ type RoomSettings struct {
 	RequireApproval bool `json:"requireApproval" gorm:"not null;default:false"`
 	E2EE            bool `json:"e2ee" gorm:"not null;default:false"`
 	IsPersistent    bool `json:"isPersistent" gorm:"not null;default:false"`
+	// TODO oncoming feature
+	RecordingsAllowed bool `json:"recordingsAllowed" gorm:"not null;default:false"`
 }
 
 // RoomParticipant represents a user in a room

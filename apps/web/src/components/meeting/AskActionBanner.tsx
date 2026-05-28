@@ -19,59 +19,25 @@ export function AskActionBanner() {
   return (
     <div
       role="alert"
-      style={{
-        position: 'fixed',
-        bottom: 'calc(100px + env(safe-area-inset-bottom, 0px))',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 60,
-        background: 'rgba(15,15,30,0.95)',
-        border: '1px solid color-mix(in oklab, var(--primary) 40%, transparent)',
-        borderRadius: 12,
-        padding: '12px 16px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-        backdropFilter: 'blur(16px)',
-        maxWidth: 'min(340px, calc(100vw - 32px))',
-      }}
+      className="fixed bottom-[calc(100px+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-60 flex items-center gap-3 bg-[#0f0f1e]/95 rounded-xl px-4 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.4)] backdrop-blur-lg max-w-[min(340px,calc(100vw-32px))]"
+      style={{ border: '1px solid color-mix(in oklab, var(--primary) 40%, transparent)' }}
     >
       <div
+        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
         style={{
-          width: 32,
-          height: 32,
-          borderRadius: 8,
           background: 'color-mix(in oklab, var(--primary) 15%, transparent)',
           border: '1px solid color-mix(in oklab, var(--primary) 30%, transparent)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
         }}
       >
-        {isUnmute ? (
-          <Mic size={15} style={{ color: 'var(--sky-300)' }} />
-        ) : (
-          <Video size={15} style={{ color: 'var(--sky-300)' }} />
-        )}
+        {isUnmute ? <Mic size={15} className="text-teal-400" /> : <Video size={15} className="text-teal-400" />}
       </div>
-      <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, flex: 1 }}>
+      <span className="text-white/80 text-[13px] flex-1">
         {isUnmute ? 'A moderator is asking you to unmute.' : 'A moderator is asking you to turn on your camera.'}
       </span>
       <button
         type="button"
         onClick={() => setDismissed(lastAsk.ts)}
-        style={{
-          background: 'none',
-          border: 'none',
-          padding: 4,
-          cursor: 'pointer',
-          color: 'rgba(255,255,255,0.3)',
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-        }}
+        className="bg-none border-none p-1 cursor-pointer text-white/50 shrink-0 flex items-center"
         aria-label="Dismiss"
       >
         <X size={14} />

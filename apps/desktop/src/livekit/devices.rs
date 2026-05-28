@@ -10,7 +10,7 @@ pub struct AudioDevice {
 pub fn list_input_devices() -> Vec<AudioDevice> {
     let host = cpal::default_host();
     let default_name = host.default_input_device()
-        .and_then(|d| d.name().ok());
+        .and_then(|d| d.description().ok().map(|desc| desc.name().to_string()));
 
     let devices = match host.input_devices() {
         Ok(iter) => iter.collect::<Vec<_>>(),
@@ -20,9 +20,11 @@ pub fn list_input_devices() -> Vec<AudioDevice> {
     devices
         .into_iter()
         .filter_map(|d| {
-            let name = d.name().ok()?;
+            let desc = d.description().ok()?;
+            let name = desc.name().to_string();
+            let id = d.id().ok()?.to_string();
             Some(AudioDevice {
-                id: name.clone(),
+                id,
                 is_default: Some(name.as_str()) == default_name.as_deref(),
                 name,
             })
@@ -33,7 +35,7 @@ pub fn list_input_devices() -> Vec<AudioDevice> {
 pub fn list_output_devices() -> Vec<AudioDevice> {
     let host = cpal::default_host();
     let default_name = host.default_output_device()
-        .and_then(|d| d.name().ok());
+        .and_then(|d| d.description().ok().map(|desc| desc.name().to_string()));
 
     let devices = match host.output_devices() {
         Ok(iter) => iter.collect::<Vec<_>>(),
@@ -43,9 +45,11 @@ pub fn list_output_devices() -> Vec<AudioDevice> {
     devices
         .into_iter()
         .filter_map(|d| {
-            let name = d.name().ok()?;
+            let desc = d.description().ok()?;
+            let name = desc.name().to_string();
+            let id = d.id().ok()?.to_string();
             Some(AudioDevice {
-                id: name.clone(),
+                id,
                 is_default: Some(name.as_str()) == default_name.as_deref(),
                 name,
             })

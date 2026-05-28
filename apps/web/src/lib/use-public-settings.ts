@@ -1,12 +1,18 @@
+// TODO oncoming feature
 import { api } from '#/lib/api'
 
 export interface PublicSettings {
+  serverName: string
   registrationEnabled: boolean
   tokenRegistrationOnly: boolean
+  guestLoginEnabled: boolean
   passkeysEnabled: boolean
   oauthProviders: string[]
+  requireEmailVerification: boolean
   chatMaxMessageCount: number
   chatMessageTTLHours: number
+  // TODO oncoming feature - always disabled
+  recordingsEnabled: boolean
 }
 
 let cached: PublicSettings | null = null
@@ -22,6 +28,11 @@ export function getPublicSettings(): Promise<PublicSettings> {
   return promise
 }
 
+export function refreshPublicSettings() {
+  cached = null
+  promise = null
+}
+
 export function usePublicSettings() {
-  return { get: getPublicSettings }
+  return { get: getPublicSettings, refresh: refreshPublicSettings }
 }

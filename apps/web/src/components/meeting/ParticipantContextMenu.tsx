@@ -62,11 +62,11 @@ const QUAL_COLOR: Record<StatsData['quality'], string> = {
   excellent: '#34d399',
   good: '#fbbf24',
   poor: '#f87171',
-  unknown: 'rgba(255,255,255,0.3)',
+  unknown: 'rgba(255,255,255,0.5)',
 }
 
 const LABEL_STYLE: React.CSSProperties = {
-  color: 'rgba(255,255,255,0.3)',
+  color: 'rgba(255,255,255,0.5)',
   fontSize: 10,
   padding: '4px 8px 2px',
   textTransform: 'uppercase',
@@ -339,7 +339,7 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
             onClick={(e) => e.stopPropagation()}
             style={{ padding: '2px 10px 6px', display: 'flex', alignItems: 'center', gap: 8 }}
           >
-            <VolumeX size={12} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
+            <VolumeX size={12} style={{ color: 'rgba(255,255,255,0.5)', flexShrink: 0 }} />
             <input
               type="range"
               min={0}
@@ -351,7 +351,7 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
             <span
               style={{
                 fontSize: 10,
-                color: 'rgba(255,255,255,0.4)',
+                color: 'rgba(255,255,255,0.5)',
                 minWidth: 32,
                 textAlign: 'right',
                 fontFamily: 'monospace',
@@ -448,7 +448,7 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
               }}
             >
               {statsLoading && !stats ? (
-                <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>Collecting…</span>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>Collecting…</span>
               ) : (
                 <>
                   <StatRow label="Quality">
@@ -496,8 +496,8 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
 
                   {statsLoading && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                      <Loader2 size={10} className="animate-spin" style={{ color: 'rgba(255,255,255,0.2)' }} />
-                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>updating…</span>
+                      <Loader2 size={10} className="animate-spin" style={{ color: 'rgba(255,255,255,0.5)' }} />
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>updating…</span>
                     </div>
                   )}
                 </>

@@ -17,8 +17,11 @@ order: 25
 | `/api/admin/users/:id` | DELETE | حذف دائمی یک کاربر |
 | `/api/admin/rooms` | GET | لیست تمام اتاق‌ها (صفحه‌بندی شده) |
 | `/api/admin/rooms/:roomId` | PUT | به‌روزرسانی تنظیمات هر اتاق |
-| `/api/admin/rooms/:roomId` | DELETE | بستن یک اتاق (حذف آبشاری) |
-| `/api/admin/rooms/:roomId/suspend` | POST | تعلیق یک اتاق فعال |
+| `/api/admin/rooms/:roomId` | DELETE | حذف یک اتاق (کار پس‌زمینه) |
+| `/api/admin/rooms/:roomId/suspend` | POST | تعلیق یک اتاق (کار پس‌زمینه) |
+| `/api/admin/rooms/bulk/suspend` | POST | تعلیق گروهی اتاق‌ها |
+| `/api/admin/rooms/bulk/close` | POST | بستن گروهی اتاق‌ها |
+| `/api/admin/users/bulk/delete` | POST | حذف گروهی کاربران |
 | `/api/admin/rooms/:roomId/participants` | GET | دریافت داده‌های زنده شرکت‌کنندگان از LiveKit |
 | `/api/admin/rooms/:roomId/participants/:identity/kick` | POST | اخراج هر شرکت‌کننده از اتاق |
 | `/api/admin/rooms/:roomId/participants/:identity/mute` | POST | قطع صدای هر شرکت‌کننده |
@@ -337,7 +340,7 @@ PUT /api/admin/rooms/:roomId
 
 ### بستن اتاق
 
-بستن دائمی یک اتاق با حذف آبشاری. یک پیام سیستمی به تمام شرکت‌کنندگان ارسال می‌کند: "This room has been closed by an administrator".
+حذف دائمی یک اتاق و تمام شرکت‌کنندگان آن. در یک کار پس‌زمینه قرار می‌گیرد و بلافاصله برمی‌گردد — اتاق ظرف چند ثانیه کاملاً حذف می‌شود.
 
 ```
 DELETE /api/admin/rooms/:roomId
@@ -349,19 +352,29 @@ DELETE /api/admin/rooms/:roomId
 |---|---|
 | `roomId` | UUID اتاق |
 
-**پاسخ (200):**
+**پاسخ (202):**
 
 ```json
 {
-  "status": "success"
+  "message": "Room deletion queued"
 }
 ```
+
+| وضعیت | توضیحات |
+|--------|-------------|
+| 202 | حذف در صف قرار گرفت — به زودی تکمیل می‌شود |
+| 404 | اتاق پیدا نشد |
+| 500 | دریافت اتاق یا قرار دادن در صف ناموفق بود |
+
+> **توجه:** بستن یک پیام سیستمی به تمام شرکت‌کنندگان فعال ارسال می‌کند: "This room has been closed by an administrator".
+> منطق بستن `cleanupSvc.CascadeDeleteRoom` را فراخوانی می‌کند که حذف اتاق LiveKit، پاکسازی آپلودهای چت
+> و حذف رکورد پایگاه داده را انجام می‌دهد.
 
 ---
 
 ### تعلیق اتاق
 
-غیرفعال کردن یک اتاق فعال و تمام شرکت‌کنندگان آن بدون حذف record اتاق. اتاق زمانی که یک شرکت‌کننده دوباره بپیوندد می‌تواند مجدداً فعال شود.
+غیرفعال کردن یک اتاق فعال، پایان دادن به تمام تماس‌های فعال اما حفظ رکورد اتاق. اتاق زمانی که یک شرکت‌کننده دوباره بپیوندد می‌تواند مجدداً فعال شود. به عنوان یک کار پس‌زمینه اجرا می‌شود و بلافاصله برمی‌گردد.
 
 ```
 POST /api/admin/rooms/:roomId/suspend
@@ -373,15 +386,70 @@ POST /api/admin/rooms/:roomId/suspend
 |---|---|
 | `roomId` | UUID اتاق |
 
-**پاسخ (200):**
+**پاسخ (202):**
 
 ```json
 {
-  "status": "success"
+  "message": "Room suspend queued"
 }
 ```
 
-**خطا (400):** اگر اتاق قبلاً غیرفعال باشد، `{"error": "Room is not active"}` برمی‌گرداند.
+| وضعیت | توضیحات |
+|--------|-------------|
+| 202 | تعلیق در صف قرار گرفت — به زودی تکمیل می‌شود |
+| 400 | اتاق قبلاً غیرفعال است |
+| 404 | اتاق پیدا نشد |
+| 500 | دریافت اتاق یا قرار دادن در صف ناموفق بود |
+
+---
+
+### تعلیق گروهی اتاق‌ها
+
+قرار دادن تعلیق برای چندین اتاق به طور همزمان در صف. اتاق‌های قبلاً تعلیق شده نادیده گرفته می‌شوند.
+
+```
+POST /api/admin/rooms/bulk/suspend
+```
+
+**بدنه درخواست:**
+
+```json
+{
+  "ids": ["room-uuid-1", "room-uuid-2"]
+}
+```
+
+**پاسخ (202):**
+
+```json
+{
+  "results": {
+    "room-uuid-1": {"success": true, "name": "team-standup"},
+    "room-uuid-2": {"success": false, "name": "design-review", "error": "room not found"}
+  },
+  "totalProcessed": 1,
+  "totalFailed": 1
+}
+```
+
+| فیلد | نوع | توضیحات |
+|-------|------|-------------|
+| `results` | object | نتیجه به ازای هر اتاق، indexed توسط ID |
+| `results.*.success` | bool | آیا عملیات در صف قرار گرفت |
+| `results.*.name` | string | نام اتاق (در صورت موفقیت وجود دارد) |
+| `results.*.error` | string | پیام خطا (در صورت شکست وجود دارد) |
+| `totalProcessed` | int | تعداد اتاق‌های موفق در صف |
+| `totalFailed` | int | تعداد اتاق‌های ناموفق |
+
+### بستن گروهی اتاق‌ها
+
+قرار دادن حذف دائمی برای چندین اتاق به طور همزمان در صف. قابل برگشت نیست.
+
+```
+POST /api/admin/rooms/bulk/close
+```
+
+فرمت درخواست/پاسخ مشابه [تعلیق گروهی اتاق‌ها](#تعلیق-گروهی-اتاق‌ها) است.
 
 ---
 

@@ -110,9 +110,9 @@ struct DashboardView: View {
 
 ```mermaid
 flowchart LR
-    NoInstances["No instances"] --> AddInstanceView
-    HasInstancesNotLogged["Has instances,<br>not logged in"] --> LoginView
-    HasInstancesLogged["Has instances,<br>logged in"] --> DashboardView
+    NoInstances["No instances"] */} AddInstanceView
+    HasInstancesNotLogged["Has instances,<br>not logged in"] */} LoginView
+    HasInstancesLogged["Has instances,<br>logged in"] */} DashboardView
     DashboardView -. "toolbar sheet" .-> InstanceSwitcherView["InstanceSwitcherView"]
 ```
 

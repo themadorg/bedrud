@@ -537,6 +537,7 @@
       "guides/appliance": "Appliance-Modus",
       "guides/admin-dashboard": "Admin-Dashboard",
       "guides/behind-proxy": "Hinter einem Proxy/CDN",
+      "guides/roles": "Benutzerrollen",
       contributing: "Mitwirken",
     },
   },

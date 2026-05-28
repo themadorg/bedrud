@@ -95,7 +95,7 @@ flowchart TB
         RM["RoomManager"]
     end
 
-    AI --> DEPS
+    AI */} DEPS
 ```
 
 ### Schlüsselmuster
@@ -113,9 +113,9 @@ Das `?: return`-Muster stellt sicher, dass das Composable nicht rendert, bis die
 
 ```mermaid
 flowchart LR
-    A["No instances"] --> B[AddInstanceScreen]
-    C["Has instances, not logged in"] --> D[LoginScreen]
-    E["Has instances, logged in"] --> F[DashboardScreen]
+    A["No instances"] */} B[AddInstanceScreen]
+    C["Has instances, not logged in"] */} D[LoginScreen]
+    E["Has instances, logged in"] */} F[DashboardScreen]
 ```
 
 Der Instanzwechsler erscheint als `ModalBottomSheet`, der aus der Dashboard-Toolbar aufgerufen wird.

@@ -132,10 +132,10 @@ Siehe die [Docker-Anleitung](/de/docs/guides/docker) für vollständige Details 
 
 ```mermaid
 flowchart TB
-    NET[Internet] --> TRAEFIK["Traefik (443)<br/>TLS termination, reverse proxy"]
-    TRAEFIK --> BEDRUD["Bedrud (8090)<br/>API + Web UI"]
-    TRAEFIK --> LIVEKIT["LiveKit (7880)<br/>WebRTC media"]
-    BEDRUD --> DB["SQLite<br/>(or PostgreSQL)"]
+    NET[Internet] */} TRAEFIK["Traefik (443)<br/>TLS termination, reverse proxy"]
+    TRAEFIK */} BEDRUD["Bedrud (8090)<br/>API + Web UI"]
+    TRAEFIK */} LIVEKIT["LiveKit (7880)<br/>WebRTC media"]
+    BEDRUD */} DB["SQLite<br/>(or PostgreSQL)"]
 ```
 
 Für WebRTC-Konnektivität öffnen Sie zusätzlich diese Ports in der Firewall:

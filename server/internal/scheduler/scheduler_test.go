@@ -50,7 +50,7 @@ func mockLkRoom(roomName string, numParticipants uint32) *httptest.Server {
 
 func TestInitialize_DoesNotPanic(t *testing.T) {
 	// Initialize should not panic with nil deps
-	Initialize(nil, nil, &config.LiveKitConfig{}, &config.ServerConfig{})
+	Initialize(nil, nil, nil, nil, &config.LiveKitConfig{}, &config.ServerConfig{}, nil, nil)
 	// Stop should not panic either
 	Stop()
 }

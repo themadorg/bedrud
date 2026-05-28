@@ -4,7 +4,9 @@ import (
 	"bedrud/config"
 	"bedrud/internal/auth"
 	"bedrud/internal/models"
+	"bedrud/internal/queue"
 	"bedrud/internal/repository"
+	"bedrud/internal/storage"
 	"bedrud/internal/utils"
 	"context"
 	"crypto/tls"
@@ -22,6 +24,7 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/rs/zerolog/log"
 	"github.com/twitchtv/twirp"
+	"gorm.io/gorm"
 )
 
 var scheduler *gocron.Scheduler
@@ -31,7 +34,7 @@ var keyFile string
 var certHosts []string
 var certMu sync.Mutex
 
-func Initialize(roomRepo *repository.RoomRepository, userRepo *repository.UserRepository, lkCfg *config.LiveKitConfig, serverCfg *config.ServerConfig) {
+func Initialize(db *gorm.DB, roomRepo *repository.RoomRepository, userRepo *repository.UserRepository, recordingRepo *repository.RecordingRepository, lkCfg *config.LiveKitConfig, serverCfg *config.ServerConfig, recStore storage.RecordingStore, recCfg *config.RecordingConfig) {
 	scheduler = gocron.NewScheduler(time.Local)
 
 	certFile = ""
@@ -107,8 +110,26 @@ func Initialize(roomRepo *repository.RoomRepository, userRepo *repository.UserRe
 		})
 	}
 
+	// Daily cleanup of unverified local/passkey accounts (configurable TTL, default 48h)
+	if userRepo != nil {
+		_, _ = scheduler.Every(1).Day().At("03:30").Do(func() {
+			cfg := config.Get()
+			ttl := cfg.Auth.UnverifiedAccountTTLHours
+			if ttl <= 0 {
+				ttl = 48 // default
+			}
+			cutoff := time.Now().Add(-time.Duration(ttl) * time.Hour)
+			deleted, err := userRepo.DeleteUnverifiedUsers(cutoff)
+			if err != nil {
+				log.Error().Err(err).Msg("Scheduler: failed to clean up unverified accounts")
+			} else if deleted > 0 {
+				log.Info().Int64("deleted", deleted).Msg("Scheduler: cleaned up unverified accounts")
+			}
+		})
+	}
+
 	// Periodic cleanup of expired blocked refresh tokens
-	_, _ = scheduler.Every(24).Hours().At("04:00").Do(func() {
+	_, _ = scheduler.Every(1).Hour().Do(func() {
 		if userRepo != nil {
 			if err := userRepo.CleanupBlockedTokens(); err != nil {
 				log.Error().Err(err).Msg("Scheduler: failed to clean up blocked tokens")
@@ -123,10 +144,84 @@ func Initialize(roomRepo *repository.RoomRepository, userRepo *repository.UserRe
 		auth.PruneRevokedTokens()
 	})
 
+	// Queue cleanup — done jobs older than 7 days, failed jobs older than 30 days
+	_, _ = scheduler.Every(1).Day().At("03:00").Do(func() {
+		queue.CleanupJobs(db, 7*24*time.Hour)
+		queue.CleanupFailedJobs(db, 30*24*time.Hour)
+	})
+
+	// TODO oncoming feature: stale recording cleanup
+	// Daily cleanup of stale (failed + pending + started) recordings older than 7 days
+	if recordingRepo != nil {
+		_, _ = scheduler.Every(1).Day().At("03:00").Do(func() {
+			cutoff := time.Now().Add(-7 * 24 * time.Hour)
+			if err := recordingRepo.DeleteStaleRecordings(cutoff); err != nil {
+				log.Error().Err(err).Msg("Scheduler: failed to clean up stale recordings")
+			}
+		})
+	}
+
 	if certFile != "" {
 		_, _ = scheduler.Every(1).Day().At("09:00").Do(func() {
 			checkCertExpiry()
 		})
+	}
+
+	// TODO oncoming feature: recording retention cleanup
+	if recCfg != nil && recCfg.RetentionHours > 0 && recStore != nil {
+		interval := recCfg.CleanupIntervalHours
+		if interval <= 0 {
+			interval = 24
+		}
+		_, _ = scheduler.Every(interval).Hour().Do(func() {
+			cutoff := time.Now().Add(-time.Duration(recCfg.RetentionHours) * time.Hour)
+
+			recordings, err := recordingRepo.FindExpiredOnArchivedRooms(cutoff)
+			if err != nil {
+				log.Error().Err(err).Msg("Recording retention: failed to query expired")
+				return
+			}
+			if len(recordings) == 0 {
+				return
+			}
+
+			deleted := 0
+			for _, rec := range recordings {
+				if rec.FileURL != "" {
+					key := storage.ExtractStorageKey(rec.FileURL)
+					if delErr := recStore.Delete(context.Background(), key); delErr != nil {
+						log.Warn().Err(delErr).Str("recordingID", rec.ID).
+							Msg("Recording retention: file delete failed")
+					}
+				}
+				if err := recordingRepo.DeleteRecording(rec.ID); err != nil {
+					log.Warn().Err(err).Str("recordingID", rec.ID).
+						Msg("Recording retention: DB delete failed")
+					continue
+				}
+				deleted++
+			}
+
+			// Purge empty archived rooms
+			emptyRooms, err := roomRepo.FindArchivedRoomsNoRecordings()
+			if err == nil {
+				for _, room := range emptyRooms {
+					if err := roomRepo.HardDeleteRoom(room.ID); err != nil {
+						log.Warn().Err(err).Str("roomID", room.ID).
+							Msg("Recording retention: failed to purge empty archived room")
+					}
+				}
+				if len(emptyRooms) > 0 {
+					log.Info().Int("count", len(emptyRooms)).
+						Msg("Recording retention: purged empty archived rooms")
+				}
+			}
+
+			log.Info().Int("deleted", deleted).
+				Msg("Recording retention cleanup complete")
+		})
+	} else {
+		log.Info().Msg("Recording retention disabled (retentionHours=0 or no store)")
 	}
 
 	scheduler.StartAsync()

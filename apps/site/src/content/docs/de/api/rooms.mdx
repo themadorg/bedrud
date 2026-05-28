@@ -16,6 +16,19 @@ Die Raumverwaltungs-Endpunkte befinden sich unter `/api/room/`. Alle Endpunkte e
 | `/api/room/:roomId/kick/:identity` | POST | Teilnehmer entfernen (Admin) |
 | `/api/room/:roomId/mute/:identity` | POST | Teilnehmer stumm schalten (Admin) |
 | `/api/room/:roomId/video/:identity/off` | POST | Video eines Teilnehmers deaktivieren (Admin) |
+| `/api/room/:roomId` | DELETE | Eigenen Raum löschen (Hintergrundjob) |
+| `/api/room/:roomId/settings` | PUT | Raumeinstellungen aktualisieren |
+| `/api/room/:roomId/chat/upload` | POST | Chat-Bild hochladen |
+| `/api/room/:roomId/ban/:identity` | POST | Teilnehmer sperren |
+| `/api/room/:roomId/promote/:identity` | POST | Teilnehmer zum Moderator befördern |
+| `/api/room/:roomId/demote/:identity` | POST | Teilnehmer herabstufen |
+| `/api/room/:roomId/block/:identity` | POST | Chat eines Teilnehmers blockieren |
+| `/api/room/:roomId/deafen/:identity` | POST | Teilnehmer taub schalten |
+| `/api/room/:roomId/ask/:identity/:action` | POST | Teilnehmer zum Entstummen/Zeigen der Kamera auffordern |
+| `/api/room/:roomId/spotlight/:identity` | POST | Teilnehmer in den Fokus rücken |
+| `/api/room/:roomId/participant/:identity/info` | GET | Teilnehmerinformationen abrufen |
+| `/api/room/guest-join` | POST | Öffentlichem Raum als Gast beitreten |
+| `/api/room/:roomId/screenshare/:identity/stop` | POST | Bildschirmfreigabe beenden |
 
 ---
 
@@ -218,6 +231,42 @@ POST /api/room/:roomId/mute/:identity
   "status": "success"
 }
 ```
+
+---
+
+### Raum löschen
+
+Löschen Sie einen von Ihnen erstellten Raum. Dies entfernt den Raum und alle zugehörigen Daten dauerhaft. Wird als Hintergrundjob ausgeführt und kehrt sofort zurück.
+
+```
+DELETE /api/room/:roomId
+```
+
+**Pfadparameter:**
+
+| Parameter | Beschreibung |
+|---|---|
+| `roomId` | Raum-UUID |
+
+**Header:** `Authorization: Bearer <accessToken>`
+
+**Antwort (202):**
+
+```json
+{
+  "message": "Room deletion queued"
+}
+```
+
+| Status | Beschreibung |
+|--------|-------------|
+| 202 | Löschung vorgemerkt — wird in Kürze abgeschlossen |
+| 403 | Nicht der Raumersteller (nur der Ersteller kann löschen) |
+| 404 | Raum nicht gefunden |
+| 409 | Löschung bereits in Bearbeitung |
+| 500 | Serverfehler |
+
+Wenn der Raum aktiv ist, werden alle Teilnehmer getrennt und sehen die Meldung „This room has been ended by the creator".
 
 ---
 

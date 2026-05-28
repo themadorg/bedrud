@@ -1,24 +1,22 @@
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { Eye, EyeOff, KeyRound, Loader2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { api } from '#/lib/api'
-import { useAuthStore } from '#/lib/auth.store'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { Eye, EyeOff, Fingerprint, KeyRound, Loader2, MailCheck } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ApiError, api } from '#/lib/api'
+import type { AuthResponse } from '#/lib/handle-auth-success'
+import { useHandleAuthSuccess } from '#/lib/handle-auth-success'
 import { getPublicSettings, type PublicSettings } from '#/lib/use-public-settings'
-import { useUserStore } from '#/lib/user.store'
+import { PasskeyButton } from '@/components/auth/PasskeyButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
-export const Route = createFileRoute('/auth/register')({ component: RegisterPage })
-
-interface AuthResponse {
-  user: { id: string; email: string; name: string; provider: string; accesses: string[] | null; avatarUrl?: string }
-  tokens: { accessToken: string; refreshToken: string }
-}
+export const Route = createFileRoute('/auth/register')({
+  head: () => ({ meta: [{ title: 'Sign Up — Bedrud' }] }),
+  component: RegisterPage,
+})
 
 function RegisterPage() {
-  const navigate = useNavigate()
-  const setTokens = useAuthStore((s) => s.setTokens)
-  const setUser = useUserStore((s) => s.setUser)
+  const handleAuthSuccess = useHandleAuthSuccess()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -31,20 +29,51 @@ function RegisterPage() {
   }>({})
   const [settings, setSettings] = useState<PublicSettings | null>(null)
 
+  // Email verification state
+  const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [resending, setResending] = useState(false)
+  const cooldownInterval = useRef<ReturnType<typeof setInterval> | null>(null)
+
   useEffect(() => {
     getPublicSettings()
       .then(setSettings)
       .catch(() =>
         setSettings({
+          serverName: '',
           registrationEnabled: true,
           tokenRegistrationOnly: false,
+          guestLoginEnabled: true,
           passkeysEnabled: true,
           oauthProviders: [],
+          requireEmailVerification: false,
           chatMaxMessageCount: 10000,
           chatMessageTTLHours: 2160,
+          // TODO oncoming feature
+          recordingsEnabled: true,
         }),
       )
+
+    // Cleanup cooldown interval on unmount
+    return () => {
+      if (cooldownInterval.current) clearInterval(cooldownInterval.current)
+    }
   }, [])
+
+  // Start countdown for resend cooldown
+  function startCooldown(seconds: number) {
+    setResendCooldown(seconds)
+    if (cooldownInterval.current) clearInterval(cooldownInterval.current)
+    cooldownInterval.current = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          if (cooldownInterval.current) clearInterval(cooldownInterval.current)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
 
   const requiresToken = settings?.tokenRegistrationOnly === true
 
@@ -74,18 +103,20 @@ function RegisterPage() {
     try {
       const body: Record<string, string> = { name, email, password }
       if (inviteToken) body.inviteToken = inviteToken
-      const res = await api.post<AuthResponse>('/api/auth/register', body)
-      setTokens(res.tokens)
-      setUser({
-        id: res.user.id,
-        email: res.user.email,
-        name: res.user.name,
-        provider: res.user.provider,
-        isAdmin: false,
-        accesses: res.user.accesses ?? [],
-        avatarUrl: res.user.avatarUrl,
-      })
-      navigate({ to: '/dashboard' })
+      const res = await api.post<AuthResponse | { requiresVerification: boolean; message: string; email: string }>(
+        '/api/auth/register',
+        body as any,
+      )
+
+      // Handle email verification flow
+      if ('requiresVerification' in res && res.requiresVerification) {
+        setRegisteredEmail((res as any).email)
+        startCooldown(120) // 2 min default cooldown
+        return
+      }
+
+      // Normal login flow
+      handleAuthSuccess(res as AuthResponse)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
@@ -93,8 +124,76 @@ function RegisterPage() {
     }
   }
 
+  async function handleResend() {
+    if (resendCooldown > 0 || !registeredEmail) return
+    setResending(true)
+    try {
+      await api.post('/api/auth/verify/resend', { email: registeredEmail })
+      startCooldown(120)
+    } catch (err) {
+      if (err instanceof ApiError && err.parsedBody?.retryAfter) {
+        startCooldown(Number(err.parsedBody.retryAfter))
+      } else {
+        startCooldown(60)
+      }
+    } finally {
+      setResending(false)
+    }
+  }
+
   function clearField(field: keyof typeof fieldErrors) {
     setFieldErrors((p) => ({ ...p, [field]: undefined }))
+  }
+
+  // ── Check email screen ──────────────────────────────────────────
+  if (registeredEmail) {
+    return (
+      <div className="space-y-7">
+        {/* Header */}
+        <div className="space-y-1 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+            <MailCheck className="h-7 w-7 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">Check your email</h1>
+          <p className="text-sm text-muted-foreground">
+            We sent a verification email to <span className="font-medium text-foreground">{registeredEmail}</span>
+          </p>
+        </div>
+
+        <p className="text-center text-sm text-muted-foreground">
+          Click the link in the email to verify your account. The link expires in 24 hours.
+        </p>
+
+        {/* Resend */}
+        <div className="text-center">
+          {resendCooldown > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Resend available in <span className="font-medium text-foreground">{resendCooldown}s</span>
+            </p>
+          ) : (
+            <Button variant="outline" onClick={handleResend} disabled={resending}>
+              {resending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending…
+                </>
+              ) : (
+                'Resend email'
+              )}
+            </Button>
+          )}
+        </div>
+
+        <p className="text-center text-sm text-muted-foreground">
+          <Link
+            to="/auth/login"
+            search={{ redirect: undefined }}
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Back to sign in
+          </Link>
+        </p>
+      </div>
+    )
   }
 
   if (settings?.registrationEnabled === false) {
@@ -137,9 +236,7 @@ function RegisterPage() {
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {/* Name */}
         <div className="space-y-1.5">
-          <label htmlFor="reg-name" className="text-sm font-medium">
-            Full name
-          </label>
+          <Label htmlFor="reg-name">Full name</Label>
           <Input
             id="reg-name"
             name="name"
@@ -153,9 +250,7 @@ function RegisterPage() {
 
         {/* Email */}
         <div className="space-y-1.5">
-          <label htmlFor="reg-email" className="text-sm font-medium">
-            Email
-          </label>
+          <Label htmlFor="reg-email">Email</Label>
           <Input
             id="reg-email"
             name="email"
@@ -169,9 +264,7 @@ function RegisterPage() {
 
         {/* Password */}
         <div className="space-y-1.5">
-          <label htmlFor="reg-password" className="text-sm font-medium">
-            Password
-          </label>
+          <Label htmlFor="reg-password">Password</Label>
           <div className="relative">
             <Input
               id="reg-password"
@@ -182,24 +275,24 @@ function RegisterPage() {
               className="pr-10"
               onChange={() => clearField('password')}
             />
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
               tabIndex={-1}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+            </Button>
           </div>
           {fieldErrors.password && <p className="text-xs text-destructive">{fieldErrors.password}</p>}
         </div>
 
         {/* Confirm */}
         <div className="space-y-1.5">
-          <label htmlFor="reg-confirm" className="text-sm font-medium">
-            Confirm password
-          </label>
+          <Label htmlFor="reg-confirm">Confirm password</Label>
           <Input
             id="reg-confirm"
             name="confirm"
@@ -214,10 +307,10 @@ function RegisterPage() {
         {/* Invite token — only shown when required by admin settings */}
         {requiresToken && (
           <div className="space-y-1.5">
-            <label htmlFor="reg-invite" className="text-sm font-medium flex items-center gap-1.5">
+            <Label htmlFor="reg-invite" className="flex items-center gap-1.5">
               <KeyRound className="h-3.5 w-3.5" style={{ color: 'var(--accent-500)' }} />
               Invite token <span className="text-destructive">*</span>
-            </label>
+            </Label>
             <Input
               id="reg-invite"
               name="inviteToken"
@@ -241,6 +334,26 @@ function RegisterPage() {
           )}
         </Button>
       </form>
+
+      {settings?.passkeysEnabled !== false && (
+        <>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground flex items-center gap-1.5">
+                <Fingerprint className="h-3.5 w-3.5" />
+                Passkey
+              </span>
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            <PasskeyButton onSuccess={handleAuthSuccess} />
+          </div>
+        </>
+      )}
 
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{' '}

@@ -1,0 +1,114 @@
+---
+title: ユーザーロール
+description: 5段階のロールベースアクセス制御 — スーパー管理者、管理者、モデレーター、ユーザー、ゲスト
+order: 36
+---
+
+Bedrud はアクセス制御のための5段階ロールシステムを実装しています。各ロールはユーザーレコードに保存されたアクセス文字列のセットにマッピングされ、API層（バックエンドミドルウェア）とUI層（フロントエンドガードと条件付きレンダリング）の両方で適用されます。
+
+## ロール階層
+
+| ロール | アクセス配列 | バックエンド重み | 説明 |
+|--------|-------------|-----------------|------|
+| スーパー管理者 | `['superadmin', 'user']` | 4 | 完全なシステムアクセス、すべての管理機能 |
+| 管理者 | `['admin', 'user']` | 3 | 完全な管理者アクセス、スーパー管理者と同じ |
+| モデレーター | `['moderator', 'user']` | 2 | 読み取り専用の管理ビュー、変更不可 |
+| ユーザー | `['user']` | 1 | 標準の登録ユーザー |
+| ゲスト | `['guest']` | 0 | 未登録の参加者、参加のみ |
+
+## バックエンドでの適用
+
+アクセスレベルは、すべての管理ルートで `RequireAccess` ミドルウェアを介して適用されます。ミドルウェアは、ユーザーのアクセス配列を必要な最小レベルと照合します：
+
+- `superadmin` アクセスが必要なルートは、管理者、モデレーター、ユーザー、ゲストを拒否
+- `admin` アクセスが必要なルートは、スーパー管理者と管理者を許可
+- `moderator` アクセスが必要なルートは、スーパー管理者、管理者、モデレーターを許可
+
+バックエンドはアクセスをカンマ区切りの文字列としてデータベースに保存します（`users` テーブルの `accesses` カラム）。GORM の `StringArray` 型がシリアライズとデシリアライズを処理します。
+
+## フロントエンド連携
+
+### ユーザータイプ
+
+`user.store.ts` の `User` インターフェースには、アクセス配列から派生した2つのブール型フィールドが含まれています：
+
+```ts
+interface User {
+  // ...
+  isSuperAdmin: boolean  // accesses.includes('superadmin')
+  isAdmin: boolean       // accesses.includes('admin') || accesses.includes('superadmin')
+  accesses: string[]     // raw access list from backend
+}
+```
+
+### 管理ガード
+
+管理レイアウト（`/dashboard/admin`）はスーパー管理者、管理者、モデレーターを通過させます。モデレーターは `isReadOnly=true` のコンテキスト変数を受け取ります：
+
+```tsx
+// routes/dashboard/admin.tsx
+const canAccess = user?.isSuperAdmin || accesses.includes('admin') || accesses.includes('moderator')
+```
+
+`useAdminContext()` フックは、すべての子ルートに `isReadOnly` フラグを提供します：
+
+```tsx
+const { isReadOnly } = useAdminContext()
+```
+
+### モデレーターが表示 vs 操作できるもの
+
+| ページ | 表示 | 変更 |
+|--------|------|------|
+| 概要統計 | ✅ 完全な統計 | N/A |
+| ユーザー一覧 | ✅ 完全な一覧 | ❌ 一括操作不可 |
+| ユーザー詳細 | ✅ 完全なプロフィール | ❌ ステータス/ロール/削除/ログアウト不可 |
+| ルーム一覧 | ✅ 完全な一覧 | ❌ 停止/削除/上限編集不可 |
+| ルーム詳細 | ✅ 完全な情報 | ❌ 停止/削除/キック/ミュート不可 |
+| 設定 | ❌ リダイレクト | ❌ |
+
+### ロールセレクター
+
+管理UIは、ユーザー一覧テーブルとユーザー詳細ページの両方に `<Select>` ドロップダウンを提供し、以前のバイナリのスーパー管理者トグルを置き換えます。利用可能なオプション：
+
+| オプション | 保存値 |
+|-----------|--------|
+| スーパー管理者 | `['superadmin', 'user']` |
+| 管理者 | `['admin', 'user']` |
+| モデレーター | `['moderator', 'user']` |
+| ユーザー | `['user']` |
+| ゲスト | `['guest']` |
+
+ドロップダウンは、完全なアクセス配列を含む `PUT /api/admin/users/:id/accesses` リクエストを送信します。
+
+## CLI 管理
+
+`bedrud user promote` および `bedrud user demote` コマンドは `--role` フラグを受け付けます：
+
+```bash
+# Promote to superadmin (default)
+bedrud user promote --email user@example.com
+
+# Promote to admin
+bedrud user promote --email user@example.com --role admin
+
+# Promote to moderator
+bedrud user promote --email user@example.com --role moderator
+
+# Demote specific role
+bedrud user demote --email user@example.com --role admin
+```
+
+有効な `--role` 値：`superadmin`、`admin`、`moderator`、`user`、`guest`。
+
+## コードの場所
+
+| ファイル | 目的 |
+|---------|------|
+| `server/internal/models/user.go` | バックエンドアクセスレベル定数 |
+| `server/internal/middleware/` | `RequireAccess` ミドルウェア |
+| `server/internal/usercli/usercli.go` | CLIロール管理関数 |
+| `apps/web/src/lib/user.store.ts` | フロントエンドのUser型 |
+| `apps/web/src/routes/dashboard/admin.tsx` | 管理ガード + isReadOnlyコンテキスト |
+| `apps/web/src/components/admin/UserTable.tsx` | ロールセレクタードロップダウン + バッジ |
+| `apps/web/src/components/admin/RoomTable.tsx` | 読み取り専用ルームテーブルマスク |

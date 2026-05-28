@@ -1,9 +1,18 @@
+// TODO oncoming feature
 import { useRoomContext } from '@livekit/components-react'
 import { RoomEvent } from 'livekit-client'
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { getPublicSettings } from '#/lib/use-public-settings'
 import { useUserStore } from '#/lib/user.store'
 import { useChatPersistence } from './chat/useChatPersistence'
+
+/** Generate a unique ID with fallback for non-secure contexts (HTTP). */
+function generateID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
+}
 
 export type SystemEventName =
   | 'kick'
@@ -38,6 +47,8 @@ export interface ChatAttachment {
   size: number
 }
 
+export type ChatMessageStatus = 'sending' | 'sent' | 'failed'
+
 export interface ChatMessage {
   id: string
   timestamp: number
@@ -46,6 +57,7 @@ export interface ChatMessage {
   message: string
   attachments: ChatAttachment[]
   isLocal: boolean
+  status?: ChatMessageStatus
 }
 
 const KNOWN_SYSTEM_EVENTS = new Set([
@@ -78,6 +90,19 @@ interface MeetingRoomContextValue {
   // Self-deafened: user toggled deafen from controls bar
   isSelfDeafened: boolean
   toggleSelfDeafen: () => void
+  // Recording state
+  // TODO oncoming feature
+  isRecording: boolean
+  // TODO oncoming feature
+  isRecordingStarting: boolean
+  // TODO oncoming feature
+  isRecordingStopping: boolean
+  // TODO oncoming feature
+  toggleRecording: () => void
+  // TODO oncoming feature
+  recordingsAllowed: boolean
+  // TODO oncoming feature
+  recordingsEnabled: boolean
 }
 
 const MeetingRoomContext = createContext<MeetingRoomContextValue | null>(null)
@@ -116,21 +141,25 @@ export function useMeetingContext(): MeetingContextValue {
   return useMemo(() => ({ ...room, ...chat }), [room, chat])
 }
 
+// ── Chat memory & persistence limits ─────────────────────────────────────
+
+const MEMORY_CHAT_CAP = 400
+const MEMORY_SYSTEM_CAP = 100
+const PERSIST_CHAT_CAP = 200
+
+function capMessages<T>(arr: T[], max: number): T[] {
+  if (arr.length <= max) return arr
+  return arr.slice(arr.length - max)
+}
+
 // ── Chat retention helpers ──────────────────────────────────────────────────
 
-function applyChatRetention(messages: ChatMessage[], retention: { maxCount: number; ttlHours: number }): ChatMessage[] {
-  let result = messages
-
-  if (retention.ttlHours > 0) {
-    const cutoff = Date.now() - retention.ttlHours * 60 * 60 * 1000
-    result = result.filter((m) => m.timestamp >= cutoff)
+function applyChatRetention(messages: ChatMessage[], ttlHours: number): ChatMessage[] {
+  if (ttlHours > 0) {
+    const cutoff = Date.now() - ttlHours * 60 * 60 * 1000
+    return messages.filter((m) => m.timestamp >= cutoff)
   }
-
-  if (retention.maxCount > 0 && result.length > retention.maxCount) {
-    result = result.slice(result.length - retention.maxCount)
-  }
-
-  return result
+  return messages
 }
 
 // ── Provider ────────────────────────────────────────────────────────────────
@@ -139,38 +168,67 @@ interface MeetingProviderProps {
   roomId: string
   roomName: string
   adminId: string
+  recordingsAllowed?: boolean
+  activeRecordingId?: string
   onRoomDeletionMessage?: (event: RoomDeletionEvent, message: string, isCurrentUserDeleted: boolean) => void
   children: ReactNode
 }
 
-export function MeetingProvider({ roomId, roomName, adminId, onRoomDeletionMessage, children }: MeetingProviderProps) {
+export function MeetingProvider({
+  roomId,
+  roomName,
+  adminId,
+  recordingsAllowed = true,
+  activeRecordingId,
+  onRoomDeletionMessage,
+  children,
+}: MeetingProviderProps) {
   const user = useUserStore((s) => s.user)
   const currentUserId = user?.id ?? ''
   const accesses = user?.accesses ?? []
   const room = useRoomContext()
 
-  const [retention, setRetention] = useState({ maxCount: 10000, ttlHours: 2160 })
+  const [ttlHours, setTtlHours] = useState(2160)
+
+  const [recordingsEnabled, setRecordingsEnabled] = useState(true)
 
   useEffect(() => {
     getPublicSettings()
       .then((s) => {
-        setRetention({
-          maxCount: s.chatMaxMessageCount ?? 10000,
-          ttlHours: s.chatMessageTTLHours ?? 2160,
-        })
+        setTtlHours(s.chatMessageTTLHours ?? 2160)
+        setRecordingsEnabled(false) // TODO oncoming feature
       })
       .catch(() => {})
   }, [])
 
-  const [initialMessages, persistMessages] = useChatPersistence(roomId, retention.maxCount, retention.ttlHours)
+  const [initialMessages, persistMessages] = useChatPersistence(roomId, PERSIST_CHAT_CAP, ttlHours)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(initialMessages)
   useEffect(() => {
-    persistMessages(chatMessages)
+    persistMessages(chatMessages.map(({ status: _, ...m }) => m as ChatMessage))
   }, [chatMessages, persistMessages])
   const [systemMessages, setSystemMessages] = useState<SystemMessage[]>([])
   const [isServerDeafened, setIsServerDeafened] = useState(false)
   const [isSelfDeafened, setIsSelfDeafened] = useState(false)
+  const [isRecording, _setIsRecording] = useState(!!activeRecordingId)
+  const [isRecordingStarting, _setIsRecordingStarting] = useState(false)
+  const [isRecordingStopping, _setIsRecordingStopping] = useState(false)
   const micBeforeDeafenRef = useRef(true)
+  const toggleSelfDeafen = useCallback(() => {
+    if (isSelfDeafened) {
+      setIsSelfDeafened(false)
+      // Restore mic only if it was on before we deafened
+      if (micBeforeDeafenRef.current) room.localParticipant.setMicrophoneEnabled(true)
+      return
+    }
+    micBeforeDeafenRef.current = room.localParticipant.isMicrophoneEnabled
+    room.localParticipant.setMicrophoneEnabled(false)
+    setIsSelfDeafened(true)
+  }, [isSelfDeafened, room.localParticipant])
+
+  const toggleRecording = useCallback(async () => {
+    // TODO oncoming feature
+  }, [])
+
   const [unreadCount, setUnreadCount] = useState(0)
 
   // Track how many messages existed at the last markRead() so we only count new arrivals
@@ -188,7 +246,8 @@ export function MeetingProvider({ roomId, roomName, adminId, onRoomDeletionMessa
           if (raw.type === 'system' && typeof raw.event === 'string' && KNOWN_SYSTEM_EVENTS.has(raw.event)) {
             if (ROOM_DELETION_EVENTS.has(raw.event)) {
               const msg = { ...(raw as SystemMessage), ts: Date.now() }
-              setSystemMessages((prev) => [...prev, msg])
+              // If virtual scroll: index-based keys (sys-${i}) need stable IDs; scroll anchoring required when cap evicts old system events.
+              setSystemMessages((prev) => capMessages([...prev, msg], MEMORY_SYSTEM_CAP))
               const isCurrentUserDeleted = raw.deletedIdentity === room.localParticipant.identity
               onRoomDeletionMessageRef.current?.(
                 raw.event as RoomDeletionEvent,
@@ -204,7 +263,8 @@ export function MeetingProvider({ roomId, roomName, adminId, onRoomDeletionMessa
               raw.target.length > 0
             ) {
               const msg = { ...(raw as SystemMessage), ts: Date.now() }
-              setSystemMessages((prev) => [...prev, msg])
+              // If virtual scroll: index-based keys (sys-${i}) need stable IDs; scroll anchoring required when cap evicts old system events.
+              setSystemMessages((prev) => capMessages([...prev, msg], MEMORY_SYSTEM_CAP))
               if (msg.target === currentUserId) {
                 if (msg.event === 'deafen') setIsServerDeafened(true)
                 else if (msg.event === 'undeafen') setIsServerDeafened(false)
@@ -221,7 +281,7 @@ export function MeetingProvider({ roomId, roomName, adminId, onRoomDeletionMessa
           const senderName = (raw.senderName as string) || p?.name || p?.identity || 'Unknown'
 
           const msg: ChatMessage = {
-            id: (raw.id as string) || crypto.randomUUID(),
+            id: (raw.id as string) || generateID(),
             timestamp: (raw.timestamp as number) || Date.now(),
             senderName,
             senderIdentity,
@@ -229,9 +289,11 @@ export function MeetingProvider({ roomId, roomName, adminId, onRoomDeletionMessa
             attachments: Array.isArray(raw.attachments) ? (raw.attachments as ChatAttachment[]) : [],
             isLocal: false,
           }
+          // If virtual scroll: index keys (cluster-${i}) need stable IDs; groupMessages output shifts on cap — virtualizer needs scroll anchoring.
           setChatMessages((prev) => {
+            if (prev.some((m) => m.id === msg.id)) return prev
             const updated = [...prev, msg]
-            return applyChatRetention(updated, retention)
+            return capMessages(applyChatRetention(updated, ttlHours), MEMORY_CHAT_CAP)
           })
         }
       } catch {
@@ -243,7 +305,7 @@ export function MeetingProvider({ roomId, roomName, adminId, onRoomDeletionMessa
     return () => {
       room.off(RoomEvent.DataReceived, handler)
     }
-  }, [room, currentUserId, retention])
+  }, [room, currentUserId, ttlHours])
 
   // Increment unread counter only for messages that arrive after the last markRead()
   useEffect(() => {
@@ -267,7 +329,7 @@ export function MeetingProvider({ roomId, roomName, adminId, onRoomDeletionMessa
   const sendChat = useCallback(
     (text: string, attachments?: ChatAttachment[]) => {
       const lp = room.localParticipant
-      const id = crypto.randomUUID()
+      const id = generateID()
       const timestamp = Date.now()
       const senderName = lp.name || lp.identity || 'You'
       const senderIdentity = lp.identity || ''
@@ -283,13 +345,19 @@ export function MeetingProvider({ roomId, roomName, adminId, onRoomDeletionMessa
       }
 
       const data = new TextEncoder().encode(JSON.stringify(payload))
-      lp.publishData(data, { reliable: true, topic: 'chat' }).catch((err) => {
-        if (import.meta.env.DEV) console.error('[MeetingContext] failed to publish chat message:', err)
-      })
+      lp.publishData(data, { reliable: true, topic: 'chat' })
+        .then(() => {
+          setChatMessages((prev) => prev.map((m): ChatMessage => (m.id === id ? { ...m, status: 'sent' } : m)))
+        })
+        .catch((err) => {
+          setChatMessages((prev) => prev.map((m): ChatMessage => (m.id === id ? { ...m, status: 'failed' } : m)))
+          if (import.meta.env.DEV) console.error('[MeetingContext] failed to publish chat message:', err)
+        })
 
       // Local echo so the sender sees the message immediately
+      // If virtual scroll: index keys (cluster-${i}) need stable IDs; groupMessages output shifts on cap — virtualizer needs scroll anchoring.
       setChatMessages((prev) => {
-        const updated = [
+        const updated: ChatMessage[] = [
           ...prev,
           {
             id,
@@ -299,35 +367,14 @@ export function MeetingProvider({ roomId, roomName, adminId, onRoomDeletionMessa
             message: text,
             attachments: attachments ?? [],
             isLocal: true,
+            status: 'sending',
           },
         ]
-        return applyChatRetention(updated, retention)
+        return capMessages(applyChatRetention(updated, ttlHours), MEMORY_CHAT_CAP)
       })
     },
-    [room, retention],
+    [room, ttlHours],
   )
-
-  const toggleSelfDeafen = useCallback(() => {
-    const lp = room.localParticipant
-    const newDeafened = !isSelfDeafened
-
-    if (newDeafened) {
-      micBeforeDeafenRef.current = lp.isMicrophoneEnabled
-      lp.setMicrophoneEnabled(false)
-    } else {
-      lp.setMicrophoneEnabled(micBeforeDeafenRef.current)
-    }
-
-    // Broadcast deafened state to all participants via metadata
-    let meta: Record<string, unknown> = {}
-    try {
-      meta = JSON.parse(lp.metadata ?? '{}')
-    } catch {
-      /* ignore */
-    }
-    lp.setMetadata(JSON.stringify({ ...meta, deafened: newDeafened }))
-    setIsSelfDeafened(newDeafened)
-  }, [room, isSelfDeafened])
 
   // Room context value — stable unless room metadata actually changes
   const roomValue = useMemo<MeetingRoomContextValue>(
@@ -338,10 +385,20 @@ export function MeetingProvider({ roomId, roomName, adminId, onRoomDeletionMessa
       currentUserId,
       isCreator: !!adminId && (currentUserId === adminId || room.localParticipant.identity === adminId),
       isAdmin: accesses.includes('admin') || accesses.includes('superadmin'),
-      isModerator: accesses.includes('moderator'),
+      isModerator:
+        accesses.includes('moderator') ||
+        accesses.includes('admin') ||
+        accesses.includes('superadmin') ||
+        (!!adminId && currentUserId === adminId),
       isServerDeafened,
       isSelfDeafened,
       toggleSelfDeafen,
+      isRecording,
+      isRecordingStarting,
+      isRecordingStopping,
+      toggleRecording,
+      recordingsAllowed,
+      recordingsEnabled,
     }),
     [
       roomId,
@@ -352,6 +409,12 @@ export function MeetingProvider({ roomId, roomName, adminId, onRoomDeletionMessa
       isServerDeafened,
       isSelfDeafened,
       toggleSelfDeafen,
+      isRecording,
+      isRecordingStarting,
+      isRecordingStopping,
+      toggleRecording,
+      recordingsAllowed,
+      recordingsEnabled,
       room.localParticipant.identity,
     ],
   )

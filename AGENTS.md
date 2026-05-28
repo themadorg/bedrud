@@ -21,10 +21,13 @@ bedrud/
 │   │   ├── middleware/    JWT auth + RBAC middleware
 │   │   ├── models/       GORM models (User, Room, Passkey, ChatUpload, Settings, etc.)
 │   │   ├── repository/   Data access layer (6 repos)
-│   │   ├── scheduler/    Background idle-room cleanup (gocron)
+│   │   ├── queue/        Job queue: async task processing (room_delete, user_delete, etc.)
+│   │   ├── scheduler/    Background idle-room cleanup + job cleanup (gocron)
 │   │   ├── server/       Bootstrap: Run() wires all subsystems
+│   │   ├── services/     RoomCleanupService (cascade delete, suspend)
 │   │   ├── storage/      Chat image upload (disk/inline/S3) + ChatUploadTracker (Record/DeleteByRoom)
 │   │   ├── templates/    HTML templates (login, index)
+│   │   ├── testutil/     Test db utilities
 │   │   ├── usercli/      CLI user management (promote/demote/create/delete)
 │   │   └── utils/        Self-signed TLS cert generation
 │   ├── migrations/       SQL migrations
@@ -62,14 +65,14 @@ make dev       # LK + hot-reload server + web (concurrent)
 **Commands:**
 | Command | What |
 |---------|------|
-| `make dev-web` | Frontend only (Vite :3000, proxy /api → :8090) |
+| `make dev-web` | Frontend only (TanStack Start :3000, proxy /api → :8090) |
 | `make dev-server` | Backend + LK (no reload) |
 | `make dev-server-hot` | Backend + Air hot-reload |
 | `make dev-api` | Backend only (no LK) |
 | `make dev-livekit` | LK only |
 | `make dev-site` | Astro site dev server |
 
-**Config:** `config.local.yaml` → `config.yaml`. Override: `CONFIG_PATH=/path bedrud run`.
+**Config:** `config.local.yaml` → `config.yaml`. Override: `CONFIG_PATH=/path bedrud run`. Queue: `QueueConfig` in config (pollInterval, maxAttempts, concurrency). Env: `QUEUE_POLL_INTERVAL`, `QUEUE_MAX_ATTEMPTS`, `QUEUE_CONCURRENCY`.
 
 ---
 
@@ -127,6 +130,13 @@ cd apps/site && bun run build            # Prod build
 - **Routing:** TanStack Router file-based. `routeTree.gen.ts` auto-gen — never edit.
 - **Styling:** TailwindCSS v4. CSS var tokens. See `apps/web/AGENTS.md`.
 - **Components:** shadcn/ui in `components/ui/`. Add: `bunx shadcn@latest add <name>`.
+- **Shadcn/ui compliance overhauled** (2026-05-16, 4 phases). Key rules:
+  - Prefer `Button`, `Input`, `Label`, `Select`, `Switch`, `Badge`, `Card`, `Dialog`, `Tabs`, `RadioGroup` from `@/components/ui/` over raw HTML
+  - No inline `style={}` for static values — use Tailwind
+  - Use `cn()` from `@/lib/utils` for dynamic classNames
+  - No gradient text (`bg-clip-text text-transparent` — banned)
+  - No animated aurora blobs — max one static radial glow per page
+  - Meeting room uses Tailwind classes now (was 100% inline), shared styles in `components/meeting/meeting.css`
 
 | Command | Purpose |
 |---------|---------|
@@ -189,8 +199,11 @@ Regen: `make swagger-gen` (needs `swag` CLI).
 - **Missing LK placeholder:** Build fails without `internal/livekit/bin/livekit-server` (even empty).
 - **Frontend not embedded:** `go build` without `make build` → no frontend → 404.
 - **Hot reload:** Only `make dev-server-hot` (Air). `make dev-server` no reload.
-- **Path aliases:** Use `#/*` not `../src/*`. Vite resolves via `vite-tsconfig-paths`.
+- **Path aliases:** Use `#/*` not `../src/*`. TanStack Start resolves via tsconfig paths.
+- **Queue polling:** Worker polls every 500ms. SQLite needs serialized writes. Postgres uses `SKIP LOCKED`. If queue jobs stay `pending`, check DB connection limits.
+- **Queue handlers are async:** Room delete/suspend, user delete, chat upload S3 all enqueue jobs. Frontend sees 202 Accepted, not immediate result.
 - **Config:** Dev config auto-copied. Override: `CONFIG_PATH` env var. LiveKit config override: `LIVEKIT_CONFIG_PATH` env var or `livekit.configPath` in config.yaml.
+- **LiveKit webhook:** Embedded LiveKit auto-configures webhook URL to `http://localhost:<httpPort>/api/livekit/webhook` for disconnect detection. For **external LiveKit** (Cloud or self-hosted), manually configure webhook URL in your LiveKit dashboard → `https://<your-domain>/api/livekit/webhook`. Uses same API key/secret for JWT signing.
 - **Embedded LiveKit TLS:** When server TLS is enabled (`enableTLS: true`), embedded LiveKit process auto-generates temp config with TURN/TLS (port 5349) using server's certificate. TURN `domain` auto-set from `server.host`, UDP port 3478 configured, relative `certFile`/`keyFile` paths resolved to absolute. Set `livekit.nodeIP` / `LIVEKIT_NODE_IP` for explicit RTC node IP (disables STUN). For custom LiveKit YAML, set `livekit.configPath` or `LIVEKIT_CONFIG_PATH`.
 - **Chat message retention:** Config `chat.maxMessageCount` (default 10000) and `chat.messageTTLHours` (default 2160 = 90 days) control frontend-side trimming of chat messages in memory and sessionStorage. LiveKit doesn't persist data channel messages server-side — these are advisory limits enforced client-side. Env: `CHAT_MAX_MESSAGE_COUNT`, `CHAT_MESSAGE_TTL_HOURS`.
 - **Privileged ports:** HTTP listener defaults to `:80`. Non-root can't bind. Fix: set `httpPort: "8080"` in config / `SERVER_HTTP_PORT=8080` env, or `sudo setcap 'cap_net_bind_service=+ep' $(which bedrud)` (re-run after each binary update).
@@ -205,7 +218,7 @@ Load skill by task. Injects full ctx.
 
 | Task | Load Skill | Provides |
 |------|-----------|----------|
-| Go backend (handler, model, repo, auth, middleware, DB) | `bedrud-server` | Every pkg → file → fn/struct/route. Full dep graph. |
+| Go backend (handler, model, repo, auth, middleware, DB, queue, scheduler) | `bedrud-server` | Every pkg → file → fn/struct/route. Full dep graph. |
 | React/UI (component, route, state, hook, store) | `bedrud-frontend` | Every route → path+purpose. Every component → props+exports. Every lib. Component hierarchy. |
 | API endpoints (add/modify/debug) | `bedrud-api` | Complete endpoint table: method, path, auth, handler, req/res shapes. Auth flow. |
 

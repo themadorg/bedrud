@@ -1,6 +1,6 @@
 ---
-title: Configuration
-description: Configure Bedrud for your needs
+title: 配置
+description: 根据您的需求配置 Bedrud
 order: 4
 ---
 
@@ -52,7 +52,7 @@ logger:
 livekit:
   host: "http://localhost:8090/livekit"  # 外部 LiveKit URL
   internalHost: "http://127.0.0.1:7880"  # 内部 LiveKit URL
-  apiKey: "devkey"              # LiveKit API key
+  apiKey: "devkey"              # LiveKit API key (auto-generated if empty)
   apiSecret: "devsecret"        # LiveKit API secret
 
 auth:
@@ -90,6 +90,27 @@ chat:
   globalDiskThresholdBytes: 0            # Global storage ceiling across all users. 0 = unlimited. Env: CHAT_GLOBAL_DISK_THRESHOLD_BYTES
   maxMessageCount: 10000                 # Max chat messages kept per room (0 = unlimited). Env: CHAT_MAX_MESSAGE_COUNT
   messageTTLHours: 2160                  # Purge messages older than this in hours (0 = forever). 2160 = 90 days. Env: CHAT_MESSAGE_TTL_HOURS
+
+
+recording:
+  maxFileSizeMB: 2048           # Max recording file size in MB (0 = unlimited). Env: RECORDING_MAX_FILE_SIZE_MB
+  storageDir: "./data/recordings"  # Local storage path for disk-backed recordings. Env: RECORDING_STORAGE_DIR
+  maxRecordingsPerRoom: 100     # Max total recordings per room (0 = unlimited). Env: RECORDING_MAX_PER_ROOM
+
+queue:
+  pollInterval: 500              # ms between job polls. Env: QUEUE_POLL_INTERVAL
+  maxAttempts: 3                 # retries before marking failed. Env: QUEUE_MAX_ATTEMPTS
+  concurrency: 1                 # worker goroutines. Env: QUEUE_CONCURRENCY
+
+email:
+  smtpHost: ""                    # SMTP server hostname. Env: EMAIL_SMTP_HOST
+  smtpPort: 587                   # SMTP server port. Env: EMAIL_SMTP_PORT
+  username: ""                    # SMTP username. Env: EMAIL_USERNAME
+  password: ""                    # SMTP password. Env: EMAIL_PASSWORD
+  fromAddress: ""                 # From address. Env: EMAIL_FROM_ADDRESS
+  fromName: "Bedrud"              # From display name. Env: EMAIL_FROM_NAME
+  tlsSkipVerify: false       # Skip TLS certificate validation. Env: EMAIL_TLS_SKIP_VERIFY
+  smtpsMode: false           # Direct TLS (SMTPS, port 465). Env: EMAIL_SMTPS_MODE
 ```
 
 ### 关键设置
@@ -133,6 +154,46 @@ Bedrud applies advisory retention limits to in-room chat messages. Since LiveKit
 <Callout type="info">
   Chat messages in Bedrud are transmitted exclusively through LiveKit data channels and are not stored on the server. The retention limits above control how many messages the frontend keeps in memory and sessionStorage. A dedicated chat history service (with server-side persistence) would be needed for true history across sessions — this is tracked as a future enhancement.
 </Callout>
+
+{/* TODO oncoming feature: recordings */}
+#### Recordings
+
+Room recording is controlled by the `RecordingsEnabled` system setting (toggle in admin Settings → General). When enabled:
+
+- Moderators can start/stop composite MP4 recordings from the meeting controls bar
+- Recordings are stored alongside chat uploads using the configured storage backend (disk/S3)
+- Each room has a per-room `recordingsAllowed` toggle that must also be enabled
+- Failed/pending recordings over 7 days old are automatically cleaned up daily
+- Non-persistent rooms have a configurable per-room recording cap (`maxRecordingsPerRoom`) to prevent abuse
+- After a room is deleted, the recording creator can still access their recordings from the same room URL
+
+**YAML Reference:**
+
+- **`maxFileSizeMB`** — maximum file size for a single recording in MB. 0 = unlimited. Default: 2048. Env: `RECORDING_MAX_FILE_SIZE_MB`
+- **`storageDir`** — directory for disk-backed recordings. Only used when S3 is not configured. Default: `./data/recordings`. Env: `RECORDING_STORAGE_DIR`
+- **`maxRecordingsPerRoom`** — caps total recordings per room (all statuses: completed, failed, etc.). 0 = unlimited. Only enforced for non-persistent rooms. Default: 100. Env: `RECORDING_MAX_PER_ROOM`
+
+See the [Recordings Guide](/en/docs/guides/recordings) for full details.
+
+
+
+#### 队列（任务系统）
+
+内部任务队列处理异步后台任务，如用户/房间删除、暂停和聊天上传。
+
+- **`pollInterval`** — 工作线程检查新任务的频率（毫秒）。较低的值可减少延迟，但会增加数据库查询次数。
+- **`maxAttempts`** — 任务标记为失败前的最大重试次数。重试使用指数退避（`2^尝试次数 * 5s`，上限为 1 小时）。
+- **`concurrency`** — 工作线程 goroutine 数量。使用 PostgreSQL 时可增加以提高吞吐量。SQLite 限制为单工作线程（一个连接）。
+
+#### 电子邮件通知
+
+Bedrud 可以通过 SMTP 发送事务性电子邮件（欢迎、密码重置、房间邀请）。
+
+- **`smtpHost`** / **`smtpPort`** — SMTP 服务器地址。默认使用端口 587（STARTTLS）。
+- **`username`** / **`password`** — SMTP 身份验证凭据。
+- **`fromAddress`** / **`fromName`** — 外发邮件的发件人身份。
+- **`tlsSkipVerify`** — 跳过 TLS 证书验证（用于自签名证书）。
+- **`smtpsMode`** — 直接 TLS（SMTPS，端口 465）。
 
 ---
 
@@ -188,6 +249,34 @@ TURN 是最后的备选中继 - 大多数客户端（约 80%）通过 UDP 直连
 
 架构、配置详情、带宽计算和故障排除请参阅 [TURN 服务器指南](/zh/docs/architecture/turn-server)。
 
+
+### Webhook（断线检测）
+
+Bedrud receives webhook events from LiveKit to detect when participants disconnect unexpectedly (e.g., browser crash, network drop) and mark them as inactive in the database.
+
+**Endpoint:** `POST /api/livekit/webhook`
+
+**Authentication:** Uses LiveKit JWT signing with the same `apiKey`/`apiSecret`. No separate secret needed.
+
+**Embedded LiveKit:** When Bedrud manages its own LiveKit server (default), the webhook URL is **auto-configured** in the generated LiveKit YAML. No user action needed.
+
+**External LiveKit** (Cloud or self-hosted with `external: true`): Manually configure the webhook URL in your LiveKit dashboard:
+
+```
+https://<your-domain>/api/livekit/webhook
+```
+
+**Events handled:**
+
+| Event | Action |
+|-------|--------|
+| `participant_disconnected` | Marks participant as inactive in `room_participants` |
+| `room_finished` | Marks all participants + room as inactive |
+
+<Callout type="info">
+  If `apiKey` is left empty in config, a random keypair is generated at startup. The embedded LiveKit server and webhook handler both use the same generated key — no manual configuration needed.
+</Callout>
+
 ### 房间设置
 
 `room:` 部分控制会议房间行为：
@@ -242,8 +331,8 @@ export LIVEKIT_API_SECRET=prodsecret
 | `DB_PATH` | `database.path` | SQLite 文件路径或 PostgreSQL 连接字符串 |
 | `LIVEKIT_HOST` | `livekit.host` | 外部 LiveKit URL |
 | `LIVEKIT_INTERNAL_HOST` | `livekit.internalHost` | 内部 LiveKit URL |
-| `LIVEKIT_API_KEY` | `livekit.apiKey` | LiveKit API key |
-| `LIVEKIT_API_SECRET` | `livekit.apiSecret` | LiveKit API secret |
+| `LIVEKIT_API_KEY` | `livekit.apiKey` | LiveKit API key (auto-generated as `gen-<32hex>` if empty) |
+| `LIVEKIT_API_SECRET` | `livekit.apiSecret` | LiveKit API secret (64-char hex auto-generated if empty) |
 | `JWT_SECRET` | `auth.jwtSecret` | 签名 JWT token 的密钥 |
 | `AUTH_FRONTEND_URL` | `auth.frontendURL` | OAuth 重定向的前端 URL |
 | `AUTH_PASSKEY_CHALLENGE_TTL` | `auth.passkeyChallengeTTL` | Passkey 挑战过期时间（分钟） |
@@ -266,6 +355,17 @@ export LIVEKIT_API_SECRET=prodsecret
 | `CHAT_GLOBAL_DISK_THRESHOLD_BYTES` | `chat.globalDiskThresholdBytes` | Global upload storage ceiling in bytes (default 0 = unlimited) |
 | `CHAT_MAX_MESSAGE_COUNT` | `chat.maxMessageCount` | Max chat messages kept per room (default 10000, 0 = unlimited) |
 | `CHAT_MESSAGE_TTL_HOURS` | `chat.messageTTLHours` | Max age of chat messages in hours (default 2160 = 90 days, 0 = forever) |
+| `QUEUE_POLL_INTERVAL` | `queue.pollInterval` | Job poll interval in ms (default 500) |
+| `QUEUE_MAX_ATTEMPTS` | `queue.maxAttempts` | Max job retries before marking failed (default 3) |
+| `QUEUE_CONCURRENCY` | `queue.concurrency` | Worker goroutine count (default 1) |
+| `EMAIL_SMTP_HOST` | `email.smtpHost` | SMTP server hostname |
+| `EMAIL_SMTP_PORT` | `email.smtpPort` | SMTP server port (default 587) |
+| `EMAIL_USERNAME` | `email.username` | SMTP username |
+| `EMAIL_PASSWORD` | `email.password` | SMTP password |
+| `EMAIL_FROM_ADDRESS` | `email.fromAddress` | From email address |
+| `EMAIL_FROM_NAME` | `email.fromName` | From display name (default "Bedrud") |
+| `EMAIL_TLS_SKIP_VERIFY` | `email.tlsSkipVerify` | Skip TLS certificate validation for self-signed SMTP certs |
+| `EMAIL_SMTPS_MODE` | `email.smtpsMode` | Enable direct TLS (SMTPS) mode for port 465 |
 
 ---
 

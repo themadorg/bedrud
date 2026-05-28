@@ -1,0 +1,114 @@
+---
+title: Kullanıcı Rolleri
+description: 5 kademeli rol tabanlı erişim kontrolü — süper admin, admin, moderatör, kullanıcı, misafir
+order: 36
+---
+
+Bedrud, erişim kontrolü için 5 kademeli bir rol sistemi uygular. Her rol, kullanıcı kaydında saklanan ve hem API katmanında (backend middleware) hem de UI katmanında (frontend korumaları ve koşullu işleme) uygulanan bir dizi erişim dizesine eşlenir.
+
+## Rol Hiyerarşisi
+
+| Rol | Erişim Dizisi | Backend Ağırlığı | Açıklama |
+|-----|--------------|-----------------|----------|
+| Süper Admin | `['superadmin', 'user']` | 4 | Tam sistem erişimi, tüm yönetici yetenekleri |
+| Admin | `['admin', 'user']` | 3 | Tam yönetici erişimi, süper admin ile aynı |
+| Moderatör | `['moderator', 'user']` | 2 | Salt okunur yönetici görünümü, değişiklik yok |
+| Kullanıcı | `['user']` | 1 | Standart kayıtlı kullanıcı |
+| Misafir | `['guest']` | 0 | Kayıtsız katılımcı, yalnızca katılma |
+
+## Backend Uygulaması
+
+Erişim seviyeleri, her admin rotasında `RequireAccess` middleware'i aracılığıyla uygulanır. Middleware, kullanıcının erişim dizisini gereken minimum seviyeye karşı kontrol eder:
+
+- `superadmin` erişimi gerektiren rotalar admin, moderatör, kullanıcı ve misafiri reddeder
+- `admin` erişimi gerektiren rotalar süper admin ve admine izin verir
+- `moderator` erişimi gerektiren rotalar süper admin, admin ve moderatöre izin verir
+
+Backend, erişimleri veritabanında virgülle ayrılmış bir dize olarak saklar (`users` tablosundaki `accesses` sütunu). `StringArray` GORM türü, serileştirme ve seri durumdan çıkarmayı yönetir.
+
+## Frontend Entegrasyonu
+
+### Kullanıcı Türü
+
+`user.store.ts` dosyasındaki `User` arayüzü, erişim dizisinden türetilen iki boolean alan içerir:
+
+```ts
+interface User {
+  // ...
+  isSuperAdmin: boolean  // accesses.includes('superadmin')
+  isAdmin: boolean       // accesses.includes('admin') || accesses.includes('superadmin')
+  accesses: string[]     // raw access list from backend
+}
+```
+
+### Admin Koruması
+
+Admin düzeni (`/dashboard/admin`), süper admin, admin ve moderatörün geçmesine izin verir. Moderatörler bir `isReadOnly=true` bağlam değişkeni alır:
+
+```tsx
+// routes/dashboard/admin.tsx
+const canAccess = user?.isSuperAdmin || accesses.includes('admin') || accesses.includes('moderator')
+```
+
+`useAdminContext()` hook'u, `isReadOnly` bayrağını tüm alt rotalara sağlar:
+
+```tsx
+const { isReadOnly } = useAdminContext()
+```
+
+### Moderatörlerin Görebildikleri vs Yapabildikleri
+
+| Sayfa | Görüntüle | Değiştir |
+|-------|-----------|----------|
+| Genel bakış istatistikleri | ✅ Tam istatistikler | N/A |
+| Kullanıcı listesi | ✅ Tam liste | ❌ Toplu işlem yok |
+| Kullanıcı detayı | ✅ Tam profil | ❌ Durum/rol/silme/çıkış yok |
+| Oda listesi | ✅ Tam liste | ❌ Askıya alma/silme/düzenleme sınırı yok |
+| Oda detayı | ✅ Tam bilgi | ❌ Askıya alma/silme/atma/susturma yok |
+| Ayarlar | ❌ Yönlendirildi | ❌ |
+
+### Rol Seçici
+
+Admin arayüzü, önceki ikili süper admin anahtarını değiştirerek hem kullanıcı listesi tablosunda hem de kullanıcı detay sayfasında bir `<Select>` açılır menüsü sağlar. Mevcut seçenekler:
+
+| Seçenek | Kaydeder |
+|---------|----------|
+| Süper Admin | `['superadmin', 'user']` |
+| Admin | `['admin', 'user']` |
+| Moderatör | `['moderator', 'user']` |
+| Kullanıcı | `['user']` |
+| Misafir | `['guest']` |
+
+Açılır menü, tam erişim dizisiyle birlikte bir `PUT /api/admin/users/:id/accesses` isteği gönderir.
+
+## CLI Yönetimi
+
+`bedrud user promote` ve `bedrud user demote` komutları bir `--role` bayrağı kabul eder:
+
+```bash
+# Promote to superadmin (default)
+bedrud user promote --email user@example.com
+
+# Promote to admin
+bedrud user promote --email user@example.com --role admin
+
+# Promote to moderator
+bedrud user promote --email user@example.com --role moderator
+
+# Demote specific role
+bedrud user demote --email user@example.com --role admin
+```
+
+Geçerli `--role` değerleri: `superadmin`, `admin`, `moderator`, `user`, `guest`.
+
+## Kod Konumları
+
+| Dosya | Amaç |
+|-------|------|
+| `server/internal/models/user.go` | Backend erişim seviyesi sabitleri |
+| `server/internal/middleware/` | `RequireAccess` middleware'i |
+| `server/internal/usercli/usercli.go` | CLI rol yönetimi fonksiyonları |
+| `apps/web/src/lib/user.store.ts` | Frontend User türü |
+| `apps/web/src/routes/dashboard/admin.tsx` | Admin koruması + isReadOnly bağlamı |
+| `apps/web/src/components/admin/UserTable.tsx` | Rol seçici açılır menüsü + rozetler |
+| `apps/web/src/components/admin/RoomTable.tsx` | Salt okunur oda tablosu maskeleme |

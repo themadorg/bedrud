@@ -20,6 +20,10 @@ type ConfigYAML struct {
 		CertFile string `yaml:"cert_file,omitempty"`
 		KeyFile  string `yaml:"key_file,omitempty"`
 	} `yaml:"turn"`
+	Webhook struct {
+		URLs   []string `yaml:"urls"`
+		APIKey string   `yaml:"api_key"`
+	} `yaml:"webhook"`
 	Logging struct {
 		JSON  bool   `yaml:"json,omitempty"`
 		Level string `yaml:"level,omitempty"`

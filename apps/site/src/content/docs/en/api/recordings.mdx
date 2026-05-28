@@ -1,0 +1,163 @@
+---
+title: Recordings API
+description: Recording start/stop/list/get endpoints
+order: 28
+---
+
+> 🚧 **Recording is a planned feature.** This guide describes functionality that will be available in a future release.
+
+Recording endpoints allow authorized participants to manage room recordings. All endpoints require authentication and the system's `RecordingsEnabled` setting.
+
+## Overview
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/rooms/:id/recording/start` | POST | Start a composite recording |
+| `/api/rooms/:id/recording/stop` | POST | Stop the active recording |
+| `/api/rooms/:id/recordings` | GET | List recordings for a room |
+| `/api/rooms/:id/recordings/:rid` | GET | Get a single recording's details |
+
+## Authorization
+
+Recording operations require three layers of authorization:
+
+| Layer | Check | Error |
+|-------|-------|-------|
+| System | `RecordingsEnabled` setting | 403 "recordings disabled on this server" |
+| Room | `Room.Settings.RecordingsAllowed` | 403 "recordings not allowed for this room" |
+| User | Room moderator or creator | 403 "Only moderators can start recordings" |
+
+---
+
+## Start Recording
+
+Begin a composite recording of the room's audio and video.
+
+```
+POST /api/rooms/:id/recording/start
+```
+
+**Headers:** `Authorization: Bearer <accessToken>`
+
+**Response (201):**
+
+```json
+{
+  "id": "recording-uuid",
+  "status": "started",
+  "roomId": "room-uuid"
+}
+```
+
+**Errors:**
+
+| Code | Condition |
+|------|-----------|
+| 403 | Not moderator, recordings disabled, or room doesn't allow recordings |
+| 409 | A recording is already active for this room |
+
+---
+
+## Stop Recording
+
+Stop the active recording. The recording transitions to `processing` state while the file is being stored.
+
+```
+POST /api/rooms/:id/recording/stop
+```
+
+**Headers:** `Authorization: Bearer <accessToken>`
+
+**Response (200):**
+
+```json
+{
+  "id": "recording-uuid",
+  "status": "processing"
+}
+```
+
+**Errors:**
+
+| Code | Condition |
+|------|-----------|
+| 404 | No active recording for this room |
+| 403 | Not moderator |
+
+---
+
+## List Recordings
+
+Get paginated list of recordings for a room.
+
+```
+GET /api/rooms/:id/recordings?page=1&limit=20
+```
+
+**Headers:** `Authorization: Bearer <accessToken>`
+
+**Response (200):**
+
+```json
+{
+  "recordings": [
+    {
+      "id": "recording-uuid",
+      "roomId": "room-uuid",
+      "roomName": "team-standup",
+      "egressId": "lk-egress-id",
+      "status": "completed",
+      "recordingType": "composite",
+      "fileUrl": "https://livekit-host/recordings/room-uuid/recording-uuid.mp4",
+      "durationMs": 300000,
+      "createdBy": "user-uuid",
+      "createdAt": "2025-03-15T10:30:00Z"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "limit": 20
+}
+```
+
+**Recording Statuses:**
+
+| Status | Meaning |
+|--------|---------|
+| `pending` | Recording requested, waiting for LiveKit |
+| `started` | LiveKit Egress is running |
+| `processing` | Recording stopped, file being stored |
+| `completed` | File stored, ready for download |
+| `failed` | Error occurred during recording |
+
+---
+
+## Get Recording
+
+Get details for a single recording.
+
+```
+GET /api/rooms/:id/recordings/:rid
+```
+
+**Headers:** `Authorization: Bearer <accessToken>`
+
+**Response (200):**
+
+```json
+{
+  "id": "recording-uuid",
+  "roomId": "room-uuid",
+  "roomName": "team-standup",
+  "status": "completed",
+  "fileUrl": "https://livekit-host/recordings/room-uuid/recording-uuid.mp4",
+  "durationMs": 300000,
+  "createdAt": "2025-03-15T10:30:00Z"
+}
+```
+
+**Errors:**
+
+| Code | Condition |
+|------|-----------|
+| 404 | Recording not found |

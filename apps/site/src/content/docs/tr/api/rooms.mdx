@@ -222,6 +222,42 @@ POST /api/room/:roomId/mute/:identity
 
 ---
 
+### Odayı Sil
+
+Oluşturduğunuz bir odayı silin. Bu, odayı ve tüm ilişkili verileri kalıcı olarak kaldırır. Bir arka plan işine kuyruğa alınır ve hemen döner.
+
+```
+DELETE /api/room/:roomId
+```
+
+**Yol Parametreleri:**
+
+| Parametre | Açıklama |
+|---|---|
+| `roomId` | Oda UUID'si |
+
+**Başlıklar:** `Authorization: Bearer <accessToken>`
+
+**Yanıt (202):**
+
+```json
+{
+  "message": "Room deletion queued"
+}
+```
+
+| Durum | Açıklama |
+|--------|-------------|
+| 202 | Silme kuyruğa alındı — kısa süre içinde tamamlanacak |
+| 403 | Oda oluşturucu değilsin (yalnızca oluşturan silebilir) |
+| 404 | Oda bulunamadı |
+| 409 | Silme zaten devam ediyor |
+| 500 | Sunucu hatası |
+
+Oda aktifse, tüm katılımcıların bağlantısı kesilir ve "This room has been ended by the creator" mesajını görürler.
+
+---
+
 ### Katılımcı Videosunu Kapat
 
 Bir katılımcının kamerasını kapatın. Bunu yalnızca oda yöneticisi yapabilir.

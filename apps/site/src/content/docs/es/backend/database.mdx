@@ -12,6 +12,20 @@ Bedrud utiliza **GORM** como su ORM, con soporte tanto para SQLite como para Pos
 
 Puedes configurar el tipo de base de datos y los detalles de conexión en el archivo `config.yaml`, en la sección `database:`.
 
+## Disposición de Archivos SQLite
+
+Al usar SQLite, Bedrud habilita el **modo WAL (Write-Ahead Log)** para un mejor rendimiento de lectura concurrente. Esto produce dos archivos adicionales junto a la base de datos principal:
+
+| Archivo | Propósito |
+|---------|-----------|
+| `bedrud-local.db` | Archivo principal de la base de datos |
+| `bedrud-local.db-shm` | Archivo de memoria compartida — coordina el acceso entre lectores y escritores |
+| `bedrud-local.db-wal` | Write-Ahead Log — las nuevas escrituras van aquí primero, luego se transfieren a la base principal |
+
+**Estos archivos son normales.** Se crean automáticamente al iniciar el servidor y se limpian al apagarlo correctamente. Si el servidor se bloquea, SQLite se recupera automáticamente — sin pérdida de datos.
+
+Para deshabilitar el modo WAL (no recomendado), establezca `PRAGMA journal_mode=DELETE;` en la configuración de SQLite, pero espere lecturas concurrentes más lentas.
+
 ## Modelos Principales
 
 Los modelos se encuentran en `internal/models/`. Estos son los más importantes:

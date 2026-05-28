@@ -24,10 +24,10 @@ flowchart TB
         LiveKit["Embedded LiveKit<br/>Media Server (WebRTC)"]
     end
 
-    Clients -->|"REST API + WebSocket"| Router
-    Router --> DB
-    Router --> LKSDK
-    LKSDK --> LiveKit
+    Clients */}|"REST API + WebSocket"| Router
+    Router */} DB
+    Router */} LKSDK
+    LKSDK */} LiveKit
 ```
 
 ## Komponenten
@@ -118,12 +118,12 @@ sequenceDiagram
 
     Client->>Server: POST /api/auth/login
     Server->>Database: verify credentials
-    Database-->>Server: credentials valid
-    Server-->>Client: access + refresh JWT
+    Database*/}>Server: credentials valid
+    Server*/}>Client: access + refresh JWT
 
     Client->>Server: GET /api/room/list
     Note right of Server: "Authorization: Bearer <access_token>"
-    Server-->>Client: room list
+    Server*/}>Client: room list
 ```
 
 Alle authentifizierten Anfragen verwenden JWT-Token im `Authorization`-Header. Der `authFetch`-Wrapper des Web-Frontends übernimmt das Anhängen des Tokens und das automatische Refresh.
@@ -156,9 +156,9 @@ sequenceDiagram
     C->>LK: Host + STUN + TURN candidates
 
     alt Direct path (UDP)
-        C-->>LK: Media via UDP 50000-60000
+        C*/}>LK: Media via UDP 50000-60000
     else TURN relay
-        C-->>LK: Media via TURN relay
+        C*/}>LK: Media via TURN relay
     end
 
     Note over C,LK: Audio/video tracks flow through SFU

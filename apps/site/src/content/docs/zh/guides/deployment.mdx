@@ -1,6 +1,6 @@
 ---
-title: Deployment Guide
-description: Deploy Bedrud to production
+title: 部署指南
+description: 将 Bedrud 部署到生产环境
 order: 28
 ---
 
@@ -132,10 +132,10 @@ docker pull ghcr.io/themadorg/bedrud:latest
 
 ```mermaid
 flowchart TB
-    NET[Internet] --> TRAEFIK["Traefik (443)<br/>TLS termination, reverse proxy"]
-    TRAEFIK --> BEDRUD["Bedrud (8090)<br/>API + Web UI"]
-    TRAEFIK --> LIVEKIT["LiveKit (7880)<br/>WebRTC media"]
-    BEDRUD --> DB["SQLite<br/>(or PostgreSQL)"]
+    NET[Internet] */} TRAEFIK["Traefik (443)<br/>TLS termination, reverse proxy"]
+    TRAEFIK */} BEDRUD["Bedrud (8090)<br/>API + Web UI"]
+    TRAEFIK */} LIVEKIT["LiveKit (7880)<br/>WebRTC media"]
+    BEDRUD */} DB["SQLite<br/>(or PostgreSQL)"]
 ```
 
 对于 WebRTC 连接，还需要在防火墙上开放以下端口：

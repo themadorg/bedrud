@@ -533,6 +533,7 @@
       "guides/appliance": "一体机模式",
       "guides/admin-dashboard": "管理仪表板",
       "guides/behind-proxy": "在代理/CDN 后面",
+      "guides/roles": "用户角色",
       contributing: "贡献",
     },
   },

@@ -42,49 +42,15 @@ export function ChatToastNotifier({ chatOpen }: ChatToastNotifierProps) {
   if (toasts.length === 0) return null
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 'calc(68px + env(safe-area-inset-top, 0px))',
-        right: 'calc(16px + env(safe-area-inset-right, 0px))',
-        zIndex: 50,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        pointerEvents: 'none',
-      }}
-    >
+    <div className="fixed top-[calc(68px+env(safe-area-inset-top))] right-[calc(16px+env(safe-area-inset-right))] z-50 flex flex-col gap-2 pointer-events-none">
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className="chat-toast"
-          style={{
-            background: 'rgba(15,15,28,0.96)',
-            border: '1px solid color-mix(in oklab, var(--primary) 35%, transparent)',
-            borderRadius: 14,
-            padding: '13px 16px',
-            maxWidth: 'min(340px, calc(100vw - 32px))',
-            boxShadow: '0 8px 28px rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(16px)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 5,
-          }}
+          className="chat-toast flex flex-col gap-[5px] bg-[#0f0f1c]/96 rounded-[14px] px-4 py-[13px] shadow-[0_8px_28px_rgba(0,0,0,0.5)] backdrop-blur-lg max-w-[min(340px,calc(100vw-32px))]"
+          style={{ border: '1px solid color-mix(in oklab, var(--primary) 35%, transparent)' }}
         >
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--sky-300)' }}>{toast.sender}</span>
-          <span
-            style={{
-              fontSize: 14,
-              color: 'rgba(255,255,255,0.75)',
-              overflow: 'hidden',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              wordBreak: 'break-word',
-            }}
-          >
-            {toast.message}
-          </span>
+          <span className="text-[13px] font-semibold text-teal-400">{toast.sender}</span>
+          <span className="text-sm text-white/75 overflow-hidden line-clamp-2 break-words">{toast.message}</span>
         </div>
       ))}
     </div>

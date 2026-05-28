@@ -17,8 +17,11 @@ order: 25
 | `/api/admin/users/:id` | DELETE | ユーザーを完全に削除 |
 | `/api/admin/rooms` | GET | 全ルームを一覧表示（ページネーション対応） |
 | `/api/admin/rooms/:roomId` | PUT | 任意のルーム設定を更新 |
-| `/api/admin/rooms/:roomId` | DELETE | ルームを閉鎖（カスケード削除） |
-| `/api/admin/rooms/:roomId/suspend` | POST | アクティブなルームを一時停止 |
+| `/api/admin/rooms/:roomId` | DELETE | ルームを削除（バックグラウンドジョブ） |
+| `/api/admin/rooms/:roomId/suspend` | POST | ルームを一時停止（バックグラウンドジョブ） |
+| `/api/admin/rooms/bulk/suspend` | POST | ルームを一括一時停止 |
+| `/api/admin/rooms/bulk/close` | POST | ルームを一括閉鎖 |
+| `/api/admin/users/bulk/delete` | POST | ユーザーを一括削除 |
 | `/api/admin/rooms/:roomId/participants` | GET | LiveKitからライブ参加者データを取得 |
 | `/api/admin/rooms/:roomId/participants/:identity/kick` | POST | 任意の参加者をルームからキック |
 | `/api/admin/rooms/:roomId/participants/:identity/mute` | POST | 任意の参加者の音声をミュート |
@@ -337,7 +340,7 @@ PUT /api/admin/rooms/:roomId
 
 ### ルームの閉鎖
 
-カスケード削除でルームを完全に閉鎖します。全参加者にシステムメッセージ「このルームは管理者によって閉鎖されました」を送信します。
+ルームとその参加者全員を完全に削除します。バックグラウンドジョブとして実行され、すぐに戻ります — ルームは数秒以内に完全に削除されます。
 
 ```
 DELETE /api/admin/rooms/:roomId
@@ -349,19 +352,29 @@ DELETE /api/admin/rooms/:roomId
 |---|---|
 | `roomId` | ルームUUID |
 
-**レスポンス (200):**
+**レスポンス (202):**
 
 ```json
 {
-  "status": "success"
+  "message": "Room deletion queued"
 }
 ```
+
+| ステータス | 説明 |
+|--------|-------------|
+| 202 | 削除をキューに入れました — まもなく完了します |
+| 404 | ルームが見つかりません |
+| 500 | ルームの取得またはジョブのキュー投入に失敗しました |
+
+> **注:** 閉鎖時にアクティブな全参加者にシステムメッセージ「このルームは管理者によって閉鎖されました」を送信します。
+> 閉鎖ロジックは `cleanupSvc.CascadeDeleteRoom` を呼び出し、LiveKitルームの削除、チャットアップロードのクリーンアップ、
+> データベースレコードの削除を処理します。
 
 ---
 
 ### ルームの一時停止
 
-ルームレコードを削除せずに、アクティブなルームとその参加者全員を非アクティブにします。参加者が再度参加するとルームは再アクティブ化されます。
+アクティブなルームを非アクティブにし、すべてのアクティブな通話を終了しますが、ルームレコードは保持します。参加者が再度参加するとルームは再アクティブ化されます。バックグラウンドジョブとして実行され、すぐに戻ります。
 
 ```
 POST /api/admin/rooms/:roomId/suspend
@@ -373,15 +386,70 @@ POST /api/admin/rooms/:roomId/suspend
 |---|---|
 | `roomId` | ルームUUID |
 
-**レスポンス (200):**
+**レスポンス (202):**
 
 ```json
 {
-  "status": "success"
+  "message": "Room suspend queued"
 }
 ```
 
-**エラー (400):** ルームが既に非アクティブな場合、`{"error": "Room is not active"}` を返します。
+| ステータス | 説明 |
+|--------|-------------|
+| 202 | 一時停止をキューに入れました — まもなく完了します |
+| 400 | ルームは既に非アクティブです |
+| 404 | ルームが見つかりません |
+| 500 | ルームの取得またはジョブのキュー投入に失敗しました |
+
+---
+
+### ルームの一括一時停止
+
+複数のルームの一時停止を同時にキューに入れます。既に一時停止されているルームはスキップされます。
+
+```
+POST /api/admin/rooms/bulk/suspend
+```
+
+**リクエストボディ:**
+
+```json
+{
+  "ids": ["room-uuid-1", "room-uuid-2"]
+}
+```
+
+**レスポンス (202):**
+
+```json
+{
+  "results": {
+    "room-uuid-1": {"success": true, "name": "team-standup"},
+    "room-uuid-2": {"success": false, "name": "design-review", "error": "room not found"}
+  },
+  "totalProcessed": 1,
+  "totalFailed": 1
+}
+```
+
+| フィールド | タイプ | 説明 |
+|-------|------|-------------|
+| `results` | object | IDでインデックスされたルームごとの結果 |
+| `results.*.success` | bool | 操作がキューに入れられたかどうか |
+| `results.*.name` | string | ルーム名（成功時に表示） |
+| `results.*.error` | string | エラーメッセージ（失敗時に表示） |
+| `totalProcessed` | int | 正常にキューに入れられたルーム数 |
+| `totalFailed` | int | 失敗したルーム数 |
+
+### ルームの一括閉鎖
+
+複数のルームの完全削除を同時にキューに入れます。元に戻せません。
+
+```
+POST /api/admin/rooms/bulk/close
+```
+
+リクエスト/レスポンス形式は[ルームの一括一時停止](#ルームの一括一時停止)と同じです。
 
 ---
 

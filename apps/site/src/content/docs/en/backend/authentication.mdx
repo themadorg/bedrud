@@ -74,6 +74,40 @@ Bedrud supports passwordless authentication via the FIDO2 standard (WebAuthn).
 ### 4. Guest Login
 Allows users to join a meeting instantly with just a name. The server creates a temporary user record with the role `guest`.
 
+## Email Verification
+
+When `requireEmailVerification: true` in config, local (non-OAuth) registration and login require email confirmation:
+
+- **Registration** creates the user but sets `EmailVerifiedAt` to `nil`. User cannot log in until verified.
+- **Login** returns `403` with `{"requiresVerification": true}` for unverified accounts.
+- **Resend** via `POST /api/auth/verify/resend` — rate-limited by `verificationEmailCooldownMins` and a separate rate limit bucket (`authResendMaxRequests`).
+- **Auto-cleanup** deletes unverified accounts after `unverifiedAccountTTLHours` (default 48h, 0 to disable).
+- **Email change** triggers a new verification flow. User stays logged in; new token issued.
+
+Guest users are exempt — they have no email.
+
+## Password Reset
+
+Password reset flow (requires SMTP):
+
+1. `POST /api/auth/forgot-password` with `{"email": "..."}` — server sends reset link to email
+2. `POST /api/auth/reset-password` with `{"token": "...", "newPassword": "..."}` — sets new password
+
+The reset token TTL is controlled by `resetTokenTTLHours` (default 1 hour). The forgot-password endpoint shares the auth rate limit bucket.
+
+## Cooldown & Rate Limiting
+
+Bedrud uses four separate rate limit buckets:
+
+| Bucket | Endpoints | Default | Window |
+|--------|-----------|---------|--------|
+| Auth | login, register, refresh, passkey, forgot-password | 10 | 60s |
+| Guest | guest-login | 5 | 60s |
+| API | general API | 30 | 60s |
+| Resend | verify/resend | 3 | 60s |
+
+Bucket set to `0` = disabled. All limits per remote IP. Exceeded requests return `429 Too Many Requests` with `Retry-After` header.
+
 ## Interoperability & CORS
 Bedrud is designed to be accessible from multiple origins, which is crucial for development (React dev server) and production (different subdomains).
 

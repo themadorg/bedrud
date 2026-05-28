@@ -1,0 +1,114 @@
+---
+title: 用户角色
+description: 基于角色的访问控制，共5个层级 — 超级管理员、管理员、版主、用户、访客
+order: 36
+---
+
+Bedrud 实现了5层角色系统用于访问控制。每个角色映射到一组存储在用户记录中的访问字符串，并在 API 层（后端中间件）和 UI 层（前端守卫和条件渲染）强制执行。
+
+## 角色层级
+
+| 角色 | 访问数组 | 后端权重 | 描述 |
+|------|---------|---------|------|
+| 超级管理员 | `['superadmin', 'user']` | 4 | 完全系统访问，所有管理能力 |
+| 管理员 | `['admin', 'user']` | 3 | 完整管理访问，与超级管理员相同 |
+| 版主 | `['moderator', 'user']` | 2 | 只读管理视图，无修改操作 |
+| 用户 | `['user']` | 1 | 标准注册用户 |
+| 访客 | `['guest']` | 0 | 未注册参与者，仅可加入 |
+
+## 后端执行
+
+访问级别通过每个管理路由上的 `RequireAccess` 中间件强制执行。中间件将用户的访问数组与所需的最低级别进行比对：
+
+- 需要 `superadmin` 访问的路由拒绝管理员、版主、用户和访客
+- 需要 `admin` 访问的路由允许超级管理员和管理员
+- 需要 `moderator` 访问的路由允许超级管理员、管理员和版主
+
+后端将访问权限以逗号分隔的字符串存储在数据库中（`users` 表的 `accesses` 列）。`StringArray` GORM 类型处理序列化和反序列化。
+
+## 前端集成
+
+### 用户类型
+
+`user.store.ts` 中的 `User` 接口包含两个从访问数组派生的布尔字段：
+
+```ts
+interface User {
+  // ...
+  isSuperAdmin: boolean  // accesses.includes('superadmin')
+  isAdmin: boolean       // accesses.includes('admin') || accesses.includes('superadmin')
+  accesses: string[]     // raw access list from backend
+}
+```
+
+### 管理守卫
+
+管理布局（`/dashboard/admin`）允许超级管理员、管理员和版主通过。版主接收一个 `isReadOnly=true` 的上下文变量：
+
+```tsx
+// routes/dashboard/admin.tsx
+const canAccess = user?.isSuperAdmin || accesses.includes('admin') || accesses.includes('moderator')
+```
+
+`useAdminContext()` 钩子为所有子路由提供 `isReadOnly` 标志：
+
+```tsx
+const { isReadOnly } = useAdminContext()
+```
+
+### 版主可查看 vs 可操作的内容
+
+| 页面 | 查看 | 修改 |
+|------|------|------|
+| 概览统计 | ✅ 完整统计 | N/A |
+| 用户列表 | ✅ 完整列表 | ❌ 无批量操作 |
+| 用户详情 | ✅ 完整资料 | ❌ 无状态/角色/删除/登出 |
+| 房间列表 | ✅ 完整列表 | ❌ 无暂停/删除/编辑上限 |
+| 房间详情 | ✅ 完整信息 | ❌ 无暂停/删除/踢出/静音 |
+| 设置 | ❌ 重定向 | ❌ |
+
+### 角色选择器
+
+管理UI在用户列表表格和用户详情页面上都提供了一个 `<Select>` 下拉菜单，取代了之前的二进制超级管理员切换开关。可用选项：
+
+| 选项 | 保存为 |
+|------|--------|
+| 超级管理员 | `['superadmin', 'user']` |
+| 管理员 | `['admin', 'user']` |
+| 版主 | `['moderator', 'user']` |
+| 用户 | `['user']` |
+| 访客 | `['guest']` |
+
+下拉菜单发送一个包含完整访问数组的 `PUT /api/admin/users/:id/accesses` 请求。
+
+## CLI 管理
+
+`bedrud user promote` 和 `bedrud user demote` 命令接受一个 `--role` 标志：
+
+```bash
+# Promote to superadmin (default)
+bedrud user promote --email user@example.com
+
+# Promote to admin
+bedrud user promote --email user@example.com --role admin
+
+# Promote to moderator
+bedrud user promote --email user@example.com --role moderator
+
+# Demote specific role
+bedrud user demote --email user@example.com --role admin
+```
+
+有效的 `--role` 值：`superadmin`、`admin`、`moderator`、`user`、`guest`。
+
+## 代码位置
+
+| 文件 | 用途 |
+|------|------|
+| `server/internal/models/user.go` | 后端访问级别常量 |
+| `server/internal/middleware/` | `RequireAccess` 中间件 |
+| `server/internal/usercli/usercli.go` | CLI 角色管理函数 |
+| `apps/web/src/lib/user.store.ts` | 前端 User 类型 |
+| `apps/web/src/routes/dashboard/admin.tsx` | 管理守卫 + isReadOnly 上下文 |
+| `apps/web/src/components/admin/UserTable.tsx` | 角色选择器下拉菜单 + 徽章 |
+| `apps/web/src/components/admin/RoomTable.tsx` | 只读房间表格掩码 |

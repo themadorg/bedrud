@@ -222,6 +222,42 @@ POST /api/room/:roomId/mute/:identity
 
 ---
 
+### Eliminar Sala
+
+Elimina una sala que hayas creado. Esto elimina permanentemente la sala y todos los datos asociados. Se ejecuta en segundo plano y regresa inmediatamente.
+
+```
+DELETE /api/room/:roomId
+```
+
+**Parámetros de Ruta:**
+
+| Parámetro | Descripción |
+|---|---|
+| `roomId` | UUID de la sala |
+
+**Encabezados:** `Authorization: Bearer <accessToken>`
+
+**Respuesta (202):**
+
+```json
+{
+  "message": "Room deletion queued"
+}
+```
+
+| Estado | Descripción |
+|--------|-------------|
+| 202 | Eliminación encolada — se completará en breve |
+| 403 | No eres el creador (solo el creador puede eliminar) |
+| 404 | Sala no encontrada |
+| 409 | Eliminación ya en curso |
+| 500 | Error del servidor |
+
+Si la sala está activa, todos los participantes se desconectan y ven "This room has been ended by the creator".
+
+---
+
 ### Desactivar Video de Participante
 
 Apaga la cámara de un participante. Solo el administrador de la sala puede hacer esto.

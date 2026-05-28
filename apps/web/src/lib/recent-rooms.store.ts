@@ -26,6 +26,18 @@ export const useRecentRoomsStore = create<RecentRoomsState>()(
       remove: (name) => set((s) => ({ rooms: s.rooms.filter((r) => r.name !== name) })),
       clear: () => set({ rooms: [] }),
     }),
-    { name: 'bedrud-recent-rooms' },
+    {
+      name: 'bedrud-recent-rooms',
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          const seen = new Set<string>()
+          state.rooms = state.rooms.filter((r) => {
+            if (seen.has(r.name)) return false
+            seen.add(r.name)
+            return true
+          })
+        }
+      },
+    },
   ),
 )

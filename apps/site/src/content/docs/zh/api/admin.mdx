@@ -1,6 +1,6 @@
 ---
 title: 管理 API
-description: Administrative operations
+description: 管理操作
 order: 25
 ---
 
@@ -17,8 +17,11 @@ order: 25
 | `/api/admin/users/:id` | DELETE | 永久删除用户 |
 | `/api/admin/rooms` | GET | 列出所有房间（分页） |
 | `/api/admin/rooms/:roomId` | PUT | 更新任意房间的设置 |
-| `/api/admin/rooms/:roomId` | DELETE | 关闭房间（级联删除） |
-| `/api/admin/rooms/:roomId/suspend` | POST | 暂停活跃房间 |
+| `/api/admin/rooms/:roomId` | DELETE | 删除房间（后台任务） |
+| `/api/admin/rooms/:roomId/suspend` | POST | 暂停房间（后台任务） |
+| `/api/admin/rooms/bulk/suspend` | POST | 批量暂停房间 |
+| `/api/admin/rooms/bulk/close` | POST | 批量关闭房间 |
+| `/api/admin/users/bulk/delete` | POST | 批量删除用户 |
 | `/api/admin/rooms/:roomId/participants` | GET | 从 LiveKit 获取实时参与者数据 |
 | `/api/admin/rooms/:roomId/participants/:identity/kick` | POST | 将任意参与者踢出房间 |
 | `/api/admin/rooms/:roomId/participants/:identity/mute` | POST | 将任意参与者的音频静音 |
@@ -337,7 +340,7 @@ PUT /api/admin/rooms/:roomId
 
 ### 关闭房间
 
-永久关闭房间并进行级联删除。向所有参与者发送系统消息："This room has been closed by an administrator"。
+永久删除房间及其所有参与者。任务将加入后台队列并立即返回——房间将在几秒内完全删除。
 
 ```
 DELETE /api/admin/rooms/:roomId
@@ -349,19 +352,29 @@ DELETE /api/admin/rooms/:roomId
 |---|---|
 | `roomId` | 房间 UUID |
 
-**响应（200）：**
+**响应（202）：**
 
 ```json
 {
-  "status": "success"
+  "message": "Room deletion queued"
 }
 ```
+
+| 状态 | 描述 |
+|--------|-------------|
+| 202 | 删除已排队——即将完成 |
+| 404 | 房间未找到 |
+| 500 | 获取房间或加入队列失败 |
+
+> **注意：** 关闭时会向所有活跃参与者发送系统消息："This room has been closed by an administrator"。
+> 关闭逻辑调用 `cleanupSvc.CascadeDeleteRoom`，处理 LiveKit 房间移除、聊天上传清理
+> 和数据库记录删除。
 
 ---
 
 ### 暂停房间
 
-停用一个活跃房间及其所有参与者，但不删除房间记录。当有参与者重新加入时房间可以被重新激活。
+停用一个活跃房间，结束所有活跃通话但保留房间记录。当参与者再次加入时可以重新激活。以后台任务方式执行并立即返回。
 
 ```
 POST /api/admin/rooms/:roomId/suspend
@@ -373,15 +386,70 @@ POST /api/admin/rooms/:roomId/suspend
 |---|---|
 | `roomId` | 房间 UUID |
 
-**响应（200）：**
+**响应（202）：**
 
 ```json
 {
-  "status": "success"
+  "message": "Room suspend queued"
 }
 ```
 
-**错误（400）：** 如果房间已处于非活跃状态，返回 `{"error": "Room is not active"}`。
+| 状态 | 描述 |
+|--------|-------------|
+| 202 | 暂停已排队——即将完成 |
+| 400 | 房间已处于非活跃状态 |
+| 404 | 房间未找到 |
+| 500 | 获取房间或加入队列失败 |
+
+---
+
+### 批量暂停房间
+
+同时为多个房间加入暂停队列。已暂停的房间将被跳过。
+
+```
+POST /api/admin/rooms/bulk/suspend
+```
+
+**请求体：**
+
+```json
+{
+  "ids": ["room-uuid-1", "room-uuid-2"]
+}
+```
+
+**响应（202）：**
+
+```json
+{
+  "results": {
+    "room-uuid-1": {"success": true, "name": "team-standup"},
+    "room-uuid-2": {"success": false, "name": "design-review", "error": "room not found"}
+  },
+  "totalProcessed": 1,
+  "totalFailed": 1
+}
+```
+
+| 字段 | 类型 | 描述 |
+|-------|------|-------------|
+| `results` | object | 按 ID 索引的每个房间的结果 |
+| `results.*.success` | bool | 操作是否已加入队列 |
+| `results.*.name` | string | 房间名称（成功时存在） |
+| `results.*.error` | string | 错误消息（失败时存在） |
+| `totalProcessed` | int | 成功加入队列的房间数 |
+| `totalFailed` | int | 失败的房间数 |
+
+### 批量关闭房间
+
+同时为多个房间加入永久删除队列。不可撤销。
+
+```
+POST /api/admin/rooms/bulk/close
+```
+
+请求/响应格式同[批量暂停房间](#批量暂停房间)。
 
 ---
 

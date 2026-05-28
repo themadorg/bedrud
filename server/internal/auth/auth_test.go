@@ -5,7 +5,9 @@ import (
 	"bedrud/internal/models"
 	"bedrud/internal/repository"
 	"bedrud/internal/testutil"
+	"errors"
 	"testing"
+	"time"
 )
 
 // testAuthConfig returns a config suitable for auth service tests
@@ -372,6 +374,98 @@ func TestAuthService_UpdateProfile_NotFound(t *testing.T) {
 	}
 }
 
+// --- ChangeEmail tests ---
+
+func TestAuthService_ChangeEmail_Success(t *testing.T) {
+	svc, cfg := setupAuthService(t)
+	config.SetForTest(cfg)
+
+	user, _ := svc.Register("old@example.com", "pass123", "Old Email")
+
+	// Simulate a session by logging in (stores refresh token in DB)
+	loginResp, _ := svc.Login("old@example.com", "pass123")
+	if loginResp.Token.RefreshToken == "" {
+		t.Fatal("expected refresh token after login")
+	}
+
+	// Change email
+	err := svc.ChangeEmail(user.ID, "new@example.com")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify DB updated
+	updated, _ := svc.GetUserByID(user.ID)
+	if updated.Email != "new@example.com" {
+		t.Fatalf("expected email 'new@example.com', got '%s'", updated.Email)
+	}
+
+	// EmailVerifiedAt reset
+	if updated.EmailVerifiedAt != nil {
+		t.Fatal("expected EmailVerifiedAt to be nil after email change")
+	}
+
+	// Refresh token cleared (forces re-login)
+	if updated.RefreshToken != "" {
+		t.Fatal("expected refresh token to be cleared after email change")
+	}
+}
+
+func TestAuthService_ChangeEmail_UserNotFound(t *testing.T) {
+	svc, _ := setupAuthService(t)
+
+	err := svc.ChangeEmail("nonexistent-id", "any@example.com")
+	if err == nil {
+		t.Fatal("expected error for nonexistent user")
+	}
+	if err.Error() != "user not found" {
+		t.Fatalf("expected 'user not found', got '%s'", err.Error())
+	}
+}
+
+func TestAuthService_ChangeEmail_InvalidEmail(t *testing.T) {
+	svc, _ := setupAuthService(t)
+
+	user, _ := svc.Register("valid@example.com", "pass123", "Valid")
+
+	err := svc.ChangeEmail(user.ID, "not-an-email")
+	if err == nil {
+		t.Fatal("expected error for invalid email")
+	}
+	// Could be either "invalid email format" or a mail.ParseAddress error
+	if err.Error() != "invalid email format" {
+		t.Fatalf("expected 'invalid email format', got '%s'", err.Error())
+	}
+}
+
+func TestAuthService_ChangeEmail_EmailAlreadyInUse(t *testing.T) {
+	svc, _ := setupAuthService(t)
+
+	user1, _ := svc.Register("first@example.com", "pass123", "First")
+	svc.Register("second@example.com", "pass456", "Second")
+
+	// user1 tries to take second@example.com
+	err := svc.ChangeEmail(user1.ID, "second@example.com")
+	if err == nil {
+		t.Fatal("expected error for email already in use")
+	}
+	if err.Error() != "email already in use" {
+		t.Fatalf("expected 'email already in use', got '%s'", err.Error())
+	}
+}
+
+func TestAuthService_ChangeEmail_SameEmailIdempotent(t *testing.T) {
+	svc, _ := setupAuthService(t)
+
+	user, _ := svc.Register("same@example.com", "pass123", "Same")
+
+	// Change to same email — should succeed (no-op without error)
+	err := svc.ChangeEmail(user.ID, "same@example.com")
+	if err != nil {
+		t.Fatalf("expected no error when changing to same email, got %v", err)
+	}
+}
+
 // --- ChangePassword tests ---
 
 func TestAuthService_ChangePassword_Success(t *testing.T) {
@@ -417,7 +511,7 @@ func TestAuthService_ChangePassword_WrongCurrent(t *testing.T) {
 	svc, cfg := setupAuthService(t)
 
 	user, _ := svc.Register("wrongcur@example.com", "realpass", "User")
-	token, _ := GenerateToken(user.ID, user.Email, user.Name, "local", user.Accesses, cfg)
+	token, _ := GenerateToken(user.ID, user.Email, user.Name, "local", user.Accesses, cfg, nil)
 
 	err := svc.ChangePassword(user.ID, "wrongcurrent", "newpass456", token)
 	if err == nil {
@@ -453,6 +547,93 @@ func TestAuthService_ChangePassword_NonLocalProvider(t *testing.T) {
 	}
 	if err.Error() != "password change is only available for local accounts" {
 		t.Fatalf("unexpected error: %s", err.Error())
+	}
+}
+
+// --- ResetPassword tests ---
+
+func TestAuthService_ResetPassword_Success(t *testing.T) {
+	svc, cfg := setupAuthService(t)
+	config.SetForTest(cfg)
+
+	user, _ := svc.Register("resetpass@example.com", "oldpass123", "Reset Pass")
+
+	// Simulate an existing session
+	loginResp, _ := svc.Login("resetpass@example.com", "oldpass123")
+
+	// Verify refresh token was stored
+	beforeUser, _ := svc.userRepo.GetUserByID(user.ID)
+	if beforeUser.RefreshToken == "" {
+		t.Fatal("expected refresh token to be stored after login")
+	}
+
+	err := svc.ResetPassword(user.ID, "newSecurePass456!", loginResp.Token.AccessToken)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify refresh token was cleared (all sessions invalidated)
+	updatedUser, _ := svc.userRepo.GetUserByID(user.ID)
+	if updatedUser.RefreshToken != "" {
+		t.Fatalf("expected refresh token to be cleared after password reset, got: %q", updatedUser.RefreshToken)
+	}
+
+	// Verify old password no longer works
+	_, loginErr := svc.Login("resetpass@example.com", "oldpass123")
+	if loginErr == nil {
+		t.Fatal("expected login with old password to fail after reset")
+	}
+
+	// Verify new password works
+	_, loginErr = svc.Login("resetpass@example.com", "newSecurePass456!")
+	if loginErr != nil {
+		t.Fatalf("login with new password failed: %v", loginErr)
+	}
+}
+
+func TestAuthService_ResetPassword_UserNotFound(t *testing.T) {
+	svc, _ := setupAuthService(t)
+
+	err := svc.ResetPassword("nonexistent-user-id", "newpass123")
+	if err == nil {
+		t.Fatal("expected error for nonexistent user")
+	}
+	if err.Error() != "user not found" {
+		t.Fatalf("expected 'user not found', got: %v", err)
+	}
+}
+
+func TestAuthService_ResetPassword_ClearsRefreshToken(t *testing.T) {
+	svc, cfg := setupAuthService(t)
+	config.SetForTest(cfg)
+
+	user, _ := svc.Register("resettoken@example.com", "oldpass123", "Reset Token")
+
+	// Login to create a session
+	loginResp, _ := svc.Login("resettoken@example.com", "oldpass123")
+
+	// Verify refresh token is stored
+	beforeUser, _ := svc.userRepo.GetUserByID(user.ID)
+	if beforeUser.RefreshToken == "" {
+		t.Fatal("expected refresh token to be stored after login")
+	}
+
+	// Reset password without passing access tokens
+	err := svc.ResetPassword(user.ID, "newpass456!")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify refresh token was cleared
+	updatedUser, _ := svc.userRepo.GetUserByID(user.ID)
+	if updatedUser.RefreshToken != "" {
+		t.Fatalf("expected refresh token to be cleared after password reset, got: %q", updatedUser.RefreshToken)
+	}
+
+	// Verify old refresh token is blocked
+	_, err = svc.ValidateRefreshToken(loginResp.Token.RefreshToken)
+	if err == nil {
+		t.Fatal("expected old refresh token to be invalid after password reset")
 	}
 }
 
@@ -549,5 +730,94 @@ func TestRefreshTokenBoundToUser(t *testing.T) {
 	}
 	if err != ErrRefreshTokenMismatch {
 		t.Fatalf("expected ErrRefreshTokenMismatch, got: %v", err)
+	}
+}
+
+// --- Email Verification Gate Tests ---
+
+func TestAuthService_Login_UnverifiedReturnsErrEmailNotVerified(t *testing.T) {
+	svc, cfg := setupAuthService(t)
+	cfg.Auth.RequireEmailVerification = true
+	config.SetForTest(cfg)
+
+	_, _ = svc.Register("unver@example.com", "mypassword", "Unverified")
+
+	_, err := svc.Login("unver@example.com", "mypassword")
+	if err == nil {
+		t.Fatal("expected ErrEmailNotVerified for unverified user")
+	}
+
+	var emailNotVerified *ErrEmailNotVerified
+	if !errors.As(err, &emailNotVerified) {
+		t.Fatalf("expected ErrEmailNotVerified, got %T: %v", err, err)
+	}
+	if emailNotVerified.Email != "unver@example.com" {
+		t.Fatalf("expected email 'unver@example.com' in error, got '%s'", emailNotVerified.Email)
+	}
+
+	// Verify no refresh token was stored (no tokens generated)
+	user, _ := svc.GetUserByEmail("unver@example.com")
+	if user.RefreshToken != "" {
+		t.Fatal("expected no refresh token stored for unverified user after failed login")
+	}
+}
+
+func TestAuthService_Login_VerifiedOkWithEmailVerificationOn(t *testing.T) {
+	svc, cfg := setupAuthService(t)
+	cfg.Auth.RequireEmailVerification = true
+	config.SetForTest(cfg)
+
+	user, _ := svc.Register("ver@example.com", "mypassword", "Verified")
+
+	// Manually verify the user
+	now := time.Now()
+	user.EmailVerifiedAt = &now
+	_ = svc.UpdateUser(user)
+
+	resp, err := svc.Login("ver@example.com", "mypassword")
+	if err != nil {
+		t.Fatalf("unexpected error for verified user: %v", err)
+	}
+	if resp.Token.AccessToken == "" {
+		t.Fatal("expected access token for verified user")
+	}
+	if resp.Token.RefreshToken == "" {
+		t.Fatal("expected refresh token for verified user")
+	}
+}
+
+func TestAuthService_GuestLogin_SkipsEmailVerification(t *testing.T) {
+	svc, cfg := setupAuthService(t)
+	cfg.Auth.RequireEmailVerification = true
+	config.SetForTest(cfg)
+
+	resp, err := svc.GuestLogin("Guest Player")
+	if err != nil {
+		t.Fatalf("unexpected error for guest login: %v", err)
+	}
+	if resp.Token.AccessToken == "" {
+		t.Fatal("expected access token for guest user")
+	}
+}
+
+func TestCanonicalizeEmail(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{" Test@Example.com ", "test@example.com"},
+		{"Straße@ExAmPlE.cOm", "straße@example.com"},
+		{"test@münchen.de", "test@xn--mnchen-3ya.de"},
+		{"  USER@example.com  ", "user@example.com"},
+		{"\uFEFFtest@example.com", "test@example.com"},
+		{"TEST@[127.0.0.1]", "test@[127.0.0.1]"},
+		{"user+tag@GMAIL.com", "user+tag@gmail.com"},
+		{"  ", ""},
+	}
+	for _, tc := range tests {
+		got := CanonicalizeEmail(tc.input)
+		if got != tc.expected {
+			t.Errorf("CanonicalizeEmail(%q) = %q, want %q", tc.input, got, tc.expected)
+		}
 	}
 }

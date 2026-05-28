@@ -32,13 +32,13 @@ sequenceDiagram
 
     alt Direct path available
         Note over C,LK: ICE/UDP - direct media
-        C-->>LK: Media via UDP 50000-60000
+        C*/}>LK: Media via UDP 50000-60000
     else UDP blocked, TURN available
         Note over C,LK: TURN - relayed media
-        C-->>LK: Media via TURN relay (3478/5349)
+        C*/}>LK: Media via TURN relay (3478/5349)
     else Corporate firewall
         Note over C,LK: TURN/TLS - relayed via 443
-        C-->>LK: Media via TLS tunnel
+        C*/}>LK: Media via TLS tunnel
     end
 
     Note over C,LK: Audio/video tracks flow through SFU
@@ -61,11 +61,11 @@ flowchart TB
         SFU["5. SFU<br/>Route media between participants"]
     end
 
-    SIG --> ICE
-    ICE --> STUN
-    ICE --> TURN
-    STUN --> SFU
-    TURN --> SFU
+    SIG */} ICE
+    ICE */} STUN
+    ICE */} TURN
+    STUN */} SFU
+    TURN */} SFU
 ```
 
 ### Описание уровней
@@ -86,20 +86,20 @@ flowchart TB
 
 ```mermaid
 flowchart TD
-    START[Start ICE Gathering] --> HOST
-    START --> SRFLX
-    START --> TURN_C
+    START[Start ICE Gathering] */} HOST
+    START */} SRFLX
+    START */} TURN_C
     HOST["Host candidates<br/>Local interface IPs<br/>e.g. 192.168.1.5:50001"]
     SRFLX["STUN candidates (srflx)<br/>Public IP discovered via STUN<br/>e.g. 203.0.113.5:50001"]
     TURN_C["TURN candidates (relay)<br/>Relay address on server<br/>e.g. 203.0.113.10:30001"]
-    HOST --> TEST
-    SRFLX --> TEST
-    TURN_C --> TEST
+    HOST */} TEST
+    SRFLX */} TEST
+    TURN_C */} TEST
     TEST{Test candidate<br/>connectivity}
-    TEST -->|"Host works"| CONNECTED[Connected via host]
-    TEST -->|"srflx works"| CONNECTED2[Connected via STUN<br/>direct P2P]
-    TEST -->|"Only relay works"| CONNECTED3[Connected via TURN relay]
-    TEST -->|"None work"| FAIL[Connection failed]
+    TEST */}|"Host works"| CONNECTED[Connected via host]
+    TEST */}|"srflx works"| CONNECTED2[Connected via STUN<br/>direct P2P]
+    TEST */}|"Only relay works"| CONNECTED3[Connected via TURN relay]
+    TEST */}|"None work"| FAIL[Connection failed]
 ```
 
 ICE одновременно собирает три типа кандидатов:
@@ -136,10 +136,10 @@ flowchart LR
         S2["Symmetric"]
     end
 
-    F -->|"Direct"| F2
-    R -->|"Direct"| R2
-    PR -->|"Direct"| PR2
-    S -->|"TURN required"| S2
+    F */}|"Direct"| F2
+    R */}|"Direct"| R2
+    PR */}|"Direct"| PR2
+    S */}|"TURN required"| S2
     S -.->|"TURN required"| PR2
     PR -.->|"TURN required"| S2
 

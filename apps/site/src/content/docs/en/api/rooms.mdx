@@ -16,6 +16,23 @@ Room management endpoints are under `/api/room/`. All endpoints require authenti
 | `/api/room/:roomId/kick/:identity` | POST | Kick a participant (admin) |
 | `/api/room/:roomId/mute/:identity` | POST | Mute a participant (admin) |
 | `/api/room/:roomId/video/:identity/off` | POST | Disable participant video (admin) |
+| `/api/room/:roomId` | DELETE | Delete your room (background job) |
+| `/api/room/:roomId/settings` | PUT | Update room settings |
+| `/api/room/:roomId/chat/upload` | POST | Upload chat image |
+| `/api/room/:roomId/ban/:identity` | POST | Ban a participant |
+| `/api/room/:roomId/promote/:identity` | POST | Promote participant to moderator |
+| `/api/room/:roomId/demote/:identity` | POST | Demote participant |
+| `/api/room/:roomId/block/:identity` | POST | Block participant chat |
+| `/api/room/:roomId/deafen/:identity` | POST | Deafen a participant |
+| `/api/room/:roomId/ask/:identity/:action` | POST | Ask participant to unmute/show camera |
+| `/api/room/:roomId/spotlight/:identity` | POST | Spotlight a participant |
+| `/api/room/:roomId/participant/:identity/info` | GET | Get participant info |
+| `/api/room/guest-join` | POST | Join a public room as guest |
+| `/api/room/:roomId/screenshare/:identity/stop` | POST | Stop participant screen share |
+| `/api/rooms/:id/recording/start` | POST | Start a composite recording (moderator) |
+| `/api/rooms/:id/recording/stop` | POST | Stop the active recording (moderator) |
+| `/api/rooms/:id/recordings` | GET | List recordings for a room |
+| `/api/rooms/:id/recordings/:rid` | GET | Get a single recording's details |
 
 ---
 
@@ -219,6 +236,42 @@ POST /api/room/:roomId/mute/:identity
   "status": "success"
 }
 ```
+
+---
+
+### Delete Room
+
+Delete a room you created. This permanently removes the room and all associated data. Enqueues a background job and returns immediately.
+
+```
+DELETE /api/room/:roomId
+```
+
+**Path Parameters:**
+
+| Parameter | Description |
+|---|---|
+| `roomId` | Room UUID |
+
+**Headers:** `Authorization: Bearer <accessToken>`
+
+**Response (202):**
+
+```json
+{
+  "message": "Room deletion queued"
+}
+```
+
+| Status | Description |
+|--------|-------------|
+| 202 | Deletion queued — will complete shortly |
+| 403 | Not the room creator (only creator can delete) |
+| 404 | Room not found |
+| 409 | Deletion already in progress |
+| 500 | Server error |
+
+If the room is active, all participants are disconnected and see "This room has been ended by the creator".
 
 ---
 

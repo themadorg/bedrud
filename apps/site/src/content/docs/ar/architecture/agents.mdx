@@ -20,10 +20,10 @@ order: 12
 
 ```mermaid
 flowchart TD
-    A[1. Parse meeting URL] --> B[2. Guest login<br/>POST /api/auth/guest-login]
-    B --> C[3. Join room<br/>POST /api/room/join]
-    C --> D[4. Connect to LiveKit<br/>WebSocket + Token]
-    D --> E[5. Publish tracks<br/>Stream audio/video frames]
+    A[1. Parse meeting URL] */} B[2. Guest login<br/>POST /api/auth/guest-login]
+    B */} C[3. Join room<br/>POST /api/room/join]
+    C */} D[4. Connect to LiveKit<br/>WebSocket + Token]
+    D */} E[5. Publish tracks<br/>Stream audio/video frames]
 ```
 
 ```mermaid
@@ -43,11 +43,11 @@ flowchart LR
         WS[WebSocket Connect]
         PT[Publish Tracks]
     end
-    MS --> FF --> PA
-    PA --> GL
-    GL --> JR
-    JR --> WS
-    WS --> PT
+    MS */} FF */} PA
+    PA */} GL
+    GL */} JR
+    JR */} WS
+    WS */} PT
 ```
 
 ## وكيل الموسيقى

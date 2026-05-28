@@ -1,7 +1,8 @@
 # Data
 data
 *.db
-
+*.db-shm
+*.db-wal
 # Build artifacts
 dist
 server/dist/

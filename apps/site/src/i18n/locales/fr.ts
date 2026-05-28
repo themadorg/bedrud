@@ -509,6 +509,7 @@
       "guides/appliance": "Mode appliance",
       "guides/admin-dashboard": "Tableau de Bord Administrateur",
       "guides/behind-proxy": "Derrière un proxy/CDN",
+      "guides/roles": "Rôles utilisateur",
       contributing: "Contribution",
     },
   },

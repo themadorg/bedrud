@@ -692,6 +692,7 @@ dependencies = [
  "dirs",
  "env_logger",
  "keyring",
+ "keyring-core",
  "log",
  "mockito",
  "reqwest",

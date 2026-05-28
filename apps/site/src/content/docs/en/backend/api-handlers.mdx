@@ -51,6 +51,24 @@ The `UsersHandler` allows administrators to:
 ### 2. Room Overview
 Admin routes allow for listing all active and historical rooms across the entire platform, regardless of who created them. This is intended for platform moderation.
 
+### 3. Async Operations (Job Queue)
+
+Destructive operations (room deletion, user deletion, room suspension) and chat uploads to S3 are handled asynchronously via the internal job queue at `internal/queue/`.
+
+**Endpoints returning 202 Accepted:**
+
+| Endpoint | Action |
+|---|---|
+| `DELETE /api/room/:roomId` | Queue room deletion |
+| `DELETE /api/admin/rooms/:roomId` | Queue room deletion (admin) |
+| `POST /api/admin/rooms/:roomId/suspend` | Queue room suspension |
+| `POST /api/admin/rooms/bulk/suspend` | Queue bulk suspensions |
+| `POST /api/admin/rooms/bulk/close` | Queue bulk deletions |
+| `DELETE /api/admin/users/:id` | Queue user deletion |
+| `POST /api/admin/users/bulk/delete` | Queue bulk user deletions |
+
+The worker polls the `jobs` table every 500ms (configurable), claims the next pending job, and dispatches to the registered handler. Failed jobs retry with exponential backoff (10s, 20s, 40s) before moving to `failed` status. Dead jobs older than 7 days (done) or 30 days (failed) are cleaned up daily.
+
 ## Request Lifecycle
 
 1.  **Request arrives**: Fiber receives the HTTP request.

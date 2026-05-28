@@ -4,6 +4,7 @@ import type { ChatMessage, SystemMessage } from '../MeetingContext'
 
 export interface ClusterGroup {
   kind: 'cluster'
+  id: string
   sender: string
   identity: string
   isLocal: boolean
@@ -12,11 +13,13 @@ export interface ClusterGroup {
 
 export interface DateSeparatorItem {
   kind: 'date-separator'
+  id: string
   label: string
 }
 
 export interface SystemItem {
   kind: 'system'
+  id: string
   msg: SystemMessage
 }
 
@@ -99,12 +102,16 @@ export function groupMessages(chatMessages: ChatMessage[], systemMessages: Syste
     if (dateLabel !== lastDateLabel) {
       lastDateLabel = dateLabel
       currentCluster = null
-      result.push({ kind: 'date-separator', label: dateLabel })
+      result.push({ kind: 'date-separator', id: `sep-${dateLabel}`, label: dateLabel })
     }
 
     if (item.kind === 'system') {
       currentCluster = null
-      result.push({ kind: 'system', msg: item.msg })
+      result.push({
+        kind: 'system',
+        id: `sys-${item.msg.event}-${item.msg.ts}-${item.msg.target ?? ''}`,
+        msg: item.msg,
+      })
       continue
     }
 
@@ -116,6 +123,7 @@ export function groupMessages(chatMessages: ChatMessage[], systemMessages: Syste
     if (!currentCluster || gapExceeded || senderChanged) {
       currentCluster = {
         kind: 'cluster',
+        id: msg.id,
         sender: msg.senderName,
         identity: msg.senderIdentity,
         isLocal: msg.isLocal,

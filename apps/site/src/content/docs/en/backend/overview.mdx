@@ -23,13 +23,14 @@ WebRTC platforms typically run separate services for signaling, TURN, web servin
 3.  **Automating** OS-level configuration (SSL, init services) via the binary itself.
 
 ## High-Level Architecture
-The backend follows a standard layered architecture:
+The backend follows a standard layered architecture with an async job queue:
 
 1.  **Server Layer (`internal/server`):** Sets up the Fiber app, routes, and middleware.
 2.  **Handler Layer (`internal/handlers`):** Manages HTTP requests and responses.
 3.  **Repository Layer (`internal/repository`):** Handles database queries using GORM.
 4.  **Model Layer (`internal/models`):** Defines the database tables and Go structures.
-5.  **Service/Logic Layer:** Integrated into handlers and repositories for simplicity, with specialized packages like `internal/auth` and `internal/livekit`.
+5.  **Queue Layer (`internal/queue`):** Async job worker for room/user deletion, suspensions, and uploads. API endpoints return `202 Accepted` and enqueue jobs for background processing.
+6.  **Service/Logic Layer:** Integrated into handlers and repositories for simplicity, with specialized packages like `internal/auth` and `internal/livekit`.
 
 ## Main Entry Point
 The application starts in `server/cmd/bedrud/main.go`. It has three main modes:

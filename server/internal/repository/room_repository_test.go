@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 )
 
 const testUserIDRoom = "user-1"
@@ -210,6 +211,47 @@ func TestRoomRepository_AddParticipant_BannedUser(t *testing.T) {
 	}
 }
 
+func TestRoomRepository_AddParticipant_UpdatesLastActivityAt(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	db.Create(&models.User{ID: "laa-u1", Email: "laa@ex.com", Name: "LAA", Provider: "local", IsActive: true})
+
+	room, _ := repo.CreateRoom("laa-u1", "laa-room", false, "standard", 0, &models.RoomSettings{})
+
+	// LastActivityAt should be set on room creation
+	if room.LastActivityAt == nil {
+		t.Fatal("expected LastActivityAt to be set on room creation")
+	}
+
+	// Add a new participant — LastActivityAt should update
+	old := *room.LastActivityAt
+	db.Create(&models.User{ID: "laa-u2", Email: "laa2@ex.com", Name: "LAA2", Provider: "local", IsActive: true})
+	if err := repo.AddParticipant(room.ID, "laa-u2"); err != nil {
+		t.Fatalf("failed to add participant: %v", err)
+	}
+
+	var updatedRoom models.Room
+	db.First(&updatedRoom, "id = ?", room.ID)
+	if updatedRoom.LastActivityAt == nil {
+		t.Fatal("expected LastActivityAt after participant add")
+	}
+	if !updatedRoom.LastActivityAt.After(old) {
+		t.Fatal("expected LastActivityAt to advance after participant add")
+	}
+
+	// Rejoin (reactivate) — LastActivityAt should update again
+	repo.RemoveParticipant(room.ID, "laa-u2")
+	reactivated := *updatedRoom.LastActivityAt
+	if err := repo.AddParticipant(room.ID, "laa-u2"); err != nil {
+		t.Fatalf("failed to re-add participant: %v", err)
+	}
+	db.First(&updatedRoom, "id = ?", room.ID)
+	if !updatedRoom.LastActivityAt.After(reactivated) {
+		t.Fatal("expected LastActivityAt to advance on rejoin")
+	}
+}
+
 func TestRoomRepository_RemoveParticipant(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := NewRoomRepository(db)
@@ -388,6 +430,174 @@ func TestRoomRepository_GetRoomsCreatedByUser(t *testing.T) {
 	}
 }
 
+func TestRoomRepository_GetLatestRoomsCreatedByUser_Dedup(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	db.Create(&models.User{ID: testUserIDRoom, Email: "dedup@ex.com", Name: "Dedup", Provider: "local", IsActive: true})
+
+	room1, _ := repo.CreateRoom(testUserIDRoom, "dup-room", false, "standard", 0, &models.RoomSettings{})
+	// Deactivate first room so second can be created with same slug
+	db.Model(&models.Room{}).Where("id = ?", room1.ID).Update("is_active", false)
+	_, _ = repo.CreateRoom(testUserIDRoom, "dup-room", false, "standard", 0, &models.RoomSettings{})
+	_, _ = repo.CreateRoom(testUserIDRoom, "unique-room", false, "standard", 0, &models.RoomSettings{})
+
+	rooms, err := repo.GetLatestRoomsCreatedByUser(testUserIDRoom)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(rooms) != 2 {
+		t.Fatalf("expected 2 rooms (deduped), got %d", len(rooms))
+	}
+	// Verify dedup: no duplicate names
+	names := make(map[string]bool)
+	for _, r := range rooms {
+		if names[r.Name] {
+			t.Fatalf("duplicate name %s in result", r.Name)
+		}
+		names[r.Name] = true
+	}
+	if !names["dup-room"] {
+		t.Fatalf("expected dup-room in results")
+	}
+	if !names["unique-room"] {
+		t.Fatalf("expected unique-room in results")
+	}
+}
+
+func TestRoomRepository_GetUserParticipationsPaginated_Basic(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	db.Create(&models.User{ID: testUserIDRoom, Email: "u1@ex.com", Name: "U1", Provider: "local", IsActive: true})
+	room, _ := repo.CreateRoom(testUserIDRoom, "session-room", false, "standard", 0, &models.RoomSettings{})
+	_ = repo.AddParticipant(room.ID, testUserIDRoom)
+
+	participants, total, err := repo.GetUserParticipationsPaginated(testUserIDRoom, UserParticipationsParams{Page: 1, Limit: 50})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Fatalf("expected total 1, got %d", total)
+	}
+	if len(participants) != 1 {
+		t.Fatalf("expected 1 participant, got %d", len(participants))
+	}
+	if participants[0].RoomID != room.ID {
+		t.Fatalf("expected room %s, got %s", room.ID, participants[0].RoomID)
+	}
+	if participants[0].Room == nil || participants[0].Room.Name != "session-room" {
+		t.Fatal("expected Room preload with name 'session-room'")
+	}
+	if !participants[0].IsActive {
+		t.Fatal("expected IsActive true after AddParticipant")
+	}
+	if participants[0].JoinedAt.IsZero() {
+		t.Fatal("expected non-zero JoinedAt")
+	}
+}
+
+func TestRoomRepository_GetUserParticipationsPaginated_NoParticipations(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	db.Create(&models.User{ID: "lone-user", Email: "lone@ex.com", Name: "Lone", Provider: "local", IsActive: true})
+
+	participants, total, err := repo.GetUserParticipationsPaginated("lone-user", UserParticipationsParams{Page: 1, Limit: 50})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 0 {
+		t.Fatalf("expected total 0, got %d", total)
+	}
+	if len(participants) != 0 {
+		t.Fatalf("expected 0 participants, got %d", len(participants))
+	}
+}
+
+func TestRoomRepository_GetUserParticipationsPaginated_Pagination(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	db.Create(&models.User{ID: testUserIDRoom, Email: "u1@ex.com", Name: "U1", Provider: "local", IsActive: true})
+	// Create 3 rooms and join them
+	for i := 0; i < 3; i++ {
+		name := fmt.Sprintf("pag-room-%d", i)
+		room, _ := repo.CreateRoom(testUserIDRoom, name, false, "standard", 0, &models.RoomSettings{})
+		_ = repo.AddParticipant(room.ID, testUserIDRoom)
+		// Stagger joined_at so ordering is deterministic
+		db.Model(&models.RoomParticipant{}).Where("room_id = ? AND user_id = ?", room.ID, testUserIDRoom).
+			Update("joined_at", time.Now().Add(-time.Duration(i)*time.Hour))
+	}
+
+	// Page 1, limit 2 → 2 results, total 3
+	p1, total, err := repo.GetUserParticipationsPaginated(testUserIDRoom, UserParticipationsParams{Page: 1, Limit: 2})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 3 {
+		t.Fatalf("expected total 3, got %d", total)
+	}
+	if len(p1) != 2 {
+		t.Fatalf("expected 2 participants on page 1, got %d", len(p1))
+	}
+
+	// Page 2, limit 2 → 1 result, total 3
+	p2, total, err := repo.GetUserParticipationsPaginated(testUserIDRoom, UserParticipationsParams{Page: 2, Limit: 2})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 3 {
+		t.Fatalf("expected total 3, got %d", total)
+	}
+	if len(p2) != 1 {
+		t.Fatalf("expected 1 participant on page 2, got %d", len(p2))
+	}
+
+	// Page 1, limit 50 → 3 results (clamp check: limit > 100 would clamp, but 50 is fine)
+	pAll, total, err := repo.GetUserParticipationsPaginated(testUserIDRoom, UserParticipationsParams{Page: 1, Limit: 50})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(pAll) != 3 {
+		t.Fatalf("expected 3 participants with limit 50, got %d", len(pAll))
+	}
+
+	// Ordered by joined_at desc (most recent first)
+	for i := 1; i < len(pAll); i++ {
+		if pAll[i].JoinedAt.After(pAll[i-1].JoinedAt) {
+			t.Fatal("expected descending joined_at order")
+		}
+	}
+}
+
+func TestRoomRepository_GetUserParticipationsPaginated_ClampLimit(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	db.Create(&models.User{ID: testUserIDRoom, Email: "u1@ex.com", Name: "U1", Provider: "local", IsActive: true})
+	room, _ := repo.CreateRoom(testUserIDRoom, "clamp-room", false, "standard", 0, &models.RoomSettings{})
+	_ = repo.AddParticipant(room.ID, testUserIDRoom)
+
+	// Limit > 100 → clamped to 50
+	_, _, err := repo.GetUserParticipationsPaginated(testUserIDRoom, UserParticipationsParams{Page: 1, Limit: 200})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Limit <= 0 → clamped to 50
+	_, _, err = repo.GetUserParticipationsPaginated(testUserIDRoom, UserParticipationsParams{Page: 1, Limit: 0})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Page <= 0 → clamped to 1 (should not error)
+	_, _, err = repo.GetUserParticipationsPaginated(testUserIDRoom, UserParticipationsParams{Page: 0, Limit: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestRoomRepository_UpdateRoomSettings(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := NewRoomRepository(db)
@@ -455,6 +665,68 @@ func TestRoomRepository_CreateRoom_DuplicateName(t *testing.T) {
 	}
 	if !errors.Is(err, models.ErrRoomNameTaken) {
 		t.Fatalf("expected ErrRoomNameTaken, got: %v", err)
+	}
+}
+
+// ====== Archived (soft-deleted) room name is reusable ======
+
+func TestRoomRepository_CreateRoom_ArchivedNameReusable(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	db.Create(&models.User{ID: testUserIDRoom, Email: "u1@ex.com", Name: "U1", Provider: "local", IsActive: true})
+
+	room, err := repo.CreateRoom(testUserIDRoom, "archived-room", false, "standard", 0, &models.RoomSettings{})
+	if err != nil {
+		t.Fatalf("first creation failed: %v", err)
+	}
+
+	// Soft-delete (archive) the room
+	if err := repo.SoftDeleteRoom(room.ID); err != nil {
+		t.Fatalf("SoftDeleteRoom failed: %v", err)
+	}
+
+	// Creating a room with same name should succeed
+	newRoom, err := repo.CreateRoom(testUserIDRoom, "archived-room", false, "standard", 0, &models.RoomSettings{})
+	if err != nil {
+		t.Fatalf("expected reuse of archived room name, got error: %v", err)
+	}
+	if newRoom.ID == room.ID {
+		t.Fatal("expected new room ID, got same as archived room")
+	}
+	if !newRoom.IsActive {
+		t.Fatal("new room should be active")
+	}
+}
+
+// ====== Idle (inactive, not soft-deleted) room name is reusable ======
+
+func TestRoomRepository_CreateRoom_IdleNameReusable(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	db.Create(&models.User{ID: testUserIDRoom, Email: "u1@ex.com", Name: "U1", Provider: "local", IsActive: true})
+
+	room, err := repo.CreateRoom(testUserIDRoom, "idle-room", false, "standard", 0, &models.RoomSettings{})
+	if err != nil {
+		t.Fatalf("first creation failed: %v", err)
+	}
+
+	// Set room idle (is_active=false, deleted_at remains NULL)
+	if err := repo.SetRoomIdle(room.ID); err != nil {
+		t.Fatalf("SetRoomIdle failed: %v", err)
+	}
+
+	// Creating a room with same name should succeed
+	newRoom, err := repo.CreateRoom(testUserIDRoom, "idle-room", false, "standard", 0, &models.RoomSettings{})
+	if err != nil {
+		t.Fatalf("expected reuse of idle room name, got error: %v", err)
+	}
+	if newRoom.ID == room.ID {
+		t.Fatal("expected new room ID, got same as idle room")
+	}
+	if !newRoom.IsActive {
+		t.Fatal("new room should be active")
 	}
 }
 
@@ -1025,6 +1297,35 @@ func TestRoomRepository_RemoveParticipant_SetsLeftAt(t *testing.T) {
 	}
 }
 
+func TestRoomRepository_RemoveAllParticipants(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	db.Create(&models.User{ID: "rap-u1", Email: "rap1@ex.com", Name: "RAP1", Provider: "local", IsActive: true})
+	db.Create(&models.User{ID: "rap-u2", Email: "rap2@ex.com", Name: "RAP2", Provider: "local", IsActive: true})
+	db.Create(&models.User{ID: "rap-u3", Email: "rap3@ex.com", Name: "RAP3", Provider: "local", IsActive: true})
+
+	room, _ := repo.CreateRoom("rap-u1", "rap-room", false, "standard", 0, &models.RoomSettings{})
+	_ = repo.AddParticipant(room.ID, "rap-u1")
+	_ = repo.AddParticipant(room.ID, "rap-u2")
+	_ = repo.AddParticipant(room.ID, "rap-u3")
+
+	if err := repo.RemoveAllParticipants(room.ID); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var count int64
+	db.Model(&models.RoomParticipant{}).Where("room_id = ? AND is_active = ?", room.ID, true).Count(&count)
+	if count != 0 {
+		t.Fatalf("expected 0 active participants, got %d", count)
+	}
+
+	// Already removed — should be a no-op
+	if err := repo.RemoveAllParticipants(room.ID); err != nil {
+		t.Fatalf("expected nil on repeat call, got %v", err)
+	}
+}
+
 // ====== Stage management edge cases ======
 
 func TestRoomRepository_BringToStage_CreatorAlreadyOnStage(t *testing.T) {
@@ -1409,5 +1710,424 @@ func TestRoomRepository_UpdateRoom_SavesAllFields(t *testing.T) {
 	}
 	if !updated.Settings.RequireApproval {
 		t.Fatal("expected RequireApproval to remain true")
+	}
+}
+
+func TestRoomRepository_EnrichAdminRoomDetails(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+	db.Create(&models.User{ID: "enrich-u1", Email: "u1@ex.com", Name: "User1", Provider: "local", IsActive: true})
+	db.Create(&models.User{ID: "enrich-u2", Email: "u2@ex.com", Name: "User2", Provider: "local", IsActive: true})
+
+	room1, _ := repo.CreateRoom("enrich-u1", "enrich-room-1", true, "standard", 0, &models.RoomSettings{})
+	room2, _ := repo.CreateRoom("enrich-u2", "enrich-room-2", true, "standard", 0, &models.RoomSettings{})
+
+	// room1 gets a second participant (creator enrich-u1 already auto-added)
+	if err := repo.AddParticipant(room1.ID, "enrich-u2"); err != nil {
+		t.Fatalf("failed to add participant: %v", err)
+	}
+
+	enriched, err := repo.EnrichAdminRoomDetails([]models.Room{*room1, *room2})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(enriched) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(enriched))
+	}
+
+	for _, e := range enriched {
+		switch e.Name {
+		case "enrich-room-1":
+			if e.ParticipantsCount != 2 {
+				t.Fatalf("expected 2 participants for room1, got %d", e.ParticipantsCount)
+			}
+			if e.LastActivityAt == nil {
+				t.Fatal("expected non-nil lastActivityAt for room1")
+			}
+			if e.OwnerName != "User1" {
+				t.Fatalf("expected owner 'User1', got '%s'", e.OwnerName)
+			}
+		case "enrich-room-2":
+			// room2 has 1 participant (the creator, auto-added by CreateRoom)
+			if e.ParticipantsCount != 1 {
+				t.Fatalf("expected 1 participant for room2, got %d", e.ParticipantsCount)
+			}
+			if e.LastActivityAt == nil {
+				t.Fatal("expected non-nil lastActivityAt for room2")
+			}
+		}
+	}
+}
+
+func TestRoomRepository_EnrichAdminRoomDetails_EmptyInput(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	result, err := repo.EnrichAdminRoomDetails([]models.Room{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil empty slice")
+	}
+	if len(result) != 0 {
+		t.Fatalf("expected 0 results, got %d", len(result))
+	}
+}
+
+func TestRoomRepository_CountRoomsByDay(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+	now := time.Now().UTC()
+
+	// Override timestamps to specific days via direct DB update
+	db.Create(&models.User{ID: "crd-u1", Email: "crd@ex.com", Name: "CRD", Provider: "local", IsActive: true})
+	room1, _ := repo.CreateRoom("crd-u1", "crd-room-1", true, "standard", 0, &models.RoomSettings{})
+	room2, _ := repo.CreateRoom("crd-u1", "crd-room-2", true, "standard", 0, &models.RoomSettings{})
+	room3, _ := repo.CreateRoom("crd-u1", "crd-room-3", true, "standard", 0, &models.RoomSettings{})
+
+	day0 := now.Add(-24 * time.Hour)
+	day1 := now.Add(-48 * time.Hour)
+	db.Model(room1).Update("created_at", day0)
+	db.Model(room2).Update("created_at", day0)
+	db.Model(room3).Update("created_at", day1)
+
+	counts, err := repo.CountRoomsByDay(7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(counts) != 7 {
+		t.Fatalf("expected 7 days, got %d", len(counts))
+	}
+
+	day0Key := day0.Format("2006-01-02")
+	day1Key := day1.Format("2006-01-02")
+	var day0Count, day1Count int
+	for _, c := range counts {
+		key := c.Date.Format("2006-01-02")
+		if key == day0Key {
+			day0Count = c.Count
+		}
+		if key == day1Key {
+			day1Count = c.Count
+		}
+	}
+	if day0Count != 2 {
+		t.Fatalf("expected 2 rooms on %s, got %d", day0Key, day0Count)
+	}
+	if day1Count != 1 {
+		t.Fatalf("expected 1 room on %s, got %d", day1Key, day1Count)
+	}
+}
+
+func TestRoomRepository_CountRoomsByDay_Empty(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	counts, err := repo.CountRoomsByDay(7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(counts) != 7 {
+		t.Fatalf("expected 7 days, got %d", len(counts))
+	}
+	for _, c := range counts {
+		if c.Count != 0 {
+			t.Fatalf("expected 0 count for %s, got %d", c.Date.Format("2006-01-02"), c.Count)
+		}
+	}
+}
+
+func TestRoomRepository_CountActiveParticipantsByDay(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+	now := time.Now().UTC()
+
+	db.Create(&models.User{ID: "cap-u1", Email: "cap@ex.com", Name: "CAP", Provider: "local", IsActive: true})
+	db.Create(&models.User{ID: "cap-u2", Email: "cap2@ex.com", Name: "CAP2", Provider: "local", IsActive: true})
+	room, _ := repo.CreateRoom("cap-u1", "cap-room", true, "standard", 0, &models.RoomSettings{})
+
+	if err := repo.AddParticipant(room.ID, "cap-u2"); err != nil {
+		t.Fatalf("failed to add participant: %v", err)
+	}
+	// Override JoinedAt on participant records
+	day0 := now.Add(-24 * time.Hour)
+	day1 := now.Add(-48 * time.Hour)
+	db.Model(&models.RoomParticipant{}).Where("user_id = ?", "cap-u1").Update("joined_at", day0)
+	db.Model(&models.RoomParticipant{}).Where("user_id = ?", "cap-u2").Update("joined_at", day1)
+
+	counts, err := repo.CountActiveParticipantsByDay(7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(counts) != 7 {
+		t.Fatalf("expected 7 days, got %d", len(counts))
+	}
+
+	day0Key := day0.Format("2006-01-02")
+	day1Key := day1.Format("2006-01-02")
+	var day0Count, day1Count int
+	for _, c := range counts {
+		key := c.Date.Format("2006-01-02")
+		if key == day0Key {
+			day0Count = c.Count
+		}
+		if key == day1Key {
+			day1Count = c.Count
+		}
+	}
+	if day0Count != 1 {
+		t.Fatalf("expected 1 participant on %s, got %d", day0Key, day0Count)
+	}
+	if day1Count != 1 {
+		t.Fatalf("expected 1 participant on %s, got %d", day1Key, day1Count)
+	}
+}
+
+func TestRoomRepository_GetRecentRoomEvents(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	db.Create(&models.User{ID: "evt-u1", Email: "evt@ex.com", Name: "EventUser", Provider: "local", IsActive: true})
+	room, err := repo.CreateRoom("evt-u1", "event-room", true, "standard", 0, &models.RoomSettings{})
+	if err != nil {
+		t.Fatalf("failed to create room: %v", err)
+	}
+
+	if err := repo.AddParticipant(room.ID, "evt-u1"); err != nil {
+		t.Fatalf("failed to add participant: %v", err)
+	}
+
+	events, err := repo.GetRecentRoomEvents(10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(events) < 2 {
+		t.Fatalf("expected at least 2 events, got %d", len(events))
+	}
+
+	// First event should be room_joined (most recent), second should be room_created
+	if events[0].Type != "room_joined" {
+		t.Fatalf("expected first event type 'room_joined', got '%s'", events[0].Type)
+	}
+	if events[0].RoomID != room.ID {
+		t.Fatalf("expected room ID %s, got %s", room.ID, events[0].RoomID)
+	}
+	if events[1].Type != "room_created" {
+		t.Fatalf("expected second event type 'room_created', got '%s'", events[1].Type)
+	}
+	if events[1].RoomID != room.ID {
+		t.Fatalf("expected room ID %s, got %s", room.ID, events[1].RoomID)
+	}
+}
+
+func TestRoomRepository_GetRecentRoomEvents_Empty(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	events, err := repo.GetRecentRoomEvents(5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if events == nil {
+		t.Fatal("expected non-nil empty slice")
+	}
+	if len(events) != 0 {
+		t.Fatalf("expected 0 events, got %d", len(events))
+	}
+}
+
+func TestRoomRepository_CountActiveRoomsWithParticipantCount(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	db.Create(&models.User{ID: "arc-u1", Email: "arc@ex.com", Name: "ARC", Provider: "local", IsActive: true})
+	repo.CreateRoom("arc-u1", "arc-active", true, "standard", 0, &models.RoomSettings{})
+	repo.CreateRoom("arc-u1", "arc-inactive", true, "standard", 0, &models.RoomSettings{})
+
+	// Deactivate second room
+	db.Model(&models.Room{}).Where("name = ?", "arc-inactive").Update("is_active", false)
+
+	count, err := repo.CountActiveRoomsWithParticipantCount()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 active room, got %d", count)
+	}
+}
+
+func TestRoomRepository_CountActiveRoomsWithParticipantCount_None(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	count, err := repo.CountActiveRoomsWithParticipantCount()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected 0 active rooms, got %d", count)
+	}
+}
+
+func TestRoomRepository_CountPersistentRooms(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	db.Create(&models.User{ID: "cpr-u1", Email: "cpr@ex.com", Name: "CPR", Provider: "local", IsActive: true})
+
+	// No persistent rooms yet
+	count, err := repo.CountPersistentRooms()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected 0 persistent rooms, got %d", count)
+	}
+
+	// Create a persistent room
+	room, _ := repo.CreateRoom("cpr-u1", "cpr-room-1", true, "standard", 0, &models.RoomSettings{IsPersistent: true})
+	count, err = repo.CountPersistentRooms()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 persistent room, got %d", count)
+	}
+
+	// Non-persistent room should not affect count
+	repo.CreateRoom("cpr-u1", "cpr-room-2", true, "standard", 0, &models.RoomSettings{})
+	count, err = repo.CountPersistentRooms()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected still 1 persistent room, got %d", count)
+	}
+
+	// Verify persisted via embedded prefix
+	var dbCount int64
+	db.Model(&models.Room{}).Where("settings_is_persistent = ?", true).Count(&dbCount)
+	if dbCount != 1 {
+		t.Fatalf("expected 1 in raw DB, got %d", dbCount)
+	}
+	_ = room
+}
+
+func TestRoomRepository_CountActiveRoomsByDay(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+	now := time.Now().UTC()
+
+	db.Create(&models.User{ID: "card-u1", Email: "card@ex.com", Name: "CARD", Provider: "local", IsActive: true})
+	db.Create(&models.User{ID: "card-u2", Email: "card2@ex.com", Name: "CARD2", Provider: "local", IsActive: true})
+
+	room, _ := repo.CreateRoom("card-u1", "card-room", true, "standard", 0, &models.RoomSettings{})
+
+	// Add participants on different days
+	if err := repo.AddParticipant(room.ID, "card-u1"); err != nil {
+		t.Fatalf("failed to add participant: %v", err)
+	}
+	if err := repo.AddParticipant(room.ID, "card-u2"); err != nil {
+		t.Fatalf("failed to add participant: %v", err)
+	}
+
+	day0 := now.Add(-24 * time.Hour)
+	day1 := now.Add(-48 * time.Hour)
+	db.Model(&models.RoomParticipant{}).Where("user_id = ?", "card-u1").Update("joined_at", day0)
+	db.Model(&models.RoomParticipant{}).Where("user_id = ?", "card-u2").Update("joined_at", day1)
+
+	counts, err := repo.CountActiveRoomsByDay(7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(counts) != 7 {
+		t.Fatalf("expected 7 days, got %d", len(counts))
+	}
+
+	day0Key := day0.Format("2006-01-02")
+	day1Key := day1.Format("2006-01-02")
+	var day0Count, day1Count int
+	for _, c := range counts {
+		key := c.Date.Format("2006-01-02")
+		if key == day0Key {
+			day0Count = c.Count
+		}
+		if key == day1Key {
+			day1Count = c.Count
+		}
+	}
+	// Both participants are in the same room — only 1 distinct room per day
+	if day0Count != 1 {
+		t.Fatalf("expected 1 active room on %s, got %d", day0Key, day0Count)
+	}
+	if day1Count != 1 {
+		t.Fatalf("expected 1 active room on %s, got %d", day1Key, day1Count)
+	}
+}
+
+func TestRoomRepository_CountActiveRoomsByDay_Empty(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	counts, err := repo.CountActiveRoomsByDay(7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(counts) != 7 {
+		t.Fatalf("expected 7 days, got %d", len(counts))
+	}
+	for _, c := range counts {
+		if c.Count != 0 {
+			t.Fatalf("expected 0 count for %s, got %d", c.Date.Format("2006-01-02"), c.Count)
+		}
+	}
+}
+
+func TestRoomRepository_CountStaleRooms(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	db.Create(&models.User{ID: "csr-u1", Email: "csr@ex.com", Name: "CSR", Provider: "local", IsActive: true})
+
+	// Room with recent activity — NOT stale
+	now := time.Now()
+	room, _ := repo.CreateRoom("csr-u1", "csr-room-active", true, "standard", 0, &models.RoomSettings{})
+	db.Model(room).Update("last_activity_at", now.Add(-1*time.Hour))
+
+	// Room with old activity — IS stale
+	room2, _ := repo.CreateRoom("csr-u1", "csr-room-stale", true, "standard", 0, &models.RoomSettings{})
+	db.Model(room2).Update("last_activity_at", now.Add(-72*time.Hour))
+
+	// Room with nil last_activity_at (pre-migration) — falls back to created_at
+	room3, _ := repo.CreateRoom("csr-u1", "csr-room-null", true, "standard", 0, &models.RoomSettings{})
+	db.Model(room3).Update("last_activity_at", nil)
+	db.Model(room3).Update("created_at", now.Add(-96*time.Hour)) // old created_at = stale
+
+	// Room created recently with nil last_activity_at — NOT stale (created_at is recent)
+	room4, _ := repo.CreateRoom("csr-u1", "csr-room-recent-null", true, "standard", 0, &models.RoomSettings{})
+	db.Model(room4).Update("last_activity_at", nil)
+
+	count, err := repo.CountStaleRooms(48)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// room2 (last_activity 72h ago) and room3 (created 96h ago, last_activity nil) are stale = 2
+	if count != 2 {
+		t.Fatalf("expected 2 stale rooms, got %d", count)
+	}
+	_ = room
+}
+
+func TestRoomRepository_CountStaleRooms_None(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	count, err := repo.CountStaleRooms(48)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected 0 stale rooms, got %d", count)
 	}
 }

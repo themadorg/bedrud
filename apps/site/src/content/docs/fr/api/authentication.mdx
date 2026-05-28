@@ -19,6 +19,12 @@ Bedrud prend en charge plusieurs méthodes d'authentification :
 | Passkeys | `POST /api/auth/passkey/*` | FIDO2/WebAuthn |
 | Renouvellement de token | `POST /api/auth/refresh` | Renouveler le token d'accès |
 
+| Resend Verification | `POST /api/auth/verify/resend` | Resend verification email |
+| Verify Email | `GET /api/auth/verify` | Verify email with token (query param, redirect) |
+| Check Verification Status | `GET /api/auth/verify/status` | Check if email is verified |
+| Forgot Password | `POST /api/auth/forgot-password` | Request password reset email |
+| Reset Password | `POST /api/auth/reset-password` | Reset password with token |
+
 ## Format des tokens
 
 Une authentification réussie renvoie une paire de tokens JWT :
@@ -226,7 +232,33 @@ POST /api/auth/logout
 
 ---
 
-### Connexion OAuth
+### Renvoyer la vérification
+
+Renvoie le lien de vérification par e-mail. Uniquement pour les comptes locaux non vérifiés. Applique silencieusement le délai via `verificationEmailCooldownMins` — retourne toujours 200 pour empêcher l'énumération des e-mails.
+
+---
+
+### Vérifier l'e-mail
+
+Effectue la vérification de l'e-mail avec le jeton du lien de vérification.
+
+---
+
+### Mot de passe oublié
+
+Demande un e-mail de réinitialisation de mot de passe. Nécessite la configuration SMTP.
+
+Le point d'accès retourne toujours 202 pour empêcher l'énumération des e-mails. Le lien de réinitialisation expire après `resetTokenTTLHours`.
+
+---
+
+### Réinitialiser le mot de passe
+
+Définit un nouveau mot de passe en utilisant le jeton de l'e-mail de réinitialisation.
+
+---
+
+## ### Connexion OAuth
 
 Démarrer un flux OAuth avec un fournisseur social.
 
@@ -260,6 +292,8 @@ Tous les points de terminaison d'auth renvoient des erreurs dans ce format :
 |--------|--------------|
 | 400 | Mauvaise requête (champs manquants, erreur de validation) |
 | 401 | Identifiants invalides ou token expiré |
+| 403 | Email not verified (`requiresVerification: true`) |
+| 429 | Rate limited — check `Retry-After` header |
 | 409 | Email déjà enregistré |
 | 500 | Erreur interne du serveur |
 
@@ -267,5 +301,5 @@ Tous les points de terminaison d'auth renvoient des erreurs dans ce format :
 
 ## Voir aussi
 
-- [Flux d'authentification](/fr/docs/backend/authentication) - fonctionnement interne de JWT, OAuth et des passkeys
+- [/fr/docs/backend/authentication](/fr/docs/backend/authentication) - how JWT, OAuth, passkeys, email verification, and password reset work internally
 - [API des passkeys](/fr/docs/api/passkeys) - référence des points de terminaison FIDO2/WebAuthn

@@ -29,7 +29,7 @@ Dispatches by arg:
 
 ### `cmd/server/main.go` — Dev API server
 
-Air hot-reload target. No CLI subcommands. Inits all subsystems, registers routes, serves Swagger/Scalar docs + SPA. Swagger annotations live here.
+Air hot-reload target. No CLI subcommands. Inits all subsystems (includes queue worker wiring, `scheduler.Initialize(db)`), registers routes, serves Swagger/Scalar docs + SPA. Swagger annotations live here.
 
 Health: `GET /api/health`. Ready: `GET /api/ready`.
 
@@ -43,19 +43,23 @@ Health: `GET /api/health`. Ready: `GET /api/ready`.
 
 `Run(configPath) error` — production bootstrap. Sequence:
 
-1. Load config (`config.Load`)
+1. Load config (`config.Load`) — includes `QueueConfig` + `EmailConfig`
 2. Init LiveKit (internal or external)
 3. Init session store (`auth.InitializeSessionStore`)
 4. Init DB (`database.Initialize`)
-5. Run migrations (`database.RunMigrations`)
-6. Init scheduler (`scheduler.Initialize`)
+5. Run migrations (`database.RunMigrations`) — includes `models.Job{}`
+6. Init scheduler (`scheduler.Initialize(db)`) — DB needed for job cleanup
 7. Init auth providers (`auth.Service.Init`)
-8. Init all repos + handlers
-9. Register Fiber routes
-10. Setup TLS (self-signed / manual certs / Let's Encrypt ACME)
+8. Init all repos
+9. Init cleanup service (`cleanupSvc`)
+10. Init queue worker (`queue.NewWorker(db, handlers).Start(ctx)`) — needs cleanupSvc + all repos built
+11. Init authService, challengeStore, authHandler
+12. Init roomHandler (receives pre-existing uploadStore internally)
+13. Register Fiber routes
+14. Setup TLS (self-signed / manual certs / Let's Encrypt ACME)
     - When TLS enabled: also starts HTTP listener on `server.httpPort` (default `:80`). Non-root: set `httpPort: "8080"` or use `setcap 'cap_net_bind_service=+ep'`.
-11. Serve embedded SPA frontend
-12. Graceful shutdown on SIGINT/SIGTERM
+15. Serve embedded SPA frontend
+16. Graceful shutdown on SIGINT/SIGTERM
 
 LK reverse-proxy at `/livekit`. CORS: dynamic origin reflection. SPA fallback: `index.html` for `/`, `shell.html` for non-API routes.
 
@@ -97,7 +101,7 @@ Helpers: `setAuthCookies` (HttpOnly, secure/sameSite/domain from config), `clear
 
 ### `room.go` — Room lifecycle + participant moderation (biggest file)
 
-`RoomHandler` struct: `roomRepo`, `livekitHost`, `apiKey`, `apiSecret`, `livekit.RoomService` client (via `lkutil.NewClient`), `uploadTracker *storage.ChatUploadTracker`, `storage.ChatUploadStore`, `uploadMax`.
+`RoomHandler` struct: `roomRepo`, `livekitHost`, `apiKey`, `apiSecret`, `livekit.RoomService` client (via `lkutil.NewClient`), `uploadTracker *storage.ChatUploadTracker`, `storage.ChatUploadStore`, `uploadMax`, `deletionInFlight sync.Map`.
 
 Request structs: `CreateRoomRequest{name, maxParticipants, isPublic, mode, settings}`, `JoinRoomRequest{roomName}`, `GuestJoinRoomRequest{roomName, guestName}`.
 
@@ -107,7 +111,7 @@ Request structs: `CreateRoomRequest{name, maxParticipants, isPublic, mode, setti
 | `JoinRoom` | POST | `/rooms/join` | Lookup room, add participant, gen LK token with user metadata |
 | `GuestJoinRoom` | POST | `/rooms/guest-join` | Unauth guest join for public rooms. Restricted LK token |
 | `ListRooms` | GET | `/rooms` | User's created rooms |
-| `DeleteRoom` | DELETE | `/rooms/:roomId` | Delete from LK + DB. Creator or superadmin |
+| `DeleteRoom` | DELETE | `/rooms/:roomId` | 202 Accepted. Enqueues `room_delete` job. Creator or superadmin. `deletionInFlight` prevents double-enqueue |
 | `UpdateSettings` | PATCH | `/rooms/:roomId/settings` | Partial update: isPublic, maxParticipants, settings. Preserves IsPersistent (superadmin-only) |
 | `PromoteParticipant` | POST | `/rooms/:roomId/participants/:identity/promote` | Add "moderator" to LK metadata |
 | `DemoteParticipant` | POST | `/rooms/:roomId/participants/:identity/demote` | Remove "moderator" from metadata |
@@ -124,23 +128,25 @@ Request structs: `CreateRoomRequest{name, maxParticipants, isPublic, mode, setti
 | `GetParticipantInfo` | GET | `/rooms/:roomId/participants/:identity` | Identity, name, state, tracks from LK. Self/admin/mod |
 | `UploadChatImage` | POST | `/rooms/:roomId/chat/upload` | Multipart upload via ChatUploadStore |
 | `AdminListRooms` | GET | `/admin/rooms` | All rooms (DB) |
-| `AdminCloseRoom` | DELETE | `/admin/rooms/:roomId` | Delete from LK, set `IsActive = false` |
-| `AdminSuspendRoom` | POST | `/admin/rooms/:roomId/suspend` | Close LK room, set `IsActive = false`, preserve DB record |
+| `AdminCloseRoom` | DELETE | `/admin/rooms/:roomId` | 202 Accepted. Enqueues `room_delete` job. `deletionInFlight` prevents double-enqueue |
+| `AdminSuspendRoom` | POST | `/admin/rooms/:roomId/suspend` | 202 Accepted. Enqueues `room_suspend` job. `deletionInFlight` prevents double-enqueue |
 | `AdminUpdateRoom` | PATCH | `/admin/rooms/:roomId` | Update maxParticipants + settings merge (superadmin). IsPersistent toggle via settings |
 | `AdminGetRoomParticipants` | GET | `/admin/rooms/:roomId/participants` | Live participants + track stats from LK |
 | `AdminKickParticipant` | DELETE | `/admin/rooms/:roomId/participants/:identity` | Kick (no creator check) |
 | `AdminMuteParticipant` | POST | `/admin/rooms/:roomId/participants/:identity/mute` | Mute audio (admin) |
 | `AdminLiveKitStats` | GET | `/admin/livekit/stats` | Aggregate: total participants, publishers, per-room |
+| `BulkSuspendRooms` | POST | `/admin/rooms/bulk/suspend` | Enqueue per-room `room_suspend` jobs. Returns 202 |
+| `BulkCloseRooms` | POST | `/admin/rooms/bulk/close` | Enqueue per-room `room_delete` jobs. Returns 202 |
 | `GetOnlineCount` | GET | `/rooms/online-count` | Active participant count across all rooms |
 | `BringToStage` | POST | `/rooms/:roomId/participants/:identity/bring-to-stage` | Stub |
 | `RemoveFromStage` | POST | `/rooms/:roomId/participants/:identity/remove-from-stage` | Stub |
 
 Internal helpers: `withAuth` (inject LK token via `lkutil.AuthContext`), `resolveRoom` (load by ID + derive adminId), `sendSystemMessage` (via `lkutil.SendSystemMessage`), `sendTargetedSystemMessage`, `generateShortID`, `containsAccess`, `boolPtr`.  
-Chat upload tracking: `UploadChatImage` calls `uploadTracker.Record()` only for disk-backed uploads (skips S3/inline). Room close/delete cleans up via `AdminDeleteRoom` + tracker.
+Chat upload tracking: `UploadChatImage` calls `uploadTracker.Record()` only for disk-backed uploads (skips S3/inline). Room close/delete cleanup runs in queue handlers (`handler_room_delete.go` calls `cleanupSvc.CascadeDeleteRoom` which includes tracker cleanup).
 
 ### `users.go` — Admin user management
 
-`UsersHandler` struct: `userRepo`, `roomRepo`, `passkeyRepo`, `prefsRepo`, `uploadTracker *storage.ChatUploadTracker`, `client livekit.RoomService` (via lkutil), `apiKey`, `apiSecret`, `wg sync.WaitGroup`.
+`UsersHandler` struct: `userRepo`, `roomRepo`, `passkeyRepo`, `prefsRepo`, `uploadTracker *storage.ChatUploadTracker`, `client livekit.RoomService` (via lkutil), `apiKey`, `apiSecret`.
 
 | Fn | Method | Route | Purpose |
 |----|--------|-------|---------|
@@ -148,8 +154,8 @@ Chat upload tracking: `UploadChatImage` calls `uploadTracker.Record()` only for 
 | `UpdateUserAccesses` | PUT | `/admin/users/:id/accesses` | Replace entire Accesses slice |
 | `UpdateUserStatus` | PUT | `/admin/users/:id/status` | Set `IsActive` |
 | `GetUserDetail` | GET | `/admin/users/:id` | User details + their rooms |
-| `DeleteUser` | DELETE | `/admin/users/:id` | 202 Accepted. 3-phase async delete: stop LK rooms → hard-delete rooms from DB + chat upload cleanup → delete passkeys/preferences/user. Self-deletion guard (400) |
-| `Shutdown` | — | — | `wg.Wait()` for graceful shutdown of in-flight delete goroutines |
+| `DeleteUser` | DELETE | `/admin/users/:id` | 202 Accepted. Enqueues `user_delete` job. Self-deletion guard (400) |
+| `BulkDeleteUsers` | POST | `/admin/users/bulk/delete` | 202 Accepted. Enqueues per-user `user_delete` jobs |
 
 DTOs: `UserListResponse`, `UserDetails{ID, Email, Name, Provider, IsActive, IsAdmin, Accesses, CreatedAt}`, `UserStatusUpdateRequest{active}`, `UserStatusUpdateResponse{message}`.  
 Constructor: `NewUsersHandler(userRepo, roomRepo, passkeyRepo, prefsRepo, uploadTracker, lkCfg)` — creates LiveKit client via `lkutil.NewClient`.
@@ -515,11 +521,101 @@ Raw SQL FK constraints: `fk_room_permissions_participant`, `fk_chat_uploads_room
 
 ---
 
+## `internal/queue/` — Job Queue
+
+`server/internal/queue/` — Internal job queue for async task processing. Worker polls `jobs` table, dispatches to registered handlers. Two DB backends with different claim algorithms (PostgreSQL: `SKIP LOCKED`; SQLite: two-step with serialized writes via `SetMaxOpenConns(1)`).
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `job.go` | 7 payload structs: `UserDeletePayload`, `RoomDeletePayload`, `RoomSuspendPayload`, `ChatUploadS3Payload`, `SendEmailPayload`, `WebhookPayload`, `ProcessRecordingPayload` |
+| `queue.go` | `Enqueue(ctx, db, jobType, payload, opts...)` — inserts job row with priority/retry opts. `Handler` type: `func(ctx, db, job) error`. `Worker` struct with `Start(ctx)`/`Stop()` |
+| `worker.go` | Claim loop: poll every 500ms, claim pending jobs via DB-specific algorithm, dispatch to handler, retry with exponential backoff (`2^attempts * 5s`, capped 1h), mark done/failed |
+| `handler_user_delete.go` | Fetch user's rooms → `cleanupSvc.DeleteUserRooms` → delete passkeys → delete prefs → delete user |
+| `handler_room_delete.go` | Fetch room → `cleanupSvc.CascadeDeleteRoom` |
+| `handler_room_suspend.go` | Fetch room → `cleanupSvc.SuspendRoom` |
+| `handler_chat_upload.go` | Decode base64 payload → `uploadStore.Store` → `uploadTracker.Record` |
+| `handler_stubs.go` | 3 stubs (email, webhook, recording) — log "not implemented — stub". Ready for future implementation |
+
+### Worker Options
+
+`WorkerOptions{Interval: 500ms, Concurrency: 1}` (configurable via `QueueConfig`). Worker drains all available jobs per tick (inner loop until nil), not one-per-tick. `Start(ctx)` runs in background goroutine, `Stop()` signals via channel.
+
+### Retry & Backoff
+
+On failure: if `attempts >= maxAttempts` → status = `failed`. Else → `run_at = now + (2^attempts * 5s)`, status stays `pending`. Default `MaxAttempts=3`: 3 total attempts (1 original + 2 retries). Backoff sequence: 10s, 20s, 40s.
+
+### Cleanup
+
+`scheduler.Initialize` sets up daily 03:00 cleanup: `CleanupJobs(db, 7d)` for done jobs, `CleanupFailedJobs(db, 30d)` for failed jobs.
+
+### Payloads
+
+| Type | Struct | Priority |
+|------|--------|----------|
+| `user_delete` | `UserDeletePayload{UserID, Email, RoomIDs}` | 1 (HIGH) |
+| `room_delete` | `RoomDeletePayload{RoomID, SystemEvent, SystemMessage, DeletedIdentity}` | 1 (HIGH) |
+| `room_suspend` | `RoomSuspendPayload{RoomID}` | 2 (MEDIUM) |
+| `chat_upload_s3` | `ChatUploadS3Payload{Data(base64), RoomID, MimeType, UserID}` | 0 (DEFAULT) |
+| `send_email` | `SendEmailPayload{To, Subject, TemplateName, TemplateData}` | stub |
+| `dispatch_webhook` | `WebhookPayload{URL, Event, Body, Secret, MaxRetries}` | stub |
+| `process_recording` | `ProcessRecordingPayload{RoomID, RoomName, EgressID, FileURL, ...}` | stub |
+
+### Config Additions
+
+Added to `config/config.go`:
+
+```go
+type QueueConfig struct {
+    PollInterval ConfigInt `yaml:"pollInterval"` // ms, default 500. Env: QUEUE_POLL_INTERVAL
+    MaxAttempts  int       `yaml:"maxAttempts"`  // default 3. Env: QUEUE_MAX_ATTEMPTS
+    Concurrency  int       `yaml:"concurrency"`  // default 1. Env: QUEUE_CONCURRENCY
+}
+
+type EmailConfig struct {
+    SMTPHost    string `yaml:"smtpHost"`    // Env: EMAIL_SMTP_HOST
+    SMTPPort    int    `yaml:"smtpPort"`    // Env: EMAIL_SMTP_PORT
+    Username    string `yaml:"username"`    // Env: EMAIL_USERNAME
+    Password    string `yaml:"password"`    // Env: EMAIL_PASSWORD
+    FromAddress string `yaml:"fromAddress"` // Env: EMAIL_FROM_ADDRESS
+    FromName    string `yaml:"fromName"`    // Env: EMAIL_FROM_NAME
+}
+```
+
+---
+
+## `internal/services/room_cleanup.go` — RoomCleanupService
+
+Cross-cutting service for cascading room/user cleanup. Used by queue handlers and user CLI.
+
+`RoomCleanupService` struct: `roomRepo`, `livekit.RoomService` client, `apiKey`, `apiSecret`, `uploadTracker`.
+
+| Fn | Purpose |
+|----|---------|
+| `NewRoomCleanupService(roomRepo, lkClient, apiKey, apiSecret, uploadTracker)` | Constructor |
+| `CascadeDeleteRoom(ctx, room, reason, deletedIdentity)` | Close LK room → broadcast end msg → AdminDeleteRoom → chat upload tracker cleanup |
+| `SuspendRoom(ctx, room)` | Close LK room → mark room inactive |
+| `DeleteUserRooms(ctx, user, rooms)` | Iterate rooms, CascadeDeleteRoom each |
+
+---
+
+## `internal/testutil/db.go`
+
+Test utilities for database-dependent unit tests.
+
+| Export | Purpose |
+|--------|---------|
+| `SetupTestDB()` | Create in-memory SQLite DB, run migrations, return `*gorm.DB` and cleanup fn |
+| `TeardownTestDB(db)` | Close and clean up test DB |
+
+---
+
 ## `internal/scheduler/scheduler.go`
 
 gocron scheduler. Every 1 min: `checkIdleRooms`.
 `checkIdleRooms(roomRepo, cfg, client)` — List active DB rooms → query LK participant counts → mark idle if 0 participants + >5min old. Skips rooms with `IsPersistent = true`. Logs error on failure, info on success.
-`Initialize(roomRepo, lkCfg)` — Setup + start async.
+`Initialize(roomRepo, lkCfg, db *gorm.DB)` — Setup + start async. DB param for daily 03:00 job cleanup (deletes done jobs >7d, failed jobs >30d).
 `Stop()` — Graceful stop.
 
 ---
@@ -595,13 +691,17 @@ cmd/bedrud → server → handlers → repository → models
                    ↘            → auth → repository
                    ↘            → lkutil (shared LiveKit client + auth + system messages)
                    ↘ middleware → auth
-                   ↘ scheduler → repository + livekit
+                   ↘ scheduler → repository + livekit + database (job cleanup)
+                   ↘ services → repository + lkutil
+                   ↘ queue → database + models + services (via handler deps)
                    ↘ storage (standalone; ChatUploadTracker depends on db + models)
                    ↘ utils (standalone)
+                   ↘ testutil (standalone; depends on database)
                    ↘ install → utils
-                   ↘ usercli → repository + lkutil
+                   ↘ usercli → repository + lkutil + services
                    ↘ database → models (via migrations)
 cmd/server → (same wiring, direct in main.go)
-                   ↘ handlers/users → lkutil + storage (ChatUploadTracker)
-                   ↘ handlers/room → lkutil + storage (ChatUploadTracker)
+                   ↘ handlers/users → lkutil + storage (ChatUploadTracker) + queue (Enqueue)
+                   ↘ handlers/room → lkutil + storage (ChatUploadTracker) + queue (Enqueue)
+                   ↘ handlers/admin_queue → database + models + queue
 ```

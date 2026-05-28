@@ -5,9 +5,26 @@ Every agent or engineer touching the web app must follow these guidelines.
 
 ---
 
+## Overhaul Complete (2026-05-16)
+
+All 4 phases of shadcn/ui compliance overhaul are done:
+
+| Phase | Scope | Status |
+|-------|-------|--------|
+| 1 — Mechanical Swaps | Replace raw `<button>`/`<input>`/`<label>`/`<select>`/`<div class="card...">` with Button, Input, Label, Select, Card, Badge, Skeleton from `ui/` | ✅ Done |
+| 2 — Structural | Switch, RadioGroup, Tabs, Dialog, Separator, `cn()` for template-literals | ✅ Done |
+| 3 — Meeting Room | 17 meeting files converted from 100% inline styles → Tailwind classes. `meeting.css` for shared meeting styles | ✅ Done |
+| 4 — Cleanup | Gradient text removed, aurora blobs removed, extra glow pruned, inline `<style>` moved, hardcoded hex replaced | ✅ Done |
+
+**Remaining (low priority):** `ParticipantContextMenu.tsx` — 55 inline styles, already uses shadcn components, mostly `color-mix` values for dark meeting theme.
+
+---
+
 ## Core Philosophy
 
 - **Semantic tokens over hardcoded hex.** Use `bg-primary`, `text-muted-foreground`, `border-input`, etc. — not `#6366f1` or `rgba(...)` for structural UI.
+- **Prefer shadcn wrappers over raw HTML elements.** Use `<Button>`, `<Input>`, `<Label>`, `<Select>`, `<Switch>`, `<Tabs>`, `<Dialog>`, `<RadioGroup>`, `<Card>`, `<Badge>`, `<Separator>` from `@/components/ui/`.
+- **No inline `style={}` except for truly dynamic values** (width/height computed from props, palette colors, `color-mix` that can't be Tailwind). Static layout must use Tailwind classes.
 - **One focal point per page.** The primary action (a form, a button) owns the visual hierarchy. Everything else is subordinate.
 - **Left-aligned, top-anchored layouts.** Avoid dead-center vertical layouts. Content should flow from a natural reading anchor.
 - **Minimal decoration.** A single subtle background glow is enough atmosphere. No aurora meshes, no animated blobs, no stacked gradients.
@@ -195,12 +212,54 @@ Avoid animations in the dashboard. On landing pages, a single subtle keyframe is
 - `beacon` pulse rings
 - `float` vertical bob
 - `blob` morph
+- `bg-clip-text text-transparent` (gradient text — banned)
 
 **Acceptable:**
 - `animate-pulse` on skeleton loaders
 - `animate-spin` on loading spinners
+- `@keyframes meet-speak-bar` for meeting waveform animation
+- `@keyframes meet-connecting-spin` for meeting spinner
+- `@keyframes wave` for auth layout waveform
 
 ---
+
+## Meeting Room — Dark Theme Conventions
+
+The meeting room has a distinct dark atmosphere regardless of the rest of the app:
+
+### File: `meeting.css`
+
+Shared meeting styles at `components/meeting/meeting.css`:
+- `.meet-tile` — base participant tile (position: relative, overflow: hidden)
+- `.meet-tile.meet-speaking` — speaking glow via `box-shadow` with `var(--primary)`
+- `@keyframes meet-speak-bar` — waveform bar animation
+- `@keyframes meet-connecting-spin` — loading spinner
+- `.meet-chat-scroll` — chat scrollbar styling
+
+### Rules
+- Use `bg-[#0c0c16]/90` or `bg-[#0f0f1c]/98` for dark surfaces — not `bg-background` (which may be light)
+- Use `text-white/*` opacity variants for text on dark backgrounds
+- Use `border-white/[0.07]` for subtle borders
+- `color-mix(in oklab, var(--primary) X%, transparent)` is acceptable inline for dynamic intensity — no Tailwind equivalent exists
+- Use `backdrop-blur-xl` / `backdrop-blur-lg` for glass effects
+- Keep `style={{}}` for: `color-mix` backgrounds/borders, palette-based colors, computed dimensions (avatarPx), and `isSpeaking` waveform animation delays
+- Convert everything else to Tailwind classes
+
+### CtrlBtn convention (ControlsBar)
+Use `btnIconCn(active, danger, isMobile)` helper that returns Tailwind classes:
+```tsx
+function btnIconCn(active = false, danger = false, isMobile = false) {
+  return cn(
+    'flex items-center justify-center shrink-0 border-none cursor-pointer transition-[background,color] duration-150',
+    isMobile ? 'h-[38px] w-[38px] rounded-[10px]' : 'h-11 w-11 rounded-xl',
+    danger
+      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+      : active
+        ? 'bg-primary/25 text-sky-300 hover:bg-primary/30'
+        : 'bg-white/[0.07] text-white/75 hover:bg-white/[0.12]',
+  )
+}
+```
 
 ## Do / Don't
 
@@ -211,11 +270,16 @@ Avoid animations in the dashboard. On landing pages, a single subtle keyframe is
 - Keep pages left-aligned with a single action in focus
 - Show one subtle background glow per full-page route
 - Parse error JSON before showing it in the UI
+- Use shadcn wrappers (`Button`, `Input`, `Label`, `Dialog`, etc.) over raw HTML
+- Use `cn()` from `@/lib/utils` for dynamic className composition
+- Import shadcn components from `@/components/ui/` and local utils from `#/lib/`
 
 **Don't:**
 - Use `linear-gradient(135deg, #6366f1 ...)` for buttons, backgrounds, or text
 - Use aurora mesh, animated blobs, or grid overlays
+- Use gradient text (`bg-clip-text text-transparent`)
 - Center content vertically in the middle of the screen with nothing around it
 - Hardcode hex colors for structural UI
 - Add decorative elements that compete with the primary action
 - Show raw JSON error strings to users
+- Use inline `style={}` for static values — use Tailwind classes instead

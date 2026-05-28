@@ -29,6 +29,7 @@ func newUserCmd() *cobra.Command {
 
 func newUserCreateCmd() *cobra.Command {
 	var email, password, name string
+	var admin bool
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a new local user",
@@ -36,12 +37,13 @@ func newUserCreateCmd() *cobra.Command {
 			if email == "" || password == "" || name == "" {
 				return fmt.Errorf("--email, --password and --name are required")
 			}
-			return usercli.CreateUser(resolveConfigPath(defaultEtcConfig), email, password, name)
+			return usercli.CreateUser(resolveConfigPath(defaultEtcConfig), email, password, name, admin)
 		},
 	}
 	cmd.Flags().StringVar(&email, "email", "", "User email")
 	cmd.Flags().StringVar(&password, "password", "", "User password")
 	cmd.Flags().StringVar(&name, "name", "", "User display name")
+	cmd.Flags().BoolVar(&admin, "admin", false, "Create user as superadmin")
 	_ = cmd.MarkFlagRequired("email")
 	return cmd
 }
@@ -72,7 +74,7 @@ func newUserPromoteCmd() *cobra.Command {
 			if email == "" {
 				return fmt.Errorf("--email is required")
 			}
-			return usercli.PromoteUser(resolveConfigPath(defaultEtcConfig), email)
+			return usercli.PromoteUser(resolveConfigPath(defaultEtcConfig), email, "superadmin")
 		},
 	}
 	cmd.Flags().StringVar(&email, "email", "", "User email")
@@ -89,7 +91,7 @@ func newUserDemoteCmd() *cobra.Command {
 			if email == "" {
 				return fmt.Errorf("--email is required")
 			}
-			return usercli.DemoteUser(resolveConfigPath(defaultEtcConfig), email)
+			return usercli.DemoteUser(resolveConfigPath(defaultEtcConfig), email, "superadmin")
 		},
 	}
 	cmd.Flags().StringVar(&email, "email", "", "User email")

@@ -18,8 +18,13 @@ func NewPreferencesHandler(repo *repository.UserPreferencesRepository) *Preferen
 	return &PreferencesHandler{prefsRepo: repo}
 }
 
-// GetPreferences handles GET /api/auth/preferences.
-// Returns the stored JSON blob or an empty object if none exists yet.
+// @Summary Get user preferences
+// @Description Retrieve the authenticated user's preferences as a JSON blob.
+// @Tags auth
+// @Produce json
+// @Success 200 {object} object
+// @Failure 500 {object} auth.ErrorResponse
+// @Router /auth/preferences [get]
 func (h *PreferencesHandler) GetPreferences(c *fiber.Ctx) error {
 	claims := c.Locals("user").(*auth.Claims)
 
@@ -34,8 +39,16 @@ func (h *PreferencesHandler) GetPreferences(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"preferencesJson": prefs.PreferencesJSON})
 }
 
-// UpdatePreferences handles PUT /api/auth/preferences.
-// Accepts { "preferencesJson": "<valid-json-string>" } and upserts it.
+// @Summary Update user preferences
+// @Description Update the authenticated user's preferences as a JSON blob (max 4 KB).
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body object true "Preferences JSON string"
+// @Success 200 {object} object
+// @Failure 400 {object} auth.ErrorResponse
+// @Failure 413 {object} auth.ErrorResponse
+// @Router /auth/preferences [put]
 func (h *PreferencesHandler) UpdatePreferences(c *fiber.Ctx) error {
 	claims := c.Locals("user").(*auth.Claims)
 

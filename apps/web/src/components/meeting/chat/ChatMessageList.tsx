@@ -69,61 +69,40 @@ export function ChatMessageList({ chatMessages, systemMessages, onScrollUnreadCh
   const items = groupMessages(chatMessages, systemMessages)
 
   return (
-    <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+    <div className="flex-1 relative overflow-hidden">
       <div
         role="log"
         ref={messagesRef}
         onScroll={handleScroll}
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
-        style={{
-          height: '100%',
-          overflowY: 'auto',
-          padding: '12px 14px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 10,
-        }}
+        className="h-full overflow-y-auto px-3.5 py-3 flex flex-col gap-2.5 meet-chat-scroll"
       >
         {items.length === 0 ? (
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 10,
-            }}
-          >
+          <div className="flex-1 flex flex-col items-center justify-center gap-2.5">
             <div
+              className="w-11 h-11 rounded-full flex items-center justify-center"
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: '50%',
                 background: 'color-mix(in oklab, var(--primary) 10%, transparent)',
                 border: '1px solid color-mix(in oklab, var(--primary) 20%, transparent)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
               }}
             >
-              <MessageSquare size={18} style={{ color: 'color-mix(in oklab, var(--primary) 50%, transparent)' }} />
+              <MessageSquare size={18} className="text-[color-mix(in_oklab,var(--primary)_50%,transparent)]" />
             </div>
-            <p style={{ color: 'rgba(255,255,255,0.22)', fontSize: 12, textAlign: 'center' }}>
+            <p className="text-white/50 text-xs text-center">
               No messages yet.
               <br />
               Say hello!
             </p>
           </div>
         ) : (
-          items.map((item, i) => {
+          items.map((item) => {
             if (item.kind === 'date-separator') {
               return (
-                <div key={`sep-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
-                  <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', fontWeight: 500 }}>{item.label}</span>
-                  <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+                <div key={item.id} className="flex items-center gap-2.5 py-1">
+                  <div className="flex-1 h-px bg-white/[0.06]" />
+                  <span className="text-[11px] text-white/50 font-medium">{item.label}</span>
+                  <div className="flex-1 h-px bg-white/[0.06]" />
                 </div>
               )
             }
@@ -131,25 +110,15 @@ export function ChatMessageList({ chatMessages, systemMessages, onScrollUnreadCh
             if (item.kind === 'system') {
               const label = item.msg.event === 'kick' ? 'was kicked by' : 'was banned by'
               return (
-                <div key={`sys-${i}`} style={{ display: 'flex', justifyContent: 'center', padding: '2px 0' }}>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      color: 'rgba(255,255,255,0.3)',
-                      background: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: 20,
-                      padding: '3px 10px',
-                      fontStyle: 'italic',
-                    }}
-                  >
+                <div key={item.id} className="flex justify-center py-0.5">
+                  <span className="text-[11px] text-white/50 bg-white/[0.05] border border-white/[0.08] rounded-full px-2.5 py-[3px] italic">
                     {item.msg.target} {label} {item.msg.actor}
                   </span>
                 </div>
               )
             }
 
-            return <ChatMessageCluster key={`cluster-${i}`} cluster={item} />
+            return <ChatMessageCluster key={item.id} cluster={item} />
           })
         )}
         <div ref={bottomRef} />
