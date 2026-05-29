@@ -247,6 +247,8 @@ jobs:
           bun-version: latest
           cache: true
       - run: bun install --frozen-lockfile
+      - name: Sync swagger.json from server
+        run: mkdir -p public && cp ../../server/docs/swagger.json public/swagger.json
       - run: bun run check
       - run: bun run typecheck:astro
       - run: bun run build

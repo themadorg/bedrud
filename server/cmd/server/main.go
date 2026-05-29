@@ -58,14 +58,14 @@ import (
 // @title           Bedrud Backend API
 // @version         1.0
 // @description     This is a Bedrud Backend API server.
-// @termsOfService  http://swagger.io/terms/
+// @termsOfService  https://bedrud.org/en/terms/
 
-// @contact.name   API Support
-// @contact.url    http://www.swagger.io/support
-// @contact.email  support@swagger.io
+// @contact.name   Bedrud API Support
+// @contact.url    https://bedrud.org/en/contact
+// @contact.email  support@bedrud.org
 
 // @license.name  Apache 2.0
-// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
+// @license.url   https://github.com/themadorg/bedrud/blob/master/LICENSE
 
 // @host      localhost:8090
 // @BasePath  /api

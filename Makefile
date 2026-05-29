@@ -250,6 +250,8 @@ dev-android:
 
 # Run Astro site dev server
 dev-site:
+	mkdir -p apps/site/public
+	cp server/docs/swagger.json apps/site/public/swagger.json
 	cd apps/site && bun run dev
 
 # Build frontend
@@ -448,6 +450,8 @@ build-desktop:
 
 # Build Astro site (SSG)
 build-site:
+	mkdir -p apps/site/public
+	cp server/docs/swagger.json apps/site/public/swagger.json
 	cd apps/site && bun run build
 
 # Build iOS for simulator (debug)
@@ -470,7 +474,9 @@ swagger-gen:
 		echo "❌ swag not found. Install with: go install github.com/swaggo/swag/cmd/swag@latest"; exit 1; \
 	fi
 	cd server && swag init -g cmd/server/main.go -o docs --parseDependency
-	@echo "✅ Swagger docs regenerated in server/docs/"
+	mkdir -p apps/site/public
+	cp server/docs/swagger.json apps/site/public/swagger.json
+	@echo "✅ Swagger docs regenerated in server/docs/ and synced to apps/site/public/"
 
 # Open Swagger UI in browser (server must be running)
 swagger-open:

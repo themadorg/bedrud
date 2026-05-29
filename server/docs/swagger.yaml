@@ -780,14 +780,14 @@ definitions:
 host: localhost:8090
 info:
   contact:
-    email: support@swagger.io
-    name: API Support
-    url: http://www.swagger.io/support
+    email: support@bedrud.org
+    name: Bedrud API Support
+    url: https://bedrud.org/en/contact
   description: This is a Bedrud Backend API server.
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
-  termsOfService: http://swagger.io/terms/
+  termsOfService: https://bedrud.org/en/terms/
   title: Bedrud Backend API
   version: "1.0"
 paths:

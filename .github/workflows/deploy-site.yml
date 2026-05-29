@@ -48,6 +48,8 @@ jobs:
           else
             echo "⚠ GPG private key not configured in secrets — skipping GPG key export"
           fi
+      - name: Sync swagger.json from server
+        run: mkdir -p apps/site/public && cp server/docs/swagger.json apps/site/public/swagger.json
       - uses: withastro/action@v6
         with:
           package-manager: bun@latest

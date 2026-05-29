@@ -6,3 +6,4 @@ dist/
 .astro/
 !.astro/types.d.ts
 public/search-index-*.json
+public/swagger.json

@@ -11,7 +11,8 @@
       "!**/dist",
       "!**/.react-router",
       "!**/.astro",
-      "!**/public/search-index-*.json"
+      "!**/public/search-index-*.json",
+      "!**/public/swagger.json"
     ]
   },
   "formatter": {

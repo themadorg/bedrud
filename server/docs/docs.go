@@ -9,11 +9,11 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "termsOfService": "http://swagger.io/terms/",
+        "termsOfService": "https://bedrud.org/en/terms/",
         "contact": {
-            "name": "API Support",
-            "url": "http://www.swagger.io/support",
-            "email": "support@swagger.io"
+            "name": "Bedrud API Support",
+            "url": "https://bedrud.org/en/contact",
+            "email": "support@bedrud.org"
         },
         "license": {
             "name": "Apache 2.0",
