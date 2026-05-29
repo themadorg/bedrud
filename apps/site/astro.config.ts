@@ -49,6 +49,9 @@ export default defineConfig({
     "/contributors": "/en/contributors",
     "/changelog": "/en/changelog",
     "/demo": "/en/demo",
+    "/api-docs": "/en/docs/api/api-refrence",
+    "/en/api-docs": "/en/docs/api/api-refrence",
+    "/docs/api/reference": "/en/docs/api/api-refrence",
     "/github":
       "https://github.com/themadorg/bedrud?utm_source=app&utm_medium=footer",
   },

@@ -243,6 +243,7 @@ Per-app design docs: `apps/web/DESIGN.md`, `apps/desktop/DESIGN.md`, `apps/site/
 - `DESIGN.md` — Project-wide design system (colors, tokens, accessibility, component patterns)
 - `apps/web/DESIGN.md` — Web-specific design details
 - `apps/web/AGENTS.md` — Frontend design system (shadcn tokens, no gradients, minimal animations)
+- `apps/site/AGENTS.md` — Site agent guide (Astro, i18n, content, styling)
 - `apps/site/README.md` — Site dev/build commands
 - `apps/site/src/content.config.ts` — Content collection schemas
 - `apps/site/src/content/docs/sidebar.ts` — Manual sidebar definition
