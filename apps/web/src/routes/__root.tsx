@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createRootRoute, HeadContent, Scripts } from '@tanstack/react-router'
 import { useEffect } from 'react'
+import { IntlProvider } from 'react-intl'
 import { Toaster } from 'sonner'
 import { useAuthStore } from '#/lib/auth.store'
 import { applyTheme, useThemeStore } from '#/lib/theme.store'
+import enMessages from '#/locales/en.json'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import appCss from '../styles.css?url'
 
@@ -87,7 +89,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           Skip to main content
         </a>
         <ErrorBoundary variant="server">
-          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+          <IntlProvider locale="en" messages={enMessages}>
+            <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+          </IntlProvider>
           <Toaster richColors closeButton />
         </ErrorBoundary>
         <Scripts />

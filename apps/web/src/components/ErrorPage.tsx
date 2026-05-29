@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { AlertTriangle, ArrowLeft, Home, Radio, RefreshCw, Server, WifiOff } from 'lucide-react'
+import { useIntl } from 'react-intl'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -57,32 +58,32 @@ interface ErrorPageProps {
 
 const VARIANT_CONFIG: Record<
   ErrorVariant,
-  { icon: typeof AlertTriangle; defaultTitle: string; defaultDescription: string }
+  { icon: typeof AlertTriangle; defaultTitleId: string; defaultDescriptionId: string }
 > = {
   'not-found': {
     icon: Radio,
-    defaultTitle: 'Nothing here',
-    defaultDescription: "The page you're looking for doesn't exist or has been moved.",
+    defaultTitleId: 'error.notFound.title',
+    defaultDescriptionId: 'error.notFound.description',
   },
   'room-error': {
     icon: WifiOff,
-    defaultTitle: 'Failed to join room',
-    defaultDescription: 'The room may not exist or has been closed.',
+    defaultTitleId: 'error.roomError.title',
+    defaultDescriptionId: 'error.roomError.description',
   },
   kicked: {
     icon: Server,
-    defaultTitle: 'You were removed',
-    defaultDescription: 'A moderator removed you from this room.',
+    defaultTitleId: 'error.kicked.title',
+    defaultDescriptionId: 'error.kicked.description',
   },
   session: {
     icon: AlertTriangle,
-    defaultTitle: 'Session expired',
-    defaultDescription: 'Your session has ended. Please sign in again.',
+    defaultTitleId: 'error.session.title',
+    defaultDescriptionId: 'error.session.description',
   },
   server: {
     icon: AlertTriangle,
-    defaultTitle: 'Something went wrong',
-    defaultDescription: 'An unexpected error occurred. Please try again.',
+    defaultTitleId: 'error.server.title',
+    defaultDescriptionId: 'error.server.description',
   },
 }
 
@@ -96,6 +97,7 @@ export function ErrorPage({
   onRetry,
   className,
 }: ErrorPageProps) {
+  const intl = useIntl()
   const config = VARIANT_CONFIG[variant]
   const Icon = config.icon
 
@@ -103,8 +105,9 @@ export function ErrorPage({
   const parsed = error ? parseApiError(error) : null
   const lookup = variant === 'room-error' ? ROOM_FRIENDLY_ERRORS : FRIENDLY_ERRORS
   const friendly = parsed?.code ? lookup[parsed.code] : undefined
-  const displayTitle = title ?? friendly?.title ?? config.defaultTitle
-  const displayDescription = description ?? friendly?.description ?? config.defaultDescription
+
+  const displayTitle = title ?? friendly?.title ?? intl.formatMessage({ id: config.defaultTitleId })
+  const displayDescription = description ?? friendly?.description ?? intl.formatMessage({ id: config.defaultDescriptionId })
 
   return (
     <div className={cn('flex min-h-screen flex-col bg-background', className)}>
