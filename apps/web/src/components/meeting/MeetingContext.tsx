@@ -234,6 +234,17 @@ export function MeetingProvider({
   // Track how many messages existed at the last markRead() so we only count new arrivals
   const chatSeenRef = useRef(0)
   const systemSeenRef = useRef(0)
+
+  // Refs to always read latest lengths inside stable callbacks (avoid recreating markRead on every length change)
+  const chatMessagesRef = useRef(chatMessages)
+  const systemMessagesRef = useRef(systemMessages)
+  useEffect(() => {
+    chatMessagesRef.current = chatMessages
+  }, [chatMessages])
+  useEffect(() => {
+    systemMessagesRef.current = systemMessages
+  }, [systemMessages])
+
   const onRoomDeletionMessageRef = useRef(onRoomDeletionMessage)
   onRoomDeletionMessageRef.current = onRoomDeletionMessage
 
@@ -319,10 +330,10 @@ export function MeetingProvider({
   }, [chatMessages.length, systemMessages.length])
 
   const markRead = useCallback(() => {
-    chatSeenRef.current = chatMessages.length
-    systemSeenRef.current = systemMessages.length
+    chatSeenRef.current = chatMessagesRef.current.length
+    systemSeenRef.current = systemMessagesRef.current.length
     setUnreadCount(0)
-  }, [chatMessages.length, systemMessages.length])
+  }, []) // stable reference – does not cause chatValue to change on message arrival
 
   // sendChat publishes a reliable data packet on the "chat" topic.
   // The message is also echoed locally immediately for zero-latency feedback.
