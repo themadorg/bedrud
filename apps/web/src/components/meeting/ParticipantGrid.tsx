@@ -18,6 +18,12 @@ function gridCols(count: number): string {
 export function ParticipantGrid({ pinnedIdentities, onTogglePin }: ParticipantGridProps) {
   const participants = useParticipants()
 
+  // Note: useParticipants() from LiveKit always includes the local participant once connected.
+  // Therefore participants.length is effectively always >= 1 in normal usage.
+  // We do not render a special "empty" state here. If length ever becomes 0 (e.g. very early mount
+  // or certain error states), the grid simply renders nothing — this is intentional future-proofing
+  // rather than dead code that needs removal.
+
   return (
     <div
       id="meet-grid"
