@@ -17,10 +17,10 @@ The easiest way to install the Bedrud server on Debian-based systems is via the 
 **1. Add the repository and GPG key:**
 
 ```bash
-curl -fsSL https://themadorg.github.io/bedrud/bedrud.gpg.key \
+curl -fsSL https://bedrud.org/key.gpg \
   | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/bedrud.gpg
 
-echo "deb https://themadorg.github.io/bedrud stable main" \
+echo "deb https://bedrud.org stable main" \
   | sudo tee /etc/apt/sources.list.d/bedrud.list
 ```
 
@@ -59,10 +59,10 @@ sudo bedrud install
 **1. Add the repository:**
 
 ```bash
-sudo curl -fsSL https://themadorg.github.io/bedrud/dnf/bedrud.gpg.key \
+sudo curl -fsSL https://bedrud.org/key.gpg \
   -o /etc/pki/rpm-gpg/RPM-GPG-KEY-bedrud
 
-sudo curl -fsSL https://themadorg.github.io/bedrud/dnf/bedrud.repo \
+sudo curl -fsSL https://bedrud.org/dnf/bedrud.repo \
   -o /etc/yum.repos.d/bedrud.repo
 ```
 

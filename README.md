@@ -227,9 +227,9 @@ See [latest release](https://github.com/themadorg/bedrud/releases/latest) for al
 <summary>Install via apt repository</summary>
 
 ```bash
-curl -fsSL https://themadorg.github.io/bedrud/bedrud.gpg.key \
+curl -fsSL https://bedrud.org/key.gpg \
   | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/bedrud.gpg
-echo "deb https://themadorg.github.io/bedrud stable main" \
+echo "deb https://bedrud.org stable main" \
   | sudo tee /etc/apt/sources.list.d/bedrud.list
 sudo apt update && sudo apt install bedrud
 sudo bedrud install

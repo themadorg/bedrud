@@ -108,17 +108,17 @@ jobs:
           cat > dnf/bedrud.repo << 'REPOEOF'
           [bedrud-desktop]
           name=Bedrud Desktop Client
-          baseurl=https://themadorg.github.io/bedrud/dnf/bedrud-desktop/$basearch/
+          baseurl=https://bedrud.org/dnf/bedrud-desktop/$basearch/
           enabled=1
           gpgcheck=1
-          gpgkey=https://themadorg.github.io/bedrud/dnf/bedrud.gpg.key
+          gpgkey=https://bedrud.org/key.gpg
 
           [bedrud]
           name=Bedrud Server
-          baseurl=https://themadorg.github.io/bedrud/dnf/bedrud/$basearch/
+          baseurl=https://bedrud.org/dnf/bedrud/$basearch/
           enabled=1
           gpgcheck=1
-          gpgkey=https://themadorg.github.io/bedrud/dnf/bedrud.gpg.key
+          gpgkey=https://bedrud.org/key.gpg
           REPOEOF
 
       - name: Commit to packages branch

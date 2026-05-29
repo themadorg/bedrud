@@ -82,10 +82,10 @@ Dağıtımınızın paket yöneticisi aracılığıyla kurun.
   <TabsContent value="ubuntu-debian-apt">
 
     ```bash
-    curl -fsSL https://themadorg.github.io/bedrud/bedrud.gpg.key \
+    curl -fsSL https://bedrud.org/key.gpg \
       | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/bedrud.gpg
 
-    echo "deb https://themadorg.github.io/bedrud stable main" \
+    echo "deb https://bedrud.org stable main" \
       | sudo tee /etc/apt/sources.list.d/bedrud.list
 
     sudo apt update && sudo apt install bedrud
@@ -107,10 +107,10 @@ Dağıtımınızın paket yöneticisi aracılığıyla kurun.
   <TabsContent value="fedora-rhel-dnf">
 
     ```bash
-    sudo curl -fsSL https://themadorg.github.io/bedrud/dnf/bedrud.gpg.key \
+    sudo curl -fsSL https://bedrud.org/key.gpg \
       -o /etc/pki/rpm-gpg/RPM-GPG-KEY-bedrud
 
-    sudo curl -fsSL https://themadorg.github.io/bedrud/dnf/bedrud.repo \
+    sudo curl -fsSL https://bedrud.org/dnf/bedrud.repo \
       -o /etc/yum.repos.d/bedrud.repo
 
     sudo dnf install bedrud
