@@ -1,6 +1,11 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import { ChevronRight, Plus, RefreshCw } from 'lucide-react'
-import { AdminActivityChart } from '#/components/admin/overview/activity-chart'
+import { lazy, Suspense } from 'react'
+
+const AdminActivityChart = lazy(() =>
+  import('#/components/admin/overview/activity-chart').then((m) => ({ default: m.AdminActivityChart })),
+)
+
 import { AdminHealthStrip } from '#/components/admin/overview/health-strip'
 import { AdminKpiRow } from '#/components/admin/overview/kpi-row'
 import { AdminNeedsAttention } from '#/components/admin/overview/needs-attention'
@@ -60,7 +65,15 @@ export function AdminOverviewPage() {
 
       {/* Row 4: Activity + Composition */}
       <section className="grid gap-4 xl:grid-cols-12">
-        <div className="xl:col-span-8">{data?.activityTrend && <AdminActivityChart data={data.activityTrend} />}</div>
+        <div className="xl:col-span-8">
+          {data?.activityTrend && (
+            <Suspense
+              fallback={<div className="h-64 border rounded p-4 text-sm text-muted-foreground">Loading chart…</div>}
+            >
+              <AdminActivityChart data={data.activityTrend} />
+            </Suspense>
+          )}
+        </div>
         <div className="xl:col-span-4">
           {data?.roomComposition && <AdminRoomComposition data={data.roomComposition} />}
         </div>

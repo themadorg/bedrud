@@ -1,7 +1,7 @@
 import { AlertCircle } from 'lucide-react'
-import { type ReactNode } from 'react'
-import ReactMarkdown from 'react-markdown'
+import { lazy, type ReactNode, Suspense } from 'react'
 import remarkGfm from 'remark-gfm'
+
 import type { ClusterGroup } from './chatGrouping'
 import { absoluteTime, avatarColor, avatarInitials, relativeTime } from './chatGrouping'
 
@@ -100,9 +100,11 @@ function ChatMarkdown({ content, isLocal }: { content: string; isLocal: boolean 
   }
 
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-      {content}
-    </ReactMarkdown>
+    <Suspense fallback={<span className="text-white/40 text-xs">Loading…</span>}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        {content}
+      </ReactMarkdown>
+    </Suspense>
   )
 }
 
