@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   meta: {
     title: "Bedrud - Visioconférences, à votre façon",
     description:
@@ -496,10 +496,13 @@
       "backend/livekit": "Intégration LiveKit",
       "backend/deployment": "Déploiement",
       "backend/advanced": "Sujets avancés",
-      "api/authentication": "API d'authentification",
-      "api/rooms": "API des salles",
+      "api/api-refrence": "Référence API",
       "api/admin": "API d'administration",
-      "api/passkeys": "API Passkeys",
+      "api/system": "API Système",
+      "api/health": "API Santé",
+      "api/auth": "API d'authentification",
+      "api/rooms": "API des salles",
+      "api/models": "Modèles",
       "guides/development": "Flux de développement",
       "guides/deployment": "Guide de déploiement",
       "guides/docker": "Guide Docker",
@@ -510,6 +513,7 @@
       "guides/admin-dashboard": "Tableau de Bord Administrateur",
       "guides/behind-proxy": "Derrière un proxy/CDN",
       "guides/roles": "Rôles utilisateur",
+      "guides/webhooks": "Webhooks",
       contributing: "Contribution",
     },
   },

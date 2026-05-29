@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   meta: {
     title: "Bedrud - 随心所欲的视频会议",
     description:
@@ -520,10 +520,13 @@
       "backend/livekit": "LiveKit 集成",
       "backend/deployment": "部署",
       "backend/advanced": "高级主题",
-      "api/authentication": "认证 API",
-      "api/rooms": "房间 API",
+      "api/api-refrence": "API 参考手册",
       "api/admin": "管理 API",
-      "api/passkeys": "通行密钥 API",
+      "api/system": "系统 API",
+      "api/health": "健康 API",
+      "api/auth": "认证 API",
+      "api/rooms": "房间 API",
+      "api/models": "模型定义",
       "guides/development": "开发工作流",
       "guides/deployment": "部署指南",
       "guides/docker": "Docker 指南",
@@ -534,6 +537,7 @@
       "guides/admin-dashboard": "管理仪表板",
       "guides/behind-proxy": "在代理/CDN 后面",
       "guides/roles": "用户角色",
+      "guides/webhooks": "Webhook",
       contributing: "贡献",
     },
   },

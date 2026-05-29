@@ -5,13 +5,13 @@ import {
   getNextDoc,
   getPreviousDoc,
   sections,
-} from "../../../content/docs/sidebar";
+} from "~/content/docs/sidebar.ts";
 import {
   isValidLocale,
   type Locale,
   supportedLocales,
   t,
-} from "../../../i18n/utils";
+} from "~/i18n/utils.ts";
 import Callout from "~/components/docs/mdx/callout.astro";
 import CreateAdmin from "~/components/docs/mdx/create-admin.astro";
 import InstallerSteps from "~/components/docs/mdx/installer-steps.astro";
@@ -20,6 +20,7 @@ import Tabs from "~/components/docs/mdx/tabs.astro";
 import TabsList from "~/components/docs/mdx/tabs-list.astro";
 import TabsTrigger from "~/components/docs/mdx/tabs-trigger.astro";
 import TabsContent from "~/components/docs/mdx/tabs-content.astro";
+import ScalarApi from "~/components/api-reference/ScalarApi.astro";
 
 export async function getStaticPaths() {
   const allDocs = (await getCollection("docs")).filter((d) => !d.data.draft);
@@ -56,6 +57,7 @@ const mdxComponents = {
   TabsList,
   TabsTrigger,
   TabsContent,
+  ScalarApi,
 };
 const title = `${doc.data.title}${t(lang, "docs.titleSuffix")}`;
 const description = doc.data.description || t(lang, "meta.description");
@@ -99,6 +101,7 @@ const breadcrumbItems = [
   image={doc.data.image}
   article={articleProps}
   headLinks={headLinks}
+  hideToc={slug === "api/api-refrence"}
   jsonLd={[
     {
       "@context": "https://schema.org",

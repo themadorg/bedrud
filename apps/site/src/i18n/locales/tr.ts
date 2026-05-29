@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   meta: {
     title: "Bedrud - İstediğiniz Gibi Video Toplantıları",
     description:
@@ -526,10 +526,13 @@
       "backend/livekit": "LiveKit Entegrasyonu",
       "backend/deployment": "Dağıtım",
       "backend/advanced": "İleri Düzey Konular",
-      "api/authentication": "Kimlik Doğrulama API'si",
-      "api/rooms": "Oda API'si",
+      "api/api-refrence": "API Referansı",
       "api/admin": "Yönetici API'si",
-      "api/passkeys": "Passkeys API'si",
+      "api/system": "Sistem API'si",
+      "api/health": "Sağlık API'si",
+      "api/auth": "Kimlik Doğrulama API'si",
+      "api/rooms": "Oda API'si",
+      "api/models": "Modeller",
       "guides/development": "Geliştirme İş Akışı",
       "guides/deployment": "Dağıtım Kılavuzu",
       "guides/docker": "Docker Kılavuzu",
@@ -540,6 +543,7 @@
       "guides/admin-dashboard": "Yönetici Paneli",
       "guides/behind-proxy": "Bir Proxy/CDN Arkasında",
       "guides/roles": "Kullanıcı Rolleri",
+      "guides/webhooks": "Webhooks",
       contributing: "Katkıda Bulunma",
     },
   },

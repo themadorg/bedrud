@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   meta: {
     title: "بدرود - اجتماعات فيديو، بطريقتك",
     description:
@@ -493,10 +493,13 @@
       "backend/livekit": "تكامل LiveKit",
       "backend/deployment": "النشر",
       "backend/advanced": "مواضيع متقدمة",
-      "api/authentication": "API المصادقة",
-      "api/rooms": "API الغرف",
+      "api/api-refrence": "مرجع API",
       "api/admin": "API المشرف",
-      "api/passkeys": "API مفاتيح المرور",
+      "api/system": "API النظام",
+      "api/health": "API الحالة والتشغيل",
+      "api/auth": "API المصادقة",
+      "api/rooms": "API الغرف",
+      "api/models": "النماذج",
       "guides/development": "سير عمل التطوير",
       "guides/deployment": "دليل النشر",
       "guides/docker": "دليل Docker",
@@ -507,6 +510,7 @@
       "guides/admin-dashboard": "لوحة تحكم المشرف",
       "guides/behind-proxy": "خلف بروكسي/CDN",
       "guides/roles": "أدوار المستخدم",
+      "guides/webhooks": "خطافات الويب",
       contributing: "المساهمة",
     },
     mdx: {

@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   meta: {
     title: "Bedrud - Videollamadas a tu manera",
     description:
@@ -493,10 +493,13 @@
       "backend/livekit": "Integración LiveKit",
       "backend/deployment": "Despliegue",
       "backend/advanced": "Temas avanzados",
-      "api/authentication": "API de autenticación",
-      "api/rooms": "API de salas",
+      "api/api-refrence": "Referencia de API",
       "api/admin": "API de administración",
-      "api/passkeys": "API de passkeys",
+      "api/system": "API del sistema",
+      "api/health": "API de salud",
+      "api/auth": "API de autenticación",
+      "api/rooms": "API de salas",
+      "api/models": "Modelos",
       "guides/development": "Flujo de desarrollo",
       "guides/deployment": "Guía de despliegue",
       "guides/docker": "Guía de Docker",
@@ -507,6 +510,7 @@
       "guides/admin-dashboard": "Panel de Administración",
       "guides/behind-proxy": "Detrás de un proxy/CDN",
       "guides/roles": "Roles de usuario",
+      "guides/webhooks": "Webhooks",
       contributing: "Contribuir",
     },
   },

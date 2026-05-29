@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   meta: {
     title: "Bedrud - あなたらしいビデオ会議",
     description:
@@ -492,10 +492,13 @@
       "backend/livekit": "LiveKit統合",
       "backend/deployment": "デプロイ",
       "backend/advanced": "高度なトピック",
-      "api/authentication": "認証API",
-      "api/rooms": "ルームAPI",
+      "api/api-refrence": "APIリファレンス",
       "api/admin": "管理API",
-      "api/passkeys": "パスキーAPI",
+      "api/system": "システムAPI",
+      "api/health": "ヘルスチェックAPI",
+      "api/auth": "認証API",
+      "api/rooms": "ルームAPI",
+      "api/models": "モデル",
       "guides/development": "開発ワークフロー",
       "guides/deployment": "デプロイガイド",
       "guides/docker": "Dockerガイド",
@@ -506,6 +509,7 @@
       "guides/admin-dashboard": "管理ダッシュボード",
       "guides/behind-proxy": "プロキシ/CDNの背後",
       "guides/roles": "ユーザーロール",
+      "guides/webhooks": "Webhook",
       contributing: "貢献する",
     },
   },

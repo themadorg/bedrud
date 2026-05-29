@@ -131,7 +131,10 @@ const ogImage = image
           { rel: "manifest", href: "/manifest.json" },
           ...headLinks,
         ],
-        meta: [{ name: "theme-color", content: "#0C0A09" }],
+        meta: [
+          { name: "theme-color", content: "#0C0A09" },
+          { name: "color-scheme", content: "dark light" },
+        ],
       }}
     />
     {jsonLd.map((data) => (

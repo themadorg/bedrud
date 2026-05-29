@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   meta: {
     title: "Bedrud - Общайтесь с людьми, а не с платформой",
     description:
@@ -675,10 +675,13 @@
       "backend/livekit": "Интеграция LiveKit",
       "backend/deployment": "Развертывание",
       "backend/advanced": "Продвинутые темы",
-      "api/authentication": "API аутентификации",
-      "api/rooms": "API комнат",
+      "api/api-refrence": "Справочник API",
       "api/admin": "API администратора",
-      "api/passkeys": "API Passkeys",
+      "api/system": "Системный API",
+      "api/health": "API работоспособности",
+      "api/auth": "API аутентификации",
+      "api/rooms": "API комнат",
+      "api/models": "Модели",
       "guides/development": "Разработка",
       "guides/deployment": "Руководство по развертыванию",
       "guides/docker": "Руководство по Docker",
@@ -689,6 +692,7 @@
       "guides/admin-dashboard": "Панель администратора",
       "guides/behind-proxy": "За прокси/CDN",
       "guides/roles": "Роли пользователей",
+      "guides/webhooks": "Вебхуки",
       contributing: "Участие в разработке",
     },
   },

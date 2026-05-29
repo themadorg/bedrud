@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   meta: {
     title: "Bedrud - Talk to people, not the platform",
     description:
@@ -651,6 +651,9 @@
     titleSuffix: " - Bedrud",
     diagramError: "Diagram render failed",
     toggleMenu: "Toggle menu",
+    apiReferenceTitle: "API Reference",
+    apiReferenceDesc:
+      "Interactive OpenAPI/Swagger API reference for Bedrud backend services",
     sections: {
       gettingStarted: "Getting Started",
       architecture: "Architecture",
@@ -713,10 +716,13 @@
       "backend/livekit": "LiveKit Integration",
       "backend/deployment": "Deployment",
       "backend/advanced": "Advanced Topics",
-      "api/authentication": "Authentication API",
-      "api/rooms": "Rooms API",
+      "api/api-refrence": "API Reference",
       "api/admin": "Admin API",
-      "api/passkeys": "Passkeys API",
+      "api/system": "System API",
+      "api/health": "Health API",
+      "api/auth": "Auth API",
+      "api/rooms": "Rooms API",
+      "api/models": "Models",
       "guides/development": "Development Workflow",
       "guides/deployment": "Deployment Guide",
       "guides/docker": "Docker Guide",
@@ -727,6 +733,7 @@
       "guides/admin-dashboard": "Admin Dashboard",
       "guides/behind-proxy": "Behind a Proxy/CDN",
       "guides/roles": "User Roles",
+      "guides/webhooks": "Webhooks",
       contributing: "Contributing",
     },
   },

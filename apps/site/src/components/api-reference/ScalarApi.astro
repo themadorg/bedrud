@@ -1,0 +1,158 @@
+---
+// src/components/api-reference/ScalarApi.astro
+interface Props {
+  lang?: string;
+}
+
+const { lang: propLang } = Astro.props;
+const urlLang = Astro.url.pathname.split("/")[1];
+const lang = propLang || urlLang || "en";
+const uniqueId = `scalar-ref-${Math.random().toString(36).slice(2, 9)}`;
+const buildTimestamp = Date.now().toString(36);
+---
+<!-- Container with dynamic unique ID and Tailwind styling -->
+<div 
+  id={uniqueId} 
+  class="scalar-api-reference-container border border-border w-full overflow-hidden"
+  data-url={`/swagger.json?v=${buildTimestamp}`}
+  data-lang={lang}
+>
+  <!-- Fallback state / loader for slow network or JS-disabled clients -->
+  <noscript>
+    <div class="p-6 text-center text-destructive">
+      This interactive API reference requires JavaScript to render. You can access the raw 
+      <a href="/swagger.json" class="underline">swagger.json schema here</a>.
+    </div>
+  </noscript>
+  <div class="scalar-loading p-12 text-center text-muted-foreground animate-pulse">
+    Loading Bedrud API Reference...
+  </div>
+</div>
+
+<script>
+  import { createApiReference } from "@scalar/api-reference";
+  import "@scalar/api-reference/style.css";
+
+  // Map of Bedrud locales to BCP-47 codes supported by Scalar
+  const scalarLocales: Record<string, string> = {
+    en: "en-US",
+    de: "de-DE",
+    fr: "fr-FR",
+    es: "es-ES",
+    zh: "zh-CN",
+    ja: "ja-JP",
+    tr: "tr-TR",
+    fa: "fa-IR",
+    ar: "ar-AE",
+    ru: "ru-RU",
+  };
+
+  // Run initialization on DOM content loaded or page load
+  const initScalar = async () => {
+    const containers = document.querySelectorAll(".scalar-api-reference-container");
+    
+    for (const container of containers) {
+      if ((container as any).__scalarInitialized) continue;
+      (container as any).__scalarInitialized = true;
+
+      const id = container.id;
+      const url = container.getAttribute("data-url") || "/swagger.json";
+      const lang = container.getAttribute("data-lang") || "en";
+      const locale = scalarLocales[lang] || "en-US";
+
+      const loadingEl = container.querySelector(".scalar-loading");
+
+      try {
+        // Initialize Scalar on the element
+        const apiReferenceInstance = await (createApiReference as any)(`#${id}`, {
+          spec: {
+            url,
+          },
+          url,
+          theme: "none", // Since we use custom CSS variables to theme Scalar
+          locale,
+          showSidebar: false,
+          hideModels: false,
+          hideDownloadButton: false,
+          withDefaultFonts: false, // Prevent loading external fonts for privacy & offline compliance
+          darkMode: document.documentElement.classList.contains("dark"),
+          agent: {
+            disabled: true,
+          },
+          mcp: {
+            disabled: true,
+          },
+          hideSearch: true,
+        } as any);
+
+        // Remove loading state if initialization succeeded
+        if (loadingEl) {
+          loadingEl.remove();
+        }
+
+        // MutationObserver to sync dark mode changes
+        const observer = new MutationObserver(() => {
+          const isDark = document.documentElement.classList.contains("dark");
+          const instance = apiReferenceInstance as any;
+          if (instance && typeof instance.setDarkMode === "function") {
+            instance.setDarkMode(isDark);
+          }
+        });
+
+        observer.observe(document.documentElement, {
+          attributes: true,
+          attributeFilter: ["class"],
+        });
+
+        // Store observer on container to disconnect on page changes if needed
+        (container as any).__scalarObserver = observer;
+      } catch (err) {
+        console.error("Failed to initialize Scalar API Reference:", err);
+        if (loadingEl) {
+          loadingEl.innerHTML = `<span class="text-destructive">Failed to load API Reference. Please check your connection.</span>`;
+        }
+      }
+    }
+  };
+
+  // Wire up with Astro view transitions / page load
+  document.addEventListener("astro:page-load", initScalar);
+</script>
+
+<style is:global>
+  /* Custom skinning mapped to Bedrud's color tokens */
+  .scalar-api-reference-container {
+    /* Colors */
+    --scalar-color-1: var(--foreground) !important;
+    --scalar-color-2: var(--muted-foreground) !important;
+    --scalar-color-3: var(--muted-foreground) !important;
+    --scalar-color-accent: var(--primary) !important;
+    
+    /* Primary Action Buttons skinning */
+    --scalar-color-btn-1: var(--primary) !important;
+    --scalar-color-btn-2: var(--primary-foreground) !important;
+    --scalar-color-btn-hover: color-mix(in oklab, var(--primary) 90%, black) !important;
+
+    /* Backgrounds */
+    --scalar-background-1: var(--background) !important;
+    --scalar-background-2: var(--card) !important;
+    --scalar-background-3: var(--muted) !important; /* Contrast surface for code blocks and inputs */
+
+    /* Borders & Radius */
+    --scalar-border-color: var(--border) !important;
+    --scalar-radius: 0px !important;      /* Zero border-radius globally */
+    --scalar-radius-lg: 0px !important;
+    --scalar-radius-xl: 0px !important;
+
+    /* Typography */
+    --scalar-font: var(--font-sans) !important;
+    --scalar-font-code: var(--font-mono) !important;
+
+    min-height: 750px;
+  }
+
+  /* Make sure internal scalar components obey our zero radius rule */
+  .scalar-api-reference-container * {
+    border-radius: 0px !important;
+  }
+</style>
