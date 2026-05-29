@@ -22,6 +22,7 @@ import { useEffect, useRef, useState } from 'react'
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { toast } from 'sonner'
 
+import { Button } from '#/components/ui/button'
 import { api } from '#/lib/api'
 import { getErrorMessage } from '#/lib/errors'
 import { useAdminContext } from '#/routes/dashboard/admin.tsx'
@@ -105,7 +106,7 @@ function RoomDetailPage() {
   // Track which participant identities have appeared so we can assign stable colors
   const identitiesRef = useRef<string[]>([])
 
-  const { data, isLoading, dataUpdatedAt } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'room', roomId, 'participants'],
     queryFn: () =>
       api.get<{ participants: LiveParticipant[]; room: RoomInfo }>(`/api/admin/rooms/${roomId}/participants`),
@@ -216,6 +217,22 @@ function RoomDetailPage() {
   const getColor = (identity: string) => {
     const idx = identitiesRef.current.indexOf(identity)
     return LINE_COLORS[idx % LINE_COLORS.length]
+  }
+
+  if (isError) {
+    return (
+      <div className="mx-auto max-w-5xl px-4 pt-8">
+        <div className="border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
+          <span className="text-destructive">
+            {error instanceof Error ? error.message : 'Failed to load room details.'}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="mr-1.5 h-3 w-3" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (

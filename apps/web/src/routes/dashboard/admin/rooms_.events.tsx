@@ -36,7 +36,7 @@ function AdminRoomEventsPage() {
   if (dateFrom) params.set('dateFrom', dateFrom)
   if (dateTo) params.set('dateTo', dateTo)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'room-events', page, limit, search, types, dateFrom, dateTo],
     queryFn: () =>
       api.get<{ events: AdminRoomEvent[]; total: number; page: number; limit: number }>(
@@ -160,7 +160,19 @@ function AdminRoomEventsPage() {
       </DataTableToolbar>
 
       {/* Table */}
-      <RoomEventsTable events={data?.events ?? []} isLoading={isLoading} />
+      {isError ? (
+        <div className="border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
+          <span className="text-destructive">
+            {error instanceof Error ? error.message : 'Failed to load room events.'}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="mr-1.5 h-3 w-3" />
+            Retry
+          </Button>
+        </div>
+      ) : (
+        <RoomEventsTable events={data?.events ?? []} isLoading={isLoading} />
+      )}
 
       {/* Pagination */}
       <DataTablePagination

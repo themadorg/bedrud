@@ -13,7 +13,23 @@ import { useAdminOverview } from '#/lib/use-admin-overview'
 
 export function AdminOverviewPage() {
   const navigate = useNavigate()
-  const { data, isLoading, refetch, isRefetching } = useAdminOverview()
+  const { data, isLoading, isError, error, refetch, isRefetching } = useAdminOverview()
+
+  if (isError) {
+    return (
+      <div className="mx-auto max-w-6xl px-4 pt-8">
+        <div className="border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
+          <span className="text-destructive">
+            {error instanceof Error ? error.message : 'Failed to load admin overview.'}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="mr-1.5 h-3 w-3" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 px-4 pb-8">

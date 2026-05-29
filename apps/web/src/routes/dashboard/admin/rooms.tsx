@@ -67,7 +67,7 @@ function AdminRoomsPage() {
     if (autoCreate) setCreateOpen(true)
   }, [autoCreate])
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'rooms', 'v2', ...statusFilter],
     queryFn: () => {
       let url = '/api/admin/rooms?limit=1000'
@@ -270,22 +270,32 @@ function AdminRoomsPage() {
       />
 
       {/* Table */}
-      <RoomTable
-        rooms={table.paginated}
-        isLoading={isLoading}
-        table={table}
-        onSuspend={(id) => suspendRoom.mutate(id)}
-        onUnsuspend={(id) => unsuspendRoom.mutate(id)}
-        onClose={(id) => closeRoom.mutate(id)}
-        onDelete={(id) => deleteRoom.mutate(id)}
-        onUpdateLimit={(id, max) => updateLimit.mutate({ id, max })}
-        onRoomClick={(id) => navigate({ to: '/dashboard/admin/rooms/$roomId', params: { roomId: id } })}
-        isReadOnly={isReadOnly}
-        pendingRoomIds={pendingRoomIds}
-        suspendPending={suspendRoom.isPending}
-        deletePending={deleteRoom.isPending}
-        closePending={closeRoom.isPending}
-      />
+      {isError ? (
+        <div className="border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
+          <span className="text-destructive">{error instanceof Error ? error.message : 'Failed to load rooms.'}</span>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="mr-1.5 h-3 w-3" />
+            Retry
+          </Button>
+        </div>
+      ) : (
+        <RoomTable
+          rooms={table.paginated}
+          isLoading={isLoading}
+          table={table}
+          onSuspend={(id) => suspendRoom.mutate(id)}
+          onUnsuspend={(id) => unsuspendRoom.mutate(id)}
+          onClose={(id) => closeRoom.mutate(id)}
+          onDelete={(id) => deleteRoom.mutate(id)}
+          onUpdateLimit={(id, max) => updateLimit.mutate({ id, max })}
+          onRoomClick={(id) => navigate({ to: '/dashboard/admin/rooms/$roomId', params: { roomId: id } })}
+          isReadOnly={isReadOnly}
+          pendingRoomIds={pendingRoomIds}
+          suspendPending={suspendRoom.isPending}
+          deletePending={deleteRoom.isPending}
+          closePending={closeRoom.isPending}
+        />
+      )}
 
       {/* Pagination */}
       <DataTablePagination

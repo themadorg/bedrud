@@ -38,7 +38,7 @@ function AdminRecentSignupsPage() {
   if (dateFrom) params.set('dateFrom', dateFrom)
   if (dateTo) params.set('dateTo', dateTo)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'recent-signups', page, limit, search, provider, dateFrom, dateTo],
     queryFn: () =>
       api.get<{ users: RecentUser[]; total: number; page: number; limit: number }>(
@@ -161,7 +161,19 @@ function AdminRecentSignupsPage() {
       </DataTableToolbar>
 
       {/* Table */}
-      <RecentSignupsTable users={data?.users ?? []} isLoading={isLoading} />
+      {isError ? (
+        <div className="border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
+          <span className="text-destructive">
+            {error instanceof Error ? error.message : 'Failed to load recent sign-ups.'}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="mr-1.5 h-3 w-3" />
+            Retry
+          </Button>
+        </div>
+      ) : (
+        <RecentSignupsTable users={data?.users ?? []} isLoading={isLoading} />
+      )}
 
       {/* Pagination */}
       <DataTablePagination

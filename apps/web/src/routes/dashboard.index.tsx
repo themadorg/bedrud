@@ -210,7 +210,14 @@ function RoomRow({
         >
           {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
         </Button>
-        <Button variant="ghost" size="icon" type="button" onClick={onSettings} className="h-7 w-7" aria-label="Room settings">
+        <Button
+          variant="ghost"
+          size="icon"
+          type="button"
+          onClick={onSettings}
+          className="h-7 w-7"
+          aria-label="Room settings"
+        >
           <Settings2 className="h-3.5 w-3.5" />
         </Button>
         <Button
