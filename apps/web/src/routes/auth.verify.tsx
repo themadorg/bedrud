@@ -124,7 +124,7 @@ function ResendVerificationForm() {
             required
           />
           <Button type="submit" disabled={isLoading || !email}>
-            <Mail className="mr-2 h-4 w-4" />
+            <Mail className="me-2 h-4 w-4" />
             {isLoading ? 'Sending…' : 'Resend'}
           </Button>
         </div>

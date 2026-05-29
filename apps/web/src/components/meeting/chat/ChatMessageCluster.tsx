@@ -77,8 +77,8 @@ function ChatMarkdown({ content, isLocal }: { content: string; isLocal: boolean 
         <code style={{ background: codeBg, borderRadius: 4, padding: '1px 5px', fontSize: 12 }}>{children}</code>
       )
     },
-    ul: ({ children }: C) => <ul style={{ margin: '2px 0', paddingLeft: 18 }}>{children}</ul>,
-    ol: ({ children }: C) => <ol style={{ margin: '2px 0', paddingLeft: 18 }}>{children}</ol>,
+    ul: ({ children }: C) => <ul style={{ margin: '2px 0', paddingInlineStart: 18 }}>{children}</ul>,
+    ol: ({ children }: C) => <ol style={{ margin: '2px 0', paddingInlineStart: 18 }}>{children}</ol>,
     li: ({ children }: C) => <li style={{ lineHeight: 1.45 }}>{children}</li>,
     strong: ({ children }: C) => <strong style={{ fontWeight: 700 }}>{children}</strong>,
     em: ({ children }: C) => <em style={{ fontStyle: 'italic' }}>{children}</em>,

@@ -165,7 +165,7 @@ function SidebarContent({
 
 function Sidebar({ user, onLogout }: { user: User | null; onLogout: () => void }) {
   return (
-    <aside className="hidden lg:flex fixed inset-y-0 left-0 z-50 w-52 flex-col border-r bg-card">
+    <aside className="hidden lg:flex fixed inset-y-0 start-0 z-50 w-52 flex-col border-e bg-card">
       <div className="flex h-11 shrink-0 items-center gap-2 border-b px-4">
         <div className="flex h-6 w-6 items-center justify-center bg-primary">
           <Radio className="h-3 w-3 text-primary-foreground" />
@@ -219,7 +219,7 @@ function TopBar({ user, onLogout }: { user: User | null; onLogout: () => void })
     : '?'
 
   return (
-    <header className="sticky top-0 z-40 flex h-11 items-center gap-2 border-b bg-background/90 px-4 backdrop-blur-sm lg:pl-52">
+    <header className="sticky top-0 z-40 flex h-11 items-center gap-2 border-b bg-background/90 px-4 backdrop-blur-sm lg:ps-52">
       <MobileNav user={user} onLogout={onLogout} />
 
       <Link to="/dashboard" className="flex items-center gap-2 lg:hidden">
@@ -229,7 +229,7 @@ function TopBar({ user, onLogout }: { user: User | null; onLogout: () => void })
         <span className="font-mono text-xs font-semibold">bedrud</span>
       </Link>
 
-      <div className="ml-auto flex items-center gap-1.5">
+      <div className="ms-auto flex items-center gap-1.5">
         <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -320,7 +320,7 @@ function DashboardLayout() {
     <div className="min-h-screen bg-background">
       <Sidebar user={user} onLogout={handleLogout} />
       <TopBar user={user} onLogout={handleLogout} />
-      <main id="main-content" className="p-4 lg:pl-52 lg:p-6">
+      <main id="main-content" className="p-4 lg:ps-52 lg:p-6">
         <Outlet />
       </main>
     </div>

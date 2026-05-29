@@ -170,7 +170,7 @@ export function PasskeyButton({ onSuccess }: Props) {
           </TabsList>
           <TabsContent value="login" className="pt-4">
             <Button onClick={handleLogin} className="w-full" disabled={isLoading}>
-              <Fingerprint className="mr-2 h-4 w-4" />
+              <Fingerprint className="me-2 h-4 w-4" />
               {isLoading ? 'Authenticating…' : 'Sign in with Passkey'}
             </Button>
           </TabsContent>

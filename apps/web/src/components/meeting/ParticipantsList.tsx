@@ -31,7 +31,7 @@ export function ParticipantsList({ onClose }: Props) {
   return (
     <aside
       ref={trapRef}
-      className="absolute right-0 top-0 bottom-0 z-30 flex flex-col bg-[#0a0a16]/94 backdrop-blur-2xl border-l border-white/[0.07] pt-[env(safe-area-inset-top)] pb-[calc(88px+env(safe-area-inset-bottom))]"
+      className="absolute end-0 top-0 bottom-0 z-30 flex flex-col bg-[#0a0a16]/94 backdrop-blur-2xl border-s border-white/[0.07] pt-[env(safe-area-inset-top)] pb-[calc(88px+env(safe-area-inset-bottom))]"
       style={{ width: 'min(288px, 100vw)' }}
     >
       {/* Header */}

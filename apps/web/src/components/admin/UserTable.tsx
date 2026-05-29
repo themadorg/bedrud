@@ -161,19 +161,19 @@ export function UserTable({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
           <DropdownMenuItem onClick={() => navigator.clipboard.writeText(user.id)}>
-            <Copy className="mr-2 h-3.5 w-3.5" />
+            <Copy className="me-2 h-3.5 w-3.5" />
             Copy ID
           </DropdownMenuItem>
           {!isReadOnly && !isSelf && (
             <>
               {user.isActive ? (
                 <DropdownMenuItem onClick={() => onToggleStatus(user.id, false)} disabled={statusPending}>
-                  <UserX className="mr-2 h-3.5 w-3.5" />
+                  <UserX className="me-2 h-3.5 w-3.5" />
                   Ban user
                 </DropdownMenuItem>
               ) : (
                 <DropdownMenuItem onClick={() => onToggleStatus(user.id, true)} disabled={statusPending}>
-                  <UserCheck className="mr-2 h-3.5 w-3.5" />
+                  <UserCheck className="me-2 h-3.5 w-3.5" />
                   Unban user
                 </DropdownMenuItem>
               )}
@@ -187,7 +187,7 @@ export function UserTable({
                     })
                   }
                 >
-                  <Shield className="mr-2 h-3.5 w-3.5" />
+                  <Shield className="me-2 h-3.5 w-3.5" />
                   Change role
                 </DropdownMenuItem>
               )}
@@ -200,7 +200,7 @@ export function UserTable({
                 onClick={() => setConfirmDelete(user.id)}
                 className="text-destructive focus:text-destructive"
               >
-                <Trash2 className="mr-2 h-3.5 w-3.5" />
+                <Trash2 className="me-2 h-3.5 w-3.5" />
                 Delete user
               </DropdownMenuItem>
             </>

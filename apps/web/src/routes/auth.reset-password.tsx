@@ -129,7 +129,7 @@ function ResetPasswordPage() {
               placeholder="At least 12 characters"
               autoComplete="new-password"
               autoFocus
-              className="pr-10"
+              className="pe-10"
               onChange={() => setFieldErrors((p) => ({ ...p, password: undefined }))}
             />
             <Button
@@ -137,7 +137,7 @@ function ResetPasswordPage() {
               variant="ghost"
               size="icon"
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+              className="absolute end-1 top-1/2 -translate-y-1/2 h-8 w-8"
               tabIndex={-1}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
@@ -163,7 +163,7 @@ function ResetPasswordPage() {
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Resetting…
+              <Loader2 className="me-2 h-4 w-4 animate-spin" /> Resetting…
             </>
           ) : (
             'Reset password'

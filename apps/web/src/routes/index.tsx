@@ -104,7 +104,7 @@ function JoinForm() {
           placeholder="your-room"
           autoComplete="off"
           spellCheck={false}
-          className="h-10 flex-1 pl-2 pr-1 font-mono text-sm sm:pl-1 border-none focus-visible:ring-0"
+          className="h-10 flex-1 ps-2 pe-1 font-mono text-sm sm:ps-1 border-none focus-visible:ring-0"
         />
         <Button type="submit" size="sm" disabled={!code.trim() || checking} className="shrink-0 h-7 gap-1">
           {checking ? (
@@ -117,7 +117,7 @@ function JoinForm() {
         </Button>
       </form>
       {error && (
-        <div className="flex items-center gap-2 border-l-2 border-destructive bg-destructive/5 px-3 py-2 text-xs text-destructive">
+        <div className="flex items-center gap-2 border-s-2 border-destructive bg-destructive/5 px-3 py-2 text-xs text-destructive">
           <AlertCircle className="h-3 w-3 shrink-0" />
           {error}
         </div>

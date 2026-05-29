@@ -261,9 +261,9 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
               style={ITEM_STYLE}
             >
               {loading === 'demote' ? (
-                <Loader2 size={13} className="animate-spin" style={{ marginRight: 8, flexShrink: 0 }} />
+                <Loader2 size={13} className="animate-spin" style={{ marginInlineEnd: 8, flexShrink: 0 }} />
               ) : (
-                <ShieldOff size={13} style={{ marginRight: 8, flexShrink: 0 }} />
+                <ShieldOff size={13} style={{ marginInlineEnd: 8, flexShrink: 0 }} />
               )}
               Demote from Moderator
             </Item>
@@ -274,9 +274,9 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
               style={ITEM_STYLE}
             >
               {loading === 'promote' ? (
-                <Loader2 size={13} className="animate-spin" style={{ marginRight: 8, flexShrink: 0 }} />
+                <Loader2 size={13} className="animate-spin" style={{ marginInlineEnd: 8, flexShrink: 0 }} />
               ) : (
-                <ShieldCheck size={13} style={{ marginRight: 8, flexShrink: 0 }} />
+                <ShieldCheck size={13} style={{ marginInlineEnd: 8, flexShrink: 0 }} />
               )}
               Promote to Moderator
             </Item>
@@ -294,9 +294,9 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
             style={{ color: '#f87171', fontSize: 13 }}
           >
             {loading === 'kick' ? (
-              <Loader2 size={13} className="animate-spin" style={{ marginRight: 8, flexShrink: 0 }} />
+              <Loader2 size={13} className="animate-spin" style={{ marginInlineEnd: 8, flexShrink: 0 }} />
             ) : (
-              <UserX size={13} style={{ marginRight: 8, flexShrink: 0 }} />
+              <UserX size={13} style={{ marginInlineEnd: 8, flexShrink: 0 }} />
             )}
             Kick
           </Item>
@@ -306,9 +306,9 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
             style={{ color: '#f87171', fontSize: 13 }}
           >
             {loading === 'ban' ? (
-              <Loader2 size={13} className="animate-spin" style={{ marginRight: 8, flexShrink: 0 }} />
+              <Loader2 size={13} className="animate-spin" style={{ marginInlineEnd: 8, flexShrink: 0 }} />
             ) : (
-              <Ban size={13} style={{ marginRight: 8, flexShrink: 0 }} />
+              <Ban size={13} style={{ marginInlineEnd: 8, flexShrink: 0 }} />
             )}
             Ban
           </Item>
@@ -324,9 +324,9 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
           {/* 3 — Client-side mute (like Discord) */}
           <Item onClick={() => toggleMute(identity)} style={ITEM_STYLE}>
             {isMuted ? (
-              <VolumeX size={13} style={{ marginRight: 8, flexShrink: 0 }} />
+              <VolumeX size={13} style={{ marginInlineEnd: 8, flexShrink: 0 }} />
             ) : (
-              <Volume2 size={13} style={{ marginRight: 8, flexShrink: 0 }} />
+              <Volume2 size={13} style={{ marginInlineEnd: 8, flexShrink: 0 }} />
             )}
             {isMuted ? 'Unmute (local)' : 'Mute (local)'}
           </Item>
@@ -353,7 +353,7 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
                 fontSize: 10,
                 color: 'rgba(255,255,255,0.5)',
                 minWidth: 32,
-                textAlign: 'right',
+                textAlign: 'end',
                 fontFamily: 'monospace',
               }}
             >
@@ -370,9 +370,9 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
                 style={ITEM_STYLE}
               >
                 {loading === 'srvmute' ? (
-                  <Loader2 size={13} className="animate-spin" style={{ marginRight: 8 }} />
+                  <Loader2 size={13} className="animate-spin" style={{ marginInlineEnd: 8 }} />
                 ) : (
-                  <MicOff size={13} style={{ marginRight: 8 }} />
+                  <MicOff size={13} style={{ marginInlineEnd: 8 }} />
                 )}
                 Server Mute
               </Item>
@@ -382,9 +382,9 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
                 style={ITEM_STYLE}
               >
                 {loading === 'deafen' ? (
-                  <Loader2 size={13} className="animate-spin" style={{ marginRight: 8 }} />
+                  <Loader2 size={13} className="animate-spin" style={{ marginInlineEnd: 8 }} />
                 ) : (
-                  <EarOff size={13} style={{ marginRight: 8 }} />
+                  <EarOff size={13} style={{ marginInlineEnd: 8 }} />
                 )}
                 Deafen
               </Item>
@@ -426,7 +426,7 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
               ;(e.currentTarget as HTMLDivElement).style.background = 'transparent'
             }}
           >
-            <Activity size={13} style={{ marginRight: 8, flexShrink: 0 }} />
+            <Activity size={13} style={{ marginInlineEnd: 8, flexShrink: 0 }} />
             {statsOpen ? 'Hide Stats' : 'Connection Stats'}
           </div>
 

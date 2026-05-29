@@ -80,17 +80,17 @@ export function RowActionsDropdown({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
         <DropdownMenuItem onClick={onView}>
-          <Eye className="mr-2 h-3.5 w-3.5" />
+          <Eye className="me-2 h-3.5 w-3.5" />
           View room
         </DropdownMenuItem>
         {!isReadOnly && (
           <DropdownMenuItem onClick={onEditCapacity}>
-            <Pencil className="mr-2 h-3.5 w-3.5" />
+            <Pencil className="me-2 h-3.5 w-3.5" />
             Edit capacity
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onClick={onCopyId}>
-          <Copy className="mr-2 h-3.5 w-3.5" />
+          <Copy className="me-2 h-3.5 w-3.5" />
           Copy room ID
         </DropdownMenuItem>
         {!isReadOnly && (
@@ -98,24 +98,24 @@ export function RowActionsDropdown({
             <DropdownMenuSeparator />
             {room.isActive ? (
               <DropdownMenuItem onClick={onSuspend}>
-                <Power className="mr-2 h-3.5 w-3.5" />
+                <Power className="me-2 h-3.5 w-3.5" />
                 Suspend
               </DropdownMenuItem>
             ) : (
               onUnsuspend && (
                 <DropdownMenuItem onClick={onUnsuspend}>
-                  <Power className="mr-2 h-3.5 w-3.5" />
+                  <Power className="me-2 h-3.5 w-3.5" />
                   Unsuspend
                 </DropdownMenuItem>
               )
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onClose} className="text-destructive focus:text-destructive">
-              <DoorOpen className="mr-2 h-3.5 w-3.5" />
+              <DoorOpen className="me-2 h-3.5 w-3.5" />
               Close room
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
-              <Trash2 className="mr-2 h-3.5 w-3.5" />
+              <Trash2 className="me-2 h-3.5 w-3.5" />
               Delete room
             </DropdownMenuItem>
           </>

@@ -562,7 +562,7 @@ function MeetingPage() {
         <RoomAudioRenderer />
         {/* LiveKitRoom renders as display:contents — this div is the actual viewport container */}
         {showReconnectBanner && (
-          <div className="fixed top-0 left-0 right-0 z-[9999] bg-yellow-500/15 border-b border-yellow-500/30 px-4 py-2 text-center text-[13px] text-amber-400 backdrop-blur-sm">
+          <div className="fixed top-0 start-0 end-0 z-[9999] bg-yellow-500/15 border-b border-yellow-500/30 px-4 py-2 text-center text-[13px] text-amber-400 backdrop-blur-sm">
             Reconnecting…
           </div>
         )}
@@ -625,11 +625,11 @@ function MeetingPage() {
 
             {/* Vignettes for header/controls legibility */}
             <div
-              className="pointer-events-none absolute left-0 right-0 top-0 z-10 h-[calc(96px+env(safe-area-inset-top))]"
+              className="pointer-events-none absolute start-0 end-0 top-0 z-10 h-[calc(96px+env(safe-area-inset-top))]"
               style={{ background: 'linear-gradient(to bottom, rgba(7,7,15,0.65) 0%, transparent 100%)' }}
             />
             <div
-              className="pointer-events-none absolute bottom-0 left-0 right-0 z-10 h-[calc(128px+env(safe-area-inset-bottom))]"
+              className="pointer-events-none absolute bottom-0 start-0 end-0 z-10 h-[calc(128px+env(safe-area-inset-bottom))]"
               style={{ background: 'linear-gradient(to top, rgba(7,7,15,0.6) 0%, transparent 100%)' }}
             />
 

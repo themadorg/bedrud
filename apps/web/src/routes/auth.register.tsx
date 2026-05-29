@@ -174,7 +174,7 @@ function RegisterPage() {
             <Button variant="outline" onClick={handleResend} disabled={resending}>
               {resending ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending…
+                  <Loader2 className="me-2 h-4 w-4 animate-spin" /> Sending…
                 </>
               ) : (
                 'Resend email'
@@ -272,7 +272,7 @@ function RegisterPage() {
               type={showPassword ? 'text' : 'password'}
               placeholder="At least 12 characters"
               autoComplete="new-password"
-              className="pr-10"
+              className="pe-10"
               onChange={() => clearField('password')}
             />
             <Button
@@ -280,7 +280,7 @@ function RegisterPage() {
               variant="ghost"
               size="icon"
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+              className="absolute end-1 top-1/2 -translate-y-1/2 h-8 w-8"
               tabIndex={-1}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
@@ -327,7 +327,7 @@ function RegisterPage() {
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating account…
+              <Loader2 className="me-2 h-4 w-4 animate-spin" /> Creating account…
             </>
           ) : (
             'Create account'

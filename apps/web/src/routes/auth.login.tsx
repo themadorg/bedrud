@@ -212,7 +212,7 @@ function LoginPage() {
             <Button variant="outline" onClick={handleResend} disabled={resending}>
               {resending ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending…
+                  <Loader2 className="me-2 h-4 w-4 animate-spin" /> Sending…
                 </>
               ) : (
                 'Resend email'
@@ -280,7 +280,7 @@ function LoginPage() {
               type={showPassword ? 'text' : 'password'}
               placeholder="••••••••"
               autoComplete="current-password"
-              className="pr-10"
+              className="pe-10"
               onChange={() => setFieldErrors((p) => ({ ...p, password: undefined }))}
             />
             <Button
@@ -288,7 +288,7 @@ function LoginPage() {
               variant="ghost"
               size="icon"
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+              className="absolute end-1 top-1/2 -translate-y-1/2 h-8 w-8"
               tabIndex={-1}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
@@ -301,7 +301,7 @@ function LoginPage() {
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…
+              <Loader2 className="me-2 h-4 w-4 animate-spin" /> Signing in…
             </>
           ) : (
             'Sign in'
