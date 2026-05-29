@@ -14,6 +14,7 @@ import { api } from '#/lib/api'
 import { getErrorMessage } from '#/lib/errors'
 import { useAdminContext } from '#/routes/dashboard/admin.tsx'
 import { CreateRoomDialog, type RoomSettings } from '@/components/dashboard/CreateRoomDialog'
+import type { AdminRoom } from '#/types/admin'
 
 interface RoomsSearch {
   create?: boolean

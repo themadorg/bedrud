@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { cn } from '@/lib/utils'
+import { Alert } from '@/components/ui/alert'
 
 export const Route = createFileRoute('/dashboard/settings/security')({
   component: SecurityPage,
@@ -117,26 +117,6 @@ function AccountForm({
         Save
       </Button>
     </form>
-  )
-}
-
-function Alert({ type, message }: { type: 'success' | 'error'; message: string }) {
-  return (
-    <div
-      className={cn(
-        'flex items-center gap-2 border px-3 py-2 text-xs',
-        type === 'success'
-          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-          : 'border-destructive/30 bg-destructive/10 text-destructive',
-      )}
-    >
-      {type === 'success' ? (
-        <Check className="h-3.5 w-3.5 shrink-0" />
-      ) : (
-        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-      )}
-      {message}
-    </div>
   )
 }
 

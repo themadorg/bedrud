@@ -13,6 +13,7 @@ import { Button } from '#/components/ui/button'
 import { api } from '#/lib/api'
 import { getErrorMessage } from '#/lib/errors'
 import { useAdminContext } from '#/routes/dashboard/admin.tsx'
+import { getRoleLabel, ROLE_OPTS, type AdminUser } from '#/types/admin'
 
 export const Route = createFileRoute('/dashboard/admin/users')({ component: AdminUsersPage })
 
@@ -20,14 +21,6 @@ const PROVIDER_OPTS = [
   { label: 'Local', value: 'local' },
   { label: 'Google', value: 'google' },
   { label: 'GitHub', value: 'github' },
-  { label: 'Guest', value: 'guest' },
-]
-
-const ROLE_OPTS = [
-  { label: 'Superadmin', value: 'superadmin' },
-  { label: 'Admin', value: 'admin' },
-  { label: 'Moderator', value: 'moderator' },
-  { label: 'User', value: 'user' },
   { label: 'Guest', value: 'guest' },
 ]
 
@@ -41,21 +34,6 @@ const CREATED_OPTS = [
   { label: 'Last 7 days', value: '7d' },
   { label: 'Last 30 days', value: '30d' },
 ]
-
-function detectRole(accesses: string[] | null): string {
-  if (!accesses || accesses.length === 0) return 'user'
-  if (accesses.includes('superadmin')) return 'superadmin'
-  if (accesses.includes('admin')) return 'admin'
-  if (accesses.includes('moderator')) return 'moderator'
-  if (accesses.includes('guest')) return 'guest'
-  return 'user'
-}
-
-function getRoleLabel(accesses: string[] | null): string {
-  const role = detectRole(accesses)
-  const found = ROLE_OPTS.find((r) => r.value === role)
-  return found ? found.label : 'User'
-}
 
 function AdminUsersPage() {
   const queryClient = useQueryClient()

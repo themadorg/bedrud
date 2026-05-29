@@ -42,31 +42,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
-
-const ROLE_OPTIONS = [
-  { value: 'superadmin', label: 'Superadmin' },
-  { value: 'admin', label: 'Admin' },
-  { value: 'moderator', label: 'Moderator' },
-  { value: 'user', label: 'User' },
-  { value: 'guest', label: 'Guest' },
-] as const
-
-const ROLE_ACCESS_MAP: Record<string, string[]> = {
-  superadmin: ['superadmin', 'user'],
-  admin: ['admin', 'user'],
-  moderator: ['moderator', 'user'],
-  user: ['user'],
-  guest: ['guest'],
-}
-
-function detectRole(accesses: string[] | null): string {
-  if (!accesses || accesses.length === 0) return 'user'
-  if (accesses.includes('superadmin')) return 'superadmin'
-  if (accesses.includes('admin')) return 'admin'
-  if (accesses.includes('moderator')) return 'moderator'
-  if (accesses.includes('guest')) return 'guest'
-  return 'user'
-}
+import { ROLE_ACCESS_MAP, ROLE_OPTS as ROLE_OPTIONS, detectRole } from '#/types/admin'
+import { ProviderBadge } from '#/components/admin/ProviderBadge'
 
 function getRoleBadgeStyle(access: string): CSSProperties {
   switch (access) {
@@ -110,30 +87,6 @@ interface Room {
   isActive: boolean
   maxParticipants: number
   createdAt: string
-}
-
-const PROVIDER_STYLE: Record<string, { bg: string; color: string }> = {
-  local: { bg: 'color-mix(in oklab, var(--primary) 8%, transparent)', color: 'var(--accent-400)' },
-  google: { bg: '#ef444415', color: '#f87171' },
-  github: { bg: '#71717a15', color: '#a1a1aa' },
-  guest: { bg: '#f59e0b15', color: '#fbbf24' },
-  passkey: { bg: '#10b98115', color: '#34d399' },
-}
-
-function ProviderBadge({ provider }: { provider: string }) {
-  const s = PROVIDER_STYLE[provider] ?? {
-    bg: 'color-mix(in oklab, var(--primary) 8%, transparent)',
-    color: 'var(--accent-400)',
-  }
-  return (
-    <Badge
-      variant="outline"
-      className="text-xs font-semibold uppercase tracking-wider px-2.5 py-1"
-      style={{ background: s.bg, color: s.color, borderColor: s.color + '30' }}
-    >
-      {provider}
-    </Badge>
-  )
 }
 
 /** Last 8 weeks, one bar per week */

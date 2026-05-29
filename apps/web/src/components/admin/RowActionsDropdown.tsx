@@ -7,34 +7,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import type { AdminRoom } from '#/types/admin'
 
-export interface AdminRoom {
-  id: string
-  name: string
-  createdBy: string
-  isPublic: boolean
-  isActive: boolean
-  maxParticipants: number
-  createdAt: string
-  updatedAt: string
-  expiresAt: string
-  adminId: string
-  mode: string
-  settings?: {
-    allowChat: boolean
-    allowVideo: boolean
-    allowAudio: boolean
-    requireApproval: boolean
-    e2ee: boolean
-    isPersistent?: boolean
-  }
-  // Extended fields from AdminRoomDetail DTO
-  participantsCount?: number
-  lastActivityAt?: string | null
-  ownerName?: string
-  ownerEmail?: string
-  deletedAt?: string | null
-}
+// Re-export for consumers that import the type from this module (back-compat)
+export type { AdminRoom }
 
 interface RowActionsDropdownProps {
   room: AdminRoom
