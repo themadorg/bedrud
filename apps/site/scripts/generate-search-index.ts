@@ -60,6 +60,26 @@ async function generateSearchIndex() {
   const publicDir = path.resolve(import.meta.dir, "..", "public");
   fs.mkdirSync(publicDir, { recursive: true });
 
+  // Copy swagger.json from server/docs/swagger.json to public/swagger.json
+  const sourceSwagger = path.resolve(
+    import.meta.dir,
+    "..",
+    "..",
+    "..",
+    "server",
+    "docs",
+    "swagger.json",
+  );
+  const destSwagger = path.resolve(publicDir, "swagger.json");
+  if (fs.existsSync(sourceSwagger)) {
+    fs.copyFileSync(sourceSwagger, destSwagger);
+    console.log(`  ✅ Copied swagger.json to ${destSwagger}`);
+  } else {
+    console.warn(
+      `  ⚠️ Warning: Source swagger.json not found at ${sourceSwagger}`,
+    );
+  }
+
   for (const locale of LOCALES) {
     const documents: Array<{
       id: string;

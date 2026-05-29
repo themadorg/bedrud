@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
+import { t } from "~/i18n/utils";
 import { cn } from "~/lib/utils";
 
 const SEARCH_OPTIONS = {
@@ -27,14 +28,6 @@ interface SearchDoc {
 interface SearchProps {
   lang: string;
   className?: string;
-  placeholder: string;
-  buttonText: string;
-  noResultsText: string;
-  loadingText: string;
-  clearSearchLabel: string;
-  searchResultsLabel: string;
-  searchDocsLabel: string;
-  errorText: string;
 }
 
 function getResultHref(lang: string, id: string): string {
@@ -45,18 +38,7 @@ function getResultHref(lang: string, id: string): string {
   return type === "blog" ? `/${lang}/blog/${slug}` : `/${lang}/docs/${slug}`;
 }
 
-export function Search({
-  lang,
-  className,
-  placeholder,
-  buttonText,
-  noResultsText,
-  loadingText,
-  clearSearchLabel,
-  searchResultsLabel,
-  searchDocsLabel,
-  errorText,
-}: SearchProps) {
+export function Search({ lang, className }: SearchProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchDoc[]>([]);
   const [open, setOpen] = useState(false);
@@ -202,7 +184,7 @@ export function Search({
       <Input
         ref={inputRef}
         type="search"
-        placeholder={placeholder}
+        placeholder={t(lang, "docs.searchPlaceholder")}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         className="ps-9 border-0 focus-visible:ring-2 focus-visible:ring-ring"
@@ -212,7 +194,7 @@ export function Search({
           type="button"
           onClick={() => setQuery("")}
           className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          aria-label={clearSearchLabel}
+          aria-label={t(lang, "docs.clearSearch")}
         >
           <X className="size-4" aria-hidden="true" />
         </button>
@@ -224,9 +206,11 @@ export function Search({
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="p-0 [&>button]:hidden">
-          <DialogTitle className="sr-only">{searchDocsLabel}</DialogTitle>
+          <DialogTitle className="sr-only">
+            {t(lang, "docs.searchDocs")}
+          </DialogTitle>
           <DialogDescription className="sr-only">
-            {placeholder}
+            {t(lang, "docs.searchPlaceholder")}
           </DialogDescription>
           <div className="flex flex-col">
             {inputElement}
@@ -234,7 +218,7 @@ export function Search({
               ref={resultsRef}
               className="mt-2 max-h-96 overflow-y-auto px-1 scroll-area"
               role="listbox"
-              aria-label={searchResultsLabel}
+              aria-label={t(lang, "docs.searchDocs")}
             >
               {hasResults && (
                 <div className="space-y-1">
@@ -267,17 +251,17 @@ export function Search({
               )}
               {error && (
                 <div className="px-3 py-2 text-sm text-destructive">
-                  {errorText}
+                  {t(lang, "docs.searchError")}
                 </div>
               )}
               {hasQuery && !hasResults && !loading && !error && (
                 <div className="px-3 py-2 text-sm text-muted-foreground">
-                  {noResultsText}
+                  {t(lang, "docs.noResults")}
                 </div>
               )}
               {loading && (
                 <div className="px-3 py-2 text-sm text-muted-foreground">
-                  {loadingText}
+                  {t(lang, "docs.loading")}
                 </div>
               )}
             </div>
@@ -287,11 +271,19 @@ export function Search({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="hidden lg:flex items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        aria-label={searchDocsLabel}
+        className="flex lg:hidden items-center justify-center rounded-md border bg-background p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        aria-label={t(lang, "docs.searchDocs")}
       >
         <SearchIcon className="size-4" aria-hidden="true" />
-        <span>{buttonText}</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="hidden lg:flex items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        aria-label={t(lang, "docs.searchDocs")}
+      >
+        <SearchIcon className="size-4" aria-hidden="true" />
+        <span>{t(lang, "docs.searchButton")}</span>
         <kbd className="ms-auto rounded bg-muted px-1.5 py-0.5 text-xs">
           {isMac ? "⌘" : "Ctrl"}&nbsp;K
         </kbd>

@@ -4,11 +4,16 @@ import { Button } from "~/components/ui/button";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetOverlay,
+  SheetTitle,
   SheetTrigger,
 } from "~/components/ui/sheet";
+import { GITHUB_URL } from "~/lib/config";
 import type { Locale } from "../../i18n/utils";
 import { getDir, t } from "../../i18n/utils";
+import { GitHubIcon } from "../landing/github-icon";
+import { Search } from "./search";
 import { Sidebar } from "./sidebar";
 
 interface DocsMobileSidebarProps {
@@ -36,8 +41,26 @@ export function DocsMobileSidebar({
         className="w-3/4 max-w-sm p-0"
         closeLabel={t(lang, "a11y.closeMenu")}
       >
+        <SheetTitle className="sr-only">
+          {t(lang, "docs.toggleMenu")}
+        </SheetTitle>
+        <SheetDescription className="sr-only">
+          {t(lang, "docs.toggleMenu")}
+        </SheetDescription>
         <div className="flex flex-col h-full">
           <div className="flex-1 overflow-y-auto">
+            <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+              <Search lang={lang} />
+              <a
+                href={GITHUB_URL}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="GitHub Repository"
+                className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <GitHubIcon className="size-4" />
+              </a>
+            </div>
             <Sidebar lang={lang} currentSlug={currentSlug} />
           </div>
         </div>
