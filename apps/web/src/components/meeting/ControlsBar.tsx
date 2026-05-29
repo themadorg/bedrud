@@ -265,6 +265,15 @@ export function ControlsBar({ onLeave }: Props) {
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('keyup', handleKeyUp)
+
+      // Restore original mic state if PTT was active on unmount (e.g. Space held while leaving meeting)
+      if (pttActiveRef.current) {
+        if (localParticipant) {
+          localParticipant.setMicrophoneEnabled(pttInitMicRef.current).catch(() => {})
+        }
+        pttActiveRef.current = false
+        setPttVisible(false)
+      }
     }
   }, [localParticipant, isSelfDeafened])
 
