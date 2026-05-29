@@ -43,10 +43,15 @@ function LoginPage() {
   const [resendCooldown, setResendCooldown] = useState(0)
   const [resending, setResending] = useState(false)
   const cooldownInterval = useRef<ReturnType<typeof setInterval> | null>(null)
+  const cancelledRef = useRef(false)
 
   useEffect(() => {
-    getPublicSettings().then(setSettings)
+    cancelledRef.current = false
+    getPublicSettings().then((s) => {
+      if (!cancelledRef.current) setSettings(s)
+    })
     return () => {
+      cancelledRef.current = true
       if (cooldownInterval.current) clearInterval(cooldownInterval.current)
     }
   }, [])

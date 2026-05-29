@@ -17,6 +17,7 @@ export function ChatToastNotifier({ chatOpen }: ChatToastNotifierProps) {
   const seenRef = useRef(chatMessages.length)
   const [toasts, setToasts] = useState<ChatToast[]>([])
   const nextId = useRef(0)
+  const timeoutRefs = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
 
   useEffect(() => {
     // On first mount, mark all existing messages as seen without toasting
@@ -33,10 +34,18 @@ export function ChatToastNotifier({ chatOpen }: ChatToastNotifierProps) {
       const id = nextId.current++
       const sender = msg.senderName || 'Someone'
       setToasts((t) => [...t.slice(-3), { id, sender, message: msg.message }])
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         setToasts((t) => t.filter((x) => x.id !== id))
+        timeoutRefs.current.delete(timer)
       }, 4500)
+      timeoutRefs.current.add(timer)
     })
+
+    return () => {
+      // Clear any pending auto-dismiss timeouts on unmount or before re-run
+      for (const t of timeoutRefs.current) clearTimeout(t)
+      timeoutRefs.current.clear()
+    }
   }, [chatMessages, chatOpen])
 
   if (toasts.length === 0) return null

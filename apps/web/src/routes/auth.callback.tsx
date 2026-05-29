@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Loader2 } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { api } from '#/lib/api'
 import { useAuthStore } from '#/lib/auth.store'
 import type { User } from '#/lib/user.store'
@@ -23,8 +23,10 @@ function OAuthCallback() {
   const navigate = useNavigate()
   const clearTokens = useAuthStore((s) => s.clear)
   const setUser = useUserStore((s) => s.setUser)
+  const cancelledRef = useRef(false)
 
   useEffect(() => {
+    cancelledRef.current = false
     // The server's OAuth callback already set the access_token as an
     // HTTP-only cookie (see server commit be894ef).  The auth middleware
     // reads it from that cookie when no Authorization header is present,
@@ -33,6 +35,7 @@ function OAuthCallback() {
     api
       .get<MeResponse>('/api/auth/me')
       .then((me) => {
+        if (cancelledRef.current) return
         const user: User = {
           id: me.id,
           email: me.email,
@@ -47,10 +50,14 @@ function OAuthCallback() {
         navigate({ to: '/dashboard' })
       })
       .catch(() => {
+        if (cancelledRef.current) return
         // Cookie missing, expired, or rejected — redirect to login
         clearTokens()
         navigate({ to: '/auth' })
       })
+    return () => {
+      cancelledRef.current = true
+    }
   }, [navigate, clearTokens, setUser])
 
   return (

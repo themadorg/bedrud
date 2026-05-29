@@ -115,18 +115,23 @@ function MeetingPage() {
     if (isUserDeleted) {
       const toastId = toast.loading('Verifying your account...')
       checkUserStatus().then((exists) => {
+        if (cancelledRef.current) return
         if (exists) {
           toast.success('Room closed', { id: toastId, description: 'This room is no longer available.' })
           navigate({ to: '/dashboard' })
         } else {
           toast.error('Account deleted', { id: toastId, description: 'Your account has been deleted.' })
           useAuthStore.getState().clear()
-          setTimeout(() => navigate({ to: '/auth/login', search: { redirect: undefined } }), 2000)
+          setTimeout(() => {
+            if (!cancelledRef.current) navigate({ to: '/auth/login', search: { redirect: undefined } })
+          }, 2000)
         }
       })
     } else {
       toast.error('Room closed', { description: 'This room is no longer available.' })
-      setTimeout(() => navigate({ to: '/dashboard' }), 5000)
+      setTimeout(() => {
+        if (!cancelledRef.current) navigate({ to: '/dashboard' })
+      }, 5000)
     }
   }, [navigate])
 
@@ -177,7 +182,7 @@ function MeetingPage() {
     api
       .get<{ preferencesJson: string }>('/api/auth/preferences')
       .then((r) => {
-        if (!r.preferencesJson) return
+        if (cancelledRef.current || !r.preferencesJson) return
         try {
           const parsed = JSON.parse(r.preferencesJson)
           if (parsed?.audio) mergeAudioPrefs(parsed.audio)
@@ -199,6 +204,7 @@ function MeetingPage() {
   const disconnectedAtRef = useRef(0)
   const reconnectAttemptRef = useRef(0)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cancelledRef = useRef(false)
 
   const attemptReconnect = useCallback(() => {
     if (!meetId) return
@@ -211,6 +217,7 @@ function MeetingPage() {
     api
       .post<{ token: string }>('/api/room/refresh-token', { roomName: meetId })
       .then(({ token }) => {
+        if (cancelledRef.current) return
         if (!isDisconnectedRef.current) {
           console.log('[reconnect] already reconnected natively, caching token')
           setCurrentToken(token)
@@ -220,6 +227,7 @@ function MeetingPage() {
         setCurrentToken(token)
       })
       .catch((err: Error) => {
+        if (cancelledRef.current) return
         const status = Number(err.message?.split(':')[0])
         if (status === 410) {
           console.log('[reconnect] fatal: room gone')
@@ -232,7 +240,9 @@ function MeetingPage() {
           return
         }
         console.log(`[reconnect] attempt=${attempt} failed, retry in ${backoff}ms`)
-        retryTimerRef.current = setTimeout(attemptReconnect, backoff)
+        if (!cancelledRef.current) {
+          retryTimerRef.current = setTimeout(attemptReconnect, backoff)
+        }
       })
   }, [meetId])
 
@@ -254,7 +264,7 @@ function MeetingPage() {
       console.log(`[reconnect] disconnected reason=${reason}`)
 
       setTimeout(() => {
-        if (isDisconnectedRef.current) {
+        if (!cancelledRef.current && isDisconnectedRef.current) {
           setShowReconnectBanner(true)
         }
       }, 5000)
@@ -282,7 +292,9 @@ function MeetingPage() {
   const invalidatedRef = useRef(false)
 
   useEffect(() => {
+    cancelledRef.current = false
     return () => {
+      cancelledRef.current = true
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current)
         retryTimerRef.current = null
@@ -301,6 +313,7 @@ function MeetingPage() {
       api
         .post<JoinResponse>('/api/room/join', { roomName: meetId })
         .then((data) => {
+          if (cancelledRef.current) return
           // Archived room owned by current user — show recreate dialog
           if ((data as unknown as ArchivedOwnedResponse).status === 'archived_owned') {
             const ar = data as unknown as ArchivedOwnedResponse
@@ -310,16 +323,21 @@ function MeetingPage() {
           addRecent(meetId)
           setJoinData(data)
         })
-        .catch((err: Error) => setJoinError(err.message))
+        .catch((err: Error) => {
+          if (!cancelledRef.current) setJoinError(err.message)
+        })
     } else if (guestName !== null && guestName !== '') {
       // Guest with confirmed name
       api
         .post<JoinResponse>('/api/room/guest-join', { roomName: meetId, guestName })
         .then((data) => {
+          if (cancelledRef.current) return
           addRecent(meetId)
           setJoinData(data)
         })
-        .catch((err: Error) => setJoinError(err.message))
+        .catch((err: Error) => {
+          if (!cancelledRef.current) setJoinError(err.message)
+        })
     }
   }, [meetId, tokens, guestName, joinData, addRecent])
 
@@ -412,16 +430,21 @@ function MeetingPage() {
                     settings: archivedRoom.settings,
                   })
                   .then((room) => {
+                    if (cancelledRef.current) return
                     setArchivedRoom(null)
                     addRecent(room.name)
                     api
                       .post<JoinResponse>('/api/room/join', { roomName: room.name })
                       .then((data) => {
-                        setJoinData(data)
+                        if (!cancelledRef.current) setJoinData(data)
                       })
-                      .catch((err: Error) => setJoinError(err.message))
+                      .catch((err: Error) => {
+                        if (!cancelledRef.current) setJoinError(err.message)
+                      })
                   })
-                  .catch((err: Error) => setJoinError(err.message))
+                  .catch((err: Error) => {
+                    if (!cancelledRef.current) setJoinError(err.message)
+                  })
               }}
               className="flex-1 py-2.5 rounded-lg"
             >

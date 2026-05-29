@@ -133,11 +133,15 @@ function useDeviceList(kind: 'audioinput' | 'audiooutput') {
     if (actual) setActiveId(actual)
   }, [room, kind])
 
+  const cancelledRef = useRef(false)
+
   useEffect(() => {
+    cancelledRef.current = false
     if (!navigator.mediaDevices) return
     const refresh = async () => {
       try {
         const all = await navigator.mediaDevices.enumerateDevices()
+        if (cancelledRef.current) return
         const filtered = all.filter((d) => d.kind === kind)
         setDevices(filtered)
         syncActiveFromRoom()
@@ -147,7 +151,10 @@ function useDeviceList(kind: 'audioinput' | 'audiooutput') {
     }
     refresh()
     navigator.mediaDevices.addEventListener('devicechange', refresh)
-    return () => navigator.mediaDevices.removeEventListener('devicechange', refresh)
+    return () => {
+      cancelledRef.current = true
+      navigator.mediaDevices.removeEventListener('devicechange', refresh)
+    }
   }, [kind, syncActiveFromRoom])
 
   // Restore saved device on room connect, then sync actual active device
@@ -158,8 +165,10 @@ function useDeviceList(kind: 'audioinput' | 'audiooutput') {
       if (saved) {
         await room.switchActiveDevice(kind, saved).catch(() => {})
       }
-      // Always sync to what the room is actually using (handles fallback)
-      syncActiveFromRoom()
+      if (!cancelledRef.current) {
+        // Always sync to what the room is actually using (handles fallback)
+        syncActiveFromRoom()
+      }
     }
 
     if (room.state === ConnectionState.Connected) {
@@ -261,6 +270,16 @@ export function ControlsBar({ onLeave }: Props) {
 
   // ── Copy link feedback ──
   const [linkCopied, setLinkCopied] = useState(false)
+  const linkCopiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (linkCopiedTimerRef.current) {
+        clearTimeout(linkCopiedTimerRef.current)
+        linkCopiedTimerRef.current = null
+      }
+    }
+  }, [])
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -492,7 +511,11 @@ export function ControlsBar({ onLeave }: Props) {
               onClick={() => {
                 navigator.clipboard.writeText(window.location.href)
                 setLinkCopied(true)
-                setTimeout(() => setLinkCopied(false), 2000)
+                if (linkCopiedTimerRef.current) clearTimeout(linkCopiedTimerRef.current)
+                linkCopiedTimerRef.current = setTimeout(() => {
+                  setLinkCopied(false)
+                  linkCopiedTimerRef.current = null
+                }, 2000)
               }}
               className="rounded-md gap-2 text-xs text-white/75 focus:text-white focus:bg-white/10"
             >
