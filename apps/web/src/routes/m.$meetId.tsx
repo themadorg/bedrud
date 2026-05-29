@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import type { AudioCaptureOptions } from 'livekit-client'
 import { DisconnectReason, Track } from 'livekit-client'
+import { WifiOff } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '#/lib/api'
@@ -204,6 +205,11 @@ function MeetingPage() {
   const disconnectedAtRef = useRef(0)
   const reconnectAttemptRef = useRef(0)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // New overlay state for better disconnect UX
+  const [showDisconnectedOverlay, setShowDisconnectedOverlay] = useState(false)
+  const [overlayMode, setOverlayMode] = useState<'reconnecting' | 'disconnected'>('reconnecting')
+  const disconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cancelledRef = useRef(false)
 
   const attemptReconnect = useCallback(() => {
@@ -254,6 +260,10 @@ function MeetingPage() {
         clearTimeout(retryTimerRef.current)
         retryTimerRef.current = null
       }
+      if (disconnectTimeoutRef.current) {
+        clearTimeout(disconnectTimeoutRef.current)
+        disconnectTimeoutRef.current = null
+      }
 
       isDisconnectedRef.current = true
       disconnectedAtRef.current = Date.now()
@@ -263,6 +273,18 @@ function MeetingPage() {
 
       console.log(`[reconnect] disconnected reason=${reason}`)
 
+      // Show overlay immediately in reconnecting mode (with debounce to avoid flicker)
+      setShowDisconnectedOverlay(true)
+      setOverlayMode('reconnecting')
+
+      // After 30s with no success, switch to full "disconnected" state with manual controls
+      disconnectTimeoutRef.current = setTimeout(() => {
+        if (!cancelledRef.current && isDisconnectedRef.current) {
+          setOverlayMode('disconnected')
+        }
+      }, 30000)
+
+      // Keep the old banner behavior for now (can be removed later)
       setTimeout(() => {
         if (!cancelledRef.current && isDisconnectedRef.current) {
           setShowReconnectBanner(true)
@@ -281,9 +303,16 @@ function MeetingPage() {
     reconnectAttemptRef.current = 0
     setShowReconnectBanner(false)
     setFatalReconnectError(null)
+    setShowDisconnectedOverlay(false)
+    setOverlayMode('reconnecting')
+
     if (retryTimerRef.current) {
       clearTimeout(retryTimerRef.current)
       retryTimerRef.current = null
+    }
+    if (disconnectTimeoutRef.current) {
+      clearTimeout(disconnectTimeoutRef.current)
+      disconnectTimeoutRef.current = null
     }
   }, [])
 
@@ -298,6 +327,10 @@ function MeetingPage() {
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current)
         retryTimerRef.current = null
+      }
+      if (disconnectTimeoutRef.current) {
+        clearTimeout(disconnectTimeoutRef.current)
+        disconnectTimeoutRef.current = null
       }
       if (!invalidatedRef.current) {
         invalidatedRef.current = true
@@ -566,6 +599,28 @@ function MeetingPage() {
             Reconnecting…
           </div>
         )}
+
+        {showDisconnectedOverlay && (
+          <DisconnectedOverlay
+            mode={overlayMode}
+            onRetry={() => {
+              setOverlayMode('reconnecting')
+              if (disconnectTimeoutRef.current) {
+                clearTimeout(disconnectTimeoutRef.current)
+                disconnectTimeoutRef.current = null
+              }
+              disconnectTimeoutRef.current = setTimeout(() => {
+                if (!cancelledRef.current && isDisconnectedRef.current) {
+                  setOverlayMode('disconnected')
+                }
+              }, 30000)
+              attemptReconnect()
+            }}
+            onLeave={() => {
+              navigate({ to: '/dashboard' })
+            }}
+          />
+        )}
         <div className="fixed inset-0 overflow-hidden" style={{ background: '#07070f' }}>
           {/* Skip links */}
           <a
@@ -641,6 +696,57 @@ function MeetingPage() {
         </div>
       </LiveKitRoom>
     </MeetingErrorBoundary>
+  )
+}
+
+// ── Disconnected overlay (new UX for poor connection) ───────────────
+function DisconnectedOverlay({
+  mode,
+  onRetry,
+  onLeave,
+}: {
+  mode: 'reconnecting' | 'disconnected'
+  onRetry: () => void
+  onLeave: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <div className="mx-4 max-w-sm text-center">
+        {mode === 'reconnecting' ? (
+          <>
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-white/20 border-t-primary" />
+            <p className="text-lg font-medium text-white">Reconnecting…</p>
+            <p className="mt-1 text-sm text-white/60">Trying to restore your connection</p>
+          </>
+        ) : (
+          <>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10">
+              <WifiOff className="h-6 w-6 text-red-400" />
+            </div>
+            <p className="text-lg font-medium text-white">Connection lost</p>
+            <p className="mt-1 text-sm text-white/60">We couldn’t reconnect after several attempts.</p>
+
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+              <button
+                type="button"
+                onClick={onRetry}
+                className="rounded-lg bg-white px-5 py-2.5 text-sm font-medium text-black transition hover:bg-white/90"
+              >
+                Retry now
+              </button>
+              <button
+                type="button"
+                onClick={onLeave}
+                className="rounded-lg border border-white/20 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+              >
+                Leave meeting
+              </button>
+            </div>
+            <p className="mt-3 text-[11px] text-white/40">You can also try refreshing the page</p>
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 
