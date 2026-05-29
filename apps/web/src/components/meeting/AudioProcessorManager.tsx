@@ -21,6 +21,7 @@ export function AudioProcessorManager() {
   const autoGainControl = useAudioPreferencesStore((s) => s.autoGainControl)
 
   // Attach on connect
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only attach once on connect; mode changes are handled by the next effect
   useEffect(() => {
     if (connectionState !== ConnectionState.Connected) return
     const pub = localParticipant?.getTrackPublication(Track.Source.Microphone)
@@ -30,8 +31,7 @@ export function AudioProcessorManager() {
     }
     // We intentionally only run this when connection state changes to Connected,
     // not on every mode change — mode changes are handled by the effect below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectionState, localParticipant, mode])
+  }, [connectionState, localParticipant])
 
   // Switch processor when mode changes mid-meeting, passing current EC/AGC prefs
   useEffect(() => {
