@@ -22,6 +22,32 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@v6
+      - name: Import and Export GPG public key
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_KEY_ID: ${{ secrets.APT_GPG_KEY_ID }}
+          RPM_GPG_PRIVATE_KEY: ${{ secrets.RPM_GPG_PRIVATE_KEY }}
+        run: |
+          GPG_KEY=""
+          GPG_KEY_ID="$APT_GPG_KEY_ID"
+          
+          if [ -n "$APT_GPG_PRIVATE_KEY" ]; then
+            GPG_KEY="$APT_GPG_PRIVATE_KEY"
+          elif [ -n "$RPM_GPG_PRIVATE_KEY" ]; then
+            GPG_KEY="$RPM_GPG_PRIVATE_KEY"
+          fi
+          
+          if [ -n "$GPG_KEY" ]; then
+            echo "$GPG_KEY" | gpg --batch --import
+            if [ -z "$GPG_KEY_ID" ]; then
+              GPG_KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5; exit}')
+            fi
+            gpg --armor --export "$GPG_KEY_ID" > apps/site/public/key.gpg
+            gpg --armor --export "$GPG_KEY_ID" > apps/site/public/bedrud.gpg.key
+            echo "Successfully exported GPG public key to apps/site/public/key.gpg and bedrud.gpg.key"
+          else
+            echo "⚠ GPG private key not configured in secrets — skipping GPG key export"
+          fi
       - uses: withastro/action@v6
         with:
           package-manager: bun@latest
