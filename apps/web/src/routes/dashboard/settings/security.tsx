@@ -228,7 +228,7 @@ function SecurityPage() {
                   id="newPassword"
                   name="newPassword"
                   type="password"
-                  placeholder="Min. 6 characters"
+                  placeholder="At least 12 characters"
                   required
                   onChange={() => setStatus(null)}
                   className="h-9 text-sm"

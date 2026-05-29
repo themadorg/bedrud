@@ -270,7 +270,7 @@ function RegisterPage() {
               id="reg-password"
               name="password"
               type={showPassword ? 'text' : 'password'}
-              placeholder="Min. 6 characters"
+              placeholder="At least 12 characters"
               autoComplete="new-password"
               className="pr-10"
               onChange={() => clearField('password')}
