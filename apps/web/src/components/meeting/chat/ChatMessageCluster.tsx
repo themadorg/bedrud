@@ -169,6 +169,8 @@ export function ChatMessageCluster({ cluster }: Props) {
                       src={att.url}
                       alt="attachment"
                       loading="lazy"
+                      width={att.w}
+                      height={att.h}
                       className="block max-w-full max-h-60 rounded-xl object-contain"
                     />
                   </a>
