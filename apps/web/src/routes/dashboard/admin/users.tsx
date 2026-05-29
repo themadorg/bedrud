@@ -42,6 +42,21 @@ const CREATED_OPTS = [
   { label: 'Last 30 days', value: '30d' },
 ]
 
+function detectRole(accesses: string[] | null): string {
+  if (!accesses || accesses.length === 0) return 'user'
+  if (accesses.includes('superadmin')) return 'superadmin'
+  if (accesses.includes('admin')) return 'admin'
+  if (accesses.includes('moderator')) return 'moderator'
+  if (accesses.includes('guest')) return 'guest'
+  return 'user'
+}
+
+function getRoleLabel(accesses: string[] | null): string {
+  const role = detectRole(accesses)
+  const found = ROLE_OPTS.find((r) => r.value === role)
+  return found ? found.label : 'User'
+}
+
 function AdminUsersPage() {
   const queryClient = useQueryClient()
   const { isReadOnly, currentUserId } = useAdminContext()
@@ -130,8 +145,8 @@ function AdminUsersPage() {
       color: 'destructive' as const,
     },
     promote: {
-      title: `Promote ${table.selectedIds.size} user${table.selectedIds.size !== 1 ? 's' : ''} to Admin?`,
-      desc: 'This grants superadmin access. They will need to log in again to get new permissions.',
+      title: `Promote ${table.selectedIds.size} user${table.selectedIds.size !== 1 ? 's' : ''}?`,
+      desc: 'Opens the bulk promotion flow. Full role management (including Admin and Moderator) is available on the individual user detail page.',
       color: 'default' as const,
     },
     delete: {
@@ -252,7 +267,19 @@ function AdminUsersPage() {
                     <div className="font-medium">{user.name}</div>
                     <div className="text-xs text-muted-foreground">{user.email}</div>
                   </div>
-                  <div className="text-xs text-muted-foreground font-mono">{user.id.slice(0, 8)}…</div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs px-2 py-0.5 rounded border text-muted-foreground">
+                      {getRoleLabel(user.accesses)}
+                    </span>
+                    <Link
+                      to="/dashboard/admin/users/$userId"
+                      params={{ userId: user.id }}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Manage roles →
+                    </Link>
+                    <div className="text-xs text-muted-foreground font-mono">{user.id.slice(0, 8)}…</div>
+                  </div>
                 </div>
               ))}
             </div>
