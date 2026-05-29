@@ -257,6 +257,28 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
   const showAdminBlock = canManageRole && !isSelf && !isRoomAdmin
   const showModBlock = canModerate && !isSelf && !isRoomAdmin
 
+  // Stable handler using data attributes to avoid per-item inline closures
+  const handleActionClick = useCallback(
+    (e: React.MouseEvent<HTMLElement>) => {
+      const el = e.currentTarget
+      const action = el.dataset.action as string | undefined
+      const path = el.dataset.path
+
+      if (!action || !path) return
+
+      if (action === 'promote' || action === 'demote' || action === 'kick' || action === 'ban') {
+        setPendingAdminAction({
+          key: action,
+          path,
+          label: action === 'promote' ? 'Promote' : action === 'demote' ? 'Demote' : action === 'kick' ? 'Kick' : 'Ban',
+          description: el.dataset.description || '',
+        })
+        onClose?.()
+      }
+    },
+    [onClose],
+  )
+
   return (
     <>
       {/* ── Section 1: Role management ────────────────────────── */}
@@ -266,15 +288,10 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
           {isMod ? (
             <Item
               disabled={loading === 'demote'}
-              onClick={() => {
-                setPendingAdminAction({
-                  key: 'demote',
-                  path: `/api/room/${roomId}/demote/${identity}`,
-                  label: 'Demote',
-                  description: `Remove moderator privileges from ${participant.name || 'this participant'}.`,
-                })
-                onClose?.()
-              }}
+              data-action="demote"
+              data-path={`/api/room/${roomId}/demote/${identity}`}
+              data-description={`Remove moderator privileges from ${participant.name || 'this participant'}.`}
+              onClick={handleActionClick}
               style={ITEM_STYLE}
             >
               {loading === 'demote' ? (
@@ -287,15 +304,10 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
           ) : (
             <Item
               disabled={loading === 'promote'}
-              onClick={() => {
-                setPendingAdminAction({
-                  key: 'promote',
-                  path: `/api/room/${roomId}/promote/${identity}`,
-                  label: 'Promote',
-                  description: `Grant moderator privileges to ${participant.name || 'this participant'}.`,
-                })
-                onClose?.()
-              }}
+              data-action="promote"
+              data-path={`/api/room/${roomId}/promote/${identity}`}
+              data-description={`Grant moderator privileges to ${participant.name || 'this participant'}.`}
+              onClick={handleActionClick}
               style={ITEM_STYLE}
             >
               {loading === 'promote' ? (
@@ -315,15 +327,10 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
         <>
           <Item
             disabled={loading === 'kick'}
-            onClick={() => {
-              setPendingAdminAction({
-                key: 'kick',
-                path: `/api/room/${roomId}/kick/${identity}`,
-                label: 'Kick',
-                description: `Remove ${participant.name || 'this participant'} from the meeting immediately. They can rejoin unless banned.`,
-              })
-              onClose?.()
-            }}
+            data-action="kick"
+            data-path={`/api/room/${roomId}/kick/${identity}`}
+            data-description={`Remove ${participant.name || 'this participant'} from the meeting immediately. They can rejoin unless banned.`}
+            onClick={handleActionClick}
             style={{ color: '#f87171', fontSize: 13 }}
           >
             {loading === 'kick' ? (
@@ -335,15 +342,10 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
           </Item>
           <Item
             disabled={loading === 'ban'}
-            onClick={() => {
-              setPendingAdminAction({
-                key: 'ban',
-                path: `/api/room/${roomId}/ban/${identity}`,
-                label: 'Ban',
-                description: `Ban ${participant.name || 'this participant'} from the room. They will be removed and blocked from rejoining.`,
-              })
-              onClose?.()
-            }}
+            data-action="ban"
+            data-path={`/api/room/${roomId}/ban/${identity}`}
+            data-description={`Ban ${participant.name || 'this participant'} from the room. They will be removed and blocked from rejoining.`}
+            onClick={handleActionClick}
             style={{ color: '#f87171', fontSize: 13 }}
           >
             {loading === 'ban' ? (

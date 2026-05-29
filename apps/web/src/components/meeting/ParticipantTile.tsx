@@ -141,17 +141,44 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
   const avatarPx = totalCount === 1 ? 120 : totalCount <= 4 ? 72 : 48
   const fontSizePx = totalCount === 1 ? 44 : totalCount <= 4 ? 26 : 18
 
+  // Memoize expensive dynamic style objects to help React.memo / reconciliation
+  const tileStyle = useMemo(
+    () => ({
+      borderRadius: totalCount === 1 ? 0 : 10,
+      background: `radial-gradient(ellipse 90% 70% at 50% 35%, ${palette.tile}, #08080f 72%)`,
+      animationDelay: `${index * 0.04}s`,
+    }),
+    [totalCount, index, palette.tile],
+  )
+
+  const avatarStyle = useMemo(
+    () => ({
+      width: avatarPx,
+      height: avatarPx,
+      borderRadius: '50%',
+      background: palette.avatar,
+      fontSize: fontSizePx,
+      boxShadow: isSpeaking
+        ? `0 0 0 3px rgba(255,255,255,0.18), 0 0 ${avatarPx * 0.6}px ${palette.glow}`
+        : `0 0 ${avatarPx * 0.4}px ${palette.glow}`,
+      transition: 'box-shadow 0.3s ease',
+    }),
+    [avatarPx, fontSizePx, isSpeaking, palette.avatar, palette.glow],
+  )
+
+  const pinButtonStyle = useMemo(
+    () => ({
+      background: isPinned ? 'color-mix(in oklab, var(--primary) 70%, transparent)' : 'rgba(0,0,0,0.55)',
+      backdropFilter: 'blur(8px)',
+      border: `1px solid ${isPinned ? 'color-mix(in oklab, var(--accent-400) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`,
+      color: isPinned ? '#e0e7ff' : 'rgba(255,255,255,0.8)',
+    }),
+    [isPinned],
+  )
+
   return (
     <ParticipantContextMenu participant={participant} isPinned={isPinned} onTogglePin={onTogglePin}>
-      <div
-        className={cn('meet-tile group', isSpeaking && 'meet-speaking')}
-        {...longPressHandlers}
-        style={{
-          borderRadius: totalCount === 1 ? 0 : 10,
-          background: `radial-gradient(ellipse 90% 70% at 50% 35%, ${palette.tile}, #08080f 72%)`,
-          animationDelay: `${index * 0.04}s`,
-        }}
-      >
+      <div className={cn('meet-tile group', isSpeaking && 'meet-speaking')} {...longPressHandlers} style={tileStyle}>
         {hasCameraVideo && cameraTrack ? (
           /* Video stream — wrapper suppresses browser's native <video> context menu
              so right-click bubbles to the Radix ContextMenuTrigger instead */
@@ -169,20 +196,7 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
         ) : (
           /* No video: gradient avatar */
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3.5">
-            <div
-              className="flex items-center justify-center shrink-0 text-white font-bold"
-              style={{
-                width: avatarPx,
-                height: avatarPx,
-                borderRadius: '50%',
-                background: palette.avatar,
-                fontSize: fontSizePx,
-                boxShadow: isSpeaking
-                  ? `0 0 0 3px rgba(255,255,255,0.18), 0 0 ${avatarPx * 0.6}px ${palette.glow}`
-                  : `0 0 ${avatarPx * 0.4}px ${palette.glow}`,
-                transition: 'box-shadow 0.3s ease',
-              }}
-            >
+            <div className="flex items-center justify-center shrink-0 text-white font-bold" style={avatarStyle}>
               {initial}
             </div>
 
@@ -272,12 +286,7 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
               'absolute top-2 right-2 w-[30px] h-[30px] rounded-lg flex items-center justify-center cursor-pointer transition-[opacity,background] duration-150',
               isPinned ? '' : 'opacity-0 group-hover:opacity-100',
             )}
-            style={{
-              background: isPinned ? 'color-mix(in oklab, var(--primary) 70%, transparent)' : 'rgba(0,0,0,0.55)',
-              backdropFilter: 'blur(8px)',
-              border: `1px solid ${isPinned ? 'color-mix(in oklab, var(--accent-400) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`,
-              color: isPinned ? '#e0e7ff' : 'rgba(255,255,255,0.8)',
-            }}
+            style={pinButtonStyle}
             aria-label={isPinned ? 'Unpin participant' : 'Pin participant'}
           >
             <Pin size={13} className={isPinned ? 'fill-current' : ''} />
