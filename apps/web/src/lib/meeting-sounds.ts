@@ -60,3 +60,15 @@ export function playMutedBeep() {
   tone(340, 0.09, 'square', 0.06)
   setTimeout(() => tone(340, 0.09, 'square', 0.06), 130)
 }
+
+/** Close the shared AudioContext. Call on meeting unmount to release resources (esp. mobile). */
+export async function closeCtx() {
+  if (ctx) {
+    try {
+      await ctx.close()
+    } catch {
+      // ignore close errors
+    }
+    ctx = null
+  }
+}

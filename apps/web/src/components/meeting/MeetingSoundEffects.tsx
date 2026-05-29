@@ -2,7 +2,7 @@ import { useLocalParticipant, useRoomContext } from '@livekit/components-react'
 import { RoomEvent } from 'livekit-client'
 import { useEffect, useRef } from 'react'
 import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
-import { playChat, playJoin, playLeave, playMutedBeep } from '#/lib/meeting-sounds'
+import { closeCtx, playChat, playJoin, playLeave, playMutedBeep } from '#/lib/meeting-sounds'
 import { useMeetingChatContext, useMeetingRoomContext } from './MeetingContext'
 
 /**
@@ -14,6 +14,13 @@ import { useMeetingChatContext, useMeetingRoomContext } from './MeetingContext'
 export function MeetingSoundEffects() {
   const room = useRoomContext()
   const { chatMessages } = useMeetingChatContext()
+
+  // Close shared AudioContext on unmount (prevents mobile audio issues from long-lived context)
+  useEffect(() => {
+    return () => {
+      closeCtx().catch(() => {})
+    }
+  }, [])
 
   // ── Join / Leave sounds ──────────────────────────────────────
   // Use RoomEvent directly for accurate join/leave detection rather
