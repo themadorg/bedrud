@@ -5,6 +5,7 @@
   <string name="common_button_save">Speichern</string>
   <string name="common_button_create">Erstellen</string>
   <string name="common_button_join">Beitreten</string>
+  <string name="common_label_or">oder</string>
   <string name="common_button_generate">Generieren</string>
   <string name="common_action_back">Zurück</string>
   <string name="common_action_remove">Entfernen</string>
@@ -52,6 +53,7 @@
   <string name="dashboard_roomSettings_title">Raumeinstellungen</string>
   <string name="meeting_status_connecting">Verbinde mit <xliff:g id="roomName" example="Team Standup">%1$s</xliff:g>…</string>
   <string name="meeting_status_preparing">Vorbereitung…</string>
+  <string name="meeting_status_joining">Beitreten…</string>
   <string name="meeting_dialog_leaveTitle">Meeting verlassen</string>
   <string name="meeting_dialog_leaveMessage">Möchten Sie das Meeting für alle beenden oder nur verlassen?</string>
   <string name="meeting_button_endForEveryone">Für alle beenden</string>
@@ -184,4 +186,12 @@
   <string name="profile_label_userId">Benutzer-ID</string>
   <string name="profile_label_provider">Anbieter</string>
   <string name="profile_button_signOut">Abmelden</string>
+  <string name="auth_label_dontHaveAccount">Noch kein Konto?</string>
+  <string name="auth_action_signIn">in dein Konto einloggen</string>
+  <string name="auth_button_joinAsGuest">als Gast beitreten</string>
+  <string name="auth_label_haveAccount">Hast du ein Konto?</string>
+  <string name="auth_description_noAccountNeeded">kein Konto nötig - wähle einfach einen Namen und los geht\'s.</string>
+  <string name="auth_button_continueAsGuest">als Gast fortfahren</string>
+  <string name="auth_button_joinBedrud">Bedrud beitreten</string>
+  <string name="auth_subtitle_createAccountToGetStarted">erstell dein Konto, um loszulegen</string>
 </resources>

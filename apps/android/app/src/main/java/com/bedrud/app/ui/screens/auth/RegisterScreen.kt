@@ -108,14 +108,14 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "Join Bedrud",
+                text = stringResource(R.string.auth_button_joinBedrud),
                 style = MaterialTheme.typography.headlineMedium
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Create your account to get started",
+                text = stringResource(R.string.auth_subtitle_createAccountToGetStarted),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

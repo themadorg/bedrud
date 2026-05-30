@@ -66,8 +66,11 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bedrud.app.R
+import com.bedrud.app.core.instance.CheckHealthResult
 import com.bedrud.app.core.instance.InstanceManager
+import com.bedrud.app.core.ssl.CertificateInfo
 import com.bedrud.app.models.Instance
+import com.bedrud.app.ui.components.CertificateTrustDialog
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -88,6 +91,9 @@ fun AddInstanceScreen(
     var insecure by rememberSaveable { mutableStateOf(false) }
     var isChecking by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var pendingCertInfo by remember { mutableStateOf<CertificateInfo?>(null) }
+    var pendingTempCertId by remember { mutableStateOf<String?>(null) }
+    var isCapturedCertTrusted by remember { mutableStateOf(false) }
 
     val scheme = if (insecure) "http" else "https"
     val resolvedURL = run {
@@ -363,12 +369,26 @@ fun AddInstanceScreen(
                         scope.launch {
                             isChecking = true
                             errorMessage = null
+                            pendingCertInfo = null
+                            pendingTempCertId = null
                             try {
-                                instanceManager.addInstance(resolvedURL, displayName.trim())
-                                serverHost = ""
-                                displayName = ""
-                                insecure = false
-                                onInstanceAdded()
+                                when (val result = instanceManager.checkHealthWithCapture(resolvedURL)) {
+                                    is CheckHealthResult.Trusted -> {
+                                        instanceManager.addInstance(resolvedURL, displayName.trim())
+                                        serverHost = ""
+                                        displayName = ""
+                                        insecure = false
+                                        onInstanceAdded()
+                                    }
+                                    is CheckHealthResult.Captured -> {
+                                        pendingCertInfo = result.certInfo
+                                        pendingTempCertId = result.tempCertId
+                                        isCapturedCertTrusted = false
+                                    }
+                                    is CheckHealthResult.Error -> {
+                                        errorMessage = result.message
+                                    }
+                                }
                             } catch (e: Exception) {
                                 errorMessage = "Could not reach server: ${e.message}"
                             } finally {
@@ -399,6 +419,40 @@ fun AddInstanceScreen(
                 }
             }
         }
+    }
+
+    if (pendingCertInfo != null && pendingTempCertId != null && !isCapturedCertTrusted) {
+        CertificateTrustDialog(
+            certInfo = pendingCertInfo!!,
+            onTrust = {
+                scope.launch {
+                    isChecking = true
+                    errorMessage = null
+                    isCapturedCertTrusted = true
+                    try {
+                        instanceManager.addInstance(resolvedURL, displayName.trim(), trustCertId = pendingTempCertId)
+                        serverHost = ""
+                        displayName = ""
+                        insecure = false
+                        pendingCertInfo = null
+                        pendingTempCertId = null
+                        onInstanceAdded()
+                    } catch (e: Exception) {
+                        errorMessage = "Could not reach server: ${e.message}"
+                        pendingCertInfo = null
+                        pendingTempCertId = null
+                    } finally {
+                        isChecking = false
+                        isCapturedCertTrusted = false
+                    }
+                }
+            },
+            onDismiss = {
+                pendingCertInfo?.let { instanceManager.discardPendingCertificate(pendingTempCertId!!) }
+                pendingCertInfo = null
+                pendingTempCertId = null
+            }
+        )
     }
 }
 
