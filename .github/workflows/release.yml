@@ -42,7 +42,7 @@ jobs:
             cgo: "1"
             cc: zig cc -target x86_64-windows-gnu
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: mlugg/setup-zig@v2
         with:
@@ -457,7 +457,7 @@ jobs:
       run:
         working-directory: apps/android
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-java@v5
         with:
@@ -548,7 +548,7 @@ jobs:
       run:
         working-directory: apps/ios
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install Apple certificate and provisioning profile
         env:
@@ -678,7 +678,7 @@ jobs:
             target: aarch64-apple-darwin
             name: macos-arm64
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -945,7 +945,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [server-binary, docker-debian, docker-alpine, docker-distroless, android, desktop]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/download-artifact@v8
         with:
@@ -1242,7 +1242,7 @@ jobs:
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_aur == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Update PKGBUILD checksums
         env:
@@ -1285,7 +1285,7 @@ jobs:
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_aur == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Update PKGBUILD checksums
         env:
@@ -1326,7 +1326,7 @@ jobs:
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_snap == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/download-artifact@v8
         with:
@@ -1368,7 +1368,7 @@ jobs:
     needs: [release, check-secrets]
     if: needs.check-secrets.result == 'success'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install Flatpak tools
         run: |
@@ -1458,7 +1458,7 @@ jobs:
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_choco == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Update nuspec version and checksums
         env:
@@ -1508,7 +1508,7 @@ jobs:
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_homebrew == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Compute macOS tarball checksums
         env:
@@ -1562,7 +1562,7 @@ jobs:
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_winget == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Submit WinGet manifests
         uses: vedantmgoyal9/winget-releaser@v2
