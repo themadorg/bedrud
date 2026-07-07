@@ -1,23 +1,28 @@
-import { Image, Maximize2, Minimize2, Send } from 'lucide-react'
+import { BarChart3, Image, Send } from 'lucide-react'
 import {
   type ChangeEvent,
   type ClipboardEvent,
   forwardRef,
   type KeyboardEvent,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState,
 } from 'react'
-import type { ChatAttachment } from '../MeetingContext'
+import { textDirectionFor } from '#/lib/text-direction'
+import { cn } from '@/lib/utils'
+import type { ChatAttachment, ChatPoll } from '../MeetingContext'
+import { ChatEmojiPicker } from './ChatEmojiPicker'
+import { ChatPollComposer } from './ChatPollComposer'
 
 const LINE_HEIGHT = 20
-const MIN_ROWS = 1
-const NORMAL_MAX_ROWS = 4
-const EXPANDED_MAX_ROWS = 10
+const VERTICAL_PADDING = 8
+const MIN_ROWS = 2
+const MAX_ROWS = 10
 
 interface Props {
-  onSend: (text: string, attachments?: ChatAttachment[]) => void
+  onSend: (text: string, attachments?: ChatAttachment[], poll?: ChatPoll) => void
   onUpload: (file: File) => Promise<ChatAttachment>
   disabled?: boolean
 }
@@ -26,36 +31,61 @@ export interface ChatInputHandle {
   focus: () => void
 }
 
+function generateID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
+}
+
+const iconBtnClass = (enabled: boolean) =>
+  cn(
+    'flex h-7 w-7 shrink-0 items-center justify-center border-none bg-transparent p-0 transition-colors',
+    enabled
+      ? 'cursor-pointer text-[var(--meet-fg-muted)] hover:text-[var(--meet-accent)]'
+      : 'cursor-default text-[var(--meet-fg-subtle)]',
+  )
+
 export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({ onSend, onUpload, disabled }, ref) {
   const [draft, setDraft] = useState('')
-  const [expanded, setExpanded] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showPollComposer, setShowPollComposer] = useState(false)
+  const [inputScrollable, setInputScrollable] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  useImperativeHandle(ref, () => ({ focus: () => textareaRef.current?.focus() }))
+  const focusInput = useCallback(() => {
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }, [])
 
-  const maxRows = expanded ? EXPANDED_MAX_ROWS : NORMAL_MAX_ROWS
-  const minHeight = MIN_ROWS * LINE_HEIGHT + 16
-  const maxHeight = maxRows * LINE_HEIGHT + 16
+  useImperativeHandle(ref, () => ({ focus: focusInput }), [focusInput])
 
-  // Auto-resize textarea on draft change
+  const minHeight = MIN_ROWS * LINE_HEIGHT + VERTICAL_PADDING
+  const maxHeight = MAX_ROWS * LINE_HEIGHT + VERTICAL_PADDING
+
   const resizeTextarea = useCallback(() => {
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`
-  }, [maxHeight])
+    const nextHeight = Math.min(Math.max(el.scrollHeight, minHeight), maxHeight)
+    el.style.height = `${nextHeight}px`
+    setInputScrollable(el.scrollHeight > maxHeight)
+  }, [minHeight, maxHeight])
+
+  useEffect(() => {
+    resizeTextarea()
+  }, [resizeTextarea])
 
   const send = useCallback(() => {
     const text = draft.trim()
     if (!text || disabled || uploading) return
     onSend(text)
     setDraft('')
-    setExpanded(false)
     if (textareaRef.current) textareaRef.current.style.height = `${minHeight}px`
-  }, [draft, disabled, uploading, onSend, minHeight])
+    setInputScrollable(false)
+    focusInput()
+  }, [draft, disabled, uploading, onSend, focusInput, minHeight])
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -75,14 +105,14 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         const attachment = await onUpload(file)
         onSend(draft.trim(), [attachment])
         setDraft('')
-        setExpanded(false)
+        focusInput()
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Upload failed')
       } finally {
         setUploading(false)
       }
     },
-    [draft, onSend, onUpload],
+    [draft, onSend, onUpload, focusInput],
   )
 
   const handlePaste = useCallback(
@@ -106,12 +136,156 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     [uploadFile],
   )
 
+  const openImagePicker = useCallback(() => {
+    setShowPollComposer(false)
+    fileInputRef.current?.click()
+  }, [])
+
+  const openPollComposer = useCallback(() => {
+    setShowPollComposer(true)
+  }, [])
+
+  const sendPoll = useCallback(
+    (question: string, optionTexts: string[]) => {
+      const poll: ChatPoll = {
+        id: generateID(),
+        question,
+        options: optionTexts.map((text) => ({ id: generateID(), text })),
+        votes: {},
+      }
+      onSend('', undefined, poll)
+      focusInput()
+    },
+    [onSend, focusInput],
+  )
+
   const canSend = Boolean(draft.trim()) && !uploading && !disabled
+  const actionsEnabled = !uploading && !disabled
+
+  const insertEmoji = useCallback(
+    (emoji: string) => {
+      const el = textareaRef.current
+      if (!el) {
+        setDraft((prev) => prev + emoji)
+        return
+      }
+
+      const start = el.selectionStart ?? draft.length
+      const end = el.selectionEnd ?? draft.length
+      const next = `${draft.slice(0, start)}${emoji}${draft.slice(end)}`
+      setDraft(next)
+
+      requestAnimationFrame(() => {
+        el.focus()
+        const caret = start + emoji.length
+        el.setSelectionRange(caret, caret)
+        resizeTextarea()
+      })
+    },
+    [draft, resizeTextarea],
+  )
+
+  const attachButtons = (
+    <>
+      <button
+        type="button"
+        disabled={!actionsEnabled}
+        title="Upload image"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={openImagePicker}
+        className={iconBtnClass(actionsEnabled)}
+        aria-label="Upload image"
+      >
+        <Image size={16} />
+      </button>
+      <button
+        type="button"
+        disabled={!actionsEnabled}
+        title="Create poll"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={openPollComposer}
+        className={iconBtnClass(actionsEnabled)}
+        aria-label="Create poll"
+      >
+        <BarChart3 size={16} />
+      </button>
+    </>
+  )
+
+  const emojiButton = (
+    <ChatEmojiPicker
+      onEmojiSelect={insertEmoji}
+      mode="full"
+      disabled={disabled || uploading}
+      side="top"
+      align="end"
+      variant="ghost"
+      className="h-7 w-7"
+      ariaLabel="Insert emoji"
+    />
+  )
+
+  const sendButton = (
+    <button
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={send}
+      disabled={!canSend}
+      className={cn(
+        'flex h-7 w-7 shrink-0 items-center justify-center border-none bg-transparent p-0 transition-colors',
+        canSend
+          ? 'cursor-pointer text-[var(--meet-accent)] hover:text-[var(--meet-accent-fg)]'
+          : 'cursor-default text-[var(--meet-fg-subtle)]',
+      )}
+      aria-label="Send message"
+    >
+      <Send size={16} />
+    </button>
+  )
+
+  const textarea = (
+    <textarea
+      ref={textareaRef}
+      id="chat-input"
+      name="chat-message"
+      aria-label="Chat message"
+      value={draft}
+      onChange={(e) => {
+        setDraft(e.target.value)
+        resizeTextarea()
+      }}
+      onKeyDown={handleKeyDown}
+      onPaste={handlePaste}
+      placeholder="Type a message…"
+      disabled={uploading || disabled}
+      rows={MIN_ROWS}
+      dir={textDirectionFor(draft)}
+      className={cn(
+        'meet-scroll meet-rtl-text w-full resize-none border-none bg-transparent px-2 py-1 text-[13px] text-[var(--meet-fg-strong)] outline-none box-border placeholder:text-[var(--meet-fg-subtle)]',
+        inputScrollable ? 'overflow-y-auto' : 'overflow-y-hidden',
+      )}
+      style={{
+        minHeight,
+        maxHeight,
+        lineHeight: `${LINE_HEIGHT}px`,
+      }}
+    />
+  )
 
   return (
-    <div className="border-t border-white/[0.06] px-3 py-2.5">
+    <div className="border-t border-[var(--meet-border)] px-1.5 py-1.5">
       {error && <p className="m-0 mb-1.5 text-[11px] text-red-400/90">{error}</p>}
-      {uploading && <p className="m-0 mb-1.5 text-[11px] text-accent-400/80">Uploading image…</p>}
+      {uploading && <p className="m-0 mb-1.5 text-[11px] text-[var(--meet-accent)]">Uploading image…</p>}
+
+      <ChatPollComposer
+        open={showPollComposer}
+        onOpenChange={(open) => {
+          setShowPollComposer(open)
+          if (!open) focusInput()
+        }}
+        onCreate={sendPoll}
+        disabled={disabled || uploading}
+      />
 
       <input
         ref={fileInputRef}
@@ -122,76 +296,15 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         aria-label="Upload an image"
       />
 
-      <div className="flex gap-2 items-center">
-        {/* Attach image */}
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading || disabled}
-          title="Attach image"
-          className="w-9 h-9 rounded-xl shrink-0 border border-white/[0.09] bg-white/[0.04] flex items-center justify-center"
-          style={{
-            color: uploading || disabled ? 'rgba(255,255,255,0.25)' : 'var(--accent-400)',
-            cursor: uploading || disabled ? 'default' : 'pointer',
-          }}
-          aria-label="Attach image"
-        >
-          <Image size={14} />
-        </button>
-
-        {/* Textarea wrapper */}
-        <div className="flex-1 relative">
-          <textarea
-            ref={textareaRef}
-            id="chat-input"
-            name="chat-message"
-            aria-label="Chat message"
-            value={draft}
-            onChange={(e) => {
-              setDraft(e.target.value)
-              resizeTextarea()
-            }}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            placeholder="Type a message…"
-            disabled={uploading || disabled}
-            rows={1}
-            dir="auto"
-            className="w-full resize-none overflow-y-hidden bg-white/[0.06] border border-white/[0.09] rounded-xl px-3 py-[7px] text-white/85 text-[13px] outline-none box-border"
-            style={{
-              minHeight,
-              maxHeight,
-              lineHeight: `${LINE_HEIGHT}px`,
-              paddingRight: 32,
-            }}
-          />
-          {/* Expand / collapse button */}
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            title={expanded ? 'Collapse' : 'Expand'}
-            className="absolute top-2 right-2 w-[18px] h-[18px] p-0 bg-transparent border-none text-white/50 cursor-pointer flex items-center justify-center"
-            aria-label={expanded ? 'Collapse input' : 'Expand input'}
-          >
-            {expanded ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
-          </button>
+      <div className="flex flex-col gap-1">
+        <div className="w-full">{textarea}</div>
+        <div className="flex items-center justify-between gap-1">
+          <div className="flex items-center gap-0.5">{attachButtons}</div>
+          <div className="flex items-center gap-0.5">
+            {emojiButton}
+            {sendButton}
+          </div>
         </div>
-
-        {/* Send */}
-        <button
-          type="button"
-          onClick={send}
-          disabled={!canSend}
-          className="w-9 h-9 rounded-xl shrink-0 border-none flex items-center justify-center transition-[background,color] duration-150"
-          style={{
-            background: canSend ? 'color-mix(in oklab, var(--primary) 80%, transparent)' : 'rgba(255,255,255,0.06)',
-            color: canSend ? 'white' : 'rgba(255,255,255,0.25)',
-            cursor: canSend ? 'pointer' : 'default',
-          }}
-          aria-label="Send message"
-        >
-          <Send size={14} />
-        </button>
       </div>
     </div>
   )

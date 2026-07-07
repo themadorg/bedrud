@@ -1,4 +1,5 @@
 import { ArrowDown } from 'lucide-react'
+import { actionBubbleChrome } from './chatBubbleStyles'
 
 interface Props {
   show: boolean
@@ -9,37 +10,37 @@ interface Props {
 export function ChatScrollManager({ show, unreadCount, onScrollToBottom }: Props) {
   if (!show) return null
 
-  const label = unreadCount === 1 ? '↑ 1 new message' : `↑ ${unreadCount} new messages`
+  const label = unreadCount === 1 ? '1 new message' : `${unreadCount} new messages`
 
   return (
     <>
-      {/* Inline banner — pill centered just above the input */}
       {unreadCount > 0 && (
-        <div className="absolute bottom-[calc(88px+env(safe-area-inset-bottom)+8px)] left-1/2 -translate-x-1/2 z-[6]">
+        <div className="absolute bottom-2 left-1/2 z-[6] -translate-x-1/2">
           <button
             type="button"
             onClick={onScrollToBottom}
-            className="border-none rounded-full px-3.5 py-[5px] text-white text-xs font-semibold cursor-pointer whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
-            style={{ background: 'color-mix(in oklab, var(--primary) 85%, transparent)' }}
+            className="cursor-pointer whitespace-nowrap px-3.5 py-2 text-xs font-semibold leading-none"
+            style={actionBubbleChrome()}
           >
             {label}
           </button>
         </div>
       )}
 
-      {/* Floating ↓ button */}
       <button
         type="button"
         onClick={onScrollToBottom}
         aria-label="Scroll to latest messages"
-        className="absolute bottom-[calc(88px+env(safe-area-inset-bottom)+56px)] right-3.5 w-[34px] h-[34px] rounded-full border border-white/[0.12] bg-[#1e1e32]/92 flex items-center justify-center cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.4)] z-[5]"
-        style={{ color: 'color-mix(in oklab, var(--accent-400) 90%, transparent)' }}
+        className="absolute bottom-1.5 right-1 z-[5] flex h-7 w-7 cursor-pointer items-center justify-center border-none bg-transparent p-0 text-teal-400/90 hover:text-teal-400"
       >
         <ArrowDown size={14} />
         {unreadCount > 0 && (
           <span
-            className="absolute -top-[5px] -right-[5px] text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center"
-            style={{ background: 'color-mix(in oklab, var(--primary) 90%, transparent)' }}
+            className="absolute -right-[5px] -top-[5px] flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-primary-foreground"
+            style={{
+              background: 'color-mix(in oklab, var(--primary) 90%, transparent)',
+              border: '1px solid color-mix(in oklab, var(--accent-400) 30%, transparent)',
+            }}
           >
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
