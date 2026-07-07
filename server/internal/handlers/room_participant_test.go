@@ -128,7 +128,7 @@ func TestParticipantAction_NotImplemented(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req := httptest.NewRequest(tt.method, tt.path, http.NoBody)
 			resp, err := app.Test(req, -1)
 			if err != nil {
 				t.Fatalf("app.Test failed: %v", err)
@@ -171,7 +171,7 @@ func TestParticipantAction_NonCreatorForbidden(t *testing.T) {
 
 	for _, tt := range adminCheckEndpoints {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req := httptest.NewRequest(tt.method, tt.path, http.NoBody)
 			resp, err := app.Test(req, -1)
 			if err != nil {
 				t.Fatalf("app.Test failed: %v", err)
@@ -200,7 +200,7 @@ func TestParticipantAction_NonCreatorForbidden(t *testing.T) {
 
 	for _, tt := range modCheckEndpoints {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req := httptest.NewRequest(tt.method, tt.path, http.NoBody)
 			resp, err := app.Test(req, -1)
 			if err != nil {
 				t.Fatalf("app.Test failed: %v", err)
@@ -240,7 +240,7 @@ func TestParticipantAction_SuperadminBypassesAuthz(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req := httptest.NewRequest(tt.method, tt.path, http.NoBody)
 			resp, err := app.Test(req, -1)
 			if err != nil {
 				t.Fatalf("app.Test failed: %v", err)
@@ -286,7 +286,7 @@ func TestParticipantAction_SelfTargetForbidden(t *testing.T) {
 
 	for _, tt := range selfBlockedEndpoints {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req := httptest.NewRequest(tt.method, tt.path, http.NoBody)
 			resp, err := app.Test(req, -1)
 			if err != nil {
 				t.Fatalf("app.Test failed: %v", err)
@@ -332,7 +332,7 @@ func TestParticipantAction_AdminTargetForbidden(t *testing.T) {
 
 	for _, tt := range adminTargetBlocked {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req := httptest.NewRequest(tt.method, tt.path, http.NoBody)
 			resp, err := app.Test(req, -1)
 			if err != nil {
 				t.Fatalf("app.Test failed: %v", err)
@@ -356,7 +356,7 @@ func TestAskParticipantAction_InvalidAction(t *testing.T) {
 	}
 	*baseClaims = auth.Claims{UserID: "creator-user", Email: "creator@ex.com", Accesses: []string{"user"}}
 
-	req := httptest.NewRequest(http.MethodPost, "/room/"+room.ID+"/ask/victim/invalid_action", nil)
+	req := httptest.NewRequest(http.MethodPost, "/room/"+room.ID+"/ask/victim/invalid_action", http.NoBody)
 	resp, err := app.Test(req, -1)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -400,7 +400,7 @@ func TestParticipantAction_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req := httptest.NewRequest(tt.method, tt.path, http.NoBody)
 			resp, err := app.Test(req, -1)
 			if err != nil {
 				t.Fatalf("app.Test failed: %v", err)
@@ -429,7 +429,7 @@ func TestGetParticipantInfo_SelfAccessAlwaysAllowed(t *testing.T) {
 	*baseClaims = auth.Claims{UserID: "other-user", Email: "other@ex.com", Accesses: []string{"user"}}
 	_ = roomRepo.AddParticipant(room.ID, "other-user")
 
-	req := httptest.NewRequest(http.MethodGet, "/room/"+room.ID+"/participant/other-user/info", nil)
+	req := httptest.NewRequest(http.MethodGet, "/room/"+room.ID+"/participant/other-user/info", http.NoBody)
 	resp, err := app.Test(req, -1)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -451,7 +451,7 @@ func TestGetParticipantProfile_MeetingParticipantCanViewOther(t *testing.T) {
 	*baseClaims = auth.Claims{UserID: "other-user", Email: "other@ex.com", Accesses: []string{"user"}}
 	_ = roomRepo.AddParticipant(room.ID, "other-user")
 
-	req := httptest.NewRequest(http.MethodGet, "/room/"+room.ID+"/participant/creator-user/profile", nil)
+	req := httptest.NewRequest(http.MethodGet, "/room/"+room.ID+"/participant/creator-user/profile", http.NoBody)
 	resp, err := app.Test(req, -1)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -474,7 +474,7 @@ func TestGetParticipantInfo_NonModeratorCannotViewOthers(t *testing.T) {
 	*baseClaims = auth.Claims{UserID: "other-user", Email: "other@ex.com", Accesses: []string{"user"}}
 	_ = roomRepo.AddParticipant(room.ID, "other-user")
 
-	req := httptest.NewRequest(http.MethodGet, "/room/"+room.ID+"/participant/victim/info", nil)
+	req := httptest.NewRequest(http.MethodGet, "/room/"+room.ID+"/participant/victim/info", http.NoBody)
 	resp, err := app.Test(req, -1)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -502,7 +502,7 @@ func TestPromoteParticipant_AlreadyModerator(t *testing.T) {
 	// unless we set up the hook)
 	// For now, test the normal promote path
 
-	req := httptest.NewRequest(http.MethodPost, "/room/"+room.ID+"/promote/victim", nil)
+	req := httptest.NewRequest(http.MethodPost, "/room/"+room.ID+"/promote/victim", http.NoBody)
 	resp, err := app.Test(req, -1)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -525,7 +525,7 @@ func TestAskParticipantAction_ValidActionCamera(t *testing.T) {
 
 	*baseClaims = auth.Claims{UserID: "creator-user", Email: "creator@ex.com", Accesses: []string{"user"}}
 
-	req := httptest.NewRequest(http.MethodPost, "/room/"+room.ID+"/ask/victim/camera", nil)
+	req := httptest.NewRequest(http.MethodPost, "/room/"+room.ID+"/ask/victim/camera", http.NoBody)
 	resp, err := app.Test(req, -1)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -548,7 +548,7 @@ func TestBanParticipant_ResponseBody(t *testing.T) {
 
 	*baseClaims = auth.Claims{UserID: "creator-user", Email: "creator@ex.com", Accesses: []string{"user"}}
 
-	req := httptest.NewRequest(http.MethodPost, "/room/"+room.ID+"/ban/victim", nil)
+	req := httptest.NewRequest(http.MethodPost, "/room/"+room.ID+"/ban/victim", http.NoBody)
 	resp, err := app.Test(req, -1)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)

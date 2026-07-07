@@ -1084,7 +1084,7 @@ func checkS3Connectivity(s models.SystemSettings) checkResult {
 
 	url := fmt.Sprintf("%s/%s", endpoint, s.ChatUploadS3Bucket)
 
-	req, err := http.NewRequest(http.MethodHead, url, nil)
+	req, err := http.NewRequest(http.MethodHead, url, http.NoBody)
 	if err != nil {
 		return failResult("failed to create request: " + err.Error())
 	}

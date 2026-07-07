@@ -852,7 +852,7 @@ func TestModeratorCannotActInOtherRoom(t *testing.T) {
 
 	// mod-user tries to spotlight a participant in roomB (a room they don't own
 	// and haven't been promoted in).
-	req := httptest.NewRequest(http.MethodPost, "/rooms/"+roomB.ID+"/participants/some-victim/spotlight", nil)
+	req := httptest.NewRequest(http.MethodPost, "/rooms/"+roomB.ID+"/participants/some-victim/spotlight", http.NoBody)
 	resp, err := app.Test(req, -1)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -893,7 +893,7 @@ func TestRoomModeratorCanActInOwnRoom(t *testing.T) {
 
 	// mod-user tries to spotlight someone in roomA — should pass the auth gate.
 	// The LiveKit call will fail (fake server), but we'll see 500 NOT 403.
-	req := httptest.NewRequest(http.MethodPost, "/rooms/"+roomA.ID+"/participants/some-user/spotlight", nil)
+	req := httptest.NewRequest(http.MethodPost, "/rooms/"+roomA.ID+"/participants/some-user/spotlight", http.NoBody)
 	resp, err := app.Test(req, -1)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
