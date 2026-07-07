@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useRouterState } from '@tanstack/react-router'
-import { Camera, Lock, Mic, User } from 'lucide-react'
+import { Camera, Lock, User } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export const Route = createFileRoute('/dashboard/settings')({
@@ -9,7 +9,6 @@ export const Route = createFileRoute('/dashboard/settings')({
 const TABS = [
   { to: '/dashboard/settings' as const, label: 'Profile', icon: User, isIndex: true },
   { to: '/dashboard/settings/security' as const, label: 'Security', icon: Lock },
-  { to: '/dashboard/settings/audio' as const, label: 'Audio', icon: Mic },
   { to: '/dashboard/settings/video' as const, label: 'Video', icon: Camera },
 ]
 

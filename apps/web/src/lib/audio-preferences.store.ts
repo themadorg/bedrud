@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { DEFAULT_PUSH_TO_TALK_KEY, normalizePushToTalkKey } from '#/lib/push-to-talk-key'
 
 export type NoiseSuppressionMode = 'none' | 'browser' | 'rnnoise' | 'krisp'
 
@@ -11,6 +12,8 @@ export interface AudioPreferences {
   noiseGate: number // 0–100 (percent), default 0 = off
   mutedBeepEnabled: boolean // play a beep when talking while muted
   mutedBeepInterval: number // ms between beeps, default 3000
+  pushToTalkEnabled: boolean
+  pushToTalkKey: string // KeyboardEvent.code, default Space
 }
 
 interface AudioPreferencesStore extends AudioPreferences {
@@ -21,6 +24,8 @@ interface AudioPreferencesStore extends AudioPreferences {
   setNoiseGate: (v: number) => void
   setMutedBeepEnabled: (v: boolean) => void
   setMutedBeepInterval: (v: number) => void
+  setPushToTalkEnabled: (v: boolean) => void
+  setPushToTalkKey: (key: string) => void
   merge: (partial: Partial<AudioPreferences>) => void
 }
 
@@ -34,6 +39,8 @@ export const useAudioPreferencesStore = create<AudioPreferencesStore>()(
       noiseGate: 0,
       mutedBeepEnabled: true,
       mutedBeepInterval: 3000,
+      pushToTalkEnabled: false,
+      pushToTalkKey: DEFAULT_PUSH_TO_TALK_KEY,
       setMode: (noiseSuppressionMode) => set({ noiseSuppressionMode }),
       setEchoCancellation: (echoCancellation) => set({ echoCancellation }),
       setAutoGainControl: (autoGainControl) => set({ autoGainControl }),
@@ -41,6 +48,8 @@ export const useAudioPreferencesStore = create<AudioPreferencesStore>()(
       setNoiseGate: (noiseGate) => set({ noiseGate: Math.max(0, Math.min(100, noiseGate)) }),
       setMutedBeepEnabled: (mutedBeepEnabled) => set({ mutedBeepEnabled }),
       setMutedBeepInterval: (mutedBeepInterval) => set({ mutedBeepInterval }),
+      setPushToTalkEnabled: (pushToTalkEnabled) => set({ pushToTalkEnabled }),
+      setPushToTalkKey: (pushToTalkKey) => set({ pushToTalkKey: normalizePushToTalkKey(pushToTalkKey) }),
       merge: (partial) =>
         set({
           ...(partial.noiseSuppressionMode !== undefined && { noiseSuppressionMode: partial.noiseSuppressionMode }),
@@ -50,6 +59,8 @@ export const useAudioPreferencesStore = create<AudioPreferencesStore>()(
           ...(partial.noiseGate !== undefined && { noiseGate: Math.max(0, Math.min(100, partial.noiseGate)) }),
           ...(partial.mutedBeepEnabled !== undefined && { mutedBeepEnabled: partial.mutedBeepEnabled }),
           ...(partial.mutedBeepInterval !== undefined && { mutedBeepInterval: partial.mutedBeepInterval }),
+          ...(partial.pushToTalkEnabled !== undefined && { pushToTalkEnabled: partial.pushToTalkEnabled }),
+          ...(partial.pushToTalkKey !== undefined && { pushToTalkKey: normalizePushToTalkKey(partial.pushToTalkKey) }),
         }),
     }),
     { name: 'audio-preferences' },
