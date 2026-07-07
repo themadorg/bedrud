@@ -17,13 +17,13 @@ import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ElevatedCard
+import com.bedrud.app.ui.components.BedrudOutlinedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LargeTopAppBar
+import com.bedrud.app.ui.components.BedrudCompactTopBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -35,7 +35,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,7 +45,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -75,21 +75,12 @@ fun SettingsContent(
     val authManager = instanceManager.authManager.collectAsState().value
     val currentUser by (authManager?.currentUser ?: kotlinx.coroutines.flow.MutableStateFlow(null)).collectAsState()
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .nestedScroll(scrollBehavior.nestedScrollConnection)
-    ) {
-        LargeTopAppBar(
-            title = { Text(stringResource(R.string.settings_title)) },
-            scrollBehavior = scrollBehavior
-        )
+    Column(modifier = modifier.fillMaxSize()) {
+        BedrudCompactTopBar(title = stringResource(R.string.settings_title))
 
         SnackbarHost(snackbarHostState)
 
@@ -103,12 +94,7 @@ fun SettingsContent(
             Spacer(modifier = Modifier.height(0.dp))
 
             // Appearance
-            ElevatedCard(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
+            BedrudOutlinedCard(shape = RoundedCornerShape(16.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         stringResource(R.string.settings_section_appearance),
@@ -174,12 +160,7 @@ fun SettingsContent(
             }
 
             // Notifications
-            ElevatedCard(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
+            BedrudOutlinedCard(shape = RoundedCornerShape(16.dp)) {
                 Column {
                     Text(
                         stringResource(R.string.settings_section_notifications),
@@ -202,10 +183,7 @@ fun SettingsContent(
 
             // Account Info
             if (currentUser != null) {
-                ElevatedCard(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
+                BedrudOutlinedCard(shape = RoundedCornerShape(16.dp)) {
                     Column {
                         Row(
                             modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp),
@@ -252,10 +230,7 @@ fun SettingsContent(
 
             // Change Password
             val isLocalAccount = currentUser?.provider.let { it == null || it == "local" || it == "passkey" }
-            ElevatedCard(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
+            BedrudOutlinedCard(shape = RoundedCornerShape(16.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(stringResource(R.string.settings_section_security), style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary)
@@ -332,12 +307,7 @@ fun SettingsContent(
             }
 
             // About
-            ElevatedCard(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
+            BedrudOutlinedCard(shape = RoundedCornerShape(16.dp)) {
                 Column {
                     Text(
                         stringResource(R.string.settings_section_about),

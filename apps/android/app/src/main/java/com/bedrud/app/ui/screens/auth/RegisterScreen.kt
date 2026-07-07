@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -41,6 +40,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
@@ -51,6 +51,12 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import com.bedrud.app.R
+import com.bedrud.app.ui.components.BedrudScaffoldContentInsets
+import com.bedrud.app.core.api.LoginOutcome
+import com.bedrud.app.ui.components.autofillType
+import com.bedrud.app.core.api.RegisterOutcome
+import com.bedrud.app.core.api.parseRegisterResponse
+import com.bedrud.app.core.api.performLogin
 import com.bedrud.app.core.instance.InstanceManager
 import com.bedrud.app.models.RegisterRequest
 import kotlinx.coroutines.launch
@@ -64,6 +70,7 @@ fun RegisterScreen(
     instanceManager: InstanceManager = koinInject()
 ) {
     val authApi = instanceManager.authApi.collectAsState().value ?: return
+    val authManager = instanceManager.authManager.collectAsState().value ?: return
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -76,6 +83,13 @@ fun RegisterScreen(
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
+    val passwordMismatchError = stringResource(R.string.auth_error_passwordMismatch)
+    val formValid = name.isNotBlank() &&
+        email.isNotBlank() &&
+        password.isNotBlank() &&
+        confirmPassword.isNotBlank() &&
+        password == confirmPassword
+
     LaunchedEffect(errorMessage) {
         errorMessage?.let {
             snackbarHostState.showSnackbar(it)
@@ -84,12 +98,16 @@ fun RegisterScreen(
     }
 
     Scaffold(
+        contentWindowInsets = BedrudScaffoldContentInsets,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.auth_title_createAccount)) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateToLogin) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_action_back))
+                    IconButton(onClick = onNavigateToLogin, enabled = !isLoading) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.common_action_back)
+                        )
                     }
                 }
             )
@@ -101,7 +119,6 @@ fun RegisterScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 24.dp)
-                .imePadding()
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -122,11 +139,11 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Name
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text(stringResource(R.string.auth_label_fullName)) },
+                enabled = !isLoading,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Text,
                     imeAction = ImeAction.Next
@@ -135,17 +152,19 @@ fun RegisterScreen(
                     onNext = { focusManager.moveFocus(FocusDirection.Down) }
                 ),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .autofillType(ContentType.PersonFullName),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Email
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
                 label = { Text(stringResource(R.string.auth_label_email)) },
+                enabled = !isLoading,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Next
@@ -154,29 +173,37 @@ fun RegisterScreen(
                     onNext = { focusManager.moveFocus(FocusDirection.Down) }
                 ),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .autofillType(ContentType.EmailAddress),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Password
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
                 label = { Text(stringResource(R.string.auth_label_password)) },
+                enabled = !isLoading,
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
                             if (passwordVisible) Icons.Default.VisibilityOff
                             else Icons.Default.Visibility,
-                            contentDescription = if (passwordVisible) stringResource(R.string.auth_password_toggle_hide)
-                                else stringResource(R.string.auth_password_toggle_show)
+                            contentDescription = if (passwordVisible) {
+                                stringResource(R.string.auth_password_toggle_hide)
+                            } else {
+                                stringResource(R.string.auth_password_toggle_show)
+                            }
                         )
                     }
                 },
-                visualTransformation = if (passwordVisible) VisualTransformation.None
-                else PasswordVisualTransformation(),
+                visualTransformation = if (passwordVisible) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Next
@@ -185,94 +212,125 @@ fun RegisterScreen(
                     onNext = { focusManager.moveFocus(FocusDirection.Down) }
                 ),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .autofillType(ContentType.NewPassword),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Confirm password
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
-                label = {
-                    Text(
-                        stringResource(
-                            R.string.auth_label_confirmPassword)) },
-                                    visualTransformation =
-                            if (passwordVisible) VisualTransformation.None
-                            else PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Password,
-                                imeAction = ImeAction.Done
-                            ),
-                            keyboardActions = KeyboardActions(
-                                onDone = { focusManager.clearFocus() }
-                            ),
-                            singleLine = true,
-                            isError = confirmPassword.isNotEmpty() && password != confirmPassword,
-                            supportingText = if (confirmPassword.isNotEmpty() && password != confirmPassword) {
-                                {
-                                    Text(stringResource(R.string.auth_error_passwordMismatch)) }
-                                } else null,
-                                modifier = Modifier.fillMaxWidth()
+                label = { Text(stringResource(R.string.auth_label_confirmPassword)) },
+                enabled = !isLoading,
+                visualTransformation = if (passwordVisible) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { focusManager.clearFocus() }
+                ),
+                singleLine = true,
+                isError = confirmPassword.isNotEmpty() && password != confirmPassword,
+                supportingText = if (confirmPassword.isNotEmpty() && password != confirmPassword) {
+                    { Text(stringResource(R.string.auth_error_passwordMismatch)) }
+                } else {
+                    null
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .autofillType(ContentType.NewPassword)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    if (isLoading) return@Button
+                    if (password != confirmPassword) {
+                        errorMessage = passwordMismatchError
+                        return@Button
+                    }
+                    scope.launch {
+                        isLoading = true
+                        try {
+                            val trimmedEmail = email.trim()
+                            val trimmedName = name.trim()
+
+                            val registerResponse = authApi.register(
+                                RegisterRequest(
+                                    email = trimmedEmail,
+                                    password = password,
+                                    name = trimmedName
                                 )
-
-                                Spacer(modifier = Modifier.height(24.dp))
-
-                                // Create Account button
-                                Button(
-                                    onClick = {
-                                        if (password != confirmPassword) {
-                                            errorMessage = "Passwords do not match"
-                                            return@Button
-                                        }
-                                        scope.launch {
-                                            isLoading = true
-                                            try {
-                                                val response = authApi.register(
-                                                    RegisterRequest(
-                                                        email = email.trim(),
-                                                        password = password,
-                                                        name = name.trim()
-                                                    )
-                                                )
-                                                if (response.isSuccessful) {
-                                                    onRegisterSuccess()
-                                                } else {
-                                                    errorMessage =
-                                                        "Registration failed. Please try again."
-                                                }
-                                            } catch (e: Exception) {
-                                                errorMessage = e.message ?: "An error occurred"
-                                            } finally {
-                                                isLoading = false
-                                            }
-                                        }
-                                    },
-                                    enabled = name.isNotBlank() && email.isNotBlank() &&
-                                            password.isNotBlank() && confirmPassword.isNotBlank() &&
-                                            password == confirmPassword && !isLoading,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    if (isLoading) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(18.dp),
-                                            strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            when (val registerOutcome = parseRegisterResponse(registerResponse)) {
+                                is RegisterOutcome.Failed -> {
+                                    errorMessage = registerOutcome.message
+                                    return@launch
+                                }
+                                is RegisterOutcome.VerificationRequired -> {
+                                    errorMessage = registerOutcome.message
+                                    onNavigateToLogin()
+                                    return@launch
+                                }
+                                is RegisterOutcome.AccountCreated -> {
+                                    when (
+                                        val loginOutcome = performLogin(
+                                            authApi = authApi,
+                                            authManager = authManager,
+                                            email = trimmedEmail,
+                                            password = password
                                         )
-                                        Spacer(modifier = Modifier.width(8.dp))
+                                    ) {
+                                        is LoginOutcome.Success -> onRegisterSuccess()
+                                        is LoginOutcome.VerificationRequired -> {
+                                            errorMessage = loginOutcome.message
+                                            onNavigateToLogin()
+                                        }
+                                        is LoginOutcome.Failed -> {
+                                            errorMessage = loginOutcome.message
+                                        }
                                     }
-                                    Text(stringResource(R.string.auth_title_createAccount))
                                 }
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                TextButton(onClick = onNavigateToLogin) {
-                                    Text(stringResource(R.string.auth_link_alreadyHaveAccount))
-                                }
-
-                                Spacer(modifier = Modifier.height(48.dp))
                             }
+                        } catch (e: Exception) {
+                            errorMessage = e.message ?: "An error occurred"
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                },
+                enabled = formValid,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                 }
+                Text(stringResource(R.string.auth_title_createAccount))
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            TextButton(onClick = onNavigateToLogin, enabled = !isLoading) {
+                Text(stringResource(R.string.auth_link_alreadyHaveAccount))
+            }
+
+            Spacer(modifier = Modifier.height(48.dp))
         }
+    }
+}

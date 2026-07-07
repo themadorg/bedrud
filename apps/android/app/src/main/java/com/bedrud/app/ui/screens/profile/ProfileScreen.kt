@@ -20,19 +20,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
+
+import com.bedrud.app.ui.components.BedrudOutlinedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LargeTopAppBar
+import com.bedrud.app.ui.components.BedrudCompactTopBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -43,7 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
@@ -69,8 +69,6 @@ fun ProfileContent(
     val activeInstance = instanceManager.store.activeInstance
     var showInstanceSwitcher by remember { mutableStateOf(false) }
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
     if (showInstanceSwitcher) {
         InstanceSwitcherSheet(
             instanceManager = instanceManager,
@@ -82,15 +80,8 @@ fun ProfileContent(
         )
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .nestedScroll(scrollBehavior.nestedScrollConnection)
-    ) {
-        LargeTopAppBar(
-            title = { Text(stringResource(R.string.profile_title)) },
-            scrollBehavior = scrollBehavior
-        )
+    Column(modifier = modifier.fillMaxSize()) {
+        BedrudCompactTopBar(title = stringResource(R.string.profile_title))
 
         Column(
             modifier = Modifier
@@ -102,12 +93,7 @@ fun ProfileContent(
             Spacer(modifier = Modifier.height(0.dp))
 
             // User section
-            ElevatedCard(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
+            BedrudOutlinedCard(shape = RoundedCornerShape(16.dp)) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -174,12 +160,7 @@ fun ProfileContent(
             }
 
             // Server section
-            ElevatedCard(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
+            BedrudOutlinedCard(shape = RoundedCornerShape(16.dp)) {
                 Column {
                     Text(
                         stringResource(R.string.profile_section_server),
@@ -235,12 +216,7 @@ fun ProfileContent(
             }
 
             // Account section
-            ElevatedCard(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
+            BedrudOutlinedCard(shape = RoundedCornerShape(16.dp)) {
                 Column {
                     Text(
                         stringResource(R.string.profile_section_account),

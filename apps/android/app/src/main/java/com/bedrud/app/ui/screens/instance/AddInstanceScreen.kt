@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,9 +27,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
-import androidx.compose.material3.CardDefaults
+
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
+import com.bedrud.app.ui.components.BedrudOutlinedCard
+import com.bedrud.app.ui.components.BedrudScaffoldContentInsets
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -101,13 +101,13 @@ fun AddInstanceScreen(
     val isDuplicate = instances.any { it.serverURL.equals(resolvedURL, ignoreCase = true) }
 
     Scaffold(
+        contentWindowInsets = BedrudScaffoldContentInsets,
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .imePadding(),
+                .padding(padding),
             contentPadding = PaddingValues(bottom = 32.dp)
         ) {
             // Header
@@ -147,14 +147,11 @@ fun AddInstanceScreen(
                 }
 
                 item {
-                    ElevatedCard(
+                    BedrudOutlinedCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.elevatedCardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        )
+                        shape = RoundedCornerShape(16.dp)
                     ) {
                         instances.forEachIndexed { index, instance ->
                             ServerRow(
@@ -202,14 +199,11 @@ fun AddInstanceScreen(
             }
 
             item {
-                ElevatedCard(
+                BedrudOutlinedCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.elevatedCardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         OutlinedTextField(

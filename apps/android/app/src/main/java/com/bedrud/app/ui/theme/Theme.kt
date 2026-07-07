@@ -13,6 +13,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import com.bedrud.app.ui.screens.settings.AppLanguage
 
 private val LightColorScheme = lightColorScheme(
     primary = LightPrimary,
@@ -60,7 +61,7 @@ private val DarkColorScheme = darkColorScheme(
 fun BedrudTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
-    isRtl: Boolean = false,
+    language: AppLanguage = AppLanguage.SYSTEM,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -72,8 +73,13 @@ fun BedrudTheme(
         else -> LightColorScheme
     }
 
+    val isRtl = language.resolveIsRtl()
     val layoutDirection = if (isRtl) LayoutDirection.Rtl else LayoutDirection.Ltr
-    val typography = if (isRtl) VazirmatnTypography else BedrudTypography
+    val typography = when {
+        language.usesShabnam() -> ShabnamTypography
+        isRtl -> VazirmatnTypography
+        else -> BedrudTypography
+    }
 
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
         MaterialTheme(

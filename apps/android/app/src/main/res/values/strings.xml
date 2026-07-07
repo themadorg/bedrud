@@ -80,6 +80,12 @@
   <string name="meeting_contentDescription_toggleCamera">Toggle Camera</string>
   <string name="meeting_contentDescription_switchCamera">Switch Camera</string>
   <string name="meeting_contentDescription_toggleScreenShare">Toggle Screen Share</string>
+  <string name="meeting_contentDescription_stopScreenShare">Stop screen share</string>
+  <string name="meeting_contentDescription_maximizeScreenShare">Full screen</string>
+  <string name="meeting_contentDescription_minimizeScreenShare">Exit full screen</string>
+  <string name="meeting_stage_screenShareTitle">Screen share</string>
+  <string name="meeting_stage_screenSharePresenting"><xliff:g id="name" example="Alex">%1$s</xliff:g> is presenting</string>
+  <string name="meeting_stage_screenShareWaiting">Waiting for <xliff:g id="name" example="Alex">%1$s</xliff:g>\'s screen…</string>
   <string name="meeting_contentDescription_toggleChat">Toggle Chat</string>
   <string name="meeting_contentDescription_participants">Participants</string>
   <string name="meeting_contentDescription_leaveCall">Leave Call</string>
@@ -90,6 +96,8 @@
   <string name="meeting_contentDescription_closeChat">Close Chat</string>
   <string name="meeting_contentDescription_scrollToBottom">Scroll to bottom</string>
   <string name="meeting_contentDescription_attachImage">Attach image</string>
+  <string name="meeting_contentDescription_closeImagePreview">Close image preview</string>
+  <string name="meeting_contentDescription_viewImage">View image</string>
   <string name="meeting_contentDescription_send">Send</string>
   <string name="admin_users">Users</string>
   <string name="admin_tab_rooms">Rooms</string>
@@ -151,6 +159,31 @@
   <string name="call_action_hangUp">Hang Up</string>
   <string name="call_notification_title">Call: <xliff:g id="roomName" example="Team Standup">%1$s</xliff:g></string>
   <string name="call_notification_text">Ongoing call</string>
+  <string name="call_default_room_name">Meeting</string>
+  <string name="screen_share_channel_name">Screen Sharing</string>
+  <string name="screen_share_channel_description">Shown while your screen is being shared</string>
+  <string name="screen_share_notification_title">Sharing screen</string>
+  <string name="screen_share_notification_text">Your screen is visible to meeting participants</string>
+  <string name="meeting_error_permissionsRequired">Camera and microphone permissions are required to join.</string>
+  <string name="meeting_error_screenShareFailed">Could not start screen sharing.</string>
+  <string name="meeting_sheet_chat">Chat</string>
+  <string name="meeting_sheet_addOthers">Add others</string>
+  <string name="meeting_share_chooserTitle">Share meeting link</string>
+  <string name="meeting_sheet_flipCamera">Flip camera</string>
+  <string name="meeting_sheet_settings">Settings</string>
+  <string name="meeting_sheet_tools">Tools</string>
+  <string name="meeting_sheet_report">Report abuse</string>
+  <string name="meeting_contentDescription_audioSource">Audio source</string>
+  <string name="meeting_audio_sheet_title">Audio</string>
+  <string name="meeting_audio_sheet_microphone">Microphone</string>
+  <string name="meeting_audio_sheet_micOn">Unmuted</string>
+  <string name="meeting_audio_sheet_micOff">Muted</string>
+  <string name="meeting_audio_sheet_output">Audio output</string>
+  <string name="meeting_audio_device_speaker">Speaker</string>
+  <string name="meeting_audio_device_earpiece">Phone</string>
+  <string name="meeting_audio_device_wired_headset">Wired headset</string>
+  <string name="meeting_audio_device_bluetooth">Bluetooth</string>
+  <string name="meeting_audio_sheet_noDevices">No audio devices available</string>
   <string name="main_tab_rooms">Rooms</string>
   <string name="main_tab_profile">Profile</string>
   <string name="main_tab_settings">Settings</string>
@@ -170,6 +203,13 @@
   <string name="dashboard_filter_all">All</string>
   <string name="dashboard_filter_active">Active</string>
   <string name="dashboard_filter_private">Private</string>
+  <string name="dashboard_filter_recent">Recent</string>
+  <string name="dashboard_dialog_deleteTitle">Delete room?</string>
+  <string name="dashboard_dialog_deleteMessage">Are you sure you want to delete <xliff:g id="roomName" example="team-standup">%1$s</xliff:g>? This cannot be undone.</string>
+  <string name="dashboard_empty_noRecent">No recent rooms</string>
+  <string name="dashboard_empty_noRecentHint">Rooms you join appear here, including on other servers.</string>
+  <string name="dashboard_contentDescription_removeRecent">Remove from recent</string>
+  <string name="dashboard_recent_onServer">on <xliff:g id="serverName" example="My Server">%1$s</xliff:g></string>
   <string name="dashboard_roomSettings_allowChat">Allow Chat</string>
   <string name="dashboard_roomSettings_allowVideo">Allow Video</string>
   <string name="dashboard_roomSettings_allowAudio">Allow Audio</string>
