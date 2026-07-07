@@ -5,6 +5,7 @@
   <string name="common_button_save">ذخیره</string>
   <string name="common_button_create">ایجاد</string>
   <string name="common_button_join">پیوستن</string>
+  <string name="common_label_or">یا</string>
   <string name="common_button_generate">تولید</string>
   <string name="common_action_back">بازگشت</string>
   <string name="common_action_remove">حذف</string>
@@ -50,6 +51,7 @@
   <string name="dashboard_roomSettings_title">تنظیمات اتاق</string>
   <string name="meeting_status_connecting">در حال اتصال به <xliff:g id="roomName" example="Team Standup">%1$s</xliff:g>…</string>
   <string name="meeting_status_preparing">در حال آماده‌سازی…</string>
+  <string name="meeting_status_joining">در حال پیوستن…</string>
   <string name="meeting_dialog_leaveTitle">ترک جلسه</string>
   <string name="meeting_dialog_leaveMessage">آیا می‌خواهید جلسه را برای همه پایان دهید یا فقط خارج شوید؟</string>
   <string name="meeting_button_endForEveryone">پایان برای همه</string>
@@ -181,4 +183,12 @@
   <string name="profile_label_userId">شناسه کاربر</string>
   <string name="profile_label_provider">ارائه‌دهنده</string>
   <string name="profile_button_signOut">خروج</string>
+  <string name="auth_label_dontHaveAccount">حساب کاربری ندارید؟</string>
+  <string name="auth_action_signIn">وارد حساب خود شوید</string>
+  <string name="auth_button_joinAsGuest">پیوستن به عنوان مهمان</string>
+  <string name="auth_label_haveAccount">حساب کاربری دارید؟</string>
+  <string name="auth_description_noAccountNeeded">نیازی به حساب نیست - فقط یک نام انتخاب کنید و وارد شوید.</string>
+  <string name="auth_button_continueAsGuest">ادامه به عنوان مهمان</string>
+  <string name="auth_button_joinBedrud">پیوستن به Bedrud</string>
+  <string name="auth_subtitle_createAccountToGetStarted">برای شروع حساب خود را ایجاد کنید</string>
 </resources>

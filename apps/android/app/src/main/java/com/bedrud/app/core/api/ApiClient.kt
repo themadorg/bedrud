@@ -10,10 +10,14 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.Route
+import okhttp3.internal.tls.OkHostnameVerifier
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.X509TrustManager
 
 /**
  * Interceptor that attaches the JWT access token to every outgoing request.
@@ -45,7 +49,9 @@ class AuthInterceptor(
 class TokenAuthenticator(
     private val authManager: AuthManager,
     private val baseURL: String,
-    private val authApiProvider: () -> AuthApi
+    private val authApiProvider: () -> AuthApi,
+    private val sslSocketFactory: SSLSocketFactory? = null,
+    private val trustManager: X509TrustManager? = null
 ) : Authenticator {
 
     override fun authenticate(route: Route?, response: Response): Request? {
@@ -63,15 +69,21 @@ class TokenAuthenticator(
         // Perform synchronous token refresh
         val refreshCall = authApiProvider().let { _ ->
             // Use a separate retrofit instance without the authenticator to avoid recursion
+            val refreshClient = OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .apply {
+                    if (sslSocketFactory != null && trustManager != null) {
+                        sslSocketFactory(sslSocketFactory, trustManager)
+                        hostnameVerifier(OkHostnameVerifier)
+                    }
+                }
+                .build()
+
             val refreshRetrofit = Retrofit.Builder()
                 .baseUrl(baseURL.trimEnd('/') + "/")
                 .addConverterFactory(GsonConverterFactory.create())
-                .client(
-                    OkHttpClient.Builder()
-                        .connectTimeout(30, TimeUnit.SECONDS)
-                        .readTimeout(30, TimeUnit.SECONDS)
-                        .build()
-                )
+                .client(refreshClient)
                 .build()
 
             val refreshApi = refreshRetrofit.create(AuthApi::class.java)
@@ -120,7 +132,9 @@ class ApiClientFactory(private val baseURL: String) {
 
     fun createOkHttpClient(
         authInterceptor: AuthInterceptor,
-        tokenAuthenticator: TokenAuthenticator
+        tokenAuthenticator: TokenAuthenticator,
+        sslSocketFactory: SSLSocketFactory? = null,
+        x509TrustManager: X509TrustManager? = null
     ): OkHttpClient {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
@@ -130,14 +144,20 @@ class ApiClientFactory(private val baseURL: String) {
             }
         }
 
-        return OkHttpClient.Builder()
+        val builder = OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
             .addInterceptor(loggingInterceptor)
             .authenticator(tokenAuthenticator)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
-            .build()
+
+        if (sslSocketFactory != null && x509TrustManager != null) {
+            builder.sslSocketFactory(sslSocketFactory, x509TrustManager)
+            builder.hostnameVerifier(OkHostnameVerifier)
+        }
+
+        return builder.build()
     }
 
     fun createRetrofit(okHttpClient: OkHttpClient): Retrofit {

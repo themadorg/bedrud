@@ -5,6 +5,7 @@
   <string name="common_button_save">Enregistrer</string>
   <string name="common_button_create">Créer</string>
   <string name="common_button_join">Rejoindre</string>
+  <string name="common_label_or">ou</string>
   <string name="common_button_generate">Générer</string>
   <string name="common_action_back">Retour</string>
   <string name="common_action_remove">Supprimer</string>
@@ -52,6 +53,7 @@
   <string name="dashboard_roomSettings_title">Paramètres du salon</string>
   <string name="meeting_status_connecting">Connexion à <xliff:g id="roomName" example="Team Standup">%1$s</xliff:g>…</string>
   <string name="meeting_status_preparing">Préparation…</string>
+  <string name="meeting_status_joining">Rejoindre…</string>
   <string name="meeting_dialog_leaveTitle">Quitter la réunion</string>
   <string name="meeting_dialog_leaveMessage">Voulez-vous terminer la réunion pour tout le monde ou simplement la quitter ?</string>
   <string name="meeting_button_endForEveryone">Terminer pour tout le monde</string>
@@ -184,4 +186,12 @@
   <string name="profile_label_userId">ID utilisateur</string>
   <string name="profile_label_provider">Fournisseur</string>
   <string name="profile_button_signOut">Déconnexion</string>
+  <string name="auth_label_dontHaveAccount">Vous n\'avez pas de compte ?</string>
+  <string name="auth_action_signIn">connectez-vous à votre compte</string>
+  <string name="auth_button_joinAsGuest">rejoindre en tant qu\'invité</string>
+  <string name="auth_label_haveAccount">Vous avez un compte ?</string>
+  <string name="auth_description_noAccountNeeded">pas de compte nécessaire - choisissez un nom et vous êtes dedans.</string>
+  <string name="auth_button_continueAsGuest">continuer en tant qu\'invité</string>
+  <string name="auth_button_joinBedrud">rejoindre Bedrud</string>
+  <string name="auth_subtitle_createAccountToGetStarted">créez votre compte pour commencer</string>
 </resources>

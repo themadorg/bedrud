@@ -12,12 +12,20 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -28,7 +36,10 @@ import com.bedrud.app.core.auth.OAuthLoginHandler
 import com.bedrud.app.core.createLocaleContext
 import com.bedrud.app.core.deeplink.BedrudURLParser
 import com.bedrud.app.core.instance.InstanceManager
+import com.bedrud.app.core.instance.RenewalResult
 import com.bedrud.app.core.pip.PipStateHolder
+import com.bedrud.app.core.ssl.CertificateInfo
+import com.bedrud.app.ui.components.CertificateTrustDialog
 import com.bedrud.app.ui.screens.auth.GuestLoginScreen
 import com.bedrud.app.ui.screens.auth.LoginScreen
 import com.bedrud.app.ui.screens.auth.RegisterScreen
@@ -74,17 +85,58 @@ class MainActivity : ComponentActivity() {
             }
 
             val language by settingsStore.language.collectAsState()
+            val snackbarHostState = remember { SnackbarHostState() }
+            var renewalCertInfo by remember { mutableStateOf<CertificateInfo?>(null) }
+            var renewalTempId by remember { mutableStateOf<String?>(null) }
+
+            LaunchedEffect(Unit) {
+                instanceManager.certificateNeedRenewal.collect {
+                    val result = snackbarHostState.showSnackbar(
+                        message = "Server certificate changed or expired",
+                        actionLabel = "Re-trust"
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        val renewal = instanceManager.beginCertificateRenewal()
+                        if (renewal is RenewalResult.Captured) {
+                            renewalCertInfo = renewal.info
+                            renewalTempId = renewal.tempCertId
+                        }
+                    }
+                }
+            }
+
+            if (renewalCertInfo != null && renewalTempId != null) {
+                CertificateTrustDialog(
+                    certInfo = renewalCertInfo!!,
+                    onTrust = {
+                        instanceManager.confirmRenewal(renewalTempId!!)
+                        renewalCertInfo = null
+                        renewalTempId = null
+                    },
+                    onDismiss = {
+                        instanceManager.cancelRenewal(renewalTempId!!)
+                        renewalCertInfo = null
+                        renewalTempId = null
+                    }
+                )
+            }
 
             BedrudTheme(darkTheme = darkTheme, isRtl = language.resolveIsRtl()) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    BedrudNavHost(
-                        instanceManager = instanceManager,
-                        deepLinkRoomName = _deepLinkRoomName,
-                        oauthToken = _oauthToken
-                    )
+                Scaffold(
+                    snackbarHost = { SnackbarHost(snackbarHostState) }
+                ) { padding ->
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        BedrudNavHost(
+                            instanceManager = instanceManager,
+                            deepLinkRoomName = _deepLinkRoomName,
+                            oauthToken = _oauthToken
+                        )
+                    }
                 }
             }
         }

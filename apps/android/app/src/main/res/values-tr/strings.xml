@@ -5,6 +5,7 @@
   <string name="common_button_save">Kaydet</string>
   <string name="common_button_create">Oluştur</string>
   <string name="common_button_join">Katıl</string>
+  <string name="common_label_or">veya</string>
   <string name="common_button_generate">Oluştur</string>
   <string name="common_action_back">Geri</string>
   <string name="common_action_remove">Kaldır</string>
@@ -12,6 +13,7 @@
   <string name="auth_label_password">Şifre</string>
   <string name="auth_label_fullName">Ad Soyad</string>
   <string name="auth_label_confirmPassword">Şifreyi Onayla</string>
+  <string name="auth_label_dontHaveAccount">Hesabınız yok mu?</string>
   <string name="auth_label_displayName">Görünen ad</string>
   <string name="auth_placeholder_displayName">Size ne diyelim?</string>
   <string name="auth_button_signIn">Giriş Yap</string>
@@ -52,6 +54,7 @@
   <string name="dashboard_roomSettings_title">Oda Ayarları</string>
   <string name="meeting_status_connecting"><xliff:g id="roomName" example="Team Standup">%1$s</xliff:g> bağlanıyor…</string>
   <string name="meeting_status_preparing">Hazırlanıyor…</string>
+  <string name="meeting_status_joining">Katılıyor…</string>
   <string name="meeting_dialog_leaveTitle">Toplantıdan Ayrıl</string>
   <string name="meeting_dialog_leaveMessage">Toplantıyı herkes için sonlandırmak mı yoksa sadece ayrılmak mı istiyorsunuz?</string>
   <string name="meeting_button_endForEveryone">Herkes İçin Sonlandır</string>
@@ -184,4 +187,11 @@
   <string name="profile_label_userId">Kullanıcı Kimliği</string>
   <string name="profile_label_provider">Sağlayıcı</string>
   <string name="profile_button_signOut">Çıkış Yap</string>
+  <string name="auth_action_signIn">hesabına giriş yap</string>
+  <string name="auth_button_joinAsGuest">misafir olarak katıl</string>
+  <string name="auth_label_haveAccount">Hesabınız var mı?</string>
+  <string name="auth_description_noAccountNeeded">hesap gerekmez - sadece bir isim seç ve içerdeysin.</string>
+  <string name="auth_button_continueAsGuest">misafir olarak devam et</string>
+  <string name="auth_button_joinBedrud">Bedrud\'a katıl</string>
+  <string name="auth_subtitle_createAccountToGetStarted">başlamak için hesabını oluştur</string>
 </resources>

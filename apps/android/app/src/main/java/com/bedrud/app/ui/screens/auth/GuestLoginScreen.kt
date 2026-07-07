@@ -146,12 +146,12 @@ fun GuestLoginScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Join as guest",
+                text = stringResource(R.string.auth_button_joinAsGuest),
                 style = MaterialTheme.typography.headlineMedium
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "No account needed — just pick a name and you're in.",
+                text = stringResource(R.string.auth_description_noAccountNeeded),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -210,7 +210,7 @@ fun GuestLoginScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 Text(
-                    if (isLoading) "Joining…" else "Continue as guest",
+                    if (isLoading) stringResource(R.string.meeting_status_joining) else stringResource(R.string.auth_button_continueAsGuest),
                     style = MaterialTheme.typography.labelLarge
                 )
             }
@@ -222,7 +222,7 @@ fun GuestLoginScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Have an account?",
+                    text = stringResource(R.string.auth_label_haveAccount),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

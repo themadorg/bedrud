@@ -5,6 +5,7 @@
   <string name="common_button_save">Guardar</string>
   <string name="common_button_create">Crear</string>
   <string name="common_button_join">Unirse</string>
+  <string name="common_label_or">o</string>
   <string name="common_button_generate">Generar</string>
   <string name="common_action_back">Atrás</string>
   <string name="common_action_remove">Eliminar</string>
@@ -13,6 +14,7 @@
   <string name="auth_label_fullName">Nombre completo</string>
   <string name="auth_label_confirmPassword">Confirmar contraseña</string>
   <string name="auth_label_displayName">Nombre para mostrar</string>
+  <string name="auth_label_dontHaveAccount">¿No tienes una cuenta?</string>
   <string name="auth_placeholder_displayName">¿Cómo deberíamos llamarte?</string>
   <string name="auth_button_signIn">Iniciar sesión</string>
   <string name="auth_button_signUp">Registrarse</string>
@@ -52,6 +54,7 @@
   <string name="dashboard_roomSettings_title">Ajustes de la sala</string>
   <string name="meeting_status_connecting">Conectando a <xliff:g id="roomName" example="Team Standup">%1$s</xliff:g>…</string>
   <string name="meeting_status_preparing">Preparando…</string>
+  <string name="meeting_status_joining">Uniéndose…</string>
   <string name="meeting_dialog_leaveTitle">Abandonar reunión</string>
   <string name="meeting_dialog_leaveMessage">¿Quieres finalizar la reunión para todos o solo irte?</string>
   <string name="meeting_button_endForEveryone">Finalizar para todos</string>
@@ -184,4 +187,11 @@
   <string name="profile_label_userId">ID de usuario</string>
   <string name="profile_label_provider">Proveedor</string>
   <string name="profile_button_signOut">Cerrar sesión</string>
+  <string name="auth_action_signIn">inicia sesión en tu cuenta</string>
+  <string name="auth_button_joinAsGuest">unirse como invitado</string>
+  <string name="auth_label_haveAccount">¿Tienes una cuenta?</string>
+  <string name="auth_description_noAccountNeeded">no necesitas cuenta - solo elige un nombre y ya estás dentro.</string>
+  <string name="auth_button_continueAsGuest">continuar como invitado</string>
+  <string name="auth_button_joinBedrud">unirse a Bedrud</string>
+  <string name="auth_subtitle_createAccountToGetStarted">crea tu cuenta para empezar</string>
 </resources>
