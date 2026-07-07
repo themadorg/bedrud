@@ -199,35 +199,79 @@ Bedrud می‌تواند ایمیل‌های تراکنشی (خوش‌آمدگو
 
 ## پیکربندی LiveKit
 
-**مکان:** `server/config/livekit.yaml` (توسعه) یا `/etc/bedrud/livekit.yaml` (تولید)
+**مکان:** `server/livekit.yaml` (توسعه) یا `/etc/bedrud/livekit.yaml` (تولید)
 
-```yaml
-port: 7880                      # پورت HTTP/WebSocket LiveKit
+<Tabs>
+  <TabsList>
+    <TabsTrigger value="production">تولید / خارجی (استاندارد)</TabsTrigger>
+    <TabsTrigger value="development">توسعه محلی (Loopback)</TabsTrigger>
+  </TabsList>
+  <TabsContent value="production">
 
-rtc:
-  port_range_start: 50000       # شروع محدوده پورت UDP
-  port_range_end: 60000         # پایان محدوده پورت UDP
-  use_external_ip: true         # استفاده از IP خارجی برای RTC
+  ```yaml
+  port: 7880                      # LiveKit HTTP/WebSocket port
 
-turn:
-  enabled: true
-  domain: "localhost"
-  tls_port: 5349
-  udp_port: 3478
+  rtc:
+    tcp_port: 7881                # TCP port for WebRTC traffic (e.g. for fallback)
+    port_range_start: 50000       # UDP port range start
+    port_range_end: 60000         # UDP port range end
+    use_external_ip: true         # Use STUN to detect public IP; requires internet
 
-keys:
-  devkey: "devsecret"           # باید با تنظیمات سرور مطابقت داشته باشد
+  turn:
+    enabled: true                 # Enable TURN server for media relay
+    domain: localhost             # Domain name (required for TURN/TLS)
+    udp_port: 3478                # UDP port for TURN/STUN requests
+    tls_port: 5349                # TLS port (requires certificates)
 
-logging:
-  level: info
+  keys:
+    devkey: "CHANGE_ME_LIVEKIT_SECRET" # Must match livekit.apiSecret in config.yaml
 
-room:
-  auto_create: true              # ایجاد خودکار اتاق‌ها هنگام پیوستن شرکت‌کنندگان
-  empty_timeout: 60              # ثانیه قبل از حذف اتاق خالی
-  departure_timeout: 60          # ثانیه برای نگه داشتن اتاق پس از خروج همه شرکت‌کنندگان
-  max_participants: 20           # حداکثر شرکت‌کننده در هر اتاق (۰ = نامحدود)
-  enable_remote_unmute: true     # اجازه unmute سمت سرور شرکت‌کنندگان
-```
+  room:
+    auto_create: true             # Auto-create rooms when participants join
+    empty_timeout: 60             # Seconds before deleting empty room
+    departure_timeout: 60         # Seconds to keep room active after everyone leaves
+    max_participants: 20          # Max participants per room (0 for no limit)
+    enable_remote_unmute: true    # Allow server-side unmute of participants
+  ```
+
+  </TabsContent>
+  <TabsContent value="development">
+
+  ```yaml
+  port: 7072                      # LiveKit HTTP/WebSocket port for local dev
+
+  rtc:
+    tcp_port: 7073                # TCP port for WebRTC fallback in local dev
+    port_range_start: 7080        # Custom UDP range to avoid conflicts
+    port_range_end: 7099
+    use_external_ip: false        # Avoids slow STUN resolution on local networks/VPNs
+    use_ice_lite: true            # Enables ICE Lite for single-node development
+    node_ip: 127.0.0.1            # Forces ICE candidates to loopback (same-machine dev)
+    ips:
+      includes:
+        - 127.0.0.1/32            # Restricts interface scanning to localhost only
+    enable_loopback_candidate: true # Allows loopback candidates (browsers on localhost)
+    allow_tcp_fallback: true      # Fall back to TCP if UDP is blocked
+
+  logging:
+    level: debug                  # Verbosely log connection issues in development
+
+  turn:
+    enabled: false                # TURN is disabled for local dev (unnecessary on localhost)
+
+  keys:
+    devkey: "CHANGE_ME_LIVEKIT_SECRET" # Must match livekit.apiSecret in config.yaml
+
+  room:
+    auto_create: true             # Auto-create rooms when participants join
+    empty_timeout: 60             # Seconds before deleting empty room
+    departure_timeout: 60         # Seconds to keep room active after everyone leaves
+    max_participants: 20          # Max participants per room (0 for no limit)
+    enable_remote_unmute: true    # Allow server-side unmute of participants
+  ```
+
+  </TabsContent>
+</Tabs>
 
 <Callout type="warning">
     `keys` در `livekit.yaml` باید با `livekit.apiKey` و `livekit.apiSecret` در `config.yaml` سرور مطابقت داشته باشد.
