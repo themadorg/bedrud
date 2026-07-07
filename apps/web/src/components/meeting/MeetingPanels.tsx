@@ -1,89 +1,139 @@
-import { useParticipants } from '@livekit/components-react'
-import { Info, MessageSquare, Users } from 'lucide-react'
-import { lazy, Suspense, useState } from 'react'
+import { useParticipants, useRoomContext } from '@livekit/components-react'
+import { Globe, Lock, MessageSquare, Users, Video } from 'lucide-react'
+import { useState } from 'react'
+import { cn } from '#/lib/utils'
+import { ChatPanel } from '@/components/meeting/ChatPanel'
 import { ChatToastNotifier } from '@/components/meeting/ChatToastNotifier'
 import { useMeetingChatContext, useMeetingRoomContext } from '@/components/meeting/MeetingContext'
 import { MeetingControls } from '@/components/meeting/MeetingControls'
+import { ParticipantsList } from '@/components/meeting/ParticipantsList'
+import { RoomAccessDialog } from '@/components/meeting/RoomAccessDialog'
 import { RoomInfoPanel } from '@/components/meeting/RoomInfoPanel'
-
-// Lazy-loaded panels: only fetched when the user opens them.
-const ChatPanel = lazy(() => import('@/components/meeting/ChatPanel').then((m) => ({ default: m.ChatPanel })))
-const ParticipantsList = lazy(() =>
-  import('@/components/meeting/ParticipantsList').then((m) => ({ default: m.ParticipantsList })),
-)
+import { useMeetingStage } from '@/components/meeting/stage/MeetingStageContext'
 
 interface MeetingPanelsProps {
   navigate: () => void
+  chatOpen: boolean
+  setChatOpen: (open: boolean | ((prev: boolean) => boolean)) => void
+  chatStuck: boolean
+  setChatStuck: (stuck: boolean) => void
+  videoSidebarOpen: boolean
+  onToggleVideoSidebar: () => void
+  infoOpen: boolean
+  onCloseInfo: () => void
+  participantsOpen: boolean
+  onToggleParticipants: () => void
+  onCloseParticipants: () => void
 }
 
-/** Manages side panels (chat, participants, room info), their toggle buttons, toast notifications, and controls. */
-export function MeetingPanels({ navigate }: MeetingPanelsProps) {
-  const [chatOpen, setChatOpen] = useState(false)
-  const [participantsOpen, setParticipantsOpen] = useState(false)
-  const [infoOpen, setInfoOpen] = useState(false)
+export function MeetingPanels({
+  navigate,
+  chatOpen,
+  setChatOpen,
+  chatStuck,
+  setChatStuck,
+  videoSidebarOpen,
+  onToggleVideoSidebar,
+  infoOpen,
+  onCloseInfo,
+  participantsOpen,
+  onToggleParticipants,
+  onCloseParticipants,
+}: MeetingPanelsProps) {
+  const { stage } = useMeetingStage()
+
+  const closeChat = () => {
+    setChatOpen(false)
+    setChatStuck(false)
+  }
 
   const toggleChat = () => {
-    setChatOpen((o) => !o)
-    setParticipantsOpen(false)
-    setInfoOpen(false)
-  }
-  const toggleParticipants = () => {
-    setParticipantsOpen((o) => !o)
-    setChatOpen(false)
-    setInfoOpen(false)
-  }
-  const toggleInfo = () => {
-    setInfoOpen((o) => !o)
-    setChatOpen(false)
-    setParticipantsOpen(false)
+    setChatOpen((open) => {
+      if (open && chatStuck) return true
+      return !open
+    })
+    onCloseParticipants()
+    onCloseInfo()
   }
 
-  const { roomId } = useMeetingRoomContext()
+  const { roomId, adminId } = useMeetingRoomContext()
+  const { chatMessages, systemMessages, sendChat, markRead, votePoll, reactToMessage } = useMeetingChatContext()
+  const room = useRoomContext()
+  const currentIdentity = room.localParticipant.identity
 
   return (
     <>
-      {/* Top-left: Participants button */}
-      <ParticipantsToggle isOpen={participantsOpen} onToggle={toggleParticipants} />
+      <div
+        className="absolute z-[25] flex items-center gap-2"
+        style={{
+          top: 'calc(14px + env(safe-area-inset-top, 0px))',
+          left: 'calc(14px + env(safe-area-inset-left, 0px))',
+        }}
+      >
+        <ParticipantsToggle isOpen={participantsOpen} onToggle={onToggleParticipants} />
+        {stage && <VideoSidebarToggle isOpen={videoSidebarOpen} onToggle={onToggleVideoSidebar} />}
+        <RoomAccessBadge />
+      </div>
 
-      {/* Top-right: Chat button */}
       <ChatToggle isOpen={chatOpen} onToggle={toggleChat} />
 
-      {/* Info toggle — between chat and participants on right */}
-      <InfoToggle isOpen={infoOpen} onToggle={toggleInfo} />
-
-      {participantsOpen && !chatOpen && !infoOpen && (
-        <Suspense fallback={null}>
-          <ParticipantsList onClose={() => setParticipantsOpen(false)} />
-        </Suspense>
+      {participantsOpen && !infoOpen && (!chatOpen || chatStuck) && (
+        <ParticipantsList adminId={adminId} onClose={onCloseParticipants} />
       )}
       {chatOpen && (
-        <Suspense fallback={null}>
-          <ChatPanel onClose={() => setChatOpen(false)} />
-        </Suspense>
+        <ChatPanel
+          onClose={closeChat}
+          roomId={roomId}
+          currentIdentity={currentIdentity}
+          chatMessages={chatMessages}
+          systemMessages={systemMessages}
+          sendChat={sendChat}
+          markRead={markRead}
+          votePoll={votePoll}
+          reactToMessage={reactToMessage}
+          stuck={chatStuck}
+          onStuckChange={setChatStuck}
+        />
       )}
-      {infoOpen && <RoomInfoPanel roomId={roomId} onClose={() => setInfoOpen(false)} />}
+      <RoomInfoPanel open={infoOpen} onOpenChange={(open) => !open && onCloseInfo()} roomId={roomId} />
       <ChatToastNotifier chatOpen={chatOpen} />
       <MeetingControls onNavigate={navigate} />
     </>
   )
 }
 
-/* ── Top-left: Participants toggle button ─────────────────────── */
+function meetChromeButtonClass(active: boolean, className?: string) {
+  return cn(
+    'cursor-pointer backdrop-blur-lg transition-all duration-150',
+    active
+      ? 'border border-[color-mix(in_oklab,var(--accent-600)_28%,transparent)] bg-[var(--meet-btn-muted-bg)] text-[var(--meet-btn-muted-fg)]'
+      : 'border border-[var(--meet-border-subtle)] bg-[var(--meet-chrome)] text-[var(--meet-fg-muted)] hover:text-[var(--meet-fg-strong)]',
+    className,
+  )
+}
 
-function ParticipantsToggle({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => void }) {
-  const participants = useParticipants()
+function VideoSidebarToggle({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => void }) {
   return (
     <button
       type="button"
       onClick={onToggle}
-      className="absolute z-[25] flex items-center gap-1.5 rounded-xl px-3 py-[7px] text-xs font-semibold cursor-pointer backdrop-blur-lg transition-all duration-150"
-      style={{
-        top: 'calc(14px + env(safe-area-inset-top, 0px))',
-        left: 'calc(14px + env(safe-area-inset-left, 0px))',
-        background: isOpen ? 'color-mix(in oklab, var(--primary) 25%, transparent)' : 'rgba(12,12,22,0.7)',
-        border: `1px solid ${isOpen ? 'color-mix(in oklab, var(--primary) 40%, transparent)' : 'rgba(255,255,255,0.08)'}`,
-        color: isOpen ? 'var(--accent-400)' : 'rgba(255,255,255,0.55)',
-      }}
+      className={meetChromeButtonClass(isOpen, 'flex items-center gap-1.5 rounded-xl px-3 py-[7px] text-xs font-semibold')}
+      aria-label={isOpen ? 'Close video panel' : 'Show video panel'}
+    >
+      <Video size={14} />
+      <span>Videos</span>
+    </button>
+  )
+}
+
+function ParticipantsToggle({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => void }) {
+  const participants = useParticipants()
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={meetChromeButtonClass(isOpen, 'flex items-center gap-1.5 rounded-xl px-3 py-[7px] text-xs font-semibold')}
       aria-label={isOpen ? 'Close participants' : 'Show participants'}
     >
       <Users size={14} />
@@ -92,43 +142,45 @@ function ParticipantsToggle({ isOpen, onToggle }: { isOpen: boolean; onToggle: (
   )
 }
 
-/* ── Top-right: Info toggle button ────────────────────────────── */
+function RoomAccessBadge() {
+  const { isPublic } = useMeetingRoomContext()
+  const [open, setOpen] = useState(false)
+  const Icon = isPublic ? Globe : Lock
 
-function InfoToggle({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="absolute z-[25] w-[38px] h-[38px] flex items-center justify-center rounded-xl cursor-pointer backdrop-blur-lg transition-all duration-150"
-      style={{
-        top: 'calc(14px + env(safe-area-inset-top, 0px))',
-        right: 'calc(14px + 38px + 8px + env(safe-area-inset-right, 0px))',
-        background: isOpen ? 'color-mix(in oklab, var(--primary) 25%, transparent)' : 'rgba(12,12,22,0.7)',
-        border: `1px solid ${isOpen ? 'color-mix(in oklab, var(--primary) 40%, transparent)' : 'rgba(255,255,255,0.08)'}`,
-        color: isOpen ? 'var(--accent-400)' : 'rgba(255,255,255,0.55)',
-      }}
-      aria-label={isOpen ? 'Close room info' : 'Show room info'}
-    >
-      <Info size={16} />
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={cn(
+          'flex h-8 w-8 items-center justify-center rounded-lg backdrop-blur-lg transition-all duration-150',
+          isPublic
+            ? 'border border-[color-mix(in_oklab,var(--accent-600)_35%,transparent)] bg-[color-mix(in_oklab,var(--accent-600)_18%,transparent)] text-accent-400'
+            : meetChromeButtonClass(false),
+        )}
+        aria-label={isPublic ? 'Public room — change access' : 'Private room — change access'}
+      >
+        <Icon size={14} />
+      </button>
+      <RoomAccessDialog open={open} onOpenChange={setOpen} />
+    </>
   )
 }
 
-/* ── Top-right: Chat toggle button ────────────────────────────── */
-
 function ChatToggle({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => void }) {
   const { unreadCount } = useMeetingChatContext()
+
   return (
     <button
       type="button"
       onClick={onToggle}
-      className="absolute z-[25] w-[38px] h-[38px] flex items-center justify-center rounded-xl cursor-pointer backdrop-blur-lg transition-all duration-150"
+      className={meetChromeButtonClass(
+        isOpen,
+        'absolute z-[25] flex h-[38px] w-[38px] items-center justify-center rounded-xl',
+      )}
       style={{
         top: 'calc(14px + env(safe-area-inset-top, 0px))',
         right: 'calc(14px + env(safe-area-inset-right, 0px))',
-        background: isOpen ? 'color-mix(in oklab, var(--primary) 25%, transparent)' : 'rgba(12,12,22,0.7)',
-        border: `1px solid ${isOpen ? 'color-mix(in oklab, var(--primary) 40%, transparent)' : 'rgba(255,255,255,0.08)'}`,
-        color: isOpen ? 'var(--accent-400)' : 'rgba(255,255,255,0.55)',
       }}
       aria-label={isOpen ? 'Close chat' : `Open chat${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
     >
