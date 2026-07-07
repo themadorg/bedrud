@@ -15,9 +15,9 @@ type QueueStats struct {
 	FailedPerMin    float64            `json:"failedPerMin"`
 	FailRate        float64            `json:"failRate"`
 
-	PendingEmail   int64      `json:"pendingEmail"`
-	FailedEmail24h int64      `json:"failedEmail24h"`
-	LastSendError  string     `json:"lastSendError,omitempty"`
+	PendingEmail    int64      `json:"pendingEmail"`
+	FailedEmail24h  int64      `json:"failedEmail24h"`
+	LastSendError   string     `json:"lastSendError,omitempty"`
 	LastSendErrorAt *time.Time `json:"lastSendErrorAt,omitempty"`
 }
 

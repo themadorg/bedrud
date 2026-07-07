@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"bedrud/config"
 	"bedrud/internal/auth"
+	"bedrud/internal/lkutil"
 	"bedrud/internal/models"
 	"bedrud/internal/repository"
 	"bedrud/internal/utils"
@@ -22,8 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"bedrud/config"
-	"bedrud/internal/lkutil"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/livekit/protocol/livekit"
@@ -860,7 +860,7 @@ func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
 	now := time.Now().UTC().Format(time.RFC1123Z)
 
 	subject := fmt.Sprintf("Test Email from %s", instanceName)
-	bodyHTML := buildTestEmailHTML(instanceName, effective.EmailButtonBg, effective.EmailHeaderBg)
+	bodyHTML := buildTestEmailHTML(instanceName, effective.EmailHeaderBg)
 	bodyPlain := fmt.Sprintf(
 		"This is a test email from %s.\nSent at: %s\nIf you see this, SMTP is working.\n",
 		instanceName, now,
@@ -900,12 +900,9 @@ func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
 	}
 }
 
-func buildTestEmailHTML(instanceName, buttonBg, headerBg string) string {
+func buildTestEmailHTML(instanceName, headerBg string) string {
 	if headerBg == "" {
 		headerBg = "#1a1a2e"
-	}
-	if buttonBg == "" {
-		buttonBg = "#e11d48"
 	}
 	now := time.Now().UTC().Format(time.RFC1123Z)
 	return fmt.Sprintf(`
@@ -1087,7 +1084,7 @@ func checkS3Connectivity(s models.SystemSettings) checkResult {
 
 	url := fmt.Sprintf("%s/%s", endpoint, s.ChatUploadS3Bucket)
 
-	req, err := http.NewRequest("HEAD", url, nil)
+	req, err := http.NewRequest(http.MethodHead, url, nil)
 	if err != nil {
 		return failResult("failed to create request: " + err.Error())
 	}
@@ -1105,7 +1102,7 @@ func checkS3Connectivity(s models.SystemSettings) checkResult {
 	if err != nil {
 		return failResult("connection failed: " + err.Error())
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		return failResult(fmt.Sprintf("bucket returned HTTP %d: %s", resp.StatusCode, resp.Status))
@@ -1545,7 +1542,7 @@ func (h *AdminHandler) TestWebhook(c *fiber.Ctx) error {
 			"latencyMs": latency,
 		})
 	}
-	resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
 	return c.JSON(fiber.Map{
