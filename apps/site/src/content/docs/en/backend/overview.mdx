@@ -48,3 +48,15 @@ The application starts in `server/cmd/bedrud/main.go`. It has three main modes:
 - [**WebRTC Connectivity**](/en/docs/architecture/webrtc-connectivity): How do clients establish media connections? (STUN/ICE/TURN/SFU)
 - [**TURN Server**](/en/docs/architecture/turn-server): TURN relay architecture, configuration, and troubleshooting
 - [**Installation & Deployment**](/en/docs/backend/deployment): How does the auto-installer work?
+
+## Contributor documentation (repository)
+
+These pages on bedrud.org are written for operators and API consumers. If you are **developing** the backend in the monorepo, use the code-audited internal docs in `docs/server/` (also linked from [AGENTS.md](https://github.com/themadorg/bedrud/blob/master/AGENTS.md)):
+
+| Topic | Internal doc (GitHub) |
+|-------|----------------------|
+| Authoritative route table | [`docs/server/routes.md`](https://github.com/themadorg/bedrud/blob/master/docs/server/routes.md) |
+| Handler method index | [`docs/server/handlers-reference.md`](https://github.com/themadorg/bedrud/blob/master/docs/server/handlers-reference.md) |
+| Queue internals | [`docs/server/queue-deep-dive.md`](https://github.com/themadorg/bedrud/blob/master/docs/server/queue-deep-dive.md) |
+| Public ↔ internal map | [`docs/server/public-docs.md`](https://github.com/themadorg/bedrud/blob/master/docs/server/public-docs.md) |
+| Add endpoints / models | [`docs/server/developer-guide.md`](https://github.com/themadorg/bedrud/blob/master/docs/server/developer-guide.md) |
