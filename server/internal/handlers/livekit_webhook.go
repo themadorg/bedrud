@@ -3,17 +3,13 @@ package handlers
 
 import (
 	"bedrud/config"
-	"bedrud/internal/models"
-	"bedrud/internal/queue"
 	"bedrud/internal/repository"
 	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/auth"
@@ -231,138 +227,4 @@ func (h *LiveKitWebhookHandler) handleRoomFinished(ctx context.Context, event *l
 	}
 
 	log.Info().Str("room", roomName).Msg("LiveKit webhook: room deactivated on finished")
-}
-
-// TODO oncoming feature
-// handleEgressStarted updates the recording status to "started" when LK egress begins.
-func (h *LiveKitWebhookHandler) handleEgressStarted(ctx context.Context, event *livekit.WebhookEvent) {
-	if h.recordingRepo == nil {
-		return
-	}
-	if event.EgressInfo == nil {
-		return
-	}
-
-	rec, err := h.recordingRepo.GetByEgressID(event.EgressInfo.EgressId)
-	if err != nil || rec == nil {
-		log.Warn().Str("egressID", event.EgressInfo.EgressId).
-			Msg("LiveKit webhook: egress_started for unknown egress")
-		return
-	}
-
-	if err := h.recordingRepo.UpdateStatus(rec.ID, models.RecordingPending, models.RecordingStarted); err != nil {
-		log.Warn().Err(err).Str("recordingID", rec.ID).
-			Msg("LiveKit webhook: failed to update recording status to started")
-		return
-	}
-
-	if err := h.recordingRepo.UpdateStartedAt(rec.ID, time.Now()); err != nil {
-		log.Warn().Err(err).Str("recordingID", rec.ID).
-			Msg("LiveKit webhook: failed to update recording started_at")
-	}
-
-	log.Info().Str("recordingID", rec.ID).Str("egressID", event.EgressInfo.EgressId).
-		Msg("LiveKit webhook: recording started")
-}
-
-// TODO oncoming feature
-// handleEgressEnded enqueues the process_recording job when LK egress completes,
-// or marks the recording as failed if the egress finished with an error.
-func (h *LiveKitWebhookHandler) handleEgressEnded(ctx context.Context, event *livekit.WebhookEvent) {
-	if h.recordingRepo == nil {
-		return
-	}
-	if event.EgressInfo == nil {
-		return
-	}
-
-	rec, err := h.recordingRepo.GetByEgressID(event.EgressInfo.EgressId)
-	if err != nil || rec == nil {
-		log.Warn().Str("egressID", event.EgressInfo.EgressId).
-			Msg("LiveKit webhook: egress_ended for unknown egress")
-		return
-	}
-
-	// Optimistic lock: only process if currently started
-	err = h.recordingRepo.UpdateStatus(rec.ID, models.RecordingStarted, models.RecordingProcessing)
-	if err != nil {
-		log.Warn().Err(err).Str("egressID", event.EgressInfo.EgressId).
-			Msg("LiveKit webhook: recording status already transitioned (duplicate egress_ended?)")
-		return
-	}
-
-	// Check if egress failed — LK reports failure via egress_ended with error status
-	if event.EgressInfo.Status == livekit.EgressStatus_EGRESS_FAILED {
-		errMsg := event.EgressInfo.Error
-		if errMsg == "" {
-			errMsg = "egress failed (no error details)"
-		}
-		_ = h.recordingRepo.UpdateError(rec.ID, errMsg)
-		log.Warn().Str("recordingID", rec.ID).Str("egressID", event.EgressInfo.EgressId).
-			Str("error", errMsg).Msg("LiveKit webhook: recording failed")
-		return
-	}
-
-	// Extract file URL from egress info
-	fileURL := extractFileURL(event.EgressInfo)
-	if fileURL == "" {
-		log.Warn().Str("egressID", event.EgressInfo.EgressId).
-			Msg("LiveKit webhook: no file URL in egress_ended event")
-		_ = h.recordingRepo.UpdateError(rec.ID, "no file URL in egress_ended event")
-		return
-	}
-
-	// Determine file size
-	var fileSize int64
-	if len(event.EgressInfo.FileResults) > 0 {
-		fileSize = event.EgressInfo.FileResults[0].Size
-	}
-
-	// Determine duration from file results (nanos → ms)
-	var durationMs int64
-	if len(event.EgressInfo.FileResults) > 0 {
-		durationMs = event.EgressInfo.FileResults[0].Duration / 1e6
-	}
-
-	// Enqueue processing
-	var startedAt string
-	if rec.StartedAt != nil {
-		startedAt = rec.StartedAt.Format(time.RFC3339)
-	}
-	payload := queue.ProcessRecordingPayload{
-		RoomID:        rec.RoomID,
-		RoomName:      rec.RoomName,
-		EgressID:      rec.EgressID,
-		FileURL:       fileURL,
-		FileSize:      fileSize,
-		RecordingType: rec.RecordingType,
-		DurationMs:    durationMs,
-		StartedAt:     startedAt,
-	}
-
-	if err := queue.Enqueue(ctx, h.db, "process_recording", payload); err != nil {
-		log.Error().Err(err).Str("egressID", event.EgressInfo.EgressId).
-			Msg("LiveKit webhook: failed to enqueue process_recording")
-		_ = h.recordingRepo.UpdateError(rec.ID, fmt.Sprintf("failed to enqueue: %v", err))
-		return
-	}
-
-	log.Info().Str("recordingID", rec.ID).Str("egressID", event.EgressInfo.EgressId).
-		Msg("LiveKit webhook: recording processing enqueued")
-}
-
-// TODO oncoming feature
-// extractFileURL returns the file URL from an egress info struct.
-// The file URL is in FileResults[0].Filename or in the Result oneof File field.
-func extractFileURL(info *livekit.EgressInfo) string {
-	if info == nil {
-		return ""
-	}
-	if len(info.FileResults) > 0 && info.FileResults[0].Filename != "" {
-		return info.FileResults[0].Filename
-	}
-	if fi := info.GetFile(); fi != nil && fi.Filename != "" {
-		return fi.Filename
-	}
-	return ""
 }

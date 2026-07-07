@@ -233,7 +233,7 @@ func (r *RecordingRepository) UpdateError(id, errMsg string) error {
 }
 
 // UpdateCompleted sets the recording as completed with the stored file details.
-func (r *RecordingRepository) UpdateCompleted(id, fileURL string, fileSize int64, durationMs int64, completedAt time.Time) error {
+func (r *RecordingRepository) UpdateCompleted(id, fileURL string, fileSize, durationMs int64, completedAt time.Time) error {
 	result := r.db.Model(&models.Recording{}).Where("id = ? AND status = ?", id, models.RecordingProcessing).Updates(map[string]interface{}{
 		"status":       models.RecordingCompleted,
 		"file_url":     fileURL,

@@ -14,7 +14,7 @@ import (
 //
 // The roomOwnerID argument should be the resolved adminId (AdminID if set,
 // else CreatedBy) that the caller already has available.
-func isRoomModerator(claims *auth.Claims, roomOwnerID string, roomID string, roomRepo *repository.RoomRepository) bool {
+func isRoomModerator(claims *auth.Claims, roomOwnerID, roomID string, roomRepo *repository.RoomRepository) bool {
 	if containsAccess(claims.Accesses, "superadmin") {
 		return true
 	}

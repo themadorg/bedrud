@@ -1210,7 +1210,7 @@ func fillMissingDays(results []models.DayCount, days int, cutoff time.Time) []mo
 		found[key] = r.Count
 	}
 	var filled []models.DayCount
-	for i := 0; i < days; i++ {
+	for i := range days {
 		day := cutoff.Add(time.Duration(i) * 24 * time.Hour)
 		key := day.Format("2006-01-02")
 		c := found[key]
@@ -1329,13 +1329,11 @@ func (r *RoomRepository) GetRoomEventsFiltered(p RoomEventsFilterParams) ([]mode
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var events []models.RoomEvent
 	for rows.Next() {
-		var (
-			typ, roomID, roomName, userID, userName, ts string
-		)
+		var typ, roomID, roomName, userID, userName, ts string
 		if err := rows.Scan(&typ, &roomID, &roomName, &userID, &userName, &ts); err != nil {
 			return nil, 0, err
 		}
@@ -1383,12 +1381,10 @@ func (r *RoomRepository) GetRecentRoomEvents(limit int) ([]models.RoomEvent, err
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
-		var (
-			typ, roomID, roomName, userID, userName, ts string
-		)
+		var typ, roomID, roomName, userID, userName, ts string
 		if err := rows.Scan(&typ, &roomID, &roomName, &userID, &userName, &ts); err != nil {
 			return nil, err
 		}

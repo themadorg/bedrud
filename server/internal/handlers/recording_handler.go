@@ -2,11 +2,6 @@
 package handlers
 
 import (
-	"context"
-	"fmt"
-	"strconv"
-	"time"
-
 	"bedrud/internal/auth"
 	"bedrud/internal/database"
 	"bedrud/internal/models"
@@ -14,6 +9,10 @@ import (
 	"bedrud/internal/repository"
 	"bedrud/internal/services"
 	"bedrud/internal/storage"
+	"context"
+	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"

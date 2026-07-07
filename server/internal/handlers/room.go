@@ -23,6 +23,7 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -45,6 +46,65 @@ import (
 const livekitTokenTTL = 2 * time.Hour
 
 func boolPtr(b bool) *bool { return &b }
+
+func (h *RoomHandler) participantDisplayName(claims *auth.Claims) string {
+	if claims == nil {
+		return ""
+	}
+	fallback := strings.TrimSpace(claims.Name)
+	if claims.UserID == "" || h.userRepo == nil {
+		return fallback
+	}
+	u, err := h.userRepo.GetUserByID(claims.UserID)
+	if err != nil || u == nil {
+		return fallback
+	}
+	if name := strings.TrimSpace(u.Name); name != "" {
+		return name
+	}
+	return fallback
+}
+
+// resolveLiveKitHost returns the browser LiveKit signaling URL.
+// Remote debug: always the server URL (e.g. wss://dev.example.com/livekit) — never
+// localhost or a Vite proxy. HTTPS page origins upgrade ws:// → wss:// only.
+func resolveLiveKitHost(c *fiber.Ctx, host string) string {
+	if host == "" {
+		return host
+	}
+
+	origin := strings.TrimSpace(c.Get("Origin"))
+	if origin == "" {
+		if ref := strings.TrimSpace(c.Get("Referer")); ref != "" {
+			if u, err := url.Parse(ref); err == nil {
+				origin = u.Scheme + "://" + u.Host
+			}
+		}
+	}
+	if origin == "" {
+		return host
+	}
+
+	ou, err := url.Parse(origin)
+	if err != nil {
+		return host
+	}
+
+	if ou.Scheme == "https" {
+		if strings.HasPrefix(host, "ws://") {
+			return "wss://" + strings.TrimPrefix(host, "ws://")
+		}
+		if strings.HasPrefix(host, "http://") {
+			return "https://" + strings.TrimPrefix(host, "http://")
+		}
+	}
+
+	return host
+}
+
+func (h *RoomHandler) clientLiveKitHost(c *fiber.Ctx) string {
+	return resolveLiveKitHost(c, h.livekitHost)
+}
 
 type AdminUpdateRoomSettingsInput struct {
 	AllowChat       *bool `json:"allowChat"`
@@ -136,19 +196,6 @@ func (h *RoomHandler) maxParticipantsLimit() int {
 		return 1000
 	}
 	return s.MaxParticipantsLimit
-}
-
-// lkSessionStartedAt returns the LiveKit room creation timestamp (epoch ms) for
-// roomName, or 0 if no active session exists yet. The first user to join sees 0
-// because the LiveKit room is created when their client connects via WebSocket;
-// subsequent joiners see the session start time.
-func (h *RoomHandler) lkSessionStartedAt(ctx context.Context, roomName string) int64 {
-	authedCtx := h.withAuth(ctx, &lkauth.VideoGrant{RoomList: true})
-	resp, err := h.client.ListRooms(authedCtx, &livekit.ListRoomsRequest{Names: []string{roomName}})
-	if err != nil || len(resp.Rooms) == 0 {
-		return 0
-	}
-	return resp.Rooms[0].CreationTime * 1000
 }
 
 func (h *RoomHandler) withAuth(ctx context.Context, grants ...*lkauth.VideoGrant) context.Context {
@@ -277,7 +324,7 @@ func (h *RoomHandler) CreateRoom(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"id": room.ID, "name": room.Name, "createdBy": room.CreatedBy, "isActive": room.IsActive,
 		"isPublic": room.IsPublic, "maxParticipants": room.MaxParticipants, "settings": room.Settings,
-		"livekitHost": h.livekitHost, "mode": room.Mode,
+		"livekitHost": h.clientLiveKitHost(c), "mode": room.Mode,
 	})
 }
 
@@ -359,7 +406,7 @@ func (h *RoomHandler) JoinRoom(c *fiber.Ctx) error {
 	h.dispatchRoomEvent(c.Context(), models.EventParticipantJoined, room.ID, room.Name, claims.UserID)
 
 	at := lkauth.NewAccessToken(h.apiKey, h.apiSecret)
-	at.AddGrant(&lkauth.VideoGrant{RoomJoin: true, Room: req.RoomName, CanUpdateOwnMetadata: boolPtr(false)}).SetIdentity(claims.UserID).SetName(claims.Name).SetValidFor(time.Hour) //nolint:staticcheck // AddGrant is deprecated but VideoGrant field is not available in this version of the protocol SDK
+	at.AddGrant(&lkauth.VideoGrant{RoomJoin: true, Room: req.RoomName, CanUpdateOwnMetadata: boolPtr(true)}).SetIdentity(claims.UserID).SetName(h.participantDisplayName(claims)).SetValidFor(time.Hour) //nolint:staticcheck // AddGrant is deprecated but VideoGrant field is not available in this version of the protocol SDK
 	if meta, err := json.Marshal(map[string]interface{}{"accesses": claims.Accesses}); err == nil {
 		at.SetMetadata(string(meta))
 	}
@@ -387,7 +434,7 @@ func (h *RoomHandler) JoinRoom(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"id": room.ID, "name": room.Name, "token": token, "createdBy": room.CreatedBy, "adminId": adminId, "isActive": room.IsActive,
 		"isPublic": room.IsPublic, "maxParticipants": room.MaxParticipants, "expiresAt": room.ExpiresAt,
-		"settings": room.Settings, "livekitHost": h.livekitHost, "mode": room.Mode,
+		"settings": room.Settings, "livekitHost": h.clientLiveKitHost(c), "mode": room.Mode,
 		"activeRecordingId": activeRecordingID,
 	})
 }
@@ -486,7 +533,7 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 	at.AddGrant(&lkauth.VideoGrant{ //nolint:staticcheck // AddGrant is deprecated but VideoGrant field is not available in this version of the protocol SDK
 		RoomJoin:             true,
 		Room:                 req.RoomName,
-		CanUpdateOwnMetadata: boolPtr(false),
+		CanUpdateOwnMetadata: boolPtr(true),
 	}).SetIdentity(guestID).SetName(req.GuestName).SetValidFor(time.Hour)
 	token, err := at.ToJWT()
 	if err != nil {
@@ -511,7 +558,8 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"id": room.ID, "name": room.Name, "token": token, "adminId": adminId,
-		"livekitHost":       h.livekitHost,
+		"isPublic":          room.IsPublic,
+		"livekitHost":       h.clientLiveKitHost(c),
 		"activeRecordingId": activeRecordingID,
 	})
 }
@@ -572,7 +620,7 @@ func (h *RoomHandler) RefreshLiveKitToken(c *fiber.Ctx) error {
 	}
 
 	at := lkauth.NewAccessToken(h.apiKey, h.apiSecret)
-	at.AddGrant(&lkauth.VideoGrant{RoomJoin: true, Room: req.RoomName, CanUpdateOwnMetadata: boolPtr(false)}).SetIdentity(claims.UserID).SetName(claims.Name).SetValidFor(livekitTokenTTL) //nolint:staticcheck
+	at.AddGrant(&lkauth.VideoGrant{RoomJoin: true, Room: req.RoomName, CanUpdateOwnMetadata: boolPtr(true)}).SetIdentity(claims.UserID).SetName(h.participantDisplayName(claims)).SetValidFor(livekitTokenTTL) //nolint:staticcheck
 	if meta, err := json.Marshal(map[string]interface{}{"accesses": claims.Accesses}); err == nil {
 		at.SetMetadata(string(meta))
 	}
@@ -1174,6 +1222,156 @@ func (h *RoomHandler) GetParticipantInfo(c *fiber.Ctx) error {
 		"joinedAt": p.JoinedAt,
 		"tracks":   tracks,
 	})
+}
+
+func (h *RoomHandler) livekitParticipant(ctx context.Context, roomName, identity string) (*livekit.ParticipantInfo, error) {
+	lkCtx := h.withAuth(ctx, &lkauth.VideoGrant{RoomAdmin: true, Room: roomName})
+	return h.client.GetParticipant(lkCtx, &livekit.RoomParticipantIdentity{Room: roomName, Identity: identity})
+}
+
+// GetParticipantProfile returns display name and avatar for a participant in an active meeting.
+// GET /api/room/:roomId/participant/:identity/profile
+//
+// @Summary Get meeting participant profile
+// @Description Fetch a participant's display name and avatar. Caller and target must both be in the room.
+// @Tags rooms
+// @Produce json
+// @Param roomId path string true "Room ID"
+// @Param identity path string true "Participant identity"
+// @Success 200 {object} map[string]interface{} "{id, name, avatarUrl}"
+// @Failure 403 {object} ErrorResponse "Not in meeting"
+// @Failure 404 {object} ErrorResponse "Participant not found"
+// @Router /room/{roomId}/participant/{identity}/profile [get]
+func (h *RoomHandler) GetParticipantProfile(c *fiber.Ctx) error {
+	roomID, identity := c.Params("roomId"), c.Params("identity")
+	claims := c.Locals("user").(*auth.Claims)
+	room, _, err := h.resolveRoom(c, roomID)
+	if err != nil {
+		return nil
+	}
+
+	if _, err := h.livekitParticipant(c.Context(), room.Name, claims.UserID); err != nil {
+		return c.Status(403).JSON(fiber.Map{"error": "You must be in this meeting"})
+	}
+
+	target, err := h.livekitParticipant(c.Context(), room.Name, identity)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Participant not found in meeting"})
+	}
+
+	if strings.HasPrefix(identity, "guest-") {
+		name := strings.TrimSpace(target.Name)
+		if name == "" {
+			name = identity
+		}
+		return c.JSON(fiber.Map{
+			"id":        identity,
+			"name":      name,
+			"avatarUrl": "",
+		})
+	}
+
+	if h.userRepo == nil {
+		name := strings.TrimSpace(target.Name)
+		if name == "" {
+			name = identity
+		}
+		return c.JSON(fiber.Map{
+			"id":        identity,
+			"name":      name,
+			"avatarUrl": "",
+		})
+	}
+
+	u, dbErr := h.userRepo.GetUserByID(identity)
+	if dbErr != nil || u == nil {
+		name := strings.TrimSpace(target.Name)
+		if name == "" {
+			name = identity
+		}
+		return c.JSON(fiber.Map{
+			"id":        identity,
+			"name":      name,
+			"avatarUrl": "",
+		})
+	}
+
+	name := strings.TrimSpace(u.Name)
+	if name == "" {
+		name = strings.TrimSpace(target.Name)
+	}
+	if name == "" {
+		name = identity
+	}
+
+	return c.JSON(fiber.Map{
+		"id":        identity,
+		"name":      name,
+		"avatarUrl": u.AvatarURL,
+	})
+}
+
+// GetRoomPresence returns people currently connected to the LiveKit room (for pre-join welcome UI).
+// GET /api/room/:roomId/presence
+func (h *RoomHandler) GetRoomPresence(c *fiber.Ctx) error {
+	roomID := c.Params("roomId")
+	room, err := h.roomRepo.GetRoom(roomID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch room"})
+	}
+	if room == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Room not found"})
+	}
+
+	type presenceParticipant struct {
+		Identity  string `json:"identity"`
+		Name      string `json:"name"`
+		AvatarURL string `json:"avatarUrl"`
+	}
+
+	if !room.IsPublic {
+		if c.Query("countOnly") == "1" || c.Query("countOnly") == "true" {
+			return c.Status(404).JSON(fiber.Map{"error": "Room not found"})
+		}
+		return c.JSON(fiber.Map{"participants": []presenceParticipant{}})
+	}
+
+	ctx := h.withAuth(c.Context(), &lkauth.VideoGrant{RoomAdmin: true, Room: room.Name})
+	resp, err := h.client.ListParticipants(ctx, &livekit.ListParticipantsRequest{Room: room.Name})
+	if err != nil {
+		if c.Query("countOnly") == "1" || c.Query("countOnly") == "true" {
+			return c.JSON(fiber.Map{"count": 0})
+		}
+		return c.JSON(fiber.Map{"participants": []presenceParticipant{}})
+	}
+
+	if c.Query("countOnly") == "1" || c.Query("countOnly") == "true" {
+		return c.JSON(fiber.Map{"count": len(resp.Participants)})
+	}
+
+	participants := make([]presenceParticipant, 0, len(resp.Participants))
+	for _, p := range resp.Participants {
+		name := strings.TrimSpace(p.Name)
+		avatarURL := ""
+		if !strings.HasPrefix(p.Identity, "guest-") {
+			if u, dbErr := h.userRepo.GetUserByID(p.Identity); dbErr == nil && u != nil {
+				if name == "" {
+					name = strings.TrimSpace(u.Name)
+				}
+				avatarURL = u.AvatarURL
+			}
+		}
+		if name == "" {
+			name = p.Identity
+		}
+		participants = append(participants, presenceParticipant{
+			Identity:  p.Identity,
+			Name:      name,
+			AvatarURL: avatarURL,
+		})
+	}
+
+	return c.JSON(fiber.Map{"participants": participants})
 }
 
 // KickParticipant kicks a participant from the room.
@@ -2254,7 +2452,7 @@ func (h *RoomHandler) UploadChatImage(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to read upload"})
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Read into memory (limited to uploadMax, already checked above).
 	data := make([]byte, file.Size)

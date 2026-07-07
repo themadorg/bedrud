@@ -1,11 +1,10 @@
 package handlers
 
 import (
-	"bytes"
-	"os"
-
 	"bedrud/config"
 	"bedrud/internal/utils"
+	"bytes"
+	"os"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
