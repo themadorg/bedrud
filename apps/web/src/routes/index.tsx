@@ -1,10 +1,12 @@
-import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { AlertCircle, ArrowRight, Radio } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '#/lib/api'
 import { useAuthStore } from '#/lib/auth.store'
+import type { User } from '#/lib/user.store'
 import { useUserStore } from '#/lib/user.store'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
@@ -14,17 +16,36 @@ interface AuthResponse {
   tokens: { accessToken: string; refreshToken: string }
 }
 
+async function loadUserIfNeeded() {
+  if (typeof window === 'undefined') return
+  if (!useAuthStore.getState().tokens) return
+  if (useUserStore.getState().user) return
+  const u = await api.get<User & { accesses?: string[] }>('/api/auth/me')
+  useUserStore.getState().setUser({
+    id: u.id,
+    email: u.email,
+    name: u.name,
+    provider: u.provider,
+    isSuperAdmin: u.accesses?.includes('superadmin') ?? false,
+    isAdmin: (u.accesses?.includes('admin') || u.accesses?.includes('superadmin')) ?? false,
+    accesses: u.accesses ?? [],
+    avatarUrl: u.avatarUrl,
+  })
+}
+
 export const Route = createFileRoute('/')({
   beforeLoad: async () => {
     if (typeof window === 'undefined') return
     await useAuthStore.getState().initialize()
-    if (useAuthStore.getState().tokens) throw redirect({ to: '/dashboard' })
   },
+  loader: loadUserIfNeeded,
+  staleTime: Infinity,
   component: HomePage,
 })
 
 function JoinForm() {
   const navigate = useNavigate()
+  const tokens = useAuthStore((s) => s.tokens)
   const setTokens = useAuthStore((s) => s.setTokens)
   const setUser = useUserStore((s) => s.setUser)
   const [code, setCode] = useState('')
@@ -41,6 +62,10 @@ function JoinForm() {
     const slug = code.trim().toLowerCase().replace(/\s+/g, '-')
     if (!slug) return
     setError(null)
+    if (tokens) {
+      navigate({ to: '/m/$meetId', params: { meetId: slug } })
+      return
+    }
     setChecking(true)
     try {
       const guestName = `Guest-${Math.random().toString(36).slice(2, 6)}`
@@ -126,7 +151,115 @@ function JoinForm() {
   )
 }
 
+function HomeHeader() {
+  const tokens = useAuthStore((s) => s.tokens)
+  const initialized = useAuthStore((s) => s.initialized)
+  const user = useUserStore((s) => s.user)
+  const initials = user?.name
+    ? user.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : '?'
+
+  return (
+    <header className="relative z-10 flex items-center justify-between px-6 py-3 sm:px-10">
+      <div className="flex items-center gap-2">
+        <div className="flex h-6 w-6 items-center justify-center bg-primary">
+          <Radio className="h-3 w-3 text-primary-foreground" />
+        </div>
+        <span className="font-mono text-xs font-bold tracking-wider uppercase">bedrud</span>
+      </div>
+      <div className="flex items-center gap-3">
+        <ThemeToggle />
+        <Separator orientation="vertical" className="hidden h-3 sm:block" />
+        {initialized && tokens ? (
+          <>
+            <div className="hidden items-center gap-2 sm:flex">
+              <Avatar className="h-7 w-7">
+                {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
+                <AvatarFallback className="bg-primary text-[10px] font-semibold text-primary-foreground">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <span className="max-w-[140px] truncate text-sm text-muted-foreground">{user?.name ?? 'Account'}</span>
+            </div>
+            <Link
+              to="/dashboard"
+              className="bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
+            >
+              Dashboard
+            </Link>
+          </>
+        ) : initialized ? (
+          <>
+            <Link
+              to="/auth/login"
+              search={{ redirect: undefined }}
+              className="hidden text-sm text-muted-foreground transition-colors hover:text-foreground sm:block"
+            >
+              Sign in
+            </Link>
+            <Link
+              to="/auth/register"
+              className="bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
+            >
+              Get started
+            </Link>
+          </>
+        ) : null}
+      </div>
+    </header>
+  )
+}
+
+function JoinHint() {
+  const tokens = useAuthStore((s) => s.tokens)
+  const user = useUserStore((s) => s.user)
+
+  if (tokens) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Signed in as {user?.name ?? 'you'} ·{' '}
+        <Link to="/dashboard" className="underline underline-offset-4 transition-colors hover:text-foreground">
+          Create rooms
+        </Link>{' '}
+        ·{' '}
+        <Link to="/new" className="underline underline-offset-4 transition-colors hover:text-foreground">
+          New meeting
+        </Link>
+      </p>
+    )
+  }
+
+  return (
+    <p className="text-xs text-muted-foreground">
+      <Link
+        to="/auth/login"
+        search={{ redirect: undefined }}
+        className="underline underline-offset-4 transition-colors hover:text-foreground"
+      >
+        Sign in
+      </Link>{' '}
+      to create rooms &middot;{' '}
+      <Link to="/auth" className="underline underline-offset-4 transition-colors hover:text-foreground">
+        join as guest
+      </Link>
+    </p>
+  )
+}
+
 function HomePage() {
+  const tokens = useAuthStore((s) => s.tokens)
+  const user = useUserStore((s) => s.user)
+
+  useEffect(() => {
+    if (!tokens || user) return
+    void loadUserIfNeeded()
+  }, [tokens, user])
+
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
       {/* Background glow — single radial per DESIGN.md rule */}
@@ -137,32 +270,7 @@ function HomePage() {
         />
       </div>
 
-      {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      <header className="relative z-10 flex items-center justify-between px-6 py-3 sm:px-10">
-        <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center bg-primary">
-            <Radio className="h-3 w-3 text-primary-foreground" />
-          </div>
-          <span className="font-mono text-xs font-bold tracking-wider uppercase">bedrud</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <Separator orientation="vertical" className="hidden h-3 sm:block" />
-          <Link
-            to="/auth/login"
-            search={{ redirect: undefined }}
-            className="hidden text-sm text-muted-foreground transition-colors hover:text-foreground sm:block"
-          >
-            Sign in
-          </Link>
-          <Link
-            to="/auth/register"
-            className="bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
-          >
-            Get started
-          </Link>
-        </div>
-      </header>
+      <HomeHeader />
 
       {/* ── Main ─────────────────────────────────────────────────────────── */}
       <main className="relative z-10 flex flex-1 flex-col px-6 pb-12 pt-20 sm:px-10 sm:pt-28 lg:pt-36">
@@ -182,26 +290,22 @@ function HomePage() {
           {/* Join + links */}
           <div className="max-w-md space-y-3">
             <JoinForm />
-            <p className="text-xs text-muted-foreground">
-              <Link
-                to="/auth/login"
-                search={{ redirect: undefined }}
-                className="underline underline-offset-4 transition-colors hover:text-foreground"
-              >
-                Sign in
-              </Link>{' '}
-              to create rooms &middot;{' '}
-              <Link to="/auth" className="underline underline-offset-4 transition-colors hover:text-foreground">
-                join as guest
-              </Link>
-            </p>
+            <JoinHint />
           </div>
         </div>
       </main>
 
       {/* ── Footer ───────────────────────────────────────────────────────── */}
       <footer className="relative z-10 flex items-center gap-4 border-t px-6 py-3 text-xs text-muted-foreground sm:px-10">
-        <span suppressHydrationWarning>&copy; {new Date().getFullYear()} Bedrud</span>
+        <a
+          href="https://github.com/themadorg"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="transition-colors hover:text-foreground"
+          suppressHydrationWarning
+        >
+          &copy; {new Date().getFullYear()} themadorg
+        </a>
         <Separator orientation="vertical" className="h-3" />
         <a
           href="https://bedrud.org/en/docs/getting-started/quickstart/?utm_source=app&utm_medium=footer"

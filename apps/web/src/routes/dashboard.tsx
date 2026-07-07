@@ -84,7 +84,7 @@ function NavLink({
       <div
         className={cn(
           'flex items-center gap-2 px-2 py-1.5 text-xs font-medium transition-colors',
-          active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+          active ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
         )}
       >
         <Icon className="h-3.5 w-3.5 shrink-0" />
