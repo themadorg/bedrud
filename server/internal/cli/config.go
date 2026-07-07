@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bedrud/config"
+	"bedrud/internal/clioutput"
 	"fmt"
 	"os"
 	"sort"
@@ -32,7 +33,11 @@ func newConfigPathCmd() *cobra.Command {
 		Use:   "path",
 		Short: "Print the resolved config file path",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println(resolveConfigPath(defaultEtcConfig))
+			path := resolveConfigPath(defaultEtcConfig)
+			if clioutput.JSON() {
+				return clioutput.Success("", map[string]string{"path": path})
+			}
+			fmt.Println(path)
 			return nil
 		},
 	}
@@ -48,6 +53,9 @@ func newConfigShowCmd() *cobra.Command {
 				return err
 			}
 			masked := maskSecrets(cfg)
+			if clioutput.JSON() {
+				return clioutput.Success("", masked)
+			}
 			out, err := yaml.Marshal(masked)
 			if err != nil {
 				return err
@@ -75,6 +83,12 @@ func newConfigGetCmd() *cobra.Command {
 			if val == nil {
 				return fmt.Errorf("key not found: %s", args[0])
 			}
+			if clioutput.JSON() {
+				return clioutput.Success("", map[string]any{
+					"key":   args[0],
+					"value": val,
+				})
+			}
 			fmt.Println(val)
 			return nil
 		},
@@ -99,8 +113,10 @@ func newConfigSetCmd() *cobra.Command {
 			if err := v.WriteConfigAs(path); err != nil {
 				return fmt.Errorf("write config: %w", err)
 			}
-			fmt.Printf("✓ Set %s = %s in %s\n", args[0], args[1], path)
-			return nil
+			return clioutput.Success(
+				fmt.Sprintf("✓ Set %s = %s in %s", args[0], args[1], path),
+				map[string]string{"key": args[0], "value": args[1], "path": path},
+			)
 		},
 	}
 	return cmd
@@ -136,8 +152,13 @@ func newConfigValidateCmd() *cobra.Command {
 			}
 			sort.Strings(problems)
 			if len(problems) == 0 {
-				fmt.Printf("✓ Config OK: %s\n", path)
-				return nil
+				return clioutput.Success(
+					fmt.Sprintf("✓ Config OK: %s", path),
+					map[string]any{"path": path, "problems": []string{}},
+				)
+			}
+			if clioutput.JSON() {
+				return fmt.Errorf("config validation failed: %v", problems)
 			}
 			fmt.Fprintf(os.Stderr, "✗ Config has %d problem(s):\n", len(problems))
 			for _, p := range problems {

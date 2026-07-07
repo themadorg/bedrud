@@ -19,8 +19,10 @@ import (
 	"time"
 )
 
-const CertWarnDays = 30
-const SelfSignedCertDays = 1825
+const (
+	CertWarnDays       = 30
+	SelfSignedCertDays = 1825
+)
 
 type KeyAlgorithm string
 

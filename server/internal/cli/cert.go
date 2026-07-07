@@ -2,9 +2,11 @@ package cli
 
 import (
 	"bedrud/config"
+	"bedrud/internal/clioutput"
 	"bedrud/internal/utils"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -88,12 +90,16 @@ func runCertRenew(configPath, algoStr string) error {
 			return fmt.Errorf("renewing certificate: %w", err)
 		}
 	}
-	fmt.Println("Self-signed TLS certificate renewed successfully")
-	fmt.Printf("  Cert: %s\n", certFile)
-	fmt.Printf("  Key:  %s\n", keyFile)
-	fmt.Printf("  SANs: %v\n", hosts)
-	fmt.Printf("  Valid for %d days\n", utils.SelfSignedCertDays)
-	return nil
+	return clioutput.Success(
+		"Self-signed TLS certificate renewed successfully",
+		map[string]any{
+			"certFile":  certFile,
+			"keyFile":   keyFile,
+			"sans":      hosts,
+			"validDays": utils.SelfSignedCertDays,
+			"algorithm": algoStr,
+		},
+	)
 }
 
 func runCertInfo(configPath string) error {
@@ -102,8 +108,7 @@ func runCertInfo(configPath string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 	if !cfg.Server.EnableTLS || cfg.Server.DisableTLS {
-		fmt.Println("TLS: not enabled")
-		return nil
+		return clioutput.Success("TLS: not enabled", map[string]any{"enabled": false})
 	}
 	certFile := cfg.Server.CertFile
 	keyFile := cfg.Server.KeyFile
@@ -117,12 +122,26 @@ func runCertInfo(configPath string) error {
 	if err != nil {
 		return fmt.Errorf("TLS certificate: %w", err)
 	}
-	fmt.Printf("Subject:        %s\n", info.Subject)
-	fmt.Printf("Issuer:         %s\n", info.Issuer)
-	fmt.Printf("Not Before:     %s\n", info.NotBefore.Format("2006-01-02 15:04:05 MST"))
-	fmt.Printf("Not After:      %s\n", info.NotAfter.Format("2006-01-02 15:04:05 MST"))
-	fmt.Printf("Days Remaining: %d\n", info.DaysRemaining)
-	fmt.Printf("Status:         %s\n", info.Status)
-	fmt.Printf("SANs:           %v\n", info.SANs)
-	return nil
+	data := map[string]any{
+		"enabled":       true,
+		"subject":       info.Subject,
+		"issuer":        info.Issuer,
+		"notBefore":     info.NotBefore.Format(time.RFC3339),
+		"notAfter":      info.NotAfter.Format(time.RFC3339),
+		"daysRemaining": info.DaysRemaining,
+		"status":        info.Status,
+		"sans":          info.SANs,
+		"certFile":      certFile,
+		"keyFile":       keyFile,
+	}
+	if !clioutput.JSON() {
+		fmt.Printf("Subject:        %s\n", info.Subject)
+		fmt.Printf("Issuer:         %s\n", info.Issuer)
+		fmt.Printf("Not Before:     %s\n", info.NotBefore.Format("2006-01-02 15:04:05 MST"))
+		fmt.Printf("Not After:      %s\n", info.NotAfter.Format("2006-01-02 15:04:05 MST"))
+		fmt.Printf("Days Remaining: %d\n", info.DaysRemaining)
+		fmt.Printf("Status:         %s\n", info.Status)
+		fmt.Printf("SANs:           %v\n", info.SANs)
+	}
+	return clioutput.Success("", data)
 }

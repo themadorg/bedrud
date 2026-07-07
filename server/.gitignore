@@ -30,6 +30,7 @@ vendor/
 
 config.yaml
 config.local.yaml
+remote-debug.yaml
 **/livekit.yaml
 data.db
 *.db

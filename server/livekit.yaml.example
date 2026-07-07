@@ -1,23 +1,37 @@
-port: 7880
+port: 7072
 rtc:
-  tcp_port: 7881
-  port_range_start: 50000
-  port_range_end: 60000
-  use_external_ip: true
+  tcp_port: 7073
+  port_range_start: 7080
+  port_range_end: 7099
+  # Local dev: false avoids slow STUN on VPN/tun interfaces (198.18.x.x).
+  use_external_ip: false
+  use_ice_lite: true
+  # Same-machine dev: loopback ICE candidates (browser on localhost:7070).
+  node_ip: 127.0.0.1
+  # Docker bridges often claim 198.18.x.x — exclude them so ICE stays on loopback.
+  ips:
+    includes:
+      - 127.0.0.1/32
+  enable_loopback_candidate: true
+  allow_tcp_fallback: true
 
+logging:
+  level: debug
+
+# TURN requires a real domain + TLS certs. Disabled for local dev (same-machine WebRTC works without it).
 turn:
-  enabled: true
-  domain: localhost
-  udp_port: 3478
-  tls_port: 5349
+  enabled: false
+  # domain: localhost
+  # udp_port: 7076
+  # tls_port: 7077
 
 keys:
   devkey: "CHANGE_ME_LIVEKIT_SECRET"
 
-redis:
-  address: redis:6379
-  username: ""
-  password: ""
+# Redis is only required for multi-node / distributed deployments (Docker, K8s).
+# Local dev (make dev / devcli) runs single-node without Redis.
+# redis:
+#   address: redis:6379
 
 room:
   # allow rooms to be automatically created when participants join

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bedrud/internal/clioutput"
 	"bedrud/internal/install"
 	"fmt"
 	"strings"
@@ -36,7 +37,13 @@ func newInstallCmd() *cobra.Command {
 			if err := install.LinuxInstall(&cfg); err != nil {
 				return fmt.Errorf("installation: %w", err)
 			}
-			return nil
+			return clioutput.Success("✓ Bedrud installed successfully", map[string]any{
+				"enableTls":   cfg.EnableTLS,
+				"selfSigned":  cfg.SelfSigned,
+				"disableTls":  cfg.DisableTLS,
+				"behindProxy": cfg.BehindProxy,
+				"domain":      cfg.Domain,
+			})
 		},
 	}
 
@@ -72,7 +79,7 @@ func newUninstallCmd() *cobra.Command {
 			if err := install.LinuxUninstall(); err != nil {
 				return fmt.Errorf("uninstallation: %w", err)
 			}
-			return nil
+			return clioutput.Success("✓ Bedrud uninstalled successfully", map[string]bool{"uninstalled": true})
 		},
 	}
 }
