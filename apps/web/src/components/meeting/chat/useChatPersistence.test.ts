@@ -11,6 +11,7 @@ function makeMsg(id: string): ChatMessage {
     senderIdentity: 'alice',
     message: 'hello',
     attachments: [],
+    reactions: {},
     isLocal: false,
   }
 }
