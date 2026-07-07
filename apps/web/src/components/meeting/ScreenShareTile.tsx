@@ -1,14 +1,15 @@
 import type { TrackReference, TrackReferenceOrPlaceholder } from '@livekit/components-react'
-import { useParticipantInfo, VideoTrack } from '@livekit/components-react'
+import { VideoTrack } from '@livekit/components-react'
 import { Monitor } from 'lucide-react'
+import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
 
 interface ScreenShareTileProps {
   trackRef: TrackReferenceOrPlaceholder
 }
 
 export function ScreenShareTile({ trackRef }: ScreenShareTileProps) {
-  const { name, identity } = useParticipantInfo({ participant: trackRef.participant })
-  const displayName = name ?? identity ?? '?'
+  const { getParticipantDisplayName } = useMeetingRoomContext()
+  const displayName = getParticipantDisplayName(trackRef.participant)
 
   // Placeholders have no publication yet — nothing to render
   if (!trackRef.publication) return null
