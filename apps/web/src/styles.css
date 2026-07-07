@@ -8,6 +8,14 @@
 @import "./components/meeting/meeting.css";
 
 @font-face {
+  font-family: "Vazirmatn";
+  src: url("/fonts/vazirmatn.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
   font-family: "Shabnam";
   src: url("/fonts/shabnam.woff2") format("woff2");
   font-weight: 400;
@@ -16,7 +24,13 @@
 }
 
 :lang(fa),
-:lang(fa-IR) {
+:lang(fa-IR),
+:lang(ar) {
+  font-family: "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
+}
+
+:is(h1, h2, h3, h4, h5, h6):lang(fa),
+:is(h1, h2, h3, h4, h5, h6):lang(fa-IR) {
   font-family: "Shabnam", ui-sans-serif, system-ui, sans-serif;
 }
 

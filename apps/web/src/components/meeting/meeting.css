@@ -468,16 +468,16 @@
   color: var(--meet-fg-subtle);
 }
 
-/* Persian/RTL content uses Shabnam even when UI locale is not fa */
+/* Persian/RTL content uses Vazirmatn even when UI locale is not fa */
 .meet-rtl-text[dir="rtl"],
 .meet-rtl-text[dir="rtl"] * {
-  font-family: "Shabnam", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
   text-align: start;
 }
 
 /* Whiteboard wysiwyg editor — inline font shorthand is patched in getFontString; this covers late loads */
 .bedrud-whiteboard-shell .excalidraw-wysiwyg[dir="rtl"] {
-  font-family: "Shabnam", ui-sans-serif, system-ui, sans-serif !important;
+  font-family: "Vazirmatn", ui-sans-serif, system-ui, sans-serif !important;
 }
 
 /*
