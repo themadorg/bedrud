@@ -1,5 +1,6 @@
 package com.bedrud.app
 
+import android.app.KeyguardManager
 import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.Intent
@@ -25,9 +26,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.bedrud.app.core.auth.OAuthLoginHandler
+import com.bedrud.app.core.call.CallService
 import com.bedrud.app.core.createLocaleContext
 import com.bedrud.app.core.deeplink.BedrudURLParser
 import com.bedrud.app.core.instance.InstanceManager
+import com.bedrud.app.core.recent.RecentRoomsStore
 import com.bedrud.app.core.pip.PipStateHolder
 import com.bedrud.app.ui.screens.auth.GuestLoginScreen
 import com.bedrud.app.ui.screens.auth.LoginScreen
@@ -40,6 +43,7 @@ import com.bedrud.app.ui.screens.settings.SettingsStore
 import com.bedrud.app.ui.theme.BedrudTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.koin.android.ext.android.inject
+import org.koin.compose.koinInject
 
 class MainActivity : ComponentActivity() {
 
@@ -62,6 +66,15 @@ class MainActivity : ComponentActivity() {
         // Parse deep link from initial intent
         handleDeepLink(intent)
 
+        // Return to an ongoing meeting from the call notification
+        handleReturnToMeeting(intent)
+        hideUiBehindKeyguard()
+
+        // Resume meeting if the foreground call service is still running
+        CallService.activeRoomName?.let { room ->
+            _deepLinkRoomName.value = room
+        }
+
         // Handle OAuth callback from initial intent (app not running)
         handleOAuthCallback(intent)
 
@@ -75,7 +88,7 @@ class MainActivity : ComponentActivity() {
 
             val language by settingsStore.language.collectAsState()
 
-            BedrudTheme(darkTheme = darkTheme, isRtl = language.resolveIsRtl()) {
+            BedrudTheme(darkTheme = darkTheme, language = language) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -92,14 +105,55 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleDeepLink(intent)
+        handleReturnToMeeting(intent)
         handleOAuthCallback(intent)
+        hideUiBehindKeyguard()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        hideUiBehindKeyguard()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        hideUiBehindKeyguard()
+    }
+
+    override fun onPause() {
+        clearLockScreenFlags()
+        super.onPause()
     }
 
     private fun handleDeepLink(intent: Intent?) {
         val uri = intent?.data ?: return
         val parsed = BedrudURLParser.parse(uri.toString()) ?: return
         _deepLinkRoomName.value = parsed.roomName
+    }
+
+    private fun handleReturnToMeeting(intent: Intent?) {
+        if (intent?.action != CallService.ACTION_RETURN_TO_MEETING) return
+        val roomName = intent.getStringExtra(CallService.EXTRA_ROOM_NAME) ?: return
+        _deepLinkRoomName.value = roomName
+    }
+
+    /** Keep the meeting UI off the lock screen; the call continues via [CallService]. */
+    private fun hideUiBehindKeyguard() {
+        clearLockScreenFlags()
+        if (intent?.action == CallService.ACTION_RETURN_TO_MEETING) return
+        val keyguard = getSystemService(KeyguardManager::class.java) ?: return
+        if (keyguard.isKeyguardLocked) {
+            moveTaskToBack(false)
+        }
+    }
+
+    private fun clearLockScreenFlags() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(false)
+            setTurnScreenOn(false)
+        }
     }
 
     private fun handleOAuthCallback(intent: Intent?) {
@@ -152,6 +206,7 @@ fun BedrudNavHost(
     val authManager by instanceManager.authManager.collectAsState()
     val authApi by instanceManager.authApi.collectAsState()
     val isLoggedIn = authManager?.isLoggedIn?.collectAsState()?.value ?: false
+    val recentRoomsStore: RecentRoomsStore = koinInject()
 
     LaunchedEffect(instances.isEmpty(), isLoggedIn, authManager) {
         val target = when {
@@ -194,6 +249,9 @@ fun BedrudNavHost(
     LaunchedEffect(deepLink) {
         val roomName = deepLink ?: return@LaunchedEffect
         if (isLoggedIn) {
+            instanceManager.store.activeInstance?.let { instance ->
+                recentRoomsStore.add(roomName, instance.id, instance.displayName)
+            }
             navController.navigate(Routes.meeting(roomName))
             deepLinkRoomName.value = null
         }
@@ -237,8 +295,8 @@ fun BedrudNavHost(
         composable(Routes.REGISTER) {
             RegisterScreen(
                 onRegisterSuccess = {
-                    navController.navigate(Routes.LOGIN) {
-                        popUpTo(Routes.REGISTER) { inclusive = true }
+                    navController.navigate(Routes.MAIN) {
+                        popUpTo(0) { inclusive = true }
                     }
                 },
                 onNavigateToLogin = {

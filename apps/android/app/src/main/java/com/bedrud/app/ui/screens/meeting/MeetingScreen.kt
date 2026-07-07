@@ -1,10 +1,17 @@
 package com.bedrud.app.ui.screens.meeting
 
+import android.app.Activity
 import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.media.projection.MediaProjectionManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -12,6 +19,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +29,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -82,27 +97,35 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusEvent
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.bedrud.app.R
 import com.bedrud.app.core.BidiUtils
 import com.bedrud.app.core.api.RoomApi
 import com.bedrud.app.core.call.CallService
+import com.bedrud.app.core.chat.ChatImageUtils
 import com.bedrud.app.core.instance.InstanceManager
+import com.bedrud.app.ui.components.BedrudScaffoldContentInsets
+import com.bedrud.app.ui.components.ChatImageLightbox
 import com.bedrud.app.core.livekit.ChatMessage
 import com.bedrud.app.core.livekit.ConnectionState
 import com.bedrud.app.core.pip.PipStateHolder
 import com.bedrud.app.models.JoinRoomRequest
 import com.bedrud.app.models.JoinRoomResponse
+import io.livekit.android.compose.ui.ScaleType
 import io.livekit.android.compose.ui.VideoTrackView
 import io.livekit.android.room.Room
 import io.livekit.android.room.participant.Participant
@@ -125,10 +148,18 @@ fun MeetingScreen(
     val roomManager = instanceManager.roomManager.collectAsState().value ?: return
     val authManager = instanceManager.authManager.collectAsState().value
     val currentUser by (authManager?.currentUser ?: kotlinx.coroutines.flow.MutableStateFlow(null)).collectAsState()
+    val serverURL = instanceManager.store.activeInstance?.serverURL.orEmpty()
+    val accessToken = authManager?.getAccessToken()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val isInPipMode by pipStateHolder.isInPipMode.collectAsState()
+    val flatFabElevation = FloatingActionButtonDefaults.elevation(
+        defaultElevation = 0.dp,
+        pressedElevation = 0.dp,
+        focusedElevation = 0.dp,
+        hoveredElevation = 0.dp
+    )
 
     // Track meeting state for PiP
     DisposableEffect(Unit) {
@@ -140,12 +171,15 @@ fun MeetingScreen(
 
     val connectionState by roomManager.connectionState.collectAsState()
     val isMicEnabled by roomManager.isMicEnabled.collectAsState()
+    val micMediaError by roomManager.micMediaError.collectAsState()
     val isCameraEnabled by roomManager.isCameraEnabled.collectAsState()
+    val cameraMediaError by roomManager.cameraMediaError.collectAsState()
     val isScreenShareEnabled by roomManager.isScreenShareEnabled.collectAsState()
     val error by roomManager.error.collectAsState()
     val wasKicked by roomManager.wasKicked.collectAsState()
 
     val participantVersion by roomManager.participantVersion.collectAsState()
+    val activeStage by roomManager.activeStage.collectAsState()
     val chatMessages by roomManager.chatMessages.collectAsState()
     var showChat by remember { mutableStateOf(false) }
     var showParticipants by remember { mutableStateOf(false) }
@@ -158,35 +192,101 @@ fun MeetingScreen(
 
     // Leave/end dialog
     var showLeaveDialog by remember { mutableStateOf(false) }
+    var showAudioSheet by remember { mutableStateOf(false) }
+    var isScreenShareFullscreen by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(activeStage?.kind) {
+        if (activeStage?.kind != "screenshare") {
+            isScreenShareFullscreen = false
+        }
+    }
 
     var roomInfo by remember { mutableStateOf<JoinRoomResponse?>(null) }
     var isJoining by remember { mutableStateOf(true) }
 
-    // Request permissions
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val allGranted = permissions.values.all { it }
-        if (allGranted && roomInfo != null) {
-            CallService.start(context, roomName, roomInfo!!.livekitHost, roomInfo!!.token, currentUser?.avatarUrl)
+    fun startMeetingCall(info: JoinRoomResponse) {
+        CallService.start(
+            context,
+            roomName,
+            info.livekitHost,
+            info.token,
+            currentUser?.avatarUrl,
+        )
+        isJoining = false
+    }
+
+    val screenCaptureLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            scope.launch {
+                val started = roomManager.startScreenShare(result.data!!)
+                if (!started) {
+                    val message = roomManager.error.value
+                        ?: context.getString(R.string.meeting_error_screenShareFailed)
+                    snackbarHostState.showSnackbar(message)
+                }
+            }
         }
     }
 
-    // Join room via API and connect to LiveKit
+    val requiredPermissions = remember {
+        buildList {
+            add(Manifest.permission.CAMERA)
+            add(Manifest.permission.RECORD_AUDIO)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }.toTypedArray()
+    }
+
+    var pendingMediaAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    fun hasPermission(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+    // Request permissions, then start the system-call foreground service
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val pending = pendingMediaAction
+        pendingMediaAction = null
+
+        if (pending != null) {
+            if (permissions.values.all { it }) {
+                pending()
+            } else {
+                scope.launch {
+                    snackbarHostState.showSnackbar(context.getString(R.string.meeting_error_permissionsRequired))
+                }
+            }
+            return@rememberLauncherForActivityResult
+        }
+
+        val mediaGranted = permissions[Manifest.permission.CAMERA] == true &&
+            permissions[Manifest.permission.RECORD_AUDIO] == true
+        if (mediaGranted && roomInfo != null) {
+            startMeetingCall(roomInfo!!)
+        } else if (!mediaGranted) {
+            scope.launch {
+                snackbarHostState.showSnackbar(context.getString(R.string.meeting_error_permissionsRequired))
+            }
+            isJoining = false
+        }
+    }
+
+    // Join room via API and connect to LiveKit (or reattach to an ongoing call)
     LaunchedEffect(roomName) {
+        if (CallService.isRunning && CallService.activeRoomName == roomName) {
+            isJoining = false
+            return@LaunchedEffect
+        }
+
         try {
             val response = roomApi.joinRoom(JoinRoomRequest(roomName = roomName))
             if (response.isSuccessful) {
                 roomInfo = response.body()
-                val info = roomInfo!!
-
-                // Request permissions then connect
-                permissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.CAMERA,
-                        Manifest.permission.RECORD_AUDIO
-                    )
-                )
+                permissionLauncher.launch(requiredPermissions)
             } else {
                 snackbarHostState.showSnackbar("Failed to join room")
                 isJoining = false
@@ -194,13 +294,6 @@ fun MeetingScreen(
         } catch (e: Exception) {
             snackbarHostState.showSnackbar(e.message ?: "Failed to join room")
             isJoining = false
-        }
-    }
-
-    // Cleanup on dispose
-    DisposableEffect(Unit) {
-        onDispose {
-            CallService.stop(context)
         }
     }
 
@@ -231,6 +324,7 @@ fun MeetingScreen(
     }
 
     Scaffold(
+        contentWindowInsets = BedrudScaffoldContentInsets,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
@@ -273,12 +367,24 @@ fun MeetingScreen(
                         room.localParticipant.identity?.value == info.adminId
                     } ?: false
                     val roomId = roomInfo?.id ?: ""
+                    val audioState = rememberMeetingAudioState(room)
+
+                    val localIdentity = room.localParticipant.identity?.value
+                    val stageScreenShareIdentity = if (activeStage?.kind == "screenshare") {
+                        activeStage?.ownerIdentity
+                    } else {
+                        null
+                    }
 
                     if (isInPipMode) {
-                        // PiP mode: show single participant filling the screen
-                        val pipParticipant = participants.firstOrNull {
-                            it.identity != room.localParticipant.identity
-                        } ?: participants.firstOrNull()
+                        val pipStage = activeStage?.takeIf { it.kind == "screenshare" }
+                        val pipParticipant = if (pipStage != null) {
+                            participants.find { it.identity?.value == pipStage.ownerIdentity }
+                        } else {
+                            participants.firstOrNull {
+                                it.identity != room.localParticipant.identity
+                            } ?: participants.firstOrNull()
+                        }
 
                         Box(
                             modifier = Modifier
@@ -287,22 +393,36 @@ fun MeetingScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             if (pipParticipant != null) {
-                                val cameraPublication = pipParticipant.getTrackPublication(Track.Source.CAMERA)
-                                val videoTrack = cameraPublication
+                                val screenSharePublication = pipParticipant.getTrackPublication(
+                                    Track.Source.SCREEN_SHARE,
+                                )
+                                val screenShareTrack = screenSharePublication
                                     ?.track as? io.livekit.android.room.track.VideoTrack
-                                val isVideoMuted = cameraPublication?.muted == true
+                                val isScreenShareMuted = screenSharePublication?.muted == true
 
-                                if (videoTrack != null && !isVideoMuted) {
+                                val cameraPublication = pipParticipant.getTrackPublication(Track.Source.CAMERA)
+                                val cameraTrack = cameraPublication
+                                    ?.track as? io.livekit.android.room.track.VideoTrack
+                                val isCameraMuted = cameraPublication?.muted == true
+
+                                val pipTrack = when {
+                                    pipStage != null && screenShareTrack != null && !isScreenShareMuted ->
+                                        screenShareTrack
+                                    cameraTrack != null && !isCameraMuted -> cameraTrack
+                                    else -> null
+                                }
+
+                                if (pipTrack != null) {
                                     VideoTrackView(
-                                        videoTrack = videoTrack,
+                                        videoTrack = pipTrack,
                                         modifier = Modifier.fillMaxSize(),
-                                        passedRoom = room
+                                        passedRoom = room,
                                     )
                                 } else {
                                     Text(
                                         text = (pipParticipant.name ?: "").take(1).uppercase(),
                                         style = MaterialTheme.typography.displayLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                             }
@@ -312,10 +432,14 @@ fun MeetingScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background)
                                 .padding(padding)
                         ) {
+                            if (!showChat) {
                             Column(
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.background)
                             ) {
                                 // Meeting Header HUD
                                 MeetingHeaderHUD(
@@ -324,6 +448,24 @@ fun MeetingScreen(
                                     connectionState = connectionState,
                                     sessionStartedAt = roomInfo?.sessionStartedAt ?: 0L
                                 )
+
+                                val screenShareStage = activeStage?.takeIf { it.kind == "screenshare" }
+                                if (screenShareStage != null && !isScreenShareFullscreen) {
+                                    MeetingScreenShareStage(
+                                        stage = screenShareStage,
+                                        room = room,
+                                        participantVersion = participantVersion,
+                                        isOwner = screenShareStage.ownerIdentity == localIdentity,
+                                        onStop = {
+                                            scope.launch { roomManager.stopScreenShare() }
+                                        },
+                                        onMaximize = { isScreenShareFullscreen = true },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 8.dp)
+                                            .padding(bottom = 8.dp),
+                                    )
+                                }
 
                                 val columns = when {
                                     participants.size <= 1 -> 1
@@ -336,7 +478,8 @@ fun MeetingScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .fillMaxWidth()
-                                        .padding(horizontal = 8.dp),
+                                        .padding(horizontal = 8.dp)
+                                        .padding(bottom = 88.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
@@ -353,167 +496,146 @@ fun MeetingScreen(
                                             roomApi = roomApi,
                                             snackbarHostState = snackbarHostState,
                                             scope = scope,
-                                            room = room
+                                            room = room,
+                                            stageScreenShareIdentity = stageScreenShareIdentity,
                                         )
                                     }
                                 }
 
-                                // Controls bar
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    // Mic toggle
-                                    SmallFloatingActionButton(
-                                        onClick = { scope.launch { roomManager.toggleMicrophone() } },
-                                        containerColor = if (isMicEnabled)
-                                            MaterialTheme.colorScheme.surfaceVariant
-                                        else MaterialTheme.colorScheme.error
-                                    ) {
-                                        Icon(
-                                            if (isMicEnabled) Icons.Default.Mic
-                                            else Icons.Default.MicOff,
-                                            contentDescription = stringResource(R.string.meeting_contentDescription_toggleMic)
-                                        )
-                                    }
-
-                                    // Camera toggle
-                                    SmallFloatingActionButton(
-                                        onClick = { scope.launch { roomManager.toggleCamera() } },
-                                        containerColor = if (isCameraEnabled)
-                                            MaterialTheme.colorScheme.surfaceVariant
-                                        else MaterialTheme.colorScheme.error
-                                    ) {
-                                        Icon(
-                                            if (isCameraEnabled) Icons.Default.Videocam
-                                            else Icons.Default.VideocamOff,
-                                            contentDescription = stringResource(R.string.meeting_contentDescription_toggleCamera)
-                                        )
-                                    }
-
-                                    // Switch camera
-                                    SmallFloatingActionButton(
-                                        onClick = { roomManager.switchCamera() },
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Cameraswitch,
-                                            contentDescription = stringResource(R.string.meeting_contentDescription_switchCamera)
-                                        )
-                                    }
-
-                                    // Screen share toggle
-                                    SmallFloatingActionButton(
-                                        onClick = { scope.launch { roomManager.toggleScreenShare() } },
-                                        containerColor = if (isScreenShareEnabled)
-                                            MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.surfaceVariant
-                                    ) {
-                                        Icon(
-                                            if (isScreenShareEnabled) Icons.Default.StopScreenShare
-                                            else Icons.Default.ScreenShare,
-                                            contentDescription = stringResource(R.string.meeting_contentDescription_toggleScreenShare)
-                                        )
-                                    }
-
-                                    // Chat toggle with unread badge
-                                    SmallFloatingActionButton(
-                                        onClick = {
-                                            showChat = !showChat
-                                            if (showChat) showParticipants = false
-                                        },
-                                        containerColor = if (showChat)
-                                            MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.surfaceVariant
-                                    ) {
-                                        BadgedBox(badge = {
-                                            if (unreadCount > 0) {
-                                                Badge { Text(if (unreadCount > 9) "9+" else unreadCount.toString()) }
-                                            }
-                                        }) {
-                                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = stringResource(R.string.meeting_contentDescription_toggleChat))
-                                        }
-                                    }
-
-                                    // Participants panel toggle
-                                    SmallFloatingActionButton(
-                                        onClick = {
-                                            showParticipants = !showParticipants
-                                            if (showParticipants) showChat = false
-                                        },
-                                        containerColor = if (showParticipants)
-                                            MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.surfaceVariant
-                                    ) {
-                                        Icon(Icons.Default.People, contentDescription = stringResource(R.string.meeting_contentDescription_participants))
-                                    }
-
-                                    // Leave / End call
-                                    FloatingActionButton(
-                                        onClick = {
-                                            if (isAdmin) showLeaveDialog = true
-                                            else { CallService.stop(context); onLeave() }
-                                        },
-                                        containerColor = MaterialTheme.colorScheme.error,
-                                        contentColor = MaterialTheme.colorScheme.onError,
-                                        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp)
-                                    ) {
-                                        Icon(Icons.Default.CallEnd, contentDescription = stringResource(R.string.meeting_contentDescription_leaveCall))
-                                    }
-
-                                    // Leave/End dialog for room creator
-                                    if (showLeaveDialog) {
-                                        AlertDialog(
-                                            onDismissRequest = { showLeaveDialog = false },
-                                            title = { Text(stringResource(R.string.meeting_dialog_leaveTitle)) },
-                                            text = { Text(stringResource(R.string.meeting_dialog_leaveMessage)) },
-                                            confirmButton = {
-                                                TextButton(onClick = {
-                                                    showLeaveDialog = false
-                                                    scope.launch {
-                                                        try {
-                                                            roomApi.deleteRoom(roomId)
-                                                        } catch (_: Exception) {}
-                                                        CallService.stop(context)
-                                                        onLeave()
-                                                    }
-                                                }) {
-                                                    Text(stringResource(R.string.meeting_button_endForEveryone), color = MaterialTheme.colorScheme.error)
-                                                }
-                                            },
-                                            dismissButton = {
-                                                Row {
-                                                    TextButton(onClick = {
-                                                        showLeaveDialog = false
-                                                        CallService.stop(context)
-                                                        onLeave()
-                                                    }) { Text(stringResource(R.string.meeting_button_justLeave)) }
-                                                    TextButton(onClick = { showLeaveDialog = false }) { Text(stringResource(R.string.common_button_cancel)) }
-                                                }
-                                            }
-                                        )
-                                    }
-                                }
+                            }
                             }
 
-                            // Chat panel - slides in from the end side
-                            val layoutDirection = LocalLayoutDirection.current
-                            val slideIn = slideInHorizontally(
-                                initialOffsetX = { if (layoutDirection == LayoutDirection.Rtl) -it else it }
+                            MeetingControlsBar(
+                                isMicEnabled = isMicEnabled,
+                                isCameraEnabled = isCameraEnabled,
+                                micHasError = micMediaError,
+                                cameraHasError = cameraMediaError,
+                                isScreenShareEnabled = isScreenShareEnabled,
+                                showChat = showChat,
+                                showParticipants = showParticipants,
+                                unreadCount = unreadCount,
+                                onToggleMic = {
+                                    val action: () -> Unit = {
+                                        scope.launch { roomManager.toggleMicrophone() }
+                                    }
+                                    if (hasPermission(Manifest.permission.RECORD_AUDIO)) {
+                                        action()
+                                    } else {
+                                        pendingMediaAction = action
+                                        permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
+                                    }
+                                },
+                                onToggleCamera = {
+                                    val action: () -> Unit = {
+                                        scope.launch { roomManager.toggleCamera() }
+                                    }
+                                    if (hasPermission(Manifest.permission.CAMERA)) {
+                                        action()
+                                    } else {
+                                        pendingMediaAction = action
+                                        permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+                                    }
+                                },
+                                onSwitchCamera = { roomManager.switchCamera() },
+                                onToggleScreenShare = {
+                                    if (isScreenShareEnabled) {
+                                        scope.launch { roomManager.stopScreenShare() }
+                                    } else {
+                                        val projectionManager = context.getSystemService(
+                                            Context.MEDIA_PROJECTION_SERVICE
+                                        ) as MediaProjectionManager
+                                        screenCaptureLauncher.launch(
+                                            projectionManager.createScreenCaptureIntent()
+                                        )
+                                    }
+                                },
+                                onToggleChat = {
+                                    showChat = !showChat
+                                    if (showChat) showParticipants = false
+                                },
+                                onToggleParticipants = {
+                                    showParticipants = !showParticipants
+                                    if (showParticipants) showChat = false
+                                },
+                                onOpenAudioSettings = { showAudioSheet = true },
+                                onEndCall = {
+                                    if (isAdmin) showLeaveDialog = true
+                                    else {
+                                        CallService.stop(context)
+                                        onLeave()
+                                    }
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = 12.dp),
                             )
-                            val slideOut = slideOutHorizontally(
-                                targetOffsetX = { if (layoutDirection == LayoutDirection.Rtl) -it else it }
-                            )
+
+                            if (showAudioSheet) {
+                                MeetingAudioSourceSheet(
+                                    room = room,
+                                    audioState = audioState,
+                                    isMicEnabled = isMicEnabled,
+                                    micHasError = micMediaError,
+                                    onDismiss = { showAudioSheet = false },
+                                    onToggleMic = {
+                                        val action: () -> Unit = {
+                                            scope.launch { roomManager.toggleMicrophone() }
+                                        }
+                                        if (hasPermission(Manifest.permission.RECORD_AUDIO)) {
+                                            action()
+                                        } else {
+                                            pendingMediaAction = action
+                                            permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
+                                        }
+                                    },
+                                )
+                            }
+
+                            if (showLeaveDialog) {
+                                AlertDialog(
+                                    onDismissRequest = { showLeaveDialog = false },
+                                    title = { Text(stringResource(R.string.meeting_dialog_leaveTitle)) },
+                                    text = { Text(stringResource(R.string.meeting_dialog_leaveMessage)) },
+                                    confirmButton = {
+                                        TextButton(onClick = {
+                                            showLeaveDialog = false
+                                            scope.launch {
+                                                try {
+                                                    roomApi.deleteRoom(roomId)
+                                                } catch (_: Exception) {}
+                                                CallService.stop(context)
+                                                onLeave()
+                                            }
+                                        }) {
+                                            Text(
+                                                stringResource(R.string.meeting_button_endForEveryone),
+                                                color = MaterialTheme.colorScheme.error,
+                                            )
+                                        }
+                                    },
+                                    dismissButton = {
+                                        Row {
+                                            TextButton(onClick = {
+                                                showLeaveDialog = false
+                                                CallService.stop(context)
+                                                onLeave()
+                                            }) { Text(stringResource(R.string.meeting_button_justLeave)) }
+                                            TextButton(onClick = { showLeaveDialog = false }) {
+                                                Text(stringResource(R.string.common_button_cancel))
+                                            }
+                                        }
+                                    },
+                                )
+                            }
+
                             AnimatedVisibility(
                                 visible = showChat,
-                                enter = slideIn,
-                                exit = slideOut,
-                                modifier = Modifier.align(Alignment.CenterEnd)
+                                enter = fadeIn(),
+                                exit = fadeOut(),
+                                modifier = Modifier.fillMaxSize()
                             ) {
                                 ChatPanel(
+                                    modifier = Modifier.fillMaxSize(),
                                     messages = chatMessages,
                                     chatInput = chatInput,
                                     onChatInputChange = { chatInput = it },
@@ -528,6 +650,8 @@ fun MeetingScreen(
                                     onClose = { showChat = false },
                                     roomId = roomInfo?.id,
                                     roomApi = roomApi,
+                                    serverURL = serverURL,
+                                    accessToken = accessToken,
                                     onSendWithAttachment = { text, attachment ->
                                         scope.launch {
                                             roomManager.sendChatMessage(text, listOf(attachment))
@@ -536,12 +660,20 @@ fun MeetingScreen(
                                 )
                             }
 
-                            // Participants panel - slides in from the end side
+                            val layoutDirection = LocalLayoutDirection.current
+                            val slideIn = slideInHorizontally(
+                                initialOffsetX = { if (layoutDirection == LayoutDirection.Rtl) it else -it }
+                            )
+                            val slideOut = slideOutHorizontally(
+                                targetOffsetX = { if (layoutDirection == LayoutDirection.Rtl) it else -it }
+                            )
+
+                            // Participants panel - slides in from the start side
                             AnimatedVisibility(
-                                visible = showParticipants,
+                                visible = showParticipants && !showChat,
                                 enter = slideIn,
                                 exit = slideOut,
-                                modifier = Modifier.align(Alignment.CenterEnd)
+                                modifier = Modifier.align(Alignment.CenterStart)
                             ) {
                                 ParticipantsPanel(
                                     participants = participants,
@@ -552,6 +684,24 @@ fun MeetingScreen(
                                     snackbarHostState = snackbarHostState,
                                     scope = scope,
                                     onClose = { showParticipants = false }
+                                )
+                            }
+
+                            val fullscreenStage = activeStage?.takeIf { it.kind == "screenshare" }
+                            if (isScreenShareFullscreen && fullscreenStage != null) {
+                                MeetingScreenShareFullscreen(
+                                    stage = fullscreenStage,
+                                    room = room,
+                                    participantVersion = participantVersion,
+                                    isOwner = fullscreenStage.ownerIdentity == localIdentity,
+                                    onMinimize = { isScreenShareFullscreen = false },
+                                    onStop = {
+                                        isScreenShareFullscreen = false
+                                        scope.launch { roomManager.stopScreenShare() }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .zIndex(6f),
                                 )
                             }
                         }
@@ -601,14 +751,21 @@ private fun ParticipantTile(
     roomApi: RoomApi? = null,
     snackbarHostState: SnackbarHostState? = null,
     scope: kotlinx.coroutines.CoroutineScope? = null,
-    room: Room? = null
+    room: Room? = null,
+    stageScreenShareIdentity: String? = null,
 ) {
-    val cameraPublication = participant.getTrackPublication(Track.Source.CAMERA)
-    val videoTrack = cameraPublication
-        ?.track as? io.livekit.android.room.track.VideoTrack
-    val isVideoMuted = cameraPublication?.muted == true
-
     val identity = participant.identity?.value ?: "Unknown"
+
+    val screenShareRef = if (identity != stageScreenShareIdentity) {
+        resolveParticipantScreenShare(participant)
+    } else {
+        null
+    }
+
+    val cameraPublication = participant.getTrackPublication(Track.Source.CAMERA)
+    val cameraTrack = cameraPublication
+        ?.track as? io.livekit.android.room.track.VideoTrack
+    val isCameraMuted = cameraPublication?.muted == true
     val name = participant.name?.ifBlank { identity } ?: identity
 
     // Parse avatar URL from participant metadata
@@ -668,22 +825,34 @@ private fun ParticipantTile(
             ),
         contentAlignment = Alignment.Center
     ) {
-        if (videoTrack != null && !isVideoMuted) {
-            VideoTrackView(
-                videoTrack = videoTrack,
-                modifier = Modifier.fillMaxSize(),
-                passedRoom = room
-            )
-        } else if (!avatarUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = avatarUrl,
-                contentDescription = stringResource(R.string.meeting_contentDescription_participantAvatar),
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape),
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop
-            )
-        } else {
+        when {
+            screenShareRef != null && screenShareRef.isRenderable && room != null -> {
+                VideoTrackView(
+                    trackReference = screenShareRef.trackReference,
+                    modifier = Modifier.fillMaxSize(),
+                    room = room,
+                    mirror = false,
+                    scaleType = ScaleType.FitInside,
+                )
+            }
+            cameraTrack != null && !isCameraMuted && room != null -> {
+                VideoTrackView(
+                    videoTrack = cameraTrack,
+                    modifier = Modifier.fillMaxSize(),
+                    passedRoom = room,
+                )
+            }
+            !avatarUrl.isNullOrBlank() -> {
+                AsyncImage(
+                    model = avatarUrl,
+                    contentDescription = stringResource(R.string.meeting_contentDescription_participantAvatar),
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                )
+            }
+            else -> {
             // Initials placeholder
             Box(
                 modifier = Modifier
@@ -695,8 +864,9 @@ private fun ParticipantTile(
                 Text(
                     text = name.take(1).uppercase(),
                     style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = MaterialTheme.colorScheme.onPrimary,
                 )
+            }
             }
         }
 
@@ -803,6 +973,34 @@ private fun ParticipantTile(
     }
 }
 
+@Composable
+private fun PanelHeader(
+    title: String,
+    onClose: () -> Unit,
+    closeContentDescription: String,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        IconButton(onClick = onClose) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = closeContentDescription,
+            )
+        }
+    }
+    androidx.compose.material3.HorizontalDivider()
+}
+
 // ── Participants Panel ─────────────────────────────────────────────────────────
 
 @Composable
@@ -822,24 +1020,11 @@ private fun ParticipantsPanel(
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surface)
     ) {
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                stringResource(R.string.meeting_panel_participants),
-                style = MaterialTheme.typography.titleMedium
-            )
-            IconButton(onClick = onClose) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.meeting_contentDescription_close))
-            }
-        }
-
-        androidx.compose.material3.HorizontalDivider()
+        PanelHeader(
+            title = stringResource(R.string.meeting_panel_participants),
+            onClose = onClose,
+            closeContentDescription = stringResource(R.string.meeting_contentDescription_close),
+        )
 
         LazyColumn(
             modifier = Modifier.weight(1f),
@@ -981,7 +1166,9 @@ private fun ParticipantListRow(
 @Composable
 private fun KickedScreen(onBack: () -> Unit) {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1096,6 +1283,7 @@ private fun MeetingHeaderHUD(
 
 @Composable
 private fun ChatPanel(
+    modifier: Modifier = Modifier.fillMaxSize(),
     messages: List<ChatMessage>,
     chatInput: String,
     onChatInputChange: (String) -> Unit,
@@ -1103,11 +1291,21 @@ private fun ChatPanel(
     onClose: () -> Unit,
     roomId: String? = null,
     roomApi: RoomApi? = null,
+    serverURL: String = "",
+    accessToken: String? = null,
     onSendWithAttachment: ((String, com.bedrud.app.core.livekit.ChatAttachment) -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val isKeyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val flatFabElevation = FloatingActionButtonDefaults.elevation(
+        defaultElevation = 0.dp,
+        pressedElevation = 0.dp,
+        focusedElevation = 0.dp,
+        hoveredElevation = 0.dp
+    )
 
     // Detect whether user has scrolled away from the bottom
     val isAtBottom by remember {
@@ -1126,6 +1324,7 @@ private fun ChatPanel(
 
     var isUploading by remember { mutableStateOf(false) }
     var uploadError by remember { mutableStateOf<String?>(null) }
+    var previewImageUrl by remember { mutableStateOf<String?>(null) }
 
     val imagePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -1173,28 +1372,14 @@ private fun ChatPanel(
     }
 
     Column(
-        modifier = Modifier
-            .width(300.dp)
-            .fillMaxHeight()
+        modifier = modifier
             .background(MaterialTheme.colorScheme.surface)
     ) {
-        // Chat header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = stringResource(R.string.meeting_panel_chat),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            IconButton(onClick = onClose) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.meeting_contentDescription_closeChat))
-            }
-        }
+        PanelHeader(
+            title = stringResource(R.string.meeting_panel_chat),
+            onClose = onClose,
+            closeContentDescription = stringResource(R.string.meeting_contentDescription_closeChat),
+        )
 
         // Messages list + scroll-to-bottom button
         Box(
@@ -1210,7 +1395,12 @@ private fun ChatPanel(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(messages) { message ->
-                    ChatBubble(message = message)
+                    ChatBubble(
+                        message = message,
+                        serverURL = serverURL,
+                        accessToken = accessToken,
+                        onImageClick = { previewImageUrl = it },
+                    )
                 }
             }
 
@@ -1226,6 +1416,7 @@ private fun ChatPanel(
                         .align(Alignment.BottomEnd)
                         .padding(8.dp),
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    elevation = flatFabElevation
                 ) {
                     Icon(
                         Icons.Default.KeyboardArrowDown,
@@ -1256,12 +1447,21 @@ private fun ChatPanel(
             )
         }
 
-        // Input row
+        // Input dock — imePadding lifts above keyboard; extra bottom inset clears controls bar when closed
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .background(MaterialTheme.colorScheme.surface)
+                .imePadding()
+                .padding(horizontal = 8.dp, vertical = 8.dp)
+                .then(
+                    if (!isKeyboardVisible) {
+                        Modifier.padding(bottom = 72.dp)
+                    } else {
+                        Modifier
+                    },
+                ),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // Image picker button
             if (roomApi != null && roomId != null) {
@@ -1286,9 +1486,18 @@ private fun ChatPanel(
                 onValueChange = onChatInputChange,
                 placeholder = { Text(stringResource(R.string.meeting_chat_placeholder)) },
                 singleLine = true,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .bringIntoViewRequester(bringIntoViewRequester)
+                    .onFocusEvent { focusState ->
+                        if (focusState.isFocused) {
+                            scope.launch { bringIntoViewRequester.bringIntoView() }
+                        }
+                    },
                 shape = RoundedCornerShape(24.dp),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content)
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    textDirection = BidiUtils.textDirection(chatInput),
+                ),
             )
             Spacer(modifier = Modifier.width(4.dp))
             IconButton(
@@ -1305,10 +1514,23 @@ private fun ChatPanel(
             }
         }
     }
+
+    ChatImageLightbox(
+        url = previewImageUrl,
+        serverURL = serverURL,
+        accessToken = accessToken,
+        onClose = { previewImageUrl = null },
+    )
 }
 
 @Composable
-private fun ChatBubble(message: ChatMessage) {
+private fun ChatBubble(
+    message: ChatMessage,
+    serverURL: String,
+    accessToken: String?,
+    onImageClick: (String) -> Unit,
+) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (message.isLocal) Alignment.End else Alignment.Start
@@ -1341,17 +1563,19 @@ private fun ChatBubble(message: ChatMessage) {
                             contentDescription = stringResource(R.string.meeting_chat_sharedImage),
                             modifier = Modifier
                                 .fillMaxWidth(0.8f)
-                                .clip(RoundedCornerShape(10.dp)),
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { onImageClick(att.url) },
                             contentScale = ContentScale.FillWidth,
                         )
                     }
                 } else {
                     AsyncImage(
-                        model = att.url,
-                        contentDescription = stringResource(R.string.meeting_chat_sharedImage),
+                        model = ChatImageUtils.imageRequest(context, serverURL, att.url, accessToken),
+                        contentDescription = stringResource(R.string.meeting_contentDescription_viewImage),
                         modifier = Modifier
                             .fillMaxWidth(0.8f)
-                            .clip(RoundedCornerShape(10.dp)),
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { onImageClick(att.url) },
                         contentScale = ContentScale.FillWidth,
                     )
                 }
@@ -1370,7 +1594,9 @@ private fun ChatBubble(message: ChatMessage) {
                 ) {
                     Text(
                         text = BidiUtils.wrap(message.text),
-                        style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            textDirection = BidiUtils.textDirection(message.text),
+                        ),
                         color = if (message.isLocal) MaterialTheme.colorScheme.onPrimaryContainer
                         else MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -54,4 +54,37 @@ object BedrudURLParser {
 
         return BedrudMeetingURL(serverBaseURL = baseURL, roomName = roomName)
     }
+
+    /**
+     * Resolves pasted join input to a room slug.
+     * Accepts full meeting URLs (any host), `/m/` or `/c/` paths, or a plain room name.
+     */
+    fun parseJoinInput(rawInput: String): String? {
+        val trimmed = rawInput.trim()
+        if (trimmed.isEmpty()) return null
+
+        parse(trimmed)?.roomName?.let { return it }
+
+        if (!trimmed.contains("://") && !trimmed.contains("/")) {
+            return trimmed
+        }
+
+        val path = trimmed.substringBefore('?').substringBefore('#')
+        for (prefix in listOf("/m/", "/c/")) {
+            val index = path.indexOf(prefix)
+            if (index >= 0) {
+                val slug = path.substring(index + prefix.length).trim('/').substringBefore('/')
+                if (slug.isNotEmpty()) return slug
+            }
+        }
+
+        return null
+    }
+
+    /** Builds a shareable meeting join URL: `{server}/m/{roomName}`. */
+    fun buildMeetingLink(serverBaseURL: String, roomName: String): String {
+        val base = serverBaseURL.trim().trimEnd('/')
+        val slug = roomName.trim().trim('/')
+        return "$base/m/$slug"
+    }
 }
