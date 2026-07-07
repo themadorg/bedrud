@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"bedrud/internal/models"
 	"bytes"
 	"context"
 	"crypto/hmac"
@@ -9,8 +10,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
-
-	"bedrud/internal/models"
 
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
@@ -77,7 +76,7 @@ func NewDispatchWebhookHandler() Handler {
 				Msg("webhook: delivery failed (network error)")
 			return nil
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			log.Warn().Int("status", resp.StatusCode).Str("url", payload.URL).

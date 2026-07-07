@@ -1,6 +1,9 @@
 package queue
 
 import (
+	"bedrud/config"
+	"bedrud/internal/models"
+	"bedrud/internal/utils"
 	"bytes"
 	"context"
 	"embed"
@@ -10,10 +13,6 @@ import (
 	"net"
 	"net/smtp"
 	"time"
-
-	"bedrud/config"
-	"bedrud/internal/models"
-	"bedrud/internal/utils"
 
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
@@ -320,8 +319,6 @@ func (h *emailHandler) validateConfig() {
 	}
 }
 
-
-
 func renderPlaintextBody(plainTmpls map[string]*template.Template, payload SendEmailPayload) string {
 	pt, ok := plainTmpls[payload.TemplateName]
 	if ok && pt != nil {
@@ -333,8 +330,6 @@ func renderPlaintextBody(plainTmpls map[string]*template.Template, payload SendE
 	bodyHTML, _ := renderEmailBody(nil, payload)
 	return stripHTML(bodyHTML)
 }
-
-
 
 func stripHTML(html string) string {
 	var buf bytes.Buffer

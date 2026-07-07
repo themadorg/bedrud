@@ -10,6 +10,7 @@ import (
 	"bedrud/internal/utils"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/pem"
 	"net"
 	"net/http"
@@ -18,7 +19,6 @@ import (
 	"sync"
 	"time"
 
-	"crypto/x509"
 	"github.com/go-co-op/gocron"
 	lkauth "github.com/livekit/protocol/auth"
 	"github.com/livekit/protocol/livekit"
@@ -29,10 +29,12 @@ import (
 
 var scheduler *gocron.Scheduler
 
-var certFile string
-var keyFile string
-var certHosts []string
-var certMu sync.Mutex
+var (
+	certFile  string
+	keyFile   string
+	certHosts []string
+	certMu    sync.Mutex
+)
 
 func Initialize(db *gorm.DB, roomRepo *repository.RoomRepository, userRepo *repository.UserRepository, recordingRepo *repository.RecordingRepository, lkCfg *config.LiveKitConfig, serverCfg *config.ServerConfig, recStore storage.RecordingStore, recCfg *config.RecordingConfig) {
 	scheduler = gocron.NewScheduler(time.Local)

@@ -2,6 +2,9 @@
 package queue
 
 import (
+	"bedrud/internal/models"
+	"bedrud/internal/repository"
+	"bedrud/internal/storage"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,10 +13,6 @@ import (
 	"net/url"
 	"os"
 	"time"
-
-	"bedrud/internal/models"
-	"bedrud/internal/repository"
-	"bedrud/internal/storage"
 
 	"github.com/livekit/protocol/auth"
 	"github.com/rs/zerolog/log"
@@ -114,7 +113,7 @@ func NewProcessRecordingHandler(
 			return fmt.Errorf("create temp file: %w", err)
 		}
 		tmpPath := tmpFile.Name()
-		defer os.Remove(tmpPath)
+		defer func() { _ = os.Remove(tmpPath) }()
 
 		dlCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 		defer cancel()
@@ -130,7 +129,7 @@ func NewProcessRecordingHandler(
 		// Retry download with square backoff (3 attempts, 1s/4s/9s)
 		var written int64
 		var downloadOK bool
-		for attempt := 0; attempt < 3; attempt++ {
+		for attempt := range 3 {
 			if attempt > 0 {
 				backoff := time.Duration((attempt+1)*(attempt+1)) * time.Second
 				log.Info().Str("egressID", payload.EgressID).Int("attempt", attempt+1).Dur("backoff", backoff).
@@ -143,7 +142,7 @@ func NewProcessRecordingHandler(
 				}
 			}
 
-			req, reqErr := http.NewRequestWithContext(dlCtx, http.MethodGet, downloadURL, nil)
+			req, reqErr := http.NewRequestWithContext(dlCtx, http.MethodGet, downloadURL, http.NoBody)
 			if reqErr != nil {
 				continue
 			}
@@ -154,16 +153,22 @@ func NewProcessRecordingHandler(
 			}
 
 			if resp.StatusCode == http.StatusOK {
-				tmpFile.Seek(0, 0)
-				tmpFile.Truncate(0)
+				if _, err := tmpFile.Seek(0, 0); err != nil {
+					_ = resp.Body.Close()
+					continue
+				}
+				if err := tmpFile.Truncate(0); err != nil {
+					_ = resp.Body.Close()
+					continue
+				}
 				written, reqErr = io.Copy(tmpFile, resp.Body)
-				resp.Body.Close()
+				_ = resp.Body.Close()
 				if reqErr == nil {
 					downloadOK = true
 					break
 				}
 			} else {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 			}
 		}
 
@@ -172,7 +177,10 @@ func NewProcessRecordingHandler(
 			return fmt.Errorf("download failed after 3 retries")
 		}
 
-		tmpFile.Close()
+		if err := tmpFile.Close(); err != nil {
+			_ = recordingRepo.UpdateError(rec.ID, fmt.Sprintf("close temp file: %v", err))
+			return fmt.Errorf("close temp file: %w", err)
+		}
 
 		// 3. Build per-user storage key with timestamps
 		var started, completed string
@@ -190,7 +198,7 @@ func NewProcessRecordingHandler(
 			_ = recordingRepo.UpdateError(rec.ID, fmt.Sprintf("open temp file: %v", err))
 			return fmt.Errorf("open temp file: %w", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		attachment, err := recStore.Store(ctx, key, f, written)
 		if err != nil {
