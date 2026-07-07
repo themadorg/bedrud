@@ -258,10 +258,10 @@ func (r *UserRepository) ActivateUser(userID string) error {
 func (r *UserRepository) UpdatePassword(userID, hashedPassword string) error {
 	now := time.Now()
 	result := r.db.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]any{
-		"password":          hashedPassword,
-		"refresh_token":     "",
+		"password":            hashedPassword,
+		"refresh_token":       "",
 		"password_changed_at": now,
-		"updated_at":        now,
+		"updated_at":          now,
 	})
 	if result.Error != nil {
 		log.Error().Err(result.Error).Str("userID", userID).Msg("Failed to update password")
@@ -579,7 +579,7 @@ func (r *UserRepository) BatchPromote(ids []string) map[string]error {
 			if !slices.Contains(u.Accesses, "superadmin") {
 				newAccesses := append(u.Accesses, "superadmin")
 				if err := r.db.Model(&u).Updates(map[string]any{
-					"accesses":      models.StringArray(newAccesses),
+					"accesses":      newAccesses,
 					"refresh_token": "",
 					"updated_at":    time.Now(),
 				}).Error; err != nil {
@@ -722,7 +722,7 @@ func (r *UserRepository) GetRecentSignupsFiltered(p RecentSignupsFilterParams) (
 	}
 
 	var users []models.User
-	if err := query.Order(sortField+" "+order).Offset(offset).Limit(p.Limit).Find(&users).Error; err != nil {
+	if err := query.Order(sortField + " " + order).Offset(offset).Limit(p.Limit).Find(&users).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -778,7 +778,7 @@ func (r *UserRepository) CountUsersByDay(days int) ([]models.DayCount, error) {
 		found[key] = r.Count
 	}
 	var filled []models.DayCount
-	for i := 0; i < days; i++ {
+	for i := range days {
 		day := cutoff.Add(time.Duration(i) * 24 * time.Hour)
 		key := day.Format("2006-01-02")
 		filled = append(filled, models.DayCount{

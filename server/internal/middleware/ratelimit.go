@@ -1,9 +1,8 @@
 package middleware
 
 import (
-	"time"
-
 	"bedrud/config"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/limiter"

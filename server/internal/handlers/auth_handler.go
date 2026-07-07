@@ -7,6 +7,7 @@ import (
 	"bedrud/internal/models"
 	"bedrud/internal/queue"
 	"bedrud/internal/repository"
+	"bedrud/internal/storage"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -14,6 +15,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -504,6 +506,78 @@ func (h *AuthHandler) GetMe(c *fiber.Ctx) error {
 	return c.JSON(user)
 }
 
+func profileResponse(user *models.User) fiber.Map {
+	return fiber.Map{
+		"id":        user.ID,
+		"name":      user.Name,
+		"email":     user.Email,
+		"provider":  user.Provider,
+		"accesses":  user.Accesses,
+		"avatarUrl": user.AvatarURL,
+	}
+}
+
+// @Summary Upload profile avatar
+// @Description Upload a profile photo stored on the server
+// @Tags auth
+// @Accept mpfd
+// @Produce json
+// @Success 200 {object} object
+// @Failure 400 {object} auth.ErrorResponse
+// @Failure 401 {object} auth.ErrorResponse
+// @Router /auth/me/avatar [post]
+func (h *AuthHandler) UploadAvatar(c *fiber.Ctx) error {
+	claims := c.Locals("user").(*auth.Claims)
+	file, err := c.FormFile("avatar")
+	if err != nil || file == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Avatar file is required"})
+	}
+	if file.Size > storage.AvatarMaxBytes() {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Avatar too large (max 2 MB)"})
+	}
+
+	f, err := file.Open()
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to read upload"})
+	}
+	defer func() { _ = f.Close() }()
+
+	data, err := io.ReadAll(io.LimitReader(f, storage.AvatarMaxBytes()+1))
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to read upload"})
+	}
+	if int64(len(data)) > storage.AvatarMaxBytes() {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Avatar too large (max 2 MB)"})
+	}
+
+	url, err := storage.SaveUserAvatar(claims.UserID, data)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	user, err := h.authService.UpdateAvatarURL(claims.UserID, url)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(profileResponse(user))
+}
+
+// @Summary Remove profile avatar
+// @Description Remove a custom uploaded profile photo
+// @Tags auth
+// @Produce json
+// @Success 200 {object} object
+// @Failure 401 {object} auth.ErrorResponse
+// @Router /auth/me/avatar [delete]
+func (h *AuthHandler) DeleteAvatar(c *fiber.Ctx) error {
+	claims := c.Locals("user").(*auth.Claims)
+	user, err := h.authService.ClearAvatar(claims.UserID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(profileResponse(user))
+}
+
 // @Summary Update profile
 // @Description Update user name or email. Email change triggers verification flow and issues new tokens.
 // @Tags auth
@@ -601,11 +675,7 @@ func (h *AuthHandler) UpdateProfile(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	res := fiber.Map{
-		"id":    user.ID,
-		"name":  user.Name,
-		"email": user.Email,
-	}
+	res := profileResponse(user)
 	if input.Email != "" && auth.CanonicalizeEmail(input.Email) != auth.CanonicalizeEmail(claims.Email) {
 		res["requiresVerification"] = true
 		res["message"] = "Verification email sent to new address"
@@ -946,12 +1016,6 @@ func enqueueVerificationEmail(h *AuthHandler, c *fiber.Ctx, user *models.User) {
 
 	// Audit log
 	h.auditVerificationEvent(user.ID, user.Email, models.VerificationSent, c)
-}
-
-// verifyFrontendURL returns the base frontend URL without a trailing slash,
-// defaulting to empty (for relative redirects) when not configured.
-func verifyFrontendURL(cfg *config.Config) string {
-	return strings.TrimRight(cfg.Auth.FrontendURL, "/")
 }
 
 // @Summary Verify email

@@ -80,19 +80,19 @@ func (StringArray) GormDataType() string {
 }
 
 type User struct {
-	ID              string      `json:"id" gorm:"primaryKey;type:varchar(36)"`
-	Email           string      `json:"email" gorm:"uniqueIndex:idx_email_provider;not null;type:varchar(255)"`
-	Name            string      `json:"name" gorm:"not null;type:varchar(255)"`
-	Provider        string      `json:"provider" gorm:"uniqueIndex:idx_email_provider;type:varchar(20);default:'local'"`
-	AvatarURL       string      `json:"avatarUrl" gorm:"column:avatar_url;type:varchar(255)"`
-	Password        string      `json:"-" gorm:"type:varchar(255)"`
-	RefreshToken    string      `json:"-" gorm:"column:refresh_token;type:text"`
-	Accesses        StringArray `json:"accesses" gorm:"type:text"`
-	IsActive        bool        `json:"isActive" gorm:"not null;default:true"`
-	EmailVerifiedAt *time.Time  `json:"emailVerifiedAt" gorm:"column:email_verified_at;index"`
-	PasswordChangedAt *time.Time `json:"passwordChangedAt" gorm:"column:password_changed_at"`
+	ID                string      `json:"id" gorm:"primaryKey;type:varchar(36)"`
+	Email             string      `json:"email" gorm:"uniqueIndex:idx_email_provider;not null;type:varchar(255)"`
+	Name              string      `json:"name" gorm:"not null;type:varchar(255)"`
+	Provider          string      `json:"provider" gorm:"uniqueIndex:idx_email_provider;type:varchar(20);default:'local'"`
+	AvatarURL         string      `json:"avatarUrl" gorm:"column:avatar_url;type:varchar(255)"`
+	Password          string      `json:"-" gorm:"type:varchar(255)"`
+	RefreshToken      string      `json:"-" gorm:"column:refresh_token;type:text"`
+	Accesses          StringArray `json:"accesses" gorm:"type:text"`
+	IsActive          bool        `json:"isActive" gorm:"not null;default:true"`
+	EmailVerifiedAt   *time.Time  `json:"emailVerifiedAt" gorm:"column:email_verified_at;index"`
+	PasswordChangedAt *time.Time  `json:"passwordChangedAt" gorm:"column:password_changed_at"`
 	CreatedAt         time.Time   `json:"createdAt" gorm:"autoCreateTime;not null"`
-	UpdatedAt       time.Time   `json:"updatedAt" gorm:"autoUpdateTime;not null"`
+	UpdatedAt         time.Time   `json:"updatedAt" gorm:"autoUpdateTime;not null"`
 }
 
 // TableName specifies the table name for GORM
