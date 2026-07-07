@@ -1,6 +1,8 @@
 package queue
 
 import (
+	"bedrud/internal/models"
+	"bedrud/internal/testutil"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -12,9 +14,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"bedrud/internal/models"
-	"bedrud/internal/testutil"
 
 	"github.com/google/uuid"
 )
@@ -34,20 +33,6 @@ func testWebhookJob(t *testing.T, url, secret, event string, body map[string]any
 	}
 }
 
-func waitForServer(t *testing.T, url string) {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		resp, err := http.Get(url)
-		if err == nil {
-			resp.Body.Close()
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("test server did not start")
-}
-
 func TestDispatchWebhook_HMACMatch(t *testing.T) {
 	received := make(chan struct {
 		sig   string
@@ -56,7 +41,7 @@ func TestDispatchWebhook_HMACMatch(t *testing.T) {
 	}, 1)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		r.Body.Close()
+		_ = r.Body.Close()
 		received <- struct {
 			sig   string
 			event string
@@ -156,7 +141,7 @@ func TestDispatchWebhook_NilBody(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var envelope map[string]any
 		body, _ := io.ReadAll(r.Body)
-		r.Body.Close()
+		_ = r.Body.Close()
 		json.Unmarshal(body, &envelope)
 
 		data, ok := envelope["data"]
@@ -190,7 +175,7 @@ func TestDispatchWebhook_EmptySecret(t *testing.T) {
 
 		// Verify HMAC with empty key produces a valid signature
 		body, _ := io.ReadAll(r.Body)
-		r.Body.Close()
+		_ = r.Body.Close()
 		mac := hmac.New(sha256.New, []byte(""))
 		mac.Write(body)
 		expectedSig := "sha256=" + hex.EncodeToString(mac.Sum(nil))

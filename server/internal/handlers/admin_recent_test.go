@@ -49,11 +49,11 @@ func seedUsers(t *testing.T, userRepo *repository.UserRepository) {
 	// Use UTC midnight today as reference to avoid timezone/date-boundary flakiness
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 	users := []*models.User{
-		{ID: "u1", Email: "alice@ex.com", Name: "Alice", Provider: "local", IsActive: true, Accesses: models.StringArray{"user"}, CreatedAt: today.Add(10 * time.Hour)},             // today 10:00 UTC
-		{ID: "u2", Email: "bob@ex.com", Name: "Bob", Provider: "google", IsActive: true, Accesses: models.StringArray{"user"}, CreatedAt: today.Add(9 * time.Hour)},              // today 09:00 UTC
-		{ID: "u3", Email: "carol@ex.com", Name: "Carol", Provider: "github", IsActive: false, Accesses: models.StringArray{"user"}, CreatedAt: today.Add(-14 * time.Hour)},          // yesterday 10:00 UTC
-		{ID: "u4", Email: "dan@ex.com", Name: "Dan", Provider: "guest", IsActive: true, Accesses: models.StringArray{"guest"}, CreatedAt: today.Add(-38 * time.Hour)},                // 2 days ago 10:00 UTC
-		{ID: "u5", Email: "eve@ex.com", Name: "Eve", Provider: "local", IsActive: true, Accesses: models.StringArray{"admin"}, CreatedAt: today.Add(-62 * time.Hour)},                // 3 days ago 10:00 UTC
+		{ID: "u1", Email: "alice@ex.com", Name: "Alice", Provider: "local", IsActive: true, Accesses: models.StringArray{"user"}, CreatedAt: today.Add(10 * time.Hour)},    // today 10:00 UTC
+		{ID: "u2", Email: "bob@ex.com", Name: "Bob", Provider: "google", IsActive: true, Accesses: models.StringArray{"user"}, CreatedAt: today.Add(9 * time.Hour)},        // today 09:00 UTC
+		{ID: "u3", Email: "carol@ex.com", Name: "Carol", Provider: "github", IsActive: false, Accesses: models.StringArray{"user"}, CreatedAt: today.Add(-14 * time.Hour)}, // yesterday 10:00 UTC
+		{ID: "u4", Email: "dan@ex.com", Name: "Dan", Provider: "guest", IsActive: true, Accesses: models.StringArray{"guest"}, CreatedAt: today.Add(-38 * time.Hour)},      // 2 days ago 10:00 UTC
+		{ID: "u5", Email: "eve@ex.com", Name: "Eve", Provider: "local", IsActive: true, Accesses: models.StringArray{"admin"}, CreatedAt: today.Add(-62 * time.Hour)},      // 3 days ago 10:00 UTC
 	}
 	for _, u := range users {
 		if err := userRepo.CreateUser(u); err != nil {
@@ -78,7 +78,7 @@ func TestRecentSignups_Empty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -113,7 +113,7 @@ func TestRecentSignups_WithUsers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -147,11 +147,16 @@ func TestRecentSignups_Pagination(t *testing.T) {
 
 	// Page 1, limit 2
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/recent?page=1&limit=2", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var p1 recentSignupsResponse
-	json.NewDecoder(resp.Body).Decode(&p1)
+	if err := json.NewDecoder(resp.Body).Decode(&p1); err != nil {
+		t.Fatal(err)
+	}
 	if len(p1.Users) != 2 {
 		t.Fatalf("expected 2 users on page 1, got %d", len(p1.Users))
 	}
@@ -164,22 +169,32 @@ func TestRecentSignups_Pagination(t *testing.T) {
 
 	// Page 2, limit 2 — should have 2 users
 	req2 := httptest.NewRequest(http.MethodGet, "/admin/users/recent?page=2&limit=2", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 
 	var p2 recentSignupsResponse
-	json.NewDecoder(resp2.Body).Decode(&p2)
+	if err := json.NewDecoder(resp2.Body).Decode(&p2); err != nil {
+		t.Fatal(err)
+	}
 	if len(p2.Users) != 2 {
 		t.Fatalf("expected 2 users on page 2, got %d", len(p2.Users))
 	}
 
 	// Page 3, limit 2 — should be empty
 	req3 := httptest.NewRequest(http.MethodGet, "/admin/users/recent?page=3&limit=2", http.NoBody)
-	resp3, _ := app.Test(req3, -1)
-	defer resp3.Body.Close()
+	resp3, err := app.Test(req3, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp3.Body.Close() }()
 
 	var p3 recentSignupsResponse
-	json.NewDecoder(resp3.Body).Decode(&p3)
+	if err := json.NewDecoder(resp3.Body).Decode(&p3); err != nil {
+		t.Fatal(err)
+	}
 	if len(p3.Users) != 0 {
 		t.Fatalf("expected 0 users on page 3, got %d", len(p3.Users))
 	}
@@ -191,33 +206,48 @@ func TestRecentSignups_SearchFilter(t *testing.T) {
 
 	// Search by name
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/recent?q=ali", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result recentSignupsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if len(result.Users) != 1 || result.Users[0].Name != "Alice" {
 		t.Fatalf("expected 1 user (Alice), got %d: %+v", len(result.Users), result.Users)
 	}
 
 	// Search by email
 	req2 := httptest.NewRequest(http.MethodGet, "/admin/users/recent?q=bob@ex", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 
 	var result2 recentSignupsResponse
-	json.NewDecoder(resp2.Body).Decode(&result2)
+	if err := json.NewDecoder(resp2.Body).Decode(&result2); err != nil {
+		t.Fatal(err)
+	}
 	if len(result2.Users) != 1 || result2.Users[0].Name != "Bob" {
 		t.Fatalf("expected 1 user (Bob), got %d", len(result2.Users))
 	}
 
 	// Search with no match
 	req3 := httptest.NewRequest(http.MethodGet, "/admin/users/recent?q=zzzzz", http.NoBody)
-	resp3, _ := app.Test(req3, -1)
-	defer resp3.Body.Close()
+	resp3, err := app.Test(req3, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp3.Body.Close() }()
 
 	var result3 recentSignupsResponse
-	json.NewDecoder(resp3.Body).Decode(&result3)
+	if err := json.NewDecoder(resp3.Body).Decode(&result3); err != nil {
+		t.Fatal(err)
+	}
 	if len(result3.Users) != 0 {
 		t.Fatalf("expected 0 users for non-matching search, got %d", len(result3.Users))
 	}
@@ -229,22 +259,32 @@ func TestRecentSignups_ProviderFilter(t *testing.T) {
 
 	// Single provider
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/recent?provider=google", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result recentSignupsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if len(result.Users) != 1 || result.Users[0].Name != "Bob" {
 		t.Fatalf("expected 1 google user (Bob), got %d: %+v", len(result.Users), result.Users)
 	}
 
 	// Multiple providers
 	req2 := httptest.NewRequest(http.MethodGet, "/admin/users/recent?provider=local,google", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 
 	var result2 recentSignupsResponse
-	json.NewDecoder(resp2.Body).Decode(&result2)
+	if err := json.NewDecoder(resp2.Body).Decode(&result2); err != nil {
+		t.Fatal(err)
+	}
 	if len(result2.Users) != 3 { // Alice (local), Bob (google), Eve (local)
 		t.Fatalf("expected 3 users for local+google, got %d: %+v", len(result2.Users), result2.Users)
 	}
@@ -254,8 +294,11 @@ func TestRecentSignups_InvalidProvider(t *testing.T) {
 	app, _ := setupRecentSignupsTestApp(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/recent?provider=invalid", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid provider, got %d", resp.StatusCode)
 	}
@@ -269,11 +312,16 @@ func TestRecentSignups_DateFilter(t *testing.T) {
 
 	// dateFrom=today — should get Alice and Bob (created today at 10:00 and 09:00 UTC)
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/recent?dateFrom="+today, http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result recentSignupsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if len(result.Users) != 2 {
 		t.Fatalf("expected 2 users from today, got %d: %+v", len(result.Users), result.Users)
 	}
@@ -281,11 +329,16 @@ func TestRecentSignups_DateFilter(t *testing.T) {
 	// dateTo=yesterday — should include Carol, Dan, Eve
 	yesterday := time.Now().UTC().Add(-24 * time.Hour).Format("2006-01-02")
 	req2 := httptest.NewRequest(http.MethodGet, "/admin/users/recent?dateTo="+yesterday, http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 
 	var result2 recentSignupsResponse
-	json.NewDecoder(resp2.Body).Decode(&result2)
+	if err := json.NewDecoder(resp2.Body).Decode(&result2); err != nil {
+		t.Fatal(err)
+	}
 	if len(result2.Users) == 0 {
 		t.Fatal("expected some older users")
 	}
@@ -295,15 +348,21 @@ func TestRecentSignups_InvalidDate(t *testing.T) {
 	app, _ := setupRecentSignupsTestApp(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/recent?dateFrom=not-a-date", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid dateFrom, got %d", resp.StatusCode)
 	}
 
 	req2 := httptest.NewRequest(http.MethodGet, "/admin/users/recent?dateTo=also-invalid", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid dateTo, got %d", resp2.StatusCode)
 	}
@@ -313,8 +372,11 @@ func TestRecentSignups_InvalidSort(t *testing.T) {
 	app, _ := setupRecentSignupsTestApp(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/recent?sort=invalid", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid sort, got %d", resp.StatusCode)
 	}
@@ -324,8 +386,11 @@ func TestRecentSignups_InvalidOrder(t *testing.T) {
 	app, _ := setupRecentSignupsTestApp(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/recent?order=invalid", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid order, got %d", resp.StatusCode)
 	}
@@ -337,11 +402,16 @@ func TestRecentSignups_LimitClamping(t *testing.T) {
 
 	// limit=200 should be clamped to 100 (the handler's max)
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/recent?limit=200", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result recentSignupsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if result.Limit != 100 && result.Limit != 50 {
 		t.Fatalf("expected limit clamped to 100 or 50, got %d", result.Limit)
 	}
@@ -352,11 +422,16 @@ func TestRecentSignups_NegativeLimit(t *testing.T) {
 	seedUsers(t, userRepo)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/recent?limit=-5", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result recentSignupsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if result.Limit != 50 {
 		t.Fatalf("expected limit clamped to 50, got %d", result.Limit)
 	}
@@ -368,11 +443,16 @@ func TestRecentSignups_ZeroPage(t *testing.T) {
 
 	// page=0 should default to 1
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/recent?page=0", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result recentSignupsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if result.Page != 1 {
 		t.Fatalf("expected page 1, got %d", result.Page)
 	}
@@ -390,11 +470,16 @@ func TestRecentSignups_CombinedFilters(t *testing.T) {
 
 	// Combined: provider=local + dateFrom=today
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/recent?provider=local&dateFrom="+today, http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result recentSignupsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	// local users created today: Alice, Bob is google, Carol is github, Dan is guest, Eve is local but 3 days ago
 	// So only Alice should match (local + today)
 	if len(result.Users) != 1 || result.Users[0].Name != "Alice" {
@@ -408,11 +493,16 @@ func TestRecentSignups_SortByName(t *testing.T) {
 
 	// sort=name, order=asc — alphabetical
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/recent?sort=name&order=asc", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result recentSignupsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if len(result.Users) != 4 {
 		t.Fatalf("expected 4 users (guest excluded), got %d", len(result.Users))
 	}
@@ -431,11 +521,16 @@ func TestRecentSignups_EmptyProviderParam(t *testing.T) {
 
 	// provider= with empty value should be treated as no filter
 	req := httptest.NewRequest(http.MethodGet, "/admin/users/recent?provider=", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result recentSignupsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if len(result.Users) != 4 {
 		t.Fatalf("expected 4 users (guest excluded by default), got %d", len(result.Users))
 	}
@@ -516,7 +611,7 @@ func TestRoomEvents_Empty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(body))
@@ -552,7 +647,7 @@ func TestRoomEvents_WithEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(body))
@@ -599,11 +694,16 @@ func TestRoomEvents_Pagination(t *testing.T) {
 
 	// Page 1, limit 2
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?page=1&limit=2", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var p1 roomEventsResponse
-	json.NewDecoder(resp.Body).Decode(&p1)
+	if err := json.NewDecoder(resp.Body).Decode(&p1); err != nil {
+		t.Fatal(err)
+	}
 	if len(p1.Events) != 2 {
 		t.Fatalf("expected 2 events on page 1, got %d", len(p1.Events))
 	}
@@ -613,33 +713,48 @@ func TestRoomEvents_Pagination(t *testing.T) {
 
 	// Page 2, limit 2 — should have 2 events
 	req2 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?page=2&limit=2", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 
 	var p2 roomEventsResponse
-	json.NewDecoder(resp2.Body).Decode(&p2)
+	if err := json.NewDecoder(resp2.Body).Decode(&p2); err != nil {
+		t.Fatal(err)
+	}
 	if len(p2.Events) != 2 {
 		t.Fatalf("expected 2 events on page 2, got %d", len(p2.Events))
 	}
 
 	// Page 3, limit 2 — should have 1 event
 	req3 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?page=3&limit=2", http.NoBody)
-	resp3, _ := app.Test(req3, -1)
-	defer resp3.Body.Close()
+	resp3, err := app.Test(req3, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp3.Body.Close() }()
 
 	var p3 roomEventsResponse
-	json.NewDecoder(resp3.Body).Decode(&p3)
+	if err := json.NewDecoder(resp3.Body).Decode(&p3); err != nil {
+		t.Fatal(err)
+	}
 	if len(p3.Events) != 1 {
 		t.Fatalf("expected 1 event on page 3, got %d", len(p3.Events))
 	}
 
 	// Page 4, limit 2 — should be empty
 	req4 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?page=4&limit=2", http.NoBody)
-	resp4, _ := app.Test(req4, -1)
-	defer resp4.Body.Close()
+	resp4, err := app.Test(req4, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp4.Body.Close() }()
 
 	var p4 roomEventsResponse
-	json.NewDecoder(resp4.Body).Decode(&p4)
+	if err := json.NewDecoder(resp4.Body).Decode(&p4); err != nil {
+		t.Fatal(err)
+	}
 	if len(p4.Events) != 0 {
 		t.Fatalf("expected 0 events on page 4, got %d", len(p4.Events))
 	}
@@ -651,33 +766,48 @@ func TestRoomEvents_TypeFilter(t *testing.T) {
 
 	// Filter by room_created only
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?type=room_created", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result roomEventsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if len(result.Events) != 2 {
 		t.Fatalf("expected 2 room_created events, got %d", len(result.Events))
 	}
 
 	// Filter by room_joined only
 	req2 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?type=room_joined", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 
 	var result2 roomEventsResponse
-	json.NewDecoder(resp2.Body).Decode(&result2)
+	if err := json.NewDecoder(resp2.Body).Decode(&result2); err != nil {
+		t.Fatal(err)
+	}
 	if len(result2.Events) != 3 {
 		t.Fatalf("expected 3 room_joined events (2 auto-joins + 1 explicit), got %d", len(result2.Events))
 	}
 
 	// Filter by both
 	req3 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?type=room_created,room_joined", http.NoBody)
-	resp3, _ := app.Test(req3, -1)
-	defer resp3.Body.Close()
+	resp3, err := app.Test(req3, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp3.Body.Close() }()
 
 	var result3 roomEventsResponse
-	json.NewDecoder(resp3.Body).Decode(&result3)
+	if err := json.NewDecoder(resp3.Body).Decode(&result3); err != nil {
+		t.Fatal(err)
+	}
 	if len(result3.Events) != 5 {
 		t.Fatalf("expected 5 events for both types, got %d", len(result3.Events))
 	}
@@ -687,8 +817,11 @@ func TestRoomEvents_InvalidType(t *testing.T) {
 	app, _, _, _ := setupRoomEventsTestApp(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?type=invalid_type", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid type, got %d", resp.StatusCode)
 	}
@@ -700,22 +833,32 @@ func TestRoomEvents_SearchFilter(t *testing.T) {
 
 	// Search by room name
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?q=meeting", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result roomEventsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if len(result.Events) == 0 {
 		t.Fatal("expected events matching 'meeting'")
 	}
 
 	// Search by user name
 	req2 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?q=joiner", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 
 	var result2 roomEventsResponse
-	json.NewDecoder(resp2.Body).Decode(&result2)
+	if err := json.NewDecoder(resp2.Body).Decode(&result2); err != nil {
+		t.Fatal(err)
+	}
 	if len(result2.Events) == 0 {
 		t.Fatal("expected events matching 'joiner'")
 	}
@@ -729,22 +872,32 @@ func TestRoomEvents_DateFilter(t *testing.T) {
 
 	// Filter from today — all events
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?dateFrom="+today, http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result roomEventsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if len(result.Events) == 0 {
 		t.Fatal("expected events from today")
 	}
 
 	// Filter to yesterday — no events (all events are from today/today-2)
 	req3 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?dateTo=2010-01-01", http.NoBody)
-	resp3, _ := app.Test(req3, -1)
-	defer resp3.Body.Close()
+	resp3, err := app.Test(req3, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp3.Body.Close() }()
 
 	var result3 roomEventsResponse
-	json.NewDecoder(resp3.Body).Decode(&result3)
+	if err := json.NewDecoder(resp3.Body).Decode(&result3); err != nil {
+		t.Fatal(err)
+	}
 	if len(result3.Events) != 0 {
 		t.Fatalf("expected 0 events before 2010, got %d", len(result3.Events))
 	}
@@ -754,15 +907,21 @@ func TestRoomEvents_InvalidDate(t *testing.T) {
 	app, _, _, _ := setupRoomEventsTestApp(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?dateFrom=bad", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid dateFrom, got %d", resp.StatusCode)
 	}
 
 	req2 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?dateTo=also-bad", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid dateTo, got %d", resp2.StatusCode)
 	}
@@ -773,11 +932,16 @@ func TestRoomEvents_OrderAsc(t *testing.T) {
 	seedRoomEvents(t, roomRepo, userRepo, db)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?order=asc", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result roomEventsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if len(result.Events) != 5 {
 		t.Fatalf("expected 5 events, got %d", len(result.Events))
 	}
@@ -787,8 +951,11 @@ func TestRoomEvents_InvalidOrder(t *testing.T) {
 	app, _, _, _ := setupRoomEventsTestApp(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?order=invalid", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid order, got %d", resp.StatusCode)
 	}
@@ -799,11 +966,16 @@ func TestRoomEvents_LimitClamping(t *testing.T) {
 	seedRoomEvents(t, roomRepo, userRepo, db)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?limit=200", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result roomEventsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if result.Limit > 100 {
 		t.Fatalf("expected limit clamped, got %d", result.Limit)
 	}
@@ -814,11 +986,16 @@ func TestRoomEvents_NegativeLimit(t *testing.T) {
 	seedRoomEvents(t, roomRepo, userRepo, db)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?limit=-5", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result roomEventsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if result.Limit != 50 {
 		t.Fatalf("expected limit clamped to 50, got %d", result.Limit)
 	}
@@ -829,11 +1006,16 @@ func TestRoomEvents_ZeroPage(t *testing.T) {
 	seedRoomEvents(t, roomRepo, userRepo, db)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?page=0", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result roomEventsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if result.Page != 1 {
 		t.Fatalf("expected page 1, got %d", result.Page)
 	}
@@ -847,11 +1029,16 @@ func TestRoomEvents_DateFromAndTo(t *testing.T) {
 
 	// Both dateFrom and dateTo = today — should get all today's events
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?dateFrom="+today+"&dateTo="+today, http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result roomEventsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if len(result.Events) == 0 {
 		t.Fatal("expected some events with dateFrom+dateTo both set to today")
 	}
@@ -863,11 +1050,16 @@ func TestRoomEvents_DateFromReversed(t *testing.T) {
 
 	// dateFrom after dateTo — should return empty (no events in that range)
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?dateFrom=2030-01-01&dateTo=2020-01-01", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result roomEventsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if len(result.Events) != 0 {
 		t.Fatalf("expected 0 events for reversed date range, got %d", len(result.Events))
 	}
@@ -879,11 +1071,16 @@ func TestRoomEvents_EmptyTypeParam(t *testing.T) {
 
 	// type= with empty value should be treated as no filter
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?type=", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result roomEventsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if len(result.Events) != 5 {
 		t.Fatalf("expected 5 events (no filter), got %d", len(result.Events))
 	}
@@ -895,11 +1092,16 @@ func TestRoomEvents_CombinedFilters(t *testing.T) {
 
 	// type=room_joined + q=meeting — should only get join events for "meeting-room"
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?type=room_joined&q=meeting", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var result roomEventsResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
 	if len(result.Events) == 0 {
 		t.Fatal("expected at least 1 join event for meeting-room")
 	}

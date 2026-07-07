@@ -521,7 +521,7 @@ func TestRoomRepository_GetUserParticipationsPaginated_Pagination(t *testing.T) 
 
 	db.Create(&models.User{ID: testUserIDRoom, Email: "u1@ex.com", Name: "U1", Provider: "local", IsActive: true})
 	// Create 3 rooms and join them
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		name := fmt.Sprintf("pag-room-%d", i)
 		room, _ := repo.CreateRoom(testUserIDRoom, name, false, "standard", 0, &models.RoomSettings{})
 		_ = repo.AddParticipant(room.ID, testUserIDRoom)
@@ -555,7 +555,7 @@ func TestRoomRepository_GetUserParticipationsPaginated_Pagination(t *testing.T) 
 	}
 
 	// Page 1, limit 50 → 3 results (clamp check: limit > 100 would clamp, but 50 is fine)
-	pAll, total, err := repo.GetUserParticipationsPaginated(testUserIDRoom, UserParticipationsParams{Page: 1, Limit: 50})
+	pAll, _, err := repo.GetUserParticipationsPaginated(testUserIDRoom, UserParticipationsParams{Page: 1, Limit: 50})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1652,7 +1652,7 @@ func TestRoomRepository_GetAllActiveRoomsWithLimit(t *testing.T) {
 
 	db.Create(&models.User{ID: "user-limit", Email: "limit@ex.com", Name: "Limit", Provider: "local", IsActive: true})
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		_, _ = repo.CreateRoom("user-limit", fmt.Sprintf("limit-room-%d", i), false, "standard", 0, &models.RoomSettings{})
 	}
 

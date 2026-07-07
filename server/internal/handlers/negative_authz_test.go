@@ -1,18 +1,17 @@
 package handlers
 
 import (
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
-
 	"bedrud/config"
 	"bedrud/internal/auth"
 	"bedrud/internal/middleware"
 	"bedrud/internal/models"
 	"bedrud/internal/repository"
 	"bedrud/internal/testutil"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -76,8 +75,12 @@ func generateTestToken(t *testing.T, userID, email, name, provider string, acces
 func TestAuthz_PublicRoute_NoAuth(t *testing.T) {
 	app := setupAuthzTestApp(t)
 	req := httptest.NewRequest(http.MethodGet, "/public", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	if resp.StatusCode != 200 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 for public route, got %d", resp.StatusCode)
 	}
 }
@@ -85,8 +88,12 @@ func TestAuthz_PublicRoute_NoAuth(t *testing.T) {
 func TestAuthz_ProtectedRoute_NoAuth(t *testing.T) {
 	app := setupAuthzTestApp(t)
 	req := httptest.NewRequest(http.MethodGet, "/protected", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	if resp.StatusCode != 401 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for protected route without auth, got %d", resp.StatusCode)
 	}
 }
@@ -95,8 +102,12 @@ func TestAuthz_ProtectedRoute_InvalidToken(t *testing.T) {
 	app := setupAuthzTestApp(t)
 	req := httptest.NewRequest(http.MethodGet, "/protected", http.NoBody)
 	req.Header.Set("Authorization", "Bearer invalid.token.here")
-	resp, _ := app.Test(req, -1)
-	if resp.StatusCode != 401 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for invalid token, got %d", resp.StatusCode)
 	}
 }
@@ -104,8 +115,12 @@ func TestAuthz_ProtectedRoute_InvalidToken(t *testing.T) {
 func TestAuthz_AdminRoute_NoAuth(t *testing.T) {
 	app := setupAuthzTestApp(t)
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	if resp.StatusCode != 401 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for admin route without auth, got %d", resp.StatusCode)
 	}
 }
@@ -113,8 +128,12 @@ func TestAuthz_AdminRoute_NoAuth(t *testing.T) {
 func TestAuthz_RoomModeration_NoAuth(t *testing.T) {
 	app := setupAuthzTestApp(t)
 	req := httptest.NewRequest(http.MethodPost, "/room/nonexistent/kick/victim", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	if resp.StatusCode != 401 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for moderation without auth, got %d", resp.StatusCode)
 	}
 }
@@ -124,8 +143,12 @@ func TestAuthz_GuestRoute_NoAuth(t *testing.T) {
 	body := `{"roomName":"test","guestName":"Guest"}`
 	req := httptest.NewRequest(http.MethodPost, "/room/guest-join", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	if resp.StatusCode == 401 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusUnauthorized {
 		t.Fatalf("expected non-401 for guest route, got %d", resp.StatusCode)
 	}
 }
@@ -140,10 +163,14 @@ func TestAuthz_AdminRoute_NonSuperadmin(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	// Middleware chain (RequireEmailVerified + RequireAccess) blocks non-privileged users
 	// May return 401 (email not verified) or 403 (access denied) depending on config
-	if resp.StatusCode != 403 && resp.StatusCode != 401 {
+	if resp.StatusCode != http.StatusForbidden && resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401/403 for non-superadmin, got %d", resp.StatusCode)
 	}
 }
@@ -159,9 +186,13 @@ func TestAuthz_AdminRoute_VerifyEmailRequired(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	// Should be blocked by RequireEmailVerified before RequireAccess
-	if resp.StatusCode != 403 && resp.StatusCode != 401 {
+	if resp.StatusCode != http.StatusForbidden && resp.StatusCode != http.StatusUnauthorized {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 403/401 for unverified email on admin route, got %d: %s", resp.StatusCode, string(body))
 	}
@@ -183,8 +214,12 @@ func TestAuthz_ExpiredToken(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	if resp.StatusCode != 401 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for expired token, got %d", resp.StatusCode)
 	}
 
@@ -199,8 +234,12 @@ func TestAuthz_SuperadminAccessesAdminRoute(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	if resp.StatusCode == 403 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusForbidden {
 		t.Fatal("superadmin should not get 403 on admin route")
 	}
 }

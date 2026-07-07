@@ -1,6 +1,10 @@
 package queue
 
 import (
+	"bedrud/internal/models"
+	"bedrud/internal/repository"
+	"bedrud/internal/storage"
+	"bedrud/internal/testutil"
 	"context"
 	"encoding/json"
 	"io"
@@ -11,11 +15,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-
-	"bedrud/internal/models"
-	"bedrud/internal/repository"
-	"bedrud/internal/storage"
-	"bedrud/internal/testutil"
 
 	"github.com/google/uuid"
 )
@@ -276,7 +275,7 @@ func TestProcessRecording_MalformedURL(t *testing.T) {
 }
 
 // updateEgressIDInPayload replaces the egress ID in the JSON payload with the given ID.
-func updateEgressIDInPayload(t *testing.T, payload string, egressID string) string {
+func updateEgressIDInPayload(t *testing.T, payload, egressID string) string {
 	t.Helper()
 	var data map[string]any
 	if err := json.Unmarshal([]byte(payload), &data); err != nil {

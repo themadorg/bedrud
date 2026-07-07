@@ -1,13 +1,6 @@
 package handlers
 
 import (
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
-	"time"
-
 	"bedrud/config"
 	"bedrud/internal/auth"
 	"bedrud/internal/middleware"
@@ -16,6 +9,12 @@ import (
 	"bedrud/internal/services"
 	"bedrud/internal/storage"
 	"bedrud/internal/testutil"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -26,11 +25,11 @@ func setupIntegrationApp(t *testing.T) *fiber.App {
 	t.Helper()
 	cfg := &config.Config{
 		Auth: config.AuthConfig{
-			JWTSecret:                  "integration-test-secret",
-			TokenDuration:              1,
-			RequireEmailVerification:   false,
-			FrontendURL:                "http://localhost:3000",
-			PasskeyChallengeTTL:        5,
+			JWTSecret:                     "integration-test-secret",
+			TokenDuration:                 1,
+			RequireEmailVerification:      false,
+			FrontendURL:                   "http://localhost:3000",
+			PasskeyChallengeTTL:           5,
 			VerificationEmailCooldownMins: 1,
 		},
 		Server: config.ServerConfig{
@@ -144,8 +143,12 @@ func integrationToken(t *testing.T, userID, email string, accesses []string) str
 func TestIntegration_PublicHealthRoute(t *testing.T) {
 	app := setupIntegrationApp(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/health", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	if resp.StatusCode != 200 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 }
@@ -155,9 +158,13 @@ func TestIntegration_PublicHealthRoute(t *testing.T) {
 func TestIntegration_AuthRegisterPublic(t *testing.T) {
 	app := setupIntegrationApp(t)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", http.NoBody)
-	resp, _ := app.Test(req, -1)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	// Should not get 401 — register is public
-	if resp.StatusCode == 401 {
+	if resp.StatusCode == http.StatusUnauthorized {
 		t.Fatal("register route should be public, not require auth")
 	}
 }
@@ -165,8 +172,12 @@ func TestIntegration_AuthRegisterPublic(t *testing.T) {
 func TestIntegration_AuthLoginPublic(t *testing.T) {
 	app := setupIntegrationApp(t)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	if resp.StatusCode == 401 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusUnauthorized {
 		t.Fatal("login route should be public, not require auth")
 	}
 }
@@ -176,8 +187,12 @@ func TestIntegration_AuthLoginPublic(t *testing.T) {
 func TestIntegration_ProtectedRouteNoAuth(t *testing.T) {
 	app := setupIntegrationApp(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	if resp.StatusCode != 401 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for protected route without auth, got %d", resp.StatusCode)
 	}
 }
@@ -185,8 +200,12 @@ func TestIntegration_ProtectedRouteNoAuth(t *testing.T) {
 func TestIntegration_RoomCreateNoAuth(t *testing.T) {
 	app := setupIntegrationApp(t)
 	req := httptest.NewRequest(http.MethodPost, "/api/room/create", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	if resp.StatusCode != 401 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for room create without auth, got %d", resp.StatusCode)
 	}
 }
@@ -194,8 +213,12 @@ func TestIntegration_RoomCreateNoAuth(t *testing.T) {
 func TestIntegration_AdminRouteNoAuth(t *testing.T) {
 	app := setupIntegrationApp(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/users", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	if resp.StatusCode != 401 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for admin route without auth, got %d", resp.StatusCode)
 	}
 }
@@ -208,8 +231,12 @@ func TestIntegration_AdminRouteNonSuperadmin(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/users", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	if resp.StatusCode != 403 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403 for non-superadmin on admin, got %d", resp.StatusCode)
 	}
 }
@@ -220,8 +247,12 @@ func TestIntegration_AdminRouteSuperadminOK(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/users", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	if resp.StatusCode == 401 || resp.StatusCode == 403 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		t.Fatalf("superadmin should access admin routes, got %d", resp.StatusCode)
 	}
 }
@@ -237,8 +268,12 @@ func TestIntegration_RecordingsDisabledGate(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/rooms/test-room/recording/start", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
-		resp, _ := app.Test(req, -1)
-		if resp.StatusCode != 403 {
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		if resp.StatusCode != http.StatusForbidden {
 			body2, _ := io.ReadAll(resp.Body)
 			t.Fatalf("expected 403 (recordings disabled), got %d: %s", resp.StatusCode, string(body2))
 		}
@@ -249,8 +284,12 @@ func TestIntegration_RecordingsDisabledGate(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/rooms/test-room/recording/stop", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
-		resp, _ := app.Test(req, -1)
-		if resp.StatusCode != 403 {
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		if resp.StatusCode != http.StatusForbidden {
 			t.Fatalf("expected 403, got %d", resp.StatusCode)
 		}
 	})
@@ -258,8 +297,12 @@ func TestIntegration_RecordingsDisabledGate(t *testing.T) {
 	t.Run("ListRecordings disabled", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/rooms/test-room/recordings", http.NoBody)
 		req.Header.Set("Authorization", "Bearer "+token)
-		resp, _ := app.Test(req, -1)
-		if resp.StatusCode != 403 {
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		if resp.StatusCode != http.StatusForbidden {
 			t.Fatalf("expected 403, got %d", resp.StatusCode)
 		}
 	})
@@ -267,8 +310,12 @@ func TestIntegration_RecordingsDisabledGate(t *testing.T) {
 	t.Run("GetRecording disabled", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/rooms/test-room/recordings/some-id", http.NoBody)
 		req.Header.Set("Authorization", "Bearer "+token)
-		resp, _ := app.Test(req, -1)
-		if resp.StatusCode != 403 {
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		if resp.StatusCode != http.StatusForbidden {
 			t.Fatalf("expected 403, got %d", resp.StatusCode)
 		}
 	})
@@ -281,9 +328,13 @@ func TestIntegration_GuestJoinNoAuth(t *testing.T) {
 	body := `{"roomName":"test-room","guestName":"Guest"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/room/guest-join", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	// Should not get 401 — guest route is public
-	if resp.StatusCode == 401 {
+	if resp.StatusCode == http.StatusUnauthorized {
 		t.Fatal("guest-join should be public, not require auth")
 	}
 }
@@ -294,10 +345,14 @@ func TestIntegration_LiveKitWebhookNoAuth(t *testing.T) {
 	app := setupIntegrationApp(t)
 	req := httptest.NewRequest(http.MethodPost, "/api/livekit/webhook", http.NoBody)
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	// Returns 401 from its own HMAC validation (not from Protected middleware).
 	// The key test is that it does NOT get 500 from unprotected handler panic.
-	if resp.StatusCode == 500 {
+	if resp.StatusCode == http.StatusInternalServerError {
 		t.Fatal("livekit webhook should handle requests without JWT middleware")
 	}
 }
@@ -310,10 +365,14 @@ func TestIntegration_ValidAuth_ProtectedRouteOK(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	// With valid token but user not found in DB... depends on handler
 	// Just check it processes the request (not 401)
-	if resp.StatusCode == 401 {
+	if resp.StatusCode == http.StatusUnauthorized {
 		t.Fatal("valid token should not get 401")
 	}
 }
