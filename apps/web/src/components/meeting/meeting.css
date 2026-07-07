@@ -1,15 +1,514 @@
 /* ─── Meeting Room Shared Styles ─────────────────────────────────────────── */
 
+:root {
+  --meet-bg: #fafafa;
+  --meet-bg-panel: #ffffff;
+  --meet-bg-elevated: #ffffff;
+  --meet-surface-muted: rgba(23, 23, 23, 0.025);
+  --meet-border: rgba(23, 23, 23, 0.08);
+  --meet-border-subtle: rgba(23, 23, 23, 0.05);
+  --meet-fg: rgba(23, 23, 23, 0.9);
+  --meet-fg-strong: rgba(23, 23, 23, 0.76);
+  --meet-fg-muted: rgba(23, 23, 23, 0.5);
+  --meet-fg-subtle: rgba(23, 23, 23, 0.36);
+  --meet-control: rgba(23, 23, 23, 0.04);
+  --meet-control-hover: rgba(23, 23, 23, 0.07);
+  --meet-control-fg: rgba(23, 23, 23, 0.66);
+  --meet-btn-muted-bg: #ecfdf9;
+  --meet-btn-muted-fg: #0f766e;
+  --meet-btn-muted-hover: #d9fbf3;
+  --meet-btn-alert-bg: rgba(239, 68, 68, 0.08);
+  --meet-btn-alert-fg: #dc2626;
+  --meet-btn-alert-hover: rgba(239, 68, 68, 0.12);
+  --meet-btn-leave-bg: #dc2626;
+  --meet-btn-leave-fg: #ffffff;
+  --meet-btn-leave-hover: #b91c1c;
+  --meet-tile-action-bg: rgba(23, 23, 23, 0.54);
+  --meet-tile-action-fg: rgba(255, 255, 255, 0.94);
+  --meet-tile-action-border: rgba(255, 255, 255, 0.14);
+  --meet-filmstrip-bg: rgba(255, 255, 255, 0.94);
+  --meet-filmstrip-fade: linear-gradient(to right, transparent, rgba(250, 250, 250, 0.98));
+  --meet-strip-border: rgba(23, 23, 23, 0.08);
+  --meet-strip-border-active: color-mix(in oklab, var(--accent-500) 42%, transparent);
+  --meet-strip-glow: color-mix(in oklab, var(--accent-400) 20%, transparent);
+  --meet-chrome: rgba(255, 255, 255, 0.96);
+  --meet-sidebar: #ffffff;
+  --meet-shadow: 0 10px 36px rgba(23, 23, 23, 0.07);
+  --meet-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 1);
+  --meet-tile-fallback: #eef0f2;
+  --meet-slider-track: rgba(23, 23, 23, 0.08);
+  --meet-slider-thumb: #ffffff;
+  --meet-vignette-top: rgba(250, 250, 250, 0.58);
+  --meet-vignette-bottom: rgba(250, 250, 250, 0.52);
+  --meet-speaking-ring: color-mix(in oklab, var(--accent-500) 50%, transparent);
+  --meet-speaking-glow: color-mix(in oklab, var(--accent-400) 24%, transparent);
+  --meet-scroll-track: rgba(23, 23, 23, 0.05);
+  --meet-scroll-thumb: #c9ece6;
+  --meet-scroll-thumb-hover: #8fd9cc;
+  --meet-chat-bubble-in-bg: #ffffff;
+  --meet-chat-bubble-in-border: rgba(23, 23, 23, 0.08);
+  --meet-chat-bubble-in-fg: rgba(23, 23, 23, 0.88);
+  --meet-chat-bubble-in-shadow: 0 1px 2px rgba(23, 23, 23, 0.06);
+  --meet-chat-bubble-out-bg: #ecfdf9;
+  --meet-chat-bubble-out-border: rgba(13, 148, 136, 0.18);
+  --meet-chat-bubble-out-fg: #0f766e;
+  --meet-chat-bubble-out-shadow: 0 1px 2px rgba(23, 23, 23, 0.04);
+  --meet-chat-action-bg: #ecfdf9;
+  --meet-chat-action-border: rgba(13, 148, 136, 0.22);
+  --meet-chat-action-fg: #0f766e;
+  --meet-chat-action-shadow: 0 2px 10px rgba(23, 23, 23, 0.06);
+  --meet-chat-control-bg: #ffffff;
+  --meet-chat-control-border: rgba(23, 23, 23, 0.08);
+  --meet-chat-control-shadow: 0 2px 8px rgba(23, 23, 23, 0.08);
+  --meet-chat-md-link-local: #0f766e;
+  --meet-chat-md-link-remote: #0d9488;
+  --meet-chat-md-code-local: rgba(13, 148, 136, 0.12);
+  --meet-chat-md-code-remote: rgba(23, 23, 23, 0.06);
+  --meet-chat-md-quote-border-local: rgba(13, 148, 136, 0.35);
+  --meet-chat-md-quote-border-remote: rgba(23, 23, 23, 0.12);
+  --meet-chat-md-quote-fg-local: rgba(15, 118, 110, 0.75);
+  --meet-chat-md-quote-fg-remote: rgba(23, 23, 23, 0.55);
+  --meet-loading-fg: rgba(23, 23, 23, 0.45);
+  --meet-loading-track: color-mix(in oklab, var(--accent-600) 22%, transparent);
+  --meet-loading-accent: var(--accent-600);
+  --meet-ambient-a: transparent;
+  --meet-ambient-b: transparent;
+  --meet-accent: #0d9488;
+  --meet-accent-fg: #0f766e;
+  --meet-switch-track-on: #0d9488;
+  --meet-switch-track-off: rgba(23, 23, 23, 0.12);
+  --meet-switch-thumb: #ffffff;
+  --meet-meter-track: rgba(23, 23, 23, 0.1);
+  --meet-meter-fill: #0d9488;
+  --meet-meter-fill-mid: #d97706;
+  --meet-meter-fill-high: #dc2626;
+}
+
+.dark {
+  --meet-bg: #07070f;
+  --meet-bg-panel: rgba(15, 15, 28, 0.98);
+  --meet-bg-elevated: rgba(12, 12, 22, 0.9);
+  --meet-surface-muted: rgba(255, 255, 255, 0.03);
+  --meet-border: rgba(255, 255, 255, 0.08);
+  --meet-border-subtle: rgba(255, 255, 255, 0.06);
+  --meet-fg: rgba(255, 255, 255, 0.9);
+  --meet-fg-strong: rgba(255, 255, 255, 0.85);
+  --meet-fg-muted: rgba(255, 255, 255, 0.55);
+  --meet-fg-subtle: rgba(255, 255, 255, 0.42);
+  --meet-control: rgba(255, 255, 255, 0.07);
+  --meet-control-hover: rgba(255, 255, 255, 0.12);
+  --meet-control-fg: rgba(255, 255, 255, 0.75);
+  --meet-btn-muted-bg: rgba(45, 212, 191, 0.12);
+  --meet-btn-muted-fg: #2dd4bf;
+  --meet-btn-muted-hover: rgba(45, 212, 191, 0.2);
+  --meet-btn-alert-bg: rgba(239, 68, 68, 0.2);
+  --meet-btn-alert-fg: #f87171;
+  --meet-btn-alert-hover: rgba(239, 68, 68, 0.3);
+  --meet-btn-leave-bg: rgba(239, 68, 68, 0.85);
+  --meet-btn-leave-fg: #ffffff;
+  --meet-btn-leave-hover: rgba(239, 68, 68, 0.95);
+  --meet-tile-action-bg: rgba(0, 0, 0, 0.55);
+  --meet-tile-action-fg: rgba(255, 255, 255, 0.85);
+  --meet-tile-action-border: rgba(255, 255, 255, 0.1);
+  --meet-filmstrip-bg: rgba(8, 8, 18, 0.7);
+  --meet-filmstrip-fade: linear-gradient(to right, transparent, rgba(8, 8, 18, 0.85));
+  --meet-strip-border: rgba(255, 255, 255, 0.07);
+  --meet-strip-border-active: color-mix(in oklab, var(--primary) 75%, transparent);
+  --meet-strip-glow: color-mix(in oklab, var(--primary) 30%, transparent);
+  --meet-chrome: rgba(12, 12, 22, 0.9);
+  --meet-sidebar: rgba(10, 10, 22, 0.94);
+  --meet-shadow: 0 8px 40px rgba(0, 0, 0, 0.55);
+  --meet-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --meet-tile-fallback: #08080f;
+  --meet-slider-track: rgba(255, 255, 255, 0.1);
+  --meet-slider-thumb: #141422;
+  --meet-vignette-top: rgba(7, 7, 15, 0.65);
+  --meet-vignette-bottom: rgba(7, 7, 15, 0.6);
+  --meet-speaking-ring: var(--primary);
+  --meet-speaking-glow: color-mix(in oklab, var(--primary) 40%, transparent);
+  --meet-scroll-track: rgba(255, 255, 255, 0.06);
+  --meet-scroll-thumb: color-mix(in oklab, var(--accent-400) 42%, transparent);
+  --meet-scroll-thumb-hover: color-mix(in oklab, var(--accent-400) 68%, transparent);
+  --meet-chat-bubble-in-bg: rgba(255, 255, 255, 0.08);
+  --meet-chat-bubble-in-border: rgba(255, 255, 255, 0.07);
+  --meet-chat-bubble-in-fg: rgba(255, 255, 255, 0.82);
+  --meet-chat-bubble-in-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  --meet-chat-bubble-out-bg: color-mix(in oklab, var(--primary) 78%, transparent);
+  --meet-chat-bubble-out-border: color-mix(in oklab, var(--accent-400) 22%, transparent);
+  --meet-chat-bubble-out-fg: rgba(255, 255, 255, 0.95);
+  --meet-chat-bubble-out-shadow: 0 1px 2px color-mix(in oklab, var(--primary) 20%, transparent);
+  --meet-chat-action-bg: color-mix(in oklab, var(--primary) 82%, transparent);
+  --meet-chat-action-border: color-mix(in oklab, var(--accent-400) 28%, transparent);
+  --meet-chat-action-fg: rgba(255, 255, 255, 0.95);
+  --meet-chat-action-shadow: 0 2px 10px color-mix(in oklab, var(--primary) 28%, transparent);
+  --meet-chat-control-bg: rgba(255, 255, 255, 0.08);
+  --meet-chat-control-border: rgba(255, 255, 255, 0.08);
+  --meet-chat-control-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --meet-chat-md-link-local: rgba(255, 255, 255, 0.9);
+  --meet-chat-md-link-remote: color-mix(in oklab, var(--accent-400) 90%, transparent);
+  --meet-chat-md-code-local: rgba(0, 0, 0, 0.25);
+  --meet-chat-md-code-remote: color-mix(in oklab, var(--primary) 15%, transparent);
+  --meet-chat-md-quote-border-local: rgba(255, 255, 255, 0.4);
+  --meet-chat-md-quote-border-remote: color-mix(in oklab, var(--accent-400) 40%, transparent);
+  --meet-chat-md-quote-fg-local: rgba(255, 255, 255, 0.7);
+  --meet-chat-md-quote-fg-remote: rgba(255, 255, 255, 0.5);
+  --meet-loading-fg: rgba(255, 255, 255, 0.45);
+  --meet-loading-track: color-mix(in oklab, var(--primary) 30%, transparent);
+  --meet-loading-accent: var(--primary);
+  --meet-ambient-a: color-mix(in oklab, var(--primary) 5.5%, transparent);
+  --meet-ambient-b: rgba(6, 182, 212, 0.04);
+  --meet-accent: #2dd4bf;
+  --meet-accent-fg: #5eead4;
+  --meet-switch-track-on: #14b8a6;
+  --meet-switch-track-off: rgba(255, 255, 255, 0.14);
+  --meet-switch-thumb: #fafafa;
+  --meet-meter-track: rgba(255, 255, 255, 0.1);
+  --meet-meter-fill: #2dd4bf;
+  --meet-meter-fill-mid: #fbbf24;
+  --meet-meter-fill-high: #f87171;
+}
+
+.meet-room,
+.lk-room-container {
+  background: var(--meet-bg) !important;
+  color: var(--meet-fg);
+}
+
+.meet-dialog {
+  border-color: var(--meet-border) !important;
+  background-color: var(--meet-bg-panel) !important;
+  color: var(--meet-fg) !important;
+}
+
+.meet-dialog [role='switch'][data-state='checked'],
+.meet-room [role='switch'][data-state='checked'] {
+  background-color: var(--meet-switch-track-on) !important;
+}
+
+.meet-dialog [role='switch'][data-state='unchecked'],
+.meet-room [role='switch'][data-state='unchecked'] {
+  background-color: var(--meet-switch-track-off) !important;
+}
+
+.meet-dialog [role='switch'] > span,
+.meet-room [role='switch'] > span {
+  background-color: var(--meet-switch-thumb) !important;
+}
+
+.meet-dialog .text-primary,
+.meet-room .text-primary {
+  color: var(--meet-accent-fg) !important;
+}
+
+.meet-dialog[role='menu'] {
+  border-color: var(--meet-border-subtle) !important;
+  background-color: var(--meet-bg-panel) !important;
+  color: var(--meet-fg) !important;
+  box-shadow: var(--meet-shadow);
+}
+
+.meet-dialog[role='menu'] [role='menuitem'] {
+  color: var(--meet-control-fg);
+}
+
+.meet-dialog[role='menu'] [role='menuitem'][data-highlighted],
+.meet-dialog[role='menu'] [role='menuitem']:focus {
+  background-color: var(--meet-control-hover) !important;
+  color: var(--meet-fg) !important;
+}
+
+.meet-dialog[role='menu'] [role='menuitem'][data-disabled] {
+  opacity: 0.5;
+}
+
+.meet-dialog[role='menu'] [role='separator'] {
+  background-color: var(--meet-border-subtle) !important;
+}
+
+.meet-filmstrip-fade {
+  background: var(--meet-filmstrip-fade);
+}
+
+.meet-loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--meet-bg);
+  color: var(--meet-fg);
+}
+
+.meet-loading-spinner {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid var(--meet-loading-track);
+  border-top-color: var(--meet-loading-accent);
+  animation: meet-connecting-spin 0.9s linear infinite;
+}
+
+.meet-loading-label {
+  margin: 0;
+  font-size: 13px;
+  color: var(--meet-loading-fg);
+}
+
+.meet-prejoin-panel {
+  width: min(340px, calc(100vw - 32px));
+  border-radius: 16px;
+  border: 1px solid var(--meet-border);
+  background: var(--meet-bg-panel);
+  padding: 32px 28px;
+  color: var(--meet-fg);
+  box-shadow: var(--meet-shadow);
+}
+
+.meet-prejoin-panel-wide {
+  width: min(380px, calc(100vw - 32px));
+}
+
+.meet-welcome-panel {
+  width: min(480px, calc(100vw - 32px));
+}
+
+.meet-welcome-preview video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.meet-ptt-btn {
+  border: 1px dashed color-mix(in oklab, var(--meet-accent) 52%, transparent);
+  background: color-mix(in oklab, var(--meet-btn-muted-bg) 88%, transparent);
+  color: var(--meet-btn-muted-fg);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--meet-accent) 14%, transparent);
+}
+
+.meet-ptt-btn:hover {
+  background: var(--meet-btn-muted-hover);
+}
+
+.meet-ptt-btn[aria-pressed='true'] {
+  border-style: solid;
+  border-color: color-mix(in oklab, var(--meet-accent) 65%, transparent);
+  background: var(--meet-btn-muted-bg);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--meet-accent) 22%, transparent),
+    0 0 0 2px color-mix(in oklab, var(--meet-accent) 18%, transparent);
+}
+
+.meet-welcome-presence {
+  pointer-events: none;
+}
+
+.meet-welcome-presence-avatar {
+  opacity: 0.72;
+  cursor: grab;
+  pointer-events: auto;
+  will-change: transform, opacity;
+  z-index: 1;
+}
+
+.meet-welcome-presence-avatar-active {
+  opacity: 1;
+}
+
+.meet-welcome-presence-avatar-dragging {
+  opacity: 1;
+  cursor: grabbing;
+  z-index: 3;
+}
+
+.meet-welcome-presence-aim line {
+  stroke: var(--meet-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.meet-welcome-presence-aim polygon {
+  fill: var(--meet-accent);
+}
+
+.meet-room .text-white\/95,
+.meet-room .text-white\/90,
+.meet-dialog .text-white\/95,
+.meet-dialog .text-white\/90 {
+  color: var(--meet-fg);
+}
+
+.meet-room .text-white\/85,
+.meet-room .text-white\/80,
+.meet-dialog .text-white\/85,
+.meet-dialog .text-white\/80 {
+  color: var(--meet-fg-strong);
+}
+
+.meet-room .text-white\/75,
+.meet-room .text-white\/70,
+.meet-room .text-white\/65,
+.meet-dialog .text-white\/75,
+.meet-dialog .text-white\/70,
+.meet-dialog .text-white\/65 {
+  color: var(--meet-control-fg);
+}
+
+.meet-room .text-white\/60,
+.meet-room .text-white\/55,
+.meet-room .text-white\/50,
+.meet-room .text-white\/45,
+.meet-room .text-white\/40,
+.meet-room .text-white\/35,
+.meet-dialog .text-white\/60,
+.meet-dialog .text-white\/55,
+.meet-dialog .text-white\/50,
+.meet-dialog .text-white\/45,
+.meet-dialog .text-white\/40,
+.meet-dialog .text-white\/35 {
+  color: var(--meet-fg-muted);
+}
+
+.meet-room .border-white\/5,
+.meet-room .border-white\/10,
+.meet-room .border-white\/\[0\.06\],
+.meet-room .border-white\/\[0\.07\],
+.meet-room .border-white\/\[0\.08\],
+.meet-room .border-white\/\[0\.09\],
+.meet-room .border-white\/\[0\.12\],
+.meet-dialog .border-white\/5,
+.meet-dialog .border-white\/10,
+.meet-dialog .border-white\/\[0\.06\],
+.meet-dialog .border-white\/\[0\.07\],
+.meet-dialog .border-white\/\[0\.08\],
+.meet-dialog .border-white\/\[0\.09\],
+.meet-dialog .border-white\/\[0\.12\] {
+  border-color: var(--meet-border);
+}
+
+.meet-room .bg-white\/\[0\.02\],
+.meet-room .bg-white\/\[0\.03\],
+.meet-room .bg-white\/\[0\.04\],
+.meet-dialog .bg-white\/\[0\.02\],
+.meet-dialog .bg-white\/\[0\.03\],
+.meet-dialog .bg-white\/\[0\.04\] {
+  background-color: var(--meet-surface-muted);
+}
+
+.meet-room .bg-white\/\[0\.05\],
+.meet-room .bg-white\/\[0\.06\],
+.meet-room .bg-white\/\[0\.07\],
+.meet-dialog .bg-white\/\[0\.05\],
+.meet-dialog .bg-white\/\[0\.06\],
+.meet-dialog .bg-white\/\[0\.07\] {
+  background-color: var(--meet-control);
+}
+
+.meet-room .bg-white\/\[0\.08\],
+.meet-room .bg-white\/\[0\.1\],
+.meet-room .bg-white\/\[0\.12\],
+.meet-dialog .bg-white\/\[0\.08\],
+.meet-dialog .bg-white\/\[0\.1\],
+.meet-dialog .bg-white\/\[0\.12\] {
+  background-color: var(--meet-control-hover);
+}
+
+.meet-room [class*='0a0a16'],
+.meet-room [class*='0c0c16'],
+.meet-dialog [class*='0a0a16'],
+.meet-dialog [class*='0c0c16'] {
+  background-color: var(--meet-sidebar) !important;
+}
+
+.meet-room [class*='0f0f1c'],
+.meet-room [class*='0f0f1e'],
+.meet-dialog [class*='0f0f1c'],
+.meet-dialog [class*='0f0f1e'] {
+  background-color: var(--meet-bg-panel) !important;
+}
+
+.meet-room [class*='07070f'],
+.meet-room [class*='030308'],
+.meet-room [class*='080812'],
+.meet-room [class*='12121f'] {
+  background-color: var(--meet-bg) !important;
+}
+
+.meet-room .hover\:text-white\/70:hover,
+.meet-room .hover\:text-white\/75:hover,
+.meet-room .hover\:text-white\/80:hover,
+.meet-dialog .hover\:text-white\/70:hover,
+.meet-dialog .hover\:text-white\/75:hover,
+.meet-dialog .hover\:text-white\/80:hover {
+  color: var(--meet-fg-strong);
+}
+
+.meet-room .hover\:bg-white\/10:hover,
+.meet-room .hover\:bg-white\/\[0\.06\]:hover,
+.meet-room .hover\:bg-white\/\[0\.08\]:hover,
+.meet-dialog .hover\:bg-white\/10:hover,
+.meet-dialog .hover\:bg-white\/\[0\.06\]:hover,
+.meet-dialog .hover\:bg-white\/\[0\.08\]:hover {
+  background-color: var(--meet-control-hover);
+}
+
+.meet-room .focus\:bg-white\/10:focus,
+.meet-room .focus\:text-white:focus,
+.meet-dialog .focus\:bg-white\/10:focus,
+.meet-dialog .focus\:text-white:focus {
+  background-color: var(--meet-control-hover);
+  color: var(--meet-fg);
+}
+
+.meet-room .placeholder\:text-white\/35::placeholder,
+.meet-dialog .placeholder\:text-white\/35::placeholder {
+  color: var(--meet-fg-subtle);
+}
+
+/* Persian/RTL content uses Shabnam even when UI locale is not fa */
+.meet-rtl-text[dir="rtl"],
+.meet-rtl-text[dir="rtl"] * {
+  font-family: "Shabnam", ui-sans-serif, system-ui, sans-serif;
+  text-align: start;
+}
+
+/* Whiteboard wysiwyg editor — inline font shorthand is patched in getFontString; this covers late loads */
+.bedrud-whiteboard-shell .excalidraw-wysiwyg[dir="rtl"] {
+  font-family: "Shabnam", ui-sans-serif, system-ui, sans-serif !important;
+}
+
+/*
+ * Laser/eraser trails render in .SVGLayer (position: fixed, viewport coords).
+ * backdrop-filter on an ancestor re-parents fixed layers and offsets trails from the cursor.
+ */
+.bedrud-whiteboard-shell .excalidraw .SVGLayer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
 /* Tile base */
 .meet-tile {
   position: relative;
   overflow: hidden;
 }
 
+.meet-avatar-circle {
+  border-radius: 50% !important;
+  clip-path: circle(50% at 50% 50%) !important;
+  overflow: hidden;
+}
+
 /* Tile speaking glow */
 .meet-tile.meet-speaking {
-  --meet-glow: 0 0 0 1px var(--primary), 0 0 24px color-mix(in oklab, var(--primary) 40%, transparent);
-  box-shadow: var(--meet-glow);
+  box-shadow:
+    0 0 0 1px var(--meet-speaking-ring),
+    0 0 24px var(--meet-speaking-glow);
 }
 
 /* Speaking waveform bars */
@@ -26,14 +525,40 @@
   100% { transform: rotate(360deg); }
 }
 
-/* Scrollbar for chat */
-.meet-chat-scroll::-webkit-scrollbar {
-  width: 4px;
+.meet-scroll,
+.meet-chat-scroll,
+.meet-room :is(.overflow-y-auto, .overflow-auto):not(.meet-scroll-none),
+.meet-dialog :is(.overflow-y-auto, .overflow-auto):not(.meet-scroll-none) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--meet-scroll-thumb) var(--meet-scroll-track);
 }
-.meet-chat-scroll::-webkit-scrollbar-track {
-  background: transparent;
+
+.meet-scroll::-webkit-scrollbar,
+.meet-chat-scroll::-webkit-scrollbar,
+.meet-room :is(.overflow-y-auto, .overflow-auto):not(.meet-scroll-none)::-webkit-scrollbar,
+.meet-dialog :is(.overflow-y-auto, .overflow-auto):not(.meet-scroll-none)::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
 }
-.meet-chat-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 2px;
+
+.meet-scroll::-webkit-scrollbar-track,
+.meet-chat-scroll::-webkit-scrollbar-track,
+.meet-room :is(.overflow-y-auto, .overflow-auto):not(.meet-scroll-none)::-webkit-scrollbar-track,
+.meet-dialog :is(.overflow-y-auto, .overflow-auto):not(.meet-scroll-none)::-webkit-scrollbar-track {
+  background: var(--meet-scroll-track);
+}
+
+.meet-scroll::-webkit-scrollbar-thumb,
+.meet-chat-scroll::-webkit-scrollbar-thumb,
+.meet-room :is(.overflow-y-auto, .overflow-auto):not(.meet-scroll-none)::-webkit-scrollbar-thumb,
+.meet-dialog :is(.overflow-y-auto, .overflow-auto):not(.meet-scroll-none)::-webkit-scrollbar-thumb {
+  background: var(--meet-scroll-thumb);
+  border-radius: 0;
+}
+
+.meet-scroll::-webkit-scrollbar-thumb:hover,
+.meet-chat-scroll::-webkit-scrollbar-thumb:hover,
+.meet-room :is(.overflow-y-auto, .overflow-auto):not(.meet-scroll-none)::-webkit-scrollbar-thumb:hover,
+.meet-dialog :is(.overflow-y-auto, .overflow-auto):not(.meet-scroll-none)::-webkit-scrollbar-thumb:hover {
+  background: var(--meet-scroll-thumb-hover);
 }

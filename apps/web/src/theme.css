@@ -43,51 +43,51 @@
   --warning-500:     #D97706;
   --destructive-500: #DC2626;
 
-  /* Foreground / chrome */
-  --fg-1: #1C1917;
-  --fg-2: #57534E;
-  --fg-3: #A8A29E;
-  --bg:     #FFFBF9;
-  --bg-alt: #FFF1F2;
-  --line:   #E7E5E4;
+  /* Foreground / chrome — neutral light surfaces (no warm stone cast) */
+  --fg-1: #171717;
+  --fg-2: #525252;
+  --fg-3: #a3a3a3;
+  --bg:     #fafafa;
+  --bg-alt: #ffffff;
+  --line:   #e5e5e5;
 
   /* ── Semantic mappings ─────────────────────────────────────────────────── */
-  --background: #FFFBF9;
-  --foreground: #1C1917;
+  --background: #fafafa;
+  --foreground: #171717;
 
-  --card: #FFFFFF;
-  --card-foreground: #1C1917;
+  --card: #ffffff;
+  --card-foreground: #171717;
 
-  --popover: #FFFFFF;
-  --popover-foreground: #1C1917;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
 
   --primary: #E11D48;
   --primary-foreground: #FFFFFF;
   --primary-hover: #BE123C;
   --primary-active: #881337;
 
-  --secondary: #FFF1F2;
-  --secondary-foreground: #1C1917;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #171717;
 
-  --muted: #F5F5F4;
-  --muted-foreground: #57534E;
+  --muted: #f4f4f5;
+  --muted-foreground: #525252;
 
-  --accent: #F0FDFA;
-  --accent-foreground: #1C1917;
+  --accent: #ecfdf9;
+  --accent-foreground: #115e59;
 
   --destructive: #DC2626;
   --destructive-foreground: #FFFFFF;
 
-  --border: #E7E5E4;
-  --input: #E7E5E4;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
   --ring: #E11D48;
 
   --radius: 0px;
 
-  /* ── Spotlight — hero background blobs ─────────────────────────────────── */
-  --spotlight-a: #F43F5E;
-  --spotlight-b: #FB7185;
-  --spotlight-c: #14B8A6;
+  /* ── Spotlight — soft ambient glow (teal/neutral, not rose wash) ─────── */
+  --spotlight-a: #99f6e4;
+  --spotlight-b: #d4d4d8;
+  --spotlight-c: #5eead4;
 
   /* Focus ring */
   --focus-ring: 0 0 0 3px color-mix(in oklab, var(--primary-500) 45%, transparent);
