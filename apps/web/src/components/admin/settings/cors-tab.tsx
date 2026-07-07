@@ -31,7 +31,7 @@ export function CorsTab({
             ce('corsAllowedOrigins')
             setSettings({ ...settings, corsAllowedOrigins: v })
           }}
-          placeholder="http://localhost:5173"
+          placeholder="http://localhost:7070"
           error={errors?.corsAllowedOrigins}
         />
       </Field>

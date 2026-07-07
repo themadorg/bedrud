@@ -50,3 +50,5 @@ server/tmp/
 # certificates
 crt.pem
 key.pem
+
+target/

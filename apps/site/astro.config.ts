@@ -32,6 +32,9 @@ const localeChunks = Object.fromEntries(
 );
 
 export default defineConfig({
+  server: {
+    port: 7075,
+  },
   compressHTML: true,
   output: "static",
   site: "https://bedrud.org",
