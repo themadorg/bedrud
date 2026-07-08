@@ -18,17 +18,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"sync"
 )
 
 // ChatAttachment is the metadata returned after a successful upload.
 type ChatAttachment struct {
+	Kind   string `json:"kind"`
 	URL    string `json:"url"`
 	Mime   string `json:"mime"`
 	Size   int64  `json:"size"`
@@ -188,6 +189,7 @@ func (s *diskStore) Store(data []byte) (*ChatAttachment, error) {
 
 	w, h := imageDimensions(data)
 	return &ChatAttachment{
+		Kind:   "image",
 		URL:    "/uploads/chat/" + filename,
 		Mime:   mime,
 		Size:   int64(len(data)),
@@ -209,6 +211,7 @@ func (s *inlineStore) Store(data []byte) (*ChatAttachment, error) {
 	dataURI := "data:" + mime + ";base64," + encoded
 	w, h := imageDimensions(data)
 	return &ChatAttachment{
+		Kind:   "image",
 		URL:    dataURI,
 		Mime:   mime,
 		Size:   int64(len(data)),
@@ -273,6 +276,7 @@ func (s *s3Store) Store(data []byte) (*ChatAttachment, error) {
 
 	w, h := imageDimensions(data)
 	return &ChatAttachment{
+		Kind:   "image",
 		URL:    url,
 		Mime:   mime,
 		Size:   int64(len(data)),
@@ -338,7 +342,7 @@ func s3PutObject(endpoint, bucket, region, accessKey, secretKey, key, contentTyp
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 300 {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		return fmt.Errorf("s3 returned status %d", resp.StatusCode)
@@ -362,7 +366,7 @@ func s3DeleteObject(endpoint, bucket, region, accessKey, secretKey, key string) 
 	amzdate := now.Format("20060102T150405Z")
 	emptyPayloadHash := fmt.Sprintf("%x", sha256.Sum256([]byte("")))
 
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	req, err := http.NewRequest(http.MethodDelete, url, http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -399,7 +403,7 @@ func s3DeleteObject(endpoint, bucket, region, accessKey, secretKey, key string) 
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 300 {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		return fmt.Errorf("s3 delete returned status %d", resp.StatusCode)
@@ -418,14 +422,6 @@ func s3DeriveSigningKey(secretKey, datestamp, region string) []byte {
 	kRegion := s3HMACSHA256(kDate, region)
 	kService := s3HMACSHA256(kRegion, "s3")
 	return s3HMACSHA256(kService, "aws4_request")
-}
-
-func (s *s3Store) hmacSHA256(key []byte, data string) []byte {
-	return s3HMACSHA256(key, data)
-}
-
-func (s *s3Store) deriveSigningKey(datestamp, region string) []byte {
-	return s3DeriveSigningKey(s.cfg.SecretKey, datestamp, region)
 }
 
 // deleteObject removes an object from the S3 bucket using AWS Signature V4.

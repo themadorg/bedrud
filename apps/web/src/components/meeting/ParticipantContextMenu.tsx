@@ -1,5 +1,4 @@
-import type { LocalAudioTrack, RemoteAudioTrack } from 'livekit-client'
-import { ConnectionQuality, type Participant, Track } from 'livekit-client'
+import type { Participant } from 'livekit-client'
 import {
   Activity,
   Ban,
@@ -19,6 +18,11 @@ import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
 import { selectIsMuted, selectVolume, useParticipantOverridesStore } from '#/lib/participant-overrides.store'
 import { AlertConfirmDialog } from '@/components/admin/AlertConfirmDialog'
 import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
+import {
+  type ConnectionQualityLabel,
+  collectMeetingConnectionStats,
+  connectionQualityLabel,
+} from '@/components/meeting/meetingConnectionStats'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -52,14 +56,16 @@ function parseMeta(raw: string | undefined): ParticipantMeta {
 }
 
 interface StatsData {
-  quality: 'excellent' | 'good' | 'poor' | 'unknown'
-  codec?: string // e.g. "OPUS"
-  ping?: number // ms (RTT from WebRTC candidate-pair stats)
-  bandwidth?: number // kbps (available incoming/outgoing bitrate)
-  ip?: string // admin-only, from backend
+  quality: ConnectionQualityLabel
+  codec?: string
+  ping?: number
+  jitter?: number
+  packetLoss?: number
+  bandwidth?: number
+  ip?: string
 }
 
-const QUAL_COLOR: Record<StatsData['quality'], string> = {
+const QUAL_COLOR: Record<ConnectionQualityLabel, string> = {
   excellent: '#34d399',
   good: '#fbbf24',
   poor: '#f87171',
@@ -92,48 +98,6 @@ export interface ParticipantMenuContentProps {
   Separator: ComponentType<{ className?: string; style?: React.CSSProperties }>
   Label: ComponentType<{ className?: string; style?: React.CSSProperties; children: ReactNode }>
   onClose?: () => void
-}
-
-// ─── WebRTC stats collector ────────────────────────────────────────────────────
-
-async function collectWebRTCStats(participant: Participant): Promise<Partial<StatsData>> {
-  const audioPub = participant.getTrackPublication(Track.Source.Microphone)
-  if (!audioPub?.track) return {}
-
-  let report: RTCStatsReport | undefined
-  try {
-    if (participant.isLocal) {
-      report = await (audioPub.track as LocalAudioTrack).sender?.getStats()
-    } else {
-      report = await (audioPub.track as RemoteAudioTrack).receiver?.getStats()
-    }
-  } catch {
-    return {}
-  }
-
-  if (!report) return {}
-
-  let codec: string | undefined
-  let ping: number | undefined
-  let bandwidth: number | undefined
-
-  report.forEach((entry) => {
-    const s = entry as Record<string, unknown>
-    // First codec entry wins
-    if (s.type === 'codec' && !codec) {
-      const mime = s.mimeType as string | undefined
-      codec = mime?.replace(/^(audio|video)\//i, '').toUpperCase()
-    }
-    // Active nominated candidate pair
-    if (s.type === 'candidate-pair' && s.nominated === true) {
-      const rtt = s.currentRoundTripTime as number | undefined
-      if (rtt != null) ping = Math.round(rtt * 1000)
-      const bw = (s.availableIncomingBitrate ?? s.availableOutgoingBitrate) as number | undefined
-      if (bw != null) bandwidth = Math.round(bw / 1000)
-    }
-  })
-
-  return { codec, ping, bandwidth }
 }
 
 // ─── Shared menu content ──────────────────────────────────────────────────────
@@ -177,12 +141,7 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
   const [statsLoading, setStatsLoading] = useState(false)
   const ipFetchedRef = useRef(false)
 
-  const quality = useMemo<StatsData['quality']>(() => {
-    if (participant.connectionQuality === ConnectionQuality.Excellent) return 'excellent'
-    if (participant.connectionQuality === ConnectionQuality.Good) return 'good'
-    if (participant.connectionQuality === ConnectionQuality.Poor) return 'poor'
-    return 'unknown'
-  }, [participant.connectionQuality])
+  const quality = useMemo(() => connectionQualityLabel(participant), [participant])
 
   // Poll WebRTC stats while panel is open; fetch IP once
   useEffect(() => {
@@ -192,13 +151,15 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
     async function poll() {
       setStatsLoading(true)
       while (!cancelled) {
-        const webrtc = await collectWebRTCStats(participant)
+        const webrtc = await collectMeetingConnectionStats(participant)
         if (cancelled) break
 
         setStats((prev) => ({
           quality,
           codec: webrtc.codec ?? prev?.codec,
           ping: webrtc.ping ?? prev?.ping,
+          jitter: webrtc.jitter ?? prev?.jitter,
+          packetLoss: webrtc.packetLoss ?? prev?.packetLoss,
           bandwidth: webrtc.bandwidth ?? prev?.bandwidth,
           ip: prev?.ip,
         }))
@@ -516,12 +477,25 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
                     <StatRow label="Ping">
                       <span
                         style={{
-                          color: stats.ping < 80 ? '#34d399' : stats.ping < 200 ? '#fbbf24' : '#f87171',
+                          color:
+                            stats.ping < 80 ? '#34d399' : stats.ping < 200 ? '#fbbf24' : '#f87171',
                           fontFamily: 'monospace',
                         }}
                       >
                         {stats.ping} ms
                       </span>
+                    </StatRow>
+                  )}
+
+                  {stats?.jitter != null && (
+                    <StatRow label="Jitter">
+                      <span style={{ fontFamily: 'monospace' }}>{stats.jitter} ms</span>
+                    </StatRow>
+                  )}
+
+                  {stats?.packetLoss != null && (
+                    <StatRow label="Packet loss">
+                      <span style={{ fontFamily: 'monospace' }}>{stats.packetLoss}%</span>
                     </StatRow>
                   )}
 

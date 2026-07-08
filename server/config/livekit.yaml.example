@@ -14,10 +14,10 @@ turn:
 keys:
   devkey: "CHANGE_ME_LIVEKIT_SECRET"
 
-redis:
-  address: redis:6379
-  username: ""
-  password: ""
+# Redis is only required for multi-node / distributed deployments (Docker, K8s).
+# Local dev (make dev / devcli) runs single-node without Redis.
+# redis:
+#   address: redis:6379
 
 room:
   # allow rooms to be automatically created when participants join

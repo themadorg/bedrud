@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bedrud/internal/clioutput"
 	"fmt"
 	"os"
 	"strings"
@@ -38,6 +39,14 @@ configuration, and certificate management.`,
 
 	root.SetVersionTemplate("bedrud {{.Version}}\n")
 	root.PersistentFlags().StringVar(&configPath, "config", "", "Path to bedrud config file (env: BEDRUD_CONFIG / CONFIG_PATH)")
+	root.PersistentFlags().Bool("json", false, "Emit machine-readable JSON output")
+	root.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		jsonFlag, _ := cmd.Flags().GetBool("json")
+		if !jsonFlag {
+			jsonFlag, _ = cmd.Root().PersistentFlags().GetBool("json")
+		}
+		clioutput.SetJSON(jsonFlag)
+	}
 
 	viper.SetEnvPrefix(envPrefix)
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
@@ -86,8 +95,15 @@ func newVersionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Print version",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("bedrud " + Version)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if clioutput.JSON() {
+				return clioutput.Success("", map[string]string{
+					"name":    "bedrud",
+					"version": Version,
+				})
+			}
+			clioutput.Println("bedrud " + Version)
+			return nil
 		},
 	}
 }
@@ -104,7 +120,11 @@ func Execute(version string) {
 	}
 	root := NewRootCmd()
 	if err := root.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
+		if clioutput.JSON() {
+			clioutput.EmitError(err)
+		} else {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+		}
 		os.Exit(1)
 	}
 }

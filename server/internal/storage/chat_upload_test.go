@@ -291,7 +291,7 @@ func TestS3DeleteObject_HTTPSignature(t *testing.T) {
 		if r.Header.Get("Authorization") == "" {
 			t.Fatal("missing Authorization header")
 		}
-		w.WriteHeader(204)
+		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
 
@@ -310,7 +310,7 @@ func TestS3DeleteObject_HTTPSignature(t *testing.T) {
 
 func TestS3DeleteObject_ServerError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
 
@@ -332,7 +332,7 @@ func TestS3DeleteObject_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedMethod = r.Method
 		capturedPath = r.URL.Path
-		w.WriteHeader(204)
+		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
 

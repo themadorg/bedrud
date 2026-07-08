@@ -199,35 +199,79 @@ Bedrud peut envoyer des e-mails transactionnels (bienvenue, réinitialisation de
 
 ## Configuration LiveKit
 
-**Emplacement :** `server/config/livekit.yaml` (développement) ou `/etc/bedrud/livekit.yaml` (production)
+**Emplacement :** `server/livekit.yaml` (développement) ou `/etc/bedrud/livekit.yaml` (production)
 
-```yaml
-port: 7880                      # Port HTTP/WebSocket LiveKit
+<Tabs>
+  <TabsList>
+    <TabsTrigger value="production">Production / Externe (Standard)</TabsTrigger>
+    <TabsTrigger value="development">Développement Local (Loopback)</TabsTrigger>
+  </TabsList>
+  <TabsContent value="production">
 
-rtc:
-  port_range_start: 50000       # Début de la plage de ports UDP
-  port_range_end: 60000         # Fin de la plage de ports UDP
-  use_external_ip: true         # Utiliser l'IP externe pour RTC
+  ```yaml
+  port: 7880                      # LiveKit HTTP/WebSocket port
 
-turn:
-  enabled: true
-  domain: "localhost"
-  tls_port: 5349
-  udp_port: 3478
+  rtc:
+    tcp_port: 7881                # TCP port for WebRTC traffic (e.g. for fallback)
+    port_range_start: 50000       # UDP port range start
+    port_range_end: 60000         # UDP port range end
+    use_external_ip: true         # Use STUN to detect public IP; requires internet
 
-keys:
-  devkey: "devsecret"           # Doit correspondre à la configuration du serveur
+  turn:
+    enabled: true                 # Enable TURN server for media relay
+    domain: localhost             # Domain name (required for TURN/TLS)
+    udp_port: 3478                # UDP port for TURN/STUN requests
+    tls_port: 5349                # TLS port (requires certificates)
 
-logging:
-  level: info
+  keys:
+    devkey: "CHANGE_ME_LIVEKIT_SECRET" # Must match livekit.apiSecret in config.yaml
 
-room:
-  auto_create: true              # Créer automatiquement des salles lorsque les participants rejoignent
-  empty_timeout: 60              # Secondes avant suppression d'une salle vide
-  departure_timeout: 60          # Secondes pour garder la salle après le départ de tous les participants
-  max_participants: 20           # Maximum de participants par salle (0 = illimité)
-  enable_remote_unmute: true     # Permettre le démappareillage côté serveur des participants
-```
+  room:
+    auto_create: true             # Auto-create rooms when participants join
+    empty_timeout: 60             # Seconds before deleting empty room
+    departure_timeout: 60         # Seconds to keep room active after everyone leaves
+    max_participants: 20          # Max participants per room (0 for no limit)
+    enable_remote_unmute: true    # Allow server-side unmute of participants
+  ```
+
+  </TabsContent>
+  <TabsContent value="development">
+
+  ```yaml
+  port: 7072                      # LiveKit HTTP/WebSocket port for local dev
+
+  rtc:
+    tcp_port: 7073                # TCP port for WebRTC fallback in local dev
+    port_range_start: 7080        # Custom UDP range to avoid conflicts
+    port_range_end: 7099
+    use_external_ip: false        # Avoids slow STUN resolution on local networks/VPNs
+    use_ice_lite: true            # Enables ICE Lite for single-node development
+    node_ip: 127.0.0.1            # Forces ICE candidates to loopback (same-machine dev)
+    ips:
+      includes:
+        - 127.0.0.1/32            # Restricts interface scanning to localhost only
+    enable_loopback_candidate: true # Allows loopback candidates (browsers on localhost)
+    allow_tcp_fallback: true      # Fall back to TCP if UDP is blocked
+
+  logging:
+    level: debug                  # Verbosely log connection issues in development
+
+  turn:
+    enabled: false                # TURN is disabled for local dev (unnecessary on localhost)
+
+  keys:
+    devkey: "CHANGE_ME_LIVEKIT_SECRET" # Must match livekit.apiSecret in config.yaml
+
+  room:
+    auto_create: true             # Auto-create rooms when participants join
+    empty_timeout: 60             # Seconds before deleting empty room
+    departure_timeout: 60         # Seconds to keep room active after everyone leaves
+    max_participants: 20          # Max participants per room (0 for no limit)
+    enable_remote_unmute: true    # Allow server-side unmute of participants
+  ```
+
+  </TabsContent>
+</Tabs>
 
 <Callout type="warning">
     Les `keys` dans `livekit.yaml` doivent correspondre à `livekit.apiKey` et `livekit.apiSecret` dans le `config.yaml` du serveur.

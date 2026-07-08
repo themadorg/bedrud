@@ -3,6 +3,7 @@ package usercli
 import (
 	"bedrud/config"
 	"bedrud/internal/auth"
+	"bedrud/internal/clioutput"
 	"bedrud/internal/database"
 	"bedrud/internal/lkutil"
 	"bedrud/internal/models"
@@ -27,8 +28,14 @@ func PromoteUser(configPath, email, role string) error {
 		if err := repo.UpdateUserAccesses(user.ID, roleAccesses); err != nil {
 			return fmt.Errorf("failed to update accesses: %w", err)
 		}
-		fmt.Printf("✓ User %q role set to %s (accesses: %v).\n", email, role, roleAccesses)
-		return nil
+		return clioutput.Success(
+			fmt.Sprintf("✓ User %q role set to %s (accesses: %v).", email, role, roleAccesses),
+			map[string]any{
+				"email":    email,
+				"role":     role,
+				"accesses": roleAccesses,
+			},
+		)
 	})
 }
 
@@ -44,10 +51,14 @@ func DemoteUser(configPath, email, role string) error {
 			}
 		}
 		if len(filtered) == len(user.Accesses) {
-			fmt.Printf("User %q does not have %q access.\n", email, role)
-			return nil
+			msg := fmt.Sprintf("User %q does not have %q access.", email, role)
+			return clioutput.Success(msg, map[string]any{
+				"email":    email,
+				"role":     role,
+				"accesses": []string(user.Accesses),
+				"changed":  false,
+			})
 		}
-		// Ensure at least "user" access remains
 		hasUser := false
 		for _, a := range filtered {
 			if a == "user" {
@@ -61,8 +72,15 @@ func DemoteUser(configPath, email, role string) error {
 		if err := repo.UpdateUserAccesses(user.ID, []string(filtered)); err != nil {
 			return fmt.Errorf("failed to update accesses: %w", err)
 		}
-		fmt.Printf("✓ Removed %q from %q. Current accesses: %v\n", role, email, filtered)
-		return nil
+		return clioutput.Success(
+			fmt.Sprintf("✓ Removed %q from %q. Current accesses: %v", role, email, filtered),
+			map[string]any{
+				"email":       email,
+				"removedRole": role,
+				"accesses":    filtered,
+				"changed":     true,
+			},
+		)
 	})
 }
 
@@ -108,8 +126,10 @@ func CreateUser(configPath, email, password, name string, admin bool) error {
 		return fmt.Errorf("failed to check existing user: %w", checkErr)
 	}
 	if existing != nil {
-		fmt.Printf("⚠ User %q already exists — skipping creation.\n", email)
-		return nil
+		return clioutput.Success(
+			fmt.Sprintf("⚠ User %q already exists — skipping creation.", email),
+			map[string]any{"email": email, "created": false, "user": userSummary(existing)},
+		)
 	}
 
 	accesses := models.StringArray{"user"}
@@ -119,7 +139,7 @@ func CreateUser(configPath, email, password, name string, admin bool) error {
 	user := &models.User{
 		ID:        uuid.New().String(),
 		Email:     email,
-		Password:  string(hashedPassword),
+		Password:  hashedPassword,
 		Name:      name,
 		Provider:  "local",
 		Accesses:  accesses,
@@ -131,8 +151,10 @@ func CreateUser(configPath, email, password, name string, admin bool) error {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
 
-	fmt.Printf("✓ Created user: %s\n", user.Email)
-	return nil
+	return clioutput.Success(
+		fmt.Sprintf("✓ Created user: %s", user.Email),
+		map[string]any{"created": true, "user": userSummary(user)},
+	)
 }
 
 func DeleteUser(configPath, email string) error {
@@ -181,7 +203,7 @@ func DeleteUser(configPath, email string) error {
 		cleanupSvc := services.NewRoomCleanupService(roomRepo, nil, client, nil, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, uploadTracker)
 
 		if err := cleanupSvc.DeleteUserRooms(context.Background(), rooms, user.ID); err != nil {
-			fmt.Printf("⚠ Room cleanup had errors (proceeding with user deletion): %v\n", err)
+			clioutput.Printf("⚠ Room cleanup had errors (proceeding with user deletion): %v\n", err)
 			log.Warn().Err(err).Msg("room cleanup had errors during CLI user deletion")
 		}
 	}
@@ -199,11 +221,16 @@ func DeleteUser(configPath, email string) error {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
 
-	fmt.Printf("✓ Deleted user: %s (%d room(s) cleaned up)\n", user.Email, len(rooms))
-	return nil
+	return clioutput.Success(
+		fmt.Sprintf("✓ Deleted user: %s (%d room(s) cleaned up)", user.Email, len(rooms)),
+		map[string]any{
+			"email":        user.Email,
+			"userId":       user.ID,
+			"roomsCleaned": len(rooms),
+		},
+	)
 }
 
-// ListUsers prints a table of users, paginated.
 func ListUsers(configPath string, page, pageSize int) error {
 	cfg, err := config.Load(configPath)
 	if err != nil {
@@ -229,42 +256,54 @@ func ListUsers(configPath string, page, pageSize int) error {
 		return fmt.Errorf("failed to list users: %w", err)
 	}
 
-	fmt.Printf("%-36s  %-32s  %-20s  %-10s  %-9s  %s\n", "ID", "EMAIL", "NAME", "PROVIDER", "ACTIVE", "ACCESSES")
+	if clioutput.JSON() {
+		summaries := make([]map[string]any, 0, len(users))
+		for i := range users {
+			summaries = append(summaries, userSummary(&users[i]))
+		}
+		return clioutput.Success("", map[string]any{
+			"users":    summaries,
+			"page":     page,
+			"pageSize": pageSize,
+			"total":    total,
+		})
+	}
+
+	clioutput.Printf("%-36s  %-32s  %-20s  %-10s  %-9s  %s\n", "ID", "EMAIL", "NAME", "PROVIDER", "ACTIVE", "ACCESSES")
 	for _, u := range users {
 		accesses := strings.Join([]string(u.Accesses), ",")
 		active := "no"
 		if u.IsActive {
 			active = "yes"
 		}
-		fmt.Printf("%-36s  %-32s  %-20s  %-10s  %-9s  %s\n",
+		clioutput.Printf("%-36s  %-32s  %-20s  %-10s  %-9s  %s\n",
 			u.ID, truncate(u.Email, 32), truncate(u.Name, 20), u.Provider, active, accesses)
 	}
-	fmt.Printf("\nshowing page %d (%d per page) of %d total user(s)\n", page, pageSize, total)
+	clioutput.Printf("\nshowing page %d (%d per page) of %d total user(s)\n", page, pageSize, total)
 	return nil
 }
 
-// ShowUser prints full information for a user identified by email.
 func ShowUser(configPath, email string) error {
 	return withUser(configPath, email, func(repo *repository.UserRepository, user *models.User) error {
+		if clioutput.JSON() {
+			return clioutput.Success("", map[string]any{"user": userDetail(user)})
+		}
 		accesses := append([]string(nil), []string(user.Accesses)...)
 		sort.Strings(accesses)
-		fmt.Println("User:")
-		fmt.Printf("  ID:        %s\n", user.ID)
-		fmt.Printf("  Email:     %s\n", user.Email)
-		fmt.Printf("  Name:      %s\n", user.Name)
-		fmt.Printf("  Provider:  %s\n", user.Provider)
-		fmt.Printf("  Avatar:    %s\n", user.AvatarURL)
-		fmt.Printf("  Active:    %t\n", user.IsActive)
-		fmt.Printf("  Accesses:  %s\n", strings.Join(accesses, ", "))
-		fmt.Printf("  Created:   %s\n", user.CreatedAt.Format(time.RFC3339))
-		fmt.Printf("  Updated:   %s\n", user.UpdatedAt.Format(time.RFC3339))
+		clioutput.Println("User:")
+		clioutput.Printf("  ID:        %s\n", user.ID)
+		clioutput.Printf("  Email:     %s\n", user.Email)
+		clioutput.Printf("  Name:      %s\n", user.Name)
+		clioutput.Printf("  Provider:  %s\n", user.Provider)
+		clioutput.Printf("  Avatar:    %s\n", user.AvatarURL)
+		clioutput.Printf("  Active:    %t\n", user.IsActive)
+		clioutput.Printf("  Accesses:  %s\n", strings.Join(accesses, ", "))
+		clioutput.Printf("  Created:   %s\n", user.CreatedAt.Format(time.RFC3339))
+		clioutput.Printf("  Updated:   %s\n", user.UpdatedAt.Format(time.RFC3339))
 		return nil
 	})
 }
 
-// SetUserPassword overwrites the password for a local-provider user. The
-// caller may pass an empty password to request generation of a random one,
-// which is then printed to stdout.
 func SetUserPassword(configPath, email, newPassword string) error {
 	return withUser(configPath, email, func(repo *repository.UserRepository, user *models.User) error {
 		generated := false
@@ -280,33 +319,72 @@ func SetUserPassword(configPath, email, newPassword string) error {
 		if err != nil {
 			return fmt.Errorf("hash password: %w", err)
 		}
-		if err := repo.UpdatePassword(user.ID, string(hashed)); err != nil {
+		if err := repo.UpdatePassword(user.ID, hashed); err != nil {
 			return fmt.Errorf("update password: %w", err)
 		}
 		if err := repo.ClearRefreshToken(user.ID); err != nil {
 			return fmt.Errorf("invalidate sessions: %w", err)
 		}
-		fmt.Printf("✓ Password updated for %s\n", email)
-		if generated {
-			fmt.Printf("  New password: %s\n", newPassword)
+		data := map[string]any{
+			"email":     email,
+			"generated": generated,
 		}
-		return nil
+		if generated {
+			data["password"] = newPassword
+		}
+		return clioutput.Success(fmt.Sprintf("✓ Password updated for %s", email), data)
 	})
 }
 
-// SetUserActive toggles the IsActive flag and clears any cached refresh token.
 func SetUserActive(configPath, email string, active bool) error {
 	return withUser(configPath, email, func(repo *repository.UserRepository, user *models.User) error {
 		if user.IsActive == active {
-			fmt.Printf("User %q already %s.\n", email, activeWord(active))
-			return nil
+			return clioutput.Success(
+				fmt.Sprintf("User %q already %s.", email, activeWord(active)),
+				map[string]any{"email": email, "active": active, "changed": false},
+			)
 		}
 		if err := repo.UpdateUserStatusAndClearToken(user.ID, active); err != nil {
 			return fmt.Errorf("update status: %w", err)
 		}
-		fmt.Printf("✓ User %q is now %s.\n", email, activeWord(active))
-		return nil
+		return clioutput.Success(
+			fmt.Sprintf("✓ User %q is now %s.", email, activeWord(active)),
+			map[string]any{"email": email, "active": active, "changed": true},
+		)
 	})
+}
+
+func userSummary(u *models.User) map[string]any {
+	if u == nil {
+		return nil
+	}
+	return map[string]any{
+		"id":       u.ID,
+		"email":    u.Email,
+		"name":     u.Name,
+		"provider": u.Provider,
+		"active":   u.IsActive,
+		"accesses": []string(u.Accesses),
+	}
+}
+
+func userDetail(u *models.User) map[string]any {
+	if u == nil {
+		return nil
+	}
+	accesses := append([]string(nil), []string(u.Accesses)...)
+	sort.Strings(accesses)
+	return map[string]any{
+		"id":        u.ID,
+		"email":     u.Email,
+		"name":      u.Name,
+		"provider":  u.Provider,
+		"avatarUrl": u.AvatarURL,
+		"active":    u.IsActive,
+		"accesses":  accesses,
+		"createdAt": u.CreatedAt.Format(time.RFC3339),
+		"updatedAt": u.UpdatedAt.Format(time.RFC3339),
+	}
 }
 
 func activeWord(active bool) string {

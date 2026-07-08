@@ -3,6 +3,7 @@ package cli
 import (
 	"bedrud/config"
 	"bedrud/internal/auth"
+	"bedrud/internal/clioutput"
 	"bedrud/internal/database"
 	"bedrud/internal/models"
 	"bedrud/internal/repository"
@@ -43,6 +44,12 @@ func newSettingsShowCmd() *cobra.Command {
 					return err
 				}
 				redactSettings(s)
+				if clioutput.JSON() {
+					return clioutput.Success("", map[string]any{
+						"effective": effective,
+						"settings":  s,
+					})
+				}
 				out, err := json.MarshalIndent(s, "", "  ")
 				if err != nil {
 					return err
@@ -77,8 +84,10 @@ func newSettingsSetCmd() *cobra.Command {
 				if effective != nil {
 					auth.ReloadProviders(effective)
 				}
-				fmt.Printf("✓ Set %s = %s\n", args[0], args[1])
-				return nil
+				return clioutput.Success(
+					fmt.Sprintf("✓ Set %s = %s", args[0], args[1]),
+					map[string]string{"field": args[0], "value": args[1]},
+				)
 			})
 		},
 	}
@@ -99,8 +108,10 @@ func newSettingsResetCmd() *cobra.Command {
 				if err := repo.SaveSettings(fresh); err != nil {
 					return err
 				}
-				fmt.Println("✓ Settings reset to zero values; restart server or re-set fields as needed.")
-				return nil
+				return clioutput.Success(
+					"✓ Settings reset to zero values; restart server or re-set fields as needed.",
+					map[string]bool{"reset": true},
+				)
 			})
 		},
 	}
@@ -116,7 +127,7 @@ func withSettingsRepo(fn func(*repository.SettingsRepository) error) error {
 	if err := database.Initialize(&cfg.Database); err != nil {
 		return err
 	}
-	defer database.Close()
+	defer func() { _ = database.Close() }()
 	if err := database.RunMigrations(); err != nil {
 		return err
 	}
@@ -128,7 +139,7 @@ func withSettingsRepo(fn func(*repository.SettingsRepository) error) error {
 func setStructField(s *models.SystemSettings, jsonName, raw string) error {
 	v := reflect.ValueOf(s).Elem()
 	t := v.Type()
-	for i := 0; i < t.NumField(); i++ {
+	for i := range t.NumField() {
 		f := t.Field(i)
 		tag := f.Tag.Get("json")
 		name := tag

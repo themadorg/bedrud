@@ -12,36 +12,36 @@ import (
 // Use RoomServiceHooks to control specific method behavior.
 type MockRoomService struct {
 	// Hooks — set before test to control behavior per-method
-	OnCreateRoom             func(ctx context.Context, req *livekit.CreateRoomRequest) (*livekit.Room, error)
-	OnListRooms              func(ctx context.Context, req *livekit.ListRoomsRequest) (*livekit.ListRoomsResponse, error)
-	OnDeleteRoom             func(ctx context.Context, req *livekit.DeleteRoomRequest) (*livekit.DeleteRoomResponse, error)
-	OnListParticipants       func(ctx context.Context, req *livekit.ListParticipantsRequest) (*livekit.ListParticipantsResponse, error)
-	OnGetParticipant         func(ctx context.Context, req *livekit.RoomParticipantIdentity) (*livekit.ParticipantInfo, error)
-	OnRemoveParticipant      func(ctx context.Context, req *livekit.RoomParticipantIdentity) (*livekit.RemoveParticipantResponse, error)
-	OnMutePublishedTrack     func(ctx context.Context, req *livekit.MuteRoomTrackRequest) (*livekit.MuteRoomTrackResponse, error)
-	OnUpdateParticipant      func(ctx context.Context, req *livekit.UpdateParticipantRequest) (*livekit.ParticipantInfo, error)
-	OnUpdateSubscriptions    func(ctx context.Context, req *livekit.UpdateSubscriptionsRequest) (*livekit.UpdateSubscriptionsResponse, error)
-	OnSendData               func(ctx context.Context, req *livekit.SendDataRequest) (*livekit.SendDataResponse, error)
-	OnUpdateRoomMetadata     func(ctx context.Context, req *livekit.UpdateRoomMetadataRequest) (*livekit.Room, error)
-	OnForwardParticipant     func(ctx context.Context, req *livekit.ForwardParticipantRequest) (*livekit.ForwardParticipantResponse, error)
-	OnMoveParticipant        func(ctx context.Context, req *livekit.MoveParticipantRequest) (*livekit.MoveParticipantResponse, error)
-	OnPerformRpc             func(ctx context.Context, req *livekit.PerformRpcRequest) (*livekit.PerformRpcResponse, error)
+	OnCreateRoom          func(ctx context.Context, req *livekit.CreateRoomRequest) (*livekit.Room, error)
+	OnListRooms           func(ctx context.Context, req *livekit.ListRoomsRequest) (*livekit.ListRoomsResponse, error)
+	OnDeleteRoom          func(ctx context.Context, req *livekit.DeleteRoomRequest) (*livekit.DeleteRoomResponse, error)
+	OnListParticipants    func(ctx context.Context, req *livekit.ListParticipantsRequest) (*livekit.ListParticipantsResponse, error)
+	OnGetParticipant      func(ctx context.Context, req *livekit.RoomParticipantIdentity) (*livekit.ParticipantInfo, error)
+	OnRemoveParticipant   func(ctx context.Context, req *livekit.RoomParticipantIdentity) (*livekit.RemoveParticipantResponse, error)
+	OnMutePublishedTrack  func(ctx context.Context, req *livekit.MuteRoomTrackRequest) (*livekit.MuteRoomTrackResponse, error)
+	OnUpdateParticipant   func(ctx context.Context, req *livekit.UpdateParticipantRequest) (*livekit.ParticipantInfo, error)
+	OnUpdateSubscriptions func(ctx context.Context, req *livekit.UpdateSubscriptionsRequest) (*livekit.UpdateSubscriptionsResponse, error)
+	OnSendData            func(ctx context.Context, req *livekit.SendDataRequest) (*livekit.SendDataResponse, error)
+	OnUpdateRoomMetadata  func(ctx context.Context, req *livekit.UpdateRoomMetadataRequest) (*livekit.Room, error)
+	OnForwardParticipant  func(ctx context.Context, req *livekit.ForwardParticipantRequest) (*livekit.ForwardParticipantResponse, error)
+	OnMoveParticipant     func(ctx context.Context, req *livekit.MoveParticipantRequest) (*livekit.MoveParticipantResponse, error)
+	OnPerformRpc          func(ctx context.Context, req *livekit.PerformRpcRequest) (*livekit.PerformRpcResponse, error)
 
 	// CallCounts — incremented each time a method is called (useful for assertions)
-	CreateRoomCalls             atomic.Int64
-	ListRoomsCalls              atomic.Int64
-	DeleteRoomCalls             atomic.Int64
-	ListParticipantsCalls       atomic.Int64
-	GetParticipantCalls         atomic.Int64
-	RemoveParticipantCalls      atomic.Int64
-	MutePublishedTrackCalls     atomic.Int64
-	UpdateParticipantCalls      atomic.Int64
-	UpdateSubscriptionsCalls    atomic.Int64
-	SendDataCalls               atomic.Int64
-	UpdateRoomMetadataCalls     atomic.Int64
-	ForwardParticipantCalls     atomic.Int64
-	MoveParticipantCalls        atomic.Int64
-	PerformRpcCalls             atomic.Int64
+	CreateRoomCalls          atomic.Int64
+	ListRoomsCalls           atomic.Int64
+	DeleteRoomCalls          atomic.Int64
+	ListParticipantsCalls    atomic.Int64
+	GetParticipantCalls      atomic.Int64
+	RemoveParticipantCalls   atomic.Int64
+	MutePublishedTrackCalls  atomic.Int64
+	UpdateParticipantCalls   atomic.Int64
+	UpdateSubscriptionsCalls atomic.Int64
+	SendDataCalls            atomic.Int64
+	UpdateRoomMetadataCalls  atomic.Int64
+	ForwardParticipantCalls  atomic.Int64
+	MoveParticipantCalls     atomic.Int64
+	PerformRpcCalls          atomic.Int64
 }
 
 // MockEgress implements livekit.Egress for testing.
@@ -49,26 +49,26 @@ type MockRoomService struct {
 // Use hooks to control specific method behavior.
 type MockEgress struct {
 	// Hooks — set before test to control behavior per-method
-	OnStartRoomCompositeEgress func(ctx context.Context, req *livekit.RoomCompositeEgressRequest) (*livekit.EgressInfo, error)
-	OnStartWebEgress           func(ctx context.Context, req *livekit.WebEgressRequest) (*livekit.EgressInfo, error)
-	OnStartParticipantEgress   func(ctx context.Context, req *livekit.ParticipantEgressRequest) (*livekit.EgressInfo, error)
+	OnStartRoomCompositeEgress  func(ctx context.Context, req *livekit.RoomCompositeEgressRequest) (*livekit.EgressInfo, error)
+	OnStartWebEgress            func(ctx context.Context, req *livekit.WebEgressRequest) (*livekit.EgressInfo, error)
+	OnStartParticipantEgress    func(ctx context.Context, req *livekit.ParticipantEgressRequest) (*livekit.EgressInfo, error)
 	OnStartTrackCompositeEgress func(ctx context.Context, req *livekit.TrackCompositeEgressRequest) (*livekit.EgressInfo, error)
-	OnStartTrackEgress         func(ctx context.Context, req *livekit.TrackEgressRequest) (*livekit.EgressInfo, error)
-	OnUpdateLayout             func(ctx context.Context, req *livekit.UpdateLayoutRequest) (*livekit.EgressInfo, error)
-	OnUpdateStream             func(ctx context.Context, req *livekit.UpdateStreamRequest) (*livekit.EgressInfo, error)
-	OnListEgress               func(ctx context.Context, req *livekit.ListEgressRequest) (*livekit.ListEgressResponse, error)
-	OnStopEgress               func(ctx context.Context, req *livekit.StopEgressRequest) (*livekit.EgressInfo, error)
+	OnStartTrackEgress          func(ctx context.Context, req *livekit.TrackEgressRequest) (*livekit.EgressInfo, error)
+	OnUpdateLayout              func(ctx context.Context, req *livekit.UpdateLayoutRequest) (*livekit.EgressInfo, error)
+	OnUpdateStream              func(ctx context.Context, req *livekit.UpdateStreamRequest) (*livekit.EgressInfo, error)
+	OnListEgress                func(ctx context.Context, req *livekit.ListEgressRequest) (*livekit.ListEgressResponse, error)
+	OnStopEgress                func(ctx context.Context, req *livekit.StopEgressRequest) (*livekit.EgressInfo, error)
 
 	// CallCounts — incremented each time a method is called
-	StartRoomCompositeEgressCalls atomic.Int64
-	StartWebEgressCalls           atomic.Int64
-	StartParticipantEgressCalls   atomic.Int64
+	StartRoomCompositeEgressCalls  atomic.Int64
+	StartWebEgressCalls            atomic.Int64
+	StartParticipantEgressCalls    atomic.Int64
 	StartTrackCompositeEgressCalls atomic.Int64
-	StartTrackEgressCalls         atomic.Int64
-	UpdateLayoutCalls             atomic.Int64
-	UpdateStreamCalls             atomic.Int64
-	ListEgressCalls               atomic.Int64
-	StopEgressCalls               atomic.Int64
+	StartTrackEgressCalls          atomic.Int64
+	UpdateLayoutCalls              atomic.Int64
+	UpdateStreamCalls              atomic.Int64
+	ListEgressCalls                atomic.Int64
+	StopEgressCalls                atomic.Int64
 }
 
 var _ livekit.Egress = (*MockEgress)(nil)

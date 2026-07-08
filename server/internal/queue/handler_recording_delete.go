@@ -2,12 +2,11 @@
 package queue
 
 import (
+	"bedrud/internal/models"
+	"bedrud/internal/repository"
 	"context"
 	"encoding/json"
 	"fmt"
-
-	"bedrud/internal/models"
-	"bedrud/internal/repository"
 
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"

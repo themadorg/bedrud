@@ -74,7 +74,10 @@ type DatabaseConfig struct {
 }
 
 type LiveKitConfig struct {
-	Host          string `yaml:"host"`
+	Host string `yaml:"host"`
+	// HostLocal is the browser signaling URL when the app is opened on localhost
+	// (e.g. ws://localhost:7070/livekit via the Vite /livekit proxy in remote debug).
+	HostLocal     string `yaml:"hostLocal"`
 	InternalHost  string `yaml:"internalHost"`
 	APIKey        string `yaml:"apiKey"`
 	APISecret     string `yaml:"apiSecret"`
@@ -381,6 +384,9 @@ func Load(configPath string) (*Config, error) {
 		if livekitHost := os.Getenv("LIVEKIT_HOST"); livekitHost != "" {
 			config.LiveKit.Host = livekitHost
 		}
+		if livekitHostLocal := os.Getenv("LIVEKIT_HOST_LOCAL"); livekitHostLocal != "" {
+			config.LiveKit.HostLocal = livekitHostLocal
+		}
 		if livekitInternalHost := os.Getenv("LIVEKIT_INTERNAL_HOST"); livekitInternalHost != "" {
 			config.LiveKit.InternalHost = livekitInternalHost
 		}
@@ -590,6 +596,12 @@ func GetSafe() *Config {
 // This bypasses the sync.Once in Load and should only be used in tests.
 func SetForTest(cfg *Config) {
 	config = cfg
+}
+
+// ResetLoadForTest clears the config singleton so Load can run again (tests only).
+func ResetLoadForTest() {
+	once = sync.Once{}
+	config = nil
 }
 
 // GetDSN returns the PostgreSQL connection string

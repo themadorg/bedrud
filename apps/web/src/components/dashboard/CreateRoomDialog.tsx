@@ -13,7 +13,7 @@ import {
   UserCheck,
   Video,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -75,6 +75,11 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
   const [maxParticipants, setMaxParticipants] = useState(20)
   const [isPublic, setIsPublic] = useState(false)
   const [settings, setSettings] = useState<RoomSettings>(DEFAULT_SETTINGS)
+  const [roomHost, setRoomHost] = useState('localhost:7070')
+
+  useEffect(() => {
+    setRoomHost(window.location.host)
+  }, [])
 
   function toggle(key: keyof RoomSettings) {
     setSettings((s) => ({ ...s, [key]: !s[key] }))
@@ -142,7 +147,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
               className="mt-2 font-mono text-xl font-semibold tracking-tight placeholder:text-muted-foreground/30 px-0"
             />
             <p className="mt-1.5 font-mono text-[11px] text-muted-foreground/50">
-              {window.location.host}/m/{displaySlug}
+              {roomHost}/m/{displaySlug}
             </p>
             {!name.trim() && (
               <p className="mt-0.5 text-[10px] text-muted-foreground/40">Leave blank to auto-generate a name</p>

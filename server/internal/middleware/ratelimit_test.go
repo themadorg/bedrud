@@ -1,12 +1,11 @@
 package middleware
 
 import (
+	"bedrud/config"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"bedrud/config"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -25,22 +24,22 @@ func setupRLApp(handler fiber.Handler) *fiber.App {
 func TestAuthRateLimiter_DefaultLimits(t *testing.T) {
 	app := setupRLApp(AuthRateLimiter(config.RateLimitConfig{}))
 
-	for i := 0; i < 10; i++ {
-		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
+	for i := range 10 {
+		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
 		if err != nil {
 			t.Fatalf("request %d: %v", i, err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("request %d: expected 200, got %d", i, resp.StatusCode)
 		}
 	}
 
-	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d", resp.StatusCode)
 	}
@@ -52,22 +51,22 @@ func TestAuthRateLimiter_CustomLimits(t *testing.T) {
 		AuthWindowSecs:  intPtr(60),
 	}))
 
-	for i := 0; i < 3; i++ {
-		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
+	for i := range 3 {
+		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
 		if err != nil {
 			t.Fatalf("request %d: %v", i, err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("request %d: expected 200, got %d", i, resp.StatusCode)
 		}
 	}
 
-	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d", resp.StatusCode)
 	}
@@ -78,12 +77,12 @@ func TestAuthRateLimiter_Disabled(t *testing.T) {
 		AuthMaxRequests: intPtr(0),
 	}))
 
-	for i := 0; i < 100; i++ {
-		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
+	for i := range 100 {
+		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
 		if err != nil {
 			t.Fatalf("request %d: %v", i, err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("request %d: expected 200, got %d", i, resp.StatusCode)
 		}
@@ -95,13 +94,17 @@ func TestAuthRateLimiter_LimitReachedBody(t *testing.T) {
 		AuthMaxRequests: intPtr(1),
 	}))
 
-	app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
-
-	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
+	firstResp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = firstResp.Body.Close() }()
+
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var body map[string]string
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
@@ -117,22 +120,22 @@ func TestAuthRateLimiter_WindowDefaultWhenNil(t *testing.T) {
 		AuthMaxRequests: intPtr(5),
 	}))
 
-	for i := 0; i < 5; i++ {
-		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
+	for i := range 5 {
+		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
 		if err != nil {
 			t.Fatalf("request %d: %v", i, err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("request %d: expected 200, got %d", i, resp.StatusCode)
 		}
 	}
 
-	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d", resp.StatusCode)
 	}
@@ -141,22 +144,22 @@ func TestAuthRateLimiter_WindowDefaultWhenNil(t *testing.T) {
 func TestGuestRateLimiter_DefaultLimits(t *testing.T) {
 	app := setupRLApp(GuestRateLimiter(config.RateLimitConfig{}))
 
-	for i := 0; i < 5; i++ {
-		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
+	for i := range 5 {
+		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
 		if err != nil {
 			t.Fatalf("request %d: %v", i, err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("request %d: expected 200, got %d", i, resp.StatusCode)
 		}
 	}
 
-	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d", resp.StatusCode)
 	}
@@ -167,12 +170,12 @@ func TestGuestRateLimiter_Disabled(t *testing.T) {
 		GuestMaxRequests: intPtr(0),
 	}))
 
-	for i := 0; i < 100; i++ {
-		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
+	for i := range 100 {
+		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
 		if err != nil {
 			t.Fatalf("request %d: %v", i, err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("request %d: expected 200, got %d", i, resp.StatusCode)
 		}
@@ -184,13 +187,17 @@ func TestGuestRateLimiter_ErrorBody(t *testing.T) {
 		GuestMaxRequests: intPtr(1),
 	}))
 
-	app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
-
-	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
+	firstResp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = firstResp.Body.Close() }()
+
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var body map[string]string
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
@@ -220,40 +227,40 @@ func TestBothLimiters_Independent(t *testing.T) {
 		return c.SendString("guest ok")
 	})
 
-	for i := 0; i < 2; i++ {
-		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/auth/login", nil))
+	for i := range 2 {
+		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/auth/login", http.NoBody))
 		if err != nil {
 			t.Fatalf("auth request %d: %v", i, err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("auth request %d: expected 200, got %d", i, resp.StatusCode)
 		}
 
-		resp, err = app.Test(httptest.NewRequest(http.MethodGet, "/guest/join", nil))
+		resp, err = app.Test(httptest.NewRequest(http.MethodGet, "/guest/join", http.NoBody))
 		if err != nil {
 			t.Fatalf("guest request %d: %v", i, err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("guest request %d: expected 200, got %d", i, resp.StatusCode)
 		}
 	}
 
-	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/auth/login", nil))
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/auth/login", http.NoBody))
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("auth blocked: expected 429, got %d", resp.StatusCode)
 	}
 
-	resp, err = app.Test(httptest.NewRequest(http.MethodGet, "/guest/join", nil))
+	resp, err = app.Test(httptest.NewRequest(http.MethodGet, "/guest/join", http.NoBody))
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("guest blocked: expected 429, got %d", resp.StatusCode)
 	}
@@ -265,22 +272,22 @@ func TestAuthRateLimiter_ExplicitWindow(t *testing.T) {
 		AuthWindowSecs:  intPtr(30),
 	}))
 
-	for i := 0; i < 2; i++ {
-		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
+	for i := range 2 {
+		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
 		if err != nil {
 			t.Fatalf("request %d: %v", i, err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("request %d: expected 200, got %d", i, resp.StatusCode)
 		}
 	}
 
-	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d", resp.StatusCode)
 	}
@@ -291,12 +298,12 @@ func TestAuthRateLimiter_ExactLimitNotBlocked(t *testing.T) {
 		AuthMaxRequests: intPtr(3),
 	}))
 
-	for i := 0; i < 3; i++ {
-		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", nil))
+	for i := range 3 {
+		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/test", http.NoBody))
 		if err != nil {
 			t.Fatalf("request %d: %v", i, err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("request %d: expected 200, got %d", i, resp.StatusCode)
 		}

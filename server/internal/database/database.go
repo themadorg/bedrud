@@ -140,6 +140,14 @@ func SetForTest(testDB *gorm.DB) {
 	db = testDB
 }
 
+// ResetForTest closes and clears the global DB handle (tests only).
+func ResetForTest() {
+	if db != nil {
+		_ = Close()
+	}
+	db = nil
+}
+
 // Close closes the database connection
 func Close() error {
 	if db != nil {

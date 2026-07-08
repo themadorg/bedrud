@@ -512,7 +512,7 @@ func getLocalIP() string {
 	}
 	resp, err := client.Get("https://ifconfig.me")
 	if err == nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		body, err := io.ReadAll(resp.Body)
 		if err == nil {
 			ip := strings.TrimSpace(string(body))

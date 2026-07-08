@@ -1,18 +1,24 @@
 import { useIsSpeaking, useParticipantInfo, VideoTrack } from '@livekit/components-react'
 import type { Participant, RemoteParticipant } from 'livekit-client'
-import { ParticipantEvent, Track } from 'livekit-client'
-import { MicOff, Pin, VolumeX } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Track } from 'livekit-client'
+import { MicOff, Pin } from 'lucide-react'
+import { useEffect, useMemo, useRef } from 'react'
+import { useAvatarPhotoPalette } from '#/lib/avatar-photo-palette'
+import { resolveAvatarUrl } from '#/lib/avatar-url'
 import { selectVolume, useParticipantOverridesStore } from '#/lib/participant-overrides.store'
 import { getPalette } from '#/lib/participant-palette'
-import { useLongPress } from '#/lib/useLongPress'
+import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
+import {
+  isPushToTalkParticipant,
+  shouldShowMicMutedIndicator,
+} from '#/lib/push-to-talk-participant'
 import { cn } from '#/lib/utils'
 import { useVideoPreferencesStore } from '#/lib/video-preferences.store'
+import { DeafenHeadphonesIcon } from '#/components/meeting/DeafenHeadphonesIcon'
+import { ParticipantAvatar } from '#/components/meeting/ParticipantAvatar'
 import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
-import { ParticipantContextMenu, ParticipantMenuButton } from '@/components/meeting/ParticipantContextMenu'
+import { hasCameraVideo, useCameraTrackPublication } from '@/components/meeting/useCameraTrackPublication'
 
-// Prevents calling createMediaElementSource twice on the same <audio>/<video> element,
-// which throws an InvalidStateError. Keyed weakly so it garbage-collects with the element.
 const elementSourceUsed = new WeakMap<HTMLMediaElement, true>()
 
 interface Props {
@@ -23,21 +29,64 @@ interface Props {
   onTogglePin?: () => void
 }
 
+function MicStatusIcon({
+  participant,
+  isSpeaking,
+  size,
+  localPushToTalkEnabled,
+}: {
+  participant: Participant
+  isSpeaking: boolean
+  size: number
+  localPushToTalkEnabled: boolean
+}) {
+  const isPtt = isPushToTalkParticipant(participant, localPushToTalkEnabled)
+
+  if (shouldShowMicMutedIndicator(participant, localPushToTalkEnabled)) {
+    return <MicOff size={size} className="shrink-0 text-red-400" />
+  }
+
+  if (isPtt && !isSpeaking) return null
+
+  const barCount = size <= 11 ? 3 : 5
+  const maxHeight = size <= 11 ? 12 : 18
+  const idleHeight = size <= 11 ? 4 : 5
+
+  return (
+    <div className={cn('flex shrink-0 items-end', size <= 11 ? 'h-3 gap-[1.5px]' : 'h-[18px] gap-[3px]')}>
+      {Array.from({ length: barCount }).map((_, i) => (
+        <span
+          key={i}
+          className={cn('inline-block rounded-sm', size <= 11 ? 'w-[2px] rounded-px' : 'w-[3px]')}
+          style={{
+            transformOrigin: 'bottom center',
+            ...(isSpeaking
+              ? {
+                  height: maxHeight,
+                  background: 'var(--primary)',
+                  animation: `meet-speak-bar 0.7s ease-in-out ${i * (size <= 11 ? 0.15 : 0.12)}s infinite`,
+                }
+              : {
+                  height: idleHeight,
+                  background: size <= 11 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.15)',
+                  animation: 'none',
+                  transition: 'height 0.3s ease, background 0.3s ease',
+                }),
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export function ParticipantTile({ participant, totalCount, index, isPinned = false, onTogglePin }: Props) {
-  const { name, identity } = useParticipantInfo({ participant })
+  const { identity } = useParticipantInfo({ participant })
   const isSpeaking = useIsSpeaking(participant)
-  const { isSelfDeafened } = useMeetingRoomContext()
+  const { isSelfDeafened, isParticipantDeafened, getParticipantDisplayName, getParticipantAvatarUrl } = useMeetingRoomContext()
 
   const volume = useParticipantOverridesStore(selectVolume(identity ?? ''))
 
-  // Parse participant metadata for deafened state (visible to all peers)
-  const isDeafened = useMemo(() => {
-    try {
-      return JSON.parse(participant.metadata ?? '{}').deafened === true
-    } catch {
-      return false
-    }
-  }, [participant.metadata])
+  const isDeafened = isParticipantDeafened(participant)
 
   // Web Audio boost: GainNode for volume > 100%
   const gainRef = useRef<{ ctx: AudioContext; gain: GainNode } | null>(null)
@@ -106,36 +155,18 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
     }
   }, [participant, volume, isSelfDeafened])
 
-  const noopLongPress = useCallback(() => {
-    // No-op: Radix ContextMenu handles contextmenu event natively on mobile long-press
-  }, [])
-  const longPressHandlers = useLongPress(noopLongPress, 500)
-
-  const [cameraTrack, setCameraTrack] = useState(() => participant.getTrackPublication(Track.Source.Camera))
-  useEffect(() => {
-    const refresh = () => setCameraTrack(participant.getTrackPublication(Track.Source.Camera))
-    participant.on(ParticipantEvent.TrackPublished, refresh)
-    participant.on(ParticipantEvent.TrackUnpublished, refresh)
-    participant.on(ParticipantEvent.TrackMuted, refresh)
-    participant.on(ParticipantEvent.TrackUnmuted, refresh)
-    participant.on(ParticipantEvent.TrackSubscribed, refresh)
-    participant.on(ParticipantEvent.TrackUnsubscribed, refresh)
-    return () => {
-      participant.off(ParticipantEvent.TrackPublished, refresh)
-      participant.off(ParticipantEvent.TrackUnpublished, refresh)
-      participant.off(ParticipantEvent.TrackMuted, refresh)
-      participant.off(ParticipantEvent.TrackUnmuted, refresh)
-      participant.off(ParticipantEvent.TrackSubscribed, refresh)
-      participant.off(ParticipantEvent.TrackUnsubscribed, refresh)
-    }
-  }, [participant])
-
-  const hasCameraVideo = Boolean(cameraTrack?.isSubscribed && !cameraTrack.isMuted)
+  const cameraTrack = useCameraTrackPublication(participant)
+  const showCameraVideo = hasCameraVideo(cameraTrack)
   const mirrorWebcam = useVideoPreferencesStore((s) => s.mirrorWebcam)
-  const displayName = name ?? identity ?? '?'
+  const pushToTalkEnabled = useAudioPreferencesStore((s) => s.pushToTalkEnabled)
+  const displayName = getParticipantDisplayName(participant)
+  const avatarUrl = getParticipantAvatarUrl(participant)
+  const resolvedAvatarUrl = resolveAvatarUrl(avatarUrl)
   const initial = displayName.charAt(0).toUpperCase()
 
-  const palette = useMemo(() => getPalette(displayName), [displayName])
+  const namePalette = useMemo(() => getPalette(displayName), [displayName])
+  const photoPalette = useAvatarPhotoPalette(resolvedAvatarUrl)
+  const palette = resolvedAvatarUrl && photoPalette ? photoPalette : namePalette
 
   // Scale avatar to available tile size
   const avatarPx = totalCount === 1 ? 120 : totalCount <= 4 ? 72 : 48
@@ -145,7 +176,7 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
   const tileStyle = useMemo(
     () => ({
       borderRadius: totalCount === 1 ? 0 : 10,
-      background: `radial-gradient(ellipse 90% 70% at 50% 35%, ${palette.tile}, #08080f 72%)`,
+      background: `radial-gradient(ellipse 90% 70% at 50% 35%, ${palette.tile}, var(--meet-tile-fallback) 72%)`,
       animationDelay: `${index * 0.04}s`,
     }),
     [totalCount, index, palette.tile],
@@ -155,9 +186,9 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
     () => ({
       width: avatarPx,
       height: avatarPx,
-      borderRadius: '50%',
       background: palette.avatar,
       fontSize: fontSizePx,
+      clipPath: 'circle(50% at 50% 50%)',
       boxShadow: isSpeaking
         ? `0 0 0 3px rgba(255,255,255,0.18), 0 0 ${avatarPx * 0.6}px ${palette.glow}`
         : `0 0 ${avatarPx * 0.4}px ${palette.glow}`,
@@ -166,27 +197,20 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
     [avatarPx, fontSizePx, isSpeaking, palette.avatar, palette.glow],
   )
 
-  const pinButtonStyle = useMemo(
-    () => ({
-      background: isPinned ? 'color-mix(in oklab, var(--primary) 70%, transparent)' : 'rgba(0,0,0,0.55)',
-      backdropFilter: 'blur(8px)',
-      border: `1px solid ${isPinned ? 'color-mix(in oklab, var(--accent-400) 50%, transparent)' : 'rgba(255,255,255,0.1)'}`,
-      color: isPinned ? '#e0e7ff' : 'rgba(255,255,255,0.8)',
-    }),
-    [isPinned],
+  const pinButtonClass = cn(
+    'absolute top-2 right-2 flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-lg border backdrop-blur-sm transition-[opacity,background,color,border-color] duration-150',
+    isPinned
+      ? 'border-[color-mix(in_oklab,var(--accent-600)_35%,transparent)] bg-[var(--meet-btn-muted-bg)] text-[var(--meet-btn-muted-fg)]'
+      : 'border-[var(--meet-tile-action-border)] bg-[var(--meet-tile-action-bg)] text-[var(--meet-tile-action-fg)]',
+    isPinned ? '' : 'opacity-0 group-hover:opacity-100',
   )
 
   return (
-    <ParticipantContextMenu participant={participant} isPinned={isPinned} onTogglePin={onTogglePin}>
-      <div className={cn('meet-tile group', isSpeaking && 'meet-speaking')} {...longPressHandlers} style={tileStyle}>
-        {hasCameraVideo && cameraTrack ? (
-          /* Video stream — wrapper suppresses browser's native <video> context menu
-             so right-click bubbles to the Radix ContextMenuTrigger instead */
-          // biome-ignore lint/a11y/noStaticElementInteractions: wrapper prevents native <video> context menu so Radix ContextMenu works
+    <div className={cn('meet-tile group h-full w-full', isSpeaking && 'meet-speaking')} style={tileStyle}>
+        {showCameraVideo && cameraTrack ? (
           <div
             className="absolute inset-0"
             style={{ transform: participant.isLocal && mirrorWebcam ? 'scaleX(-1)' : undefined }}
-            onContextMenu={(e) => e.preventDefault()}
           >
             <VideoTrack
               trackRef={{ participant, source: Track.Source.Camera, publication: cameraTrack }}
@@ -196,84 +220,51 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
         ) : (
           /* No video: gradient avatar */
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3.5">
-            <div className="flex items-center justify-center shrink-0 text-white font-bold" style={avatarStyle}>
-              {initial}
-            </div>
+            <ParticipantAvatar
+              avatarUrl={avatarUrl}
+              initials={initial}
+              paletteBackground={palette.avatar}
+              style={avatarStyle}
+              textClassName=""
+            />
 
             {/* Name label + mute indicator (only when large enough to be readable) */}
             {totalCount <= 2 && (
               <div className="flex items-center gap-1.5">
-                <span className="text-white/60 text-sm font-medium">
+                <span className="text-sm font-medium text-white/60">
                   {displayName}
-                  {participant.isLocal && <span className="text-white/75 text-xs ms-1.5">you</span>}
+                  {participant.isLocal && (
+                    <span className="ms-1.5 text-xs text-[var(--meet-btn-muted-fg)]">you</span>
+                  )}
                 </span>
-                {isDeafened && <VolumeX size={13} className="shrink-0 text-red-400" />}
-                {!participant.isMicrophoneEnabled && <MicOff size={13} className="shrink-0 text-red-400" />}
+                <MicStatusIcon
+                  participant={participant}
+                  isSpeaking={isSpeaking}
+                  size={13}
+                  localPushToTalkEnabled={pushToTalkEnabled}
+                />
+                {isDeafened && <DeafenHeadphonesIcon size={13} off className="text-red-400" />}
               </div>
             )}
-
-            {/* Waveform bars — always visible, animated when speaking */}
-            <div className="flex items-end gap-[3px] h-[18px]">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <span
-                  key={i}
-                  className="inline-block w-[3px] rounded-sm"
-                  style={{
-                    transformOrigin: 'bottom center',
-                    ...(isSpeaking
-                      ? {
-                          height: 18,
-                          background: 'var(--primary)',
-                          animation: `meet-speak-bar 0.7s ease-in-out ${i * 0.12}s infinite`,
-                        }
-                      : {
-                          height: 5,
-                          background: 'rgba(255,255,255,0.15)',
-                          animation: 'none',
-                          transition: 'height 0.3s ease, background 0.3s ease',
-                        }),
-                  }}
-                />
-              ))}
-            </div>
           </div>
         )}
 
         {/* Name + mute badge at bottom-left — for video tiles or dense grids */}
-        {(hasCameraVideo || totalCount > 2) && (
-          <div className="absolute bottom-2 left-2 flex items-center gap-[5px] bg-black/60 backdrop-blur-sm rounded-[7px] px-2 py-[3px] max-w-[calc(100%-50px)]">
-            <span className="text-white text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap">
+        {(showCameraVideo || totalCount > 2) && (
+          <div className="absolute bottom-2 left-2 flex max-w-[calc(100%-50px)] items-center gap-[5px] rounded-[7px] border border-[var(--meet-tile-action-border)] bg-[var(--meet-tile-action-bg)] px-2 py-[3px] backdrop-blur-sm">
+            <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium text-[var(--meet-tile-action-fg)]">
               {displayName}
-              {participant.isLocal && <span className="text-white/75 text-[11px] ms-1">you</span>}
+              {participant.isLocal && (
+                <span className="ms-1 text-[11px] text-[var(--meet-btn-muted-fg)]">you</span>
+              )}
             </span>
-            {isDeafened && <VolumeX size={11} className="shrink-0 text-red-400" />}
-            {!participant.isMicrophoneEnabled ? (
-              <MicOff size={11} className="shrink-0 text-red-400" />
-            ) : (
-              <div className="flex items-end gap-[1.5px] h-3 shrink-0">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="inline-block w-[2px] rounded-px"
-                    style={{
-                      transformOrigin: 'bottom center',
-                      ...(isSpeaking
-                        ? {
-                            height: 12,
-                            background: 'var(--primary)',
-                            animation: `meet-speak-bar 0.7s ease-in-out ${i * 0.15}s infinite`,
-                          }
-                        : {
-                            height: 4,
-                            background: 'rgba(255,255,255,0.25)',
-                            animation: 'none',
-                            transition: 'height 0.3s ease, background 0.3s ease',
-                          }),
-                    }}
-                  />
-                ))}
-              </div>
-            )}
+            <MicStatusIcon
+              participant={participant}
+              isSpeaking={isSpeaking}
+              size={11}
+              localPushToTalkEnabled={pushToTalkEnabled}
+            />
+            {isDeafened && <DeafenHeadphonesIcon size={11} off className="text-red-400" />}
           </div>
         )}
 
@@ -282,22 +273,13 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
           <button
             type="button"
             onClick={onTogglePin}
-            className={cn(
-              'absolute top-2 right-2 w-[30px] h-[30px] rounded-lg flex items-center justify-center cursor-pointer transition-[opacity,background] duration-150',
-              isPinned ? '' : 'opacity-0 group-hover:opacity-100',
-            )}
-            style={pinButtonStyle}
+            className={pinButtonClass}
             aria-label={isPinned ? 'Unpin participant' : 'Pin participant'}
           >
             <Pin size={13} className={isPinned ? 'fill-current' : ''} />
           </button>
         )}
 
-        {/* 3-dot button — top-left corner (pin button is top-right) */}
-        <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-          <ParticipantMenuButton participant={participant} isPinned={isPinned} onTogglePin={onTogglePin} />
-        </div>
       </div>
-    </ParticipantContextMenu>
   )
 }

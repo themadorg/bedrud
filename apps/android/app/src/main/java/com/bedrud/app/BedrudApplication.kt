@@ -2,6 +2,7 @@ package com.bedrud.app
 
 import android.app.Application
 import android.content.Context
+import com.bedrud.app.core.call.CallTelecom
 import com.bedrud.app.core.createLocaleContext
 import com.bedrud.app.core.di.appModule
 import com.bedrud.app.core.instance.InstanceStore
@@ -32,5 +33,7 @@ class BedrudApplication : Application() {
         // Migrate old single-instance data if present
         val store: InstanceStore by inject()
         MigrationHelper.migrateIfNeeded(this, store)
+
+        CallTelecom.registerPhoneAccount(this)
     }
 }

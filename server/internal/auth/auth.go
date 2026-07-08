@@ -4,6 +4,7 @@ import (
 	"bedrud/config"
 	"bedrud/internal/models"
 	"bedrud/internal/repository"
+	"bedrud/internal/storage"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
@@ -137,7 +138,7 @@ func (s *AuthService) Register(email, password, name string) (*models.User, erro
 	user := &models.User{
 		ID:        uuid.New().String(),
 		Email:     email,
-		Password:  string(hashedPassword),
+		Password:  hashedPassword,
 		Name:      name,
 		Provider:  "local",
 		Accesses:  models.StringArray{"user"}, // Use our custom type
@@ -342,6 +343,33 @@ func (s *AuthService) UpdateProfile(userID, name string) (*models.User, error) {
 	return user, nil
 }
 
+func (s *AuthService) UpdateAvatarURL(userID, avatarURL string) (*models.User, error) {
+	user, err := s.userRepo.GetUserByID(userID)
+	if err != nil || user == nil {
+		return nil, errors.New("user not found")
+	}
+	user.AvatarURL = avatarURL
+	if err := s.userRepo.UpdateUser(user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (s *AuthService) ClearAvatar(userID string) (*models.User, error) {
+	user, err := s.userRepo.GetUserByID(userID)
+	if err != nil || user == nil {
+		return nil, errors.New("user not found")
+	}
+	if strings.HasPrefix(user.AvatarURL, "/uploads/avatars/") {
+		_ = storage.DeleteUserAvatarFiles(userID)
+	}
+	user.AvatarURL = ""
+	if err := s.userRepo.UpdateUser(user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
 // ChangeEmail updates the user's email address, clears verification status,
 // and invalidates all existing sessions (forces re-login).
 func (s *AuthService) ChangeEmail(userID, newEmail string) error {
@@ -404,7 +432,7 @@ func (s *AuthService) ChangePassword(userID, currentPassword, newPassword, acces
 	}
 	// Use UpdatePassword to atomically update the hash and clear refresh_token,
 	// invalidating all active sessions. Matches admin SetUserPassword behavior.
-	if err := s.userRepo.UpdatePassword(userID, string(hashed)); err != nil {
+	if err := s.userRepo.UpdatePassword(userID, hashed); err != nil {
 		return err
 	}
 	RevokeAccessToken(accessToken, config.Get())
@@ -426,7 +454,7 @@ func (s *AuthService) ResetPassword(userID, newPassword string, accessTokens ...
 	}
 
 	// Atomically update password and clear refresh_token (invalidates all sessions)
-	if err := s.userRepo.UpdatePassword(userID, string(hashed)); err != nil {
+	if err := s.userRepo.UpdatePassword(userID, hashed); err != nil {
 		return err
 	}
 
@@ -444,7 +472,7 @@ func (s *AuthService) ResetPassword(userID, newPassword string, accessTokens ...
 // @Summary Logout user
 // @Description Invalidate refresh token and logout user
 // @Tags auth
-func (s *AuthService) Logout(userID string, refreshToken string, accessToken string) error {
+func (s *AuthService) Logout(userID, refreshToken, accessToken string) error {
 	if err := s.BlockRefreshToken(userID, refreshToken); err != nil {
 		return err
 	}

@@ -5,6 +5,34 @@
 
 @import "tailwindcss";
 @import "./theme.css";
+@import "./components/meeting/meeting.css";
+
+@font-face {
+  font-family: "Vazirmatn";
+  src: url("/fonts/vazirmatn.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Shabnam";
+  src: url("/fonts/shabnam.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+  font-style: normal;
+}
+
+:lang(fa),
+:lang(fa-IR),
+:lang(ar) {
+  font-family: "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
+}
+
+:is(h1, h2, h3, h4, h5, h6):lang(fa),
+:is(h1, h2, h3, h4, h5, h6):lang(fa-IR) {
+  font-family: "Shabnam", ui-sans-serif, system-ui, sans-serif;
+}
 
 /* Use class-based dark mode — toggled by adding .dark to <html> */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -286,4 +314,10 @@ a[href="#main-content"] {
    This rule helps surface missing labels during audits (no visual change). */
 button:has(> svg):not([aria-label]):not([aria-labelledby]) {
   /* Visual debug aid in dev only — remove or comment in production if desired */
+}
+
+.meet-avatar-circle {
+  border-radius: 50% !important;
+  clip-path: circle(50% at 50% 50%) !important;
+  overflow: hidden;
 }

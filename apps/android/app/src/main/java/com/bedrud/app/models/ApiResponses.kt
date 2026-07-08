@@ -24,11 +24,11 @@ data class LoginResponse(
     val user: User
 )
 
-data class RegisterResponse(
-    @SerializedName("access_token")
-    val accessToken: String,
-    @SerializedName("refresh_token")
-    val refreshToken: String
+data class RegisterVerificationResponse(
+    @SerializedName("requiresVerification")
+    val requiresVerification: Boolean,
+    val message: String,
+    val email: String
 )
 
 data class RefreshTokenRequest(

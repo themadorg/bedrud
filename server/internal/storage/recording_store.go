@@ -2,6 +2,7 @@
 package storage
 
 import (
+	"bedrud/config"
 	"context"
 	"fmt"
 	"io"
@@ -9,8 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"bedrud/config"
 
 	"github.com/rs/zerolog/log"
 )
@@ -82,9 +81,6 @@ func (s *diskRecordingStore) Store(ctx context.Context, key string, src io.Reade
 		if size > s.maxBytes {
 			return nil, fmt.Errorf("recording file size %d exceeds max %d", size, s.maxBytes)
 		}
-		if size <= 0 {
-			// Unknown size — we can't check upfront. Will enforce during copy.
-		}
 	}
 
 	if err := os.MkdirAll(s.dir, 0o755); err != nil {
@@ -119,29 +115,32 @@ func (s *diskRecordingStore) Store(ctx context.Context, key string, src io.Reade
 		// Unknown size — limit via io.LimitReader
 		written, err = io.Copy(tmp, io.LimitReader(src, s.maxBytes+1))
 		if written > s.maxBytes {
-			tmp.Close()
-			os.Remove(tmpName)
+			_ = tmp.Close()
+			_ = os.Remove(tmpName)
 			return nil, fmt.Errorf("recording exceeds max size %d bytes", s.maxBytes)
 		}
 	} else {
 		written, err = io.Copy(tmp, src)
 	}
 	if err != nil {
-		tmp.Close()
-		os.Remove(tmpName)
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
 		return nil, fmt.Errorf("write recording: %w", err)
 	}
-	tmp.Close()
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpName)
+		return nil, fmt.Errorf("close recording: %w", err)
+	}
 
 	// Atomic rename
 	if err := os.Rename(tmpName, dst); err != nil {
-		os.Remove(tmpName) // cleanup temp on rename failure
+		_ = os.Remove(tmpName) // cleanup temp on rename failure
 		return nil, fmt.Errorf("rename recording: %w", err)
 	}
 	// fsync directory to persist rename
 	if dirF, err := os.Open(filepath.Dir(dst)); err == nil {
-		dirF.Sync()
-		dirF.Close()
+		_ = dirF.Sync()
+		_ = dirF.Close()
 	}
 
 	url := "/recordings/" + cleanKey

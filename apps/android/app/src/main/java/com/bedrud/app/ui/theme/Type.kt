@@ -21,6 +21,17 @@ private fun buildVazirmatnFamily(): FontFamily {
 }
 
 val VazirmatnFontFamily = buildVazirmatnFamily()
+
+private fun buildShabnamFamily(): FontFamily {
+    return FontFamily(
+        Font(R.font.shabnam, weight = FontWeight.Normal),
+        Font(R.font.shabnam, weight = FontWeight.Medium),
+        Font(R.font.shabnam, weight = FontWeight.SemiBold),
+        Font(R.font.shabnam, weight = FontWeight.Bold)
+    )
+}
+
+val ShabnamFontFamily = buildShabnamFamily()
 val BedrudTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
@@ -129,20 +140,23 @@ val BedrudTypography = Typography(
     )
 )
 
-val VazirmatnTypography = Typography(
-    displayLarge = BedrudTypography.displayLarge.copy(fontFamily = VazirmatnFontFamily),
-    displayMedium = BedrudTypography.displayMedium.copy(fontFamily = VazirmatnFontFamily),
-    displaySmall = BedrudTypography.displaySmall.copy(fontFamily = VazirmatnFontFamily),
-    headlineLarge = BedrudTypography.headlineLarge.copy(fontFamily = VazirmatnFontFamily),
-    headlineMedium = BedrudTypography.headlineMedium.copy(fontFamily = VazirmatnFontFamily),
-    headlineSmall = BedrudTypography.headlineSmall.copy(fontFamily = VazirmatnFontFamily),
-    titleLarge = BedrudTypography.titleLarge.copy(fontFamily = VazirmatnFontFamily),
-    titleMedium = BedrudTypography.titleMedium.copy(fontFamily = VazirmatnFontFamily),
-    titleSmall = BedrudTypography.titleSmall.copy(fontFamily = VazirmatnFontFamily),
-    bodyLarge = BedrudTypography.bodyLarge.copy(fontFamily = VazirmatnFontFamily),
-    bodyMedium = BedrudTypography.bodyMedium.copy(fontFamily = VazirmatnFontFamily),
-    bodySmall = BedrudTypography.bodySmall.copy(fontFamily = VazirmatnFontFamily),
-    labelLarge = BedrudTypography.labelLarge.copy(fontFamily = VazirmatnFontFamily),
-    labelMedium = BedrudTypography.labelMedium.copy(fontFamily = VazirmatnFontFamily),
-    labelSmall = BedrudTypography.labelSmall.copy(fontFamily = VazirmatnFontFamily)
+private fun rtlTypography(fontFamily: FontFamily) = Typography(
+    displayLarge = BedrudTypography.displayLarge.copy(fontFamily = fontFamily),
+    displayMedium = BedrudTypography.displayMedium.copy(fontFamily = fontFamily),
+    displaySmall = BedrudTypography.displaySmall.copy(fontFamily = fontFamily),
+    headlineLarge = BedrudTypography.headlineLarge.copy(fontFamily = fontFamily),
+    headlineMedium = BedrudTypography.headlineMedium.copy(fontFamily = fontFamily),
+    headlineSmall = BedrudTypography.headlineSmall.copy(fontFamily = fontFamily),
+    titleLarge = BedrudTypography.titleLarge.copy(fontFamily = fontFamily),
+    titleMedium = BedrudTypography.titleMedium.copy(fontFamily = fontFamily),
+    titleSmall = BedrudTypography.titleSmall.copy(fontFamily = fontFamily),
+    bodyLarge = BedrudTypography.bodyLarge.copy(fontFamily = fontFamily),
+    bodyMedium = BedrudTypography.bodyMedium.copy(fontFamily = fontFamily),
+    bodySmall = BedrudTypography.bodySmall.copy(fontFamily = fontFamily),
+    labelLarge = BedrudTypography.labelLarge.copy(fontFamily = fontFamily),
+    labelMedium = BedrudTypography.labelMedium.copy(fontFamily = fontFamily),
+    labelSmall = BedrudTypography.labelSmall.copy(fontFamily = fontFamily)
 )
+
+val ShabnamTypography = rtlTypography(ShabnamFontFamily)
+val VazirmatnTypography = rtlTypography(VazirmatnFontFamily)

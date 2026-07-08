@@ -1,6 +1,7 @@
 package livekit
 
 import (
+	"bedrud/internal/utils"
 	"context"
 	"fmt"
 	"net"
@@ -8,8 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
-
-	"bedrud/internal/utils"
 
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
@@ -163,11 +162,14 @@ func generateTempConfig(apiKey, apiSecret string, port int, nodeIP, certFile, ke
 	}
 
 	if _, err := tmpFile.Write(data); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpFile.Name())
 		return "", fmt.Errorf("failed to write temp LiveKit config: %w", err)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		_ = os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("failed to close temp LiveKit config: %w", err)
+	}
 
 	return tmpFile.Name(), nil
 }
@@ -225,7 +227,7 @@ func StartInternalServer(ctx context.Context, apiKey, apiSecret string, port int
 			log.Error().Err(err).Msg("LiveKit process exited")
 		}
 		if cleanupTemp != "" {
-			os.Remove(cleanupTemp)
+			_ = os.Remove(cleanupTemp)
 		}
 	}()
 

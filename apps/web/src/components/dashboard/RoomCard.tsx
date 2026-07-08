@@ -17,7 +17,7 @@ import { useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 
 interface Room {
   id: string
@@ -56,97 +56,88 @@ export function RoomCard({ room, onJoin, onDelete, onSettings }: Props) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const capacityLabel = room.maxParticipants > 0 ? `${room.maxParticipants}` : 'Open'
+
   return (
-    <Card className="group flex h-full flex-col p-4 transition-all hover:-translate-y-0.5 hover:border-primary/20">
-      <div className="flex items-start justify-between gap-3">
+    <Card className="group flex flex-col gap-2.5 p-3 transition-colors hover:border-primary/25">
+      <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1">
             {room.isActive && (
               <Badge
                 variant="outline"
-                className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 gap-1"
+                className="h-5 gap-1 border-emerald-500/30 bg-emerald-500/10 px-1.5 text-[10px] text-emerald-600 dark:text-emerald-400"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span className="h-1 w-1 rounded-full bg-emerald-500" />
                 Live
               </Badge>
             )}
-            <Badge variant="outline" className="gap-1">
-              {room.isPublic ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+            <Badge variant="outline" className="h-5 gap-1 px-1.5 text-[10px]">
+              {room.isPublic ? <Globe className="h-2.5 w-2.5" /> : <Lock className="h-2.5 w-2.5" />}
               {room.isPublic ? 'Public' : 'Private'}
             </Badge>
             {room.settings.e2ee && (
-              <Badge className="gap-1">
-                <ShieldCheck className="h-3 w-3" />
-                Encrypted
+              <Badge className="h-5 gap-1 px-1.5 text-[10px]">
+                <ShieldCheck className="h-2.5 w-2.5" />
+                E2EE
               </Badge>
             )}
             {room.settings.requireApproval && (
-              <Badge variant="outline" className="gap-1">
-                <UserCheck className="h-3 w-3" />
+              <Badge variant="outline" className="h-5 gap-1 px-1.5 text-[10px]">
+                <UserCheck className="h-2.5 w-2.5" />
                 Approval
               </Badge>
             )}
           </div>
-
-          <h3 className="mt-3 truncate font-mono text-sm font-semibold">{room.name}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {room.isActive ? 'Participants can join immediately.' : 'Ready for the next session.'}
-          </p>
+          <h3 className="mt-1.5 truncate font-mono text-[13px] font-semibold leading-tight">{room.name}</h3>
         </div>
 
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
           onClick={copyLink}
+          className="h-7 w-7 shrink-0"
           aria-label="Copy link"
           title={copied ? 'Copied!' : 'Copy invite link'}
         >
-          {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4 text-muted-foreground" />}
+          {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
         </Button>
       </div>
 
-      <CardContent className="mt-4 grid gap-2 p-0 sm:grid-cols-2">
-        <div className="border bg-background/70 p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Capacity</p>
-          <p className="mt-2 flex items-center gap-2 text-sm font-medium">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            {room.maxParticipants} seats
-          </p>
-        </div>
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1">
+          <Users className="h-3 w-3 shrink-0" />
+          {capacityLabel}
+        </span>
+        {capabilities.map(({ icon: Icon, label }) => (
+          <span key={label} className="inline-flex items-center gap-0.5" title={label}>
+            <Icon className="h-3 w-3 shrink-0" />
+            {label}
+          </span>
+        ))}
+      </div>
 
-        <div className="border bg-background/70 p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Access</p>
-          <p className="mt-2 text-sm font-medium">
-            {room.isPublic ? 'Anyone with the link can join.' : 'Only invited participants can enter.'}
-          </p>
-        </div>
-      </CardContent>
-
-      <CardContent className="mt-4 border bg-background/70 p-3">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Enabled</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {capabilities.length > 0 ? (
-            capabilities.map(({ icon: Icon, label }) => (
-              <Badge key={label} variant="outline" className="gap-1">
-                <Icon className="h-3.5 w-3.5" />
-                {label}
-              </Badge>
-            ))
-          ) : (
-            <p className="text-xs text-muted-foreground">No participant features enabled.</p>
-          )}
-        </div>
-      </CardContent>
-
-      <div className="mt-4 flex items-center gap-2">
-        <Button variant={room.isActive ? 'default' : 'outline'} onClick={onJoin} className="flex-1">
-          {room.isActive ? 'Join live room' : 'Open room'}
-          <ArrowRight className="h-4 w-4" />
+      <div className="flex items-center gap-1.5 pt-0.5">
+        <Button
+          variant={room.isActive ? 'default' : 'outline'}
+          size="sm"
+          onClick={onJoin}
+          className="h-8 flex-1 gap-1.5 text-xs"
+        >
+          {room.isActive ? 'Join' : 'Open'}
+          <ArrowRight className="h-3.5 w-3.5" />
         </Button>
 
         {onSettings && (
-          <Button variant="outline" size="icon" onClick={onSettings} aria-label="Room settings" title="Room settings">
-            <Settings2 className="h-4 w-4 text-muted-foreground" />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onSettings}
+            className="h-8 w-8"
+            aria-label="Room settings"
+            title="Room settings"
+          >
+            <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
           </Button>
         )}
 
@@ -155,28 +146,26 @@ export function RoomCard({ room, onJoin, onDelete, onSettings }: Props) {
             variant="outline"
             size="icon"
             onClick={() => setConfirmDelete(true)}
-            className="border-destructive/30 bg-destructive/10 hover:bg-destructive/15"
+            className="h-8 w-8 border-destructive/30 bg-destructive/10 hover:bg-destructive/15"
             aria-label="Delete room"
             title="Delete room"
           >
-            <Trash2 className="h-4 w-4 text-destructive" />
+            <Trash2 className="h-3.5 w-3.5 text-destructive" />
           </Button>
         )}
       </div>
 
       {confirmDelete && onDelete && (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border border-destructive/30 bg-destructive/10 px-3 py-3">
-          <div>
-            <p className="text-sm font-medium text-destructive">Delete this room?</p>
-            <p className="text-xs text-destructive/80">This removes the room from the dashboard.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
+        <div className="flex items-center justify-between gap-2 border border-destructive/30 bg-destructive/10 px-2 py-2">
+          <p className="text-[11px] font-medium text-destructive">Delete room?</p>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setConfirmDelete(false)}>
               Cancel
             </Button>
             <Button
               variant="destructive"
               size="sm"
+              className="h-7 px-2 text-xs"
               onClick={() => {
                 onDelete()
                 setConfirmDelete(false)

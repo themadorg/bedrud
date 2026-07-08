@@ -44,7 +44,7 @@ function ForgotPasswordPage() {
     return (
       <div className="space-y-7">
         <div className="space-y-1 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
             <MailCheck className="h-7 w-7 text-primary" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Check your email</h1>

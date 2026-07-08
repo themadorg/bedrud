@@ -3,10 +3,9 @@ package middleware
 import (
 	"bedrud/config"
 	"bedrud/internal/auth"
+	"bedrud/internal/models"
 	"bedrud/internal/repository"
 	"strings"
-
-	"bedrud/internal/models"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"

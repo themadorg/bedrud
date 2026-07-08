@@ -34,6 +34,12 @@ enum class AppLanguage(val localeTag: String, val label: String, val isRtl: Bool
         if (this != SYSTEM) return isRtl
         return TextUtils.getLayoutDirectionFromLocale(Locale.getDefault()) == View.LAYOUT_DIRECTION_RTL
     }
+
+    fun usesShabnam(): Boolean {
+        if (this == PERSIAN) return true
+        if (this == SYSTEM) return Locale.getDefault().language == "fa"
+        return false
+    }
 }
 
 class SettingsStore(context: Context) {

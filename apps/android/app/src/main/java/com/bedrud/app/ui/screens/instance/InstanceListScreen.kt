@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bedrud.app.R
+import com.bedrud.app.ui.components.BedrudScaffoldContentInsets
 import com.bedrud.app.core.instance.InstanceManager
 import com.bedrud.app.models.Instance
 import org.koin.compose.koinInject
@@ -53,6 +54,7 @@ fun InstanceListScreen(
     val activeId by instanceManager.store.activeInstanceId.collectAsState()
 
     Scaffold(
+        contentWindowInsets = BedrudScaffoldContentInsets,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.instance_title_servers)) },

@@ -1,10 +1,9 @@
 package database
 
 import (
+	"bedrud/internal/models"
 	"fmt"
 	"os"
-
-	"bedrud/internal/models"
 
 	"github.com/rs/zerolog/log"
 )
@@ -50,7 +49,7 @@ func RunMigrations() error {
 						isUnique = true
 					}
 				}
-				rows.Close()
+				_ = rows.Close()
 			}
 		} else if db.Dialector.Name() == "postgres" {
 			var unique int

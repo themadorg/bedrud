@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -32,20 +33,25 @@ class CallService : Service() {
     private var roomManager: RoomManager? = null
     private var serviceScope: CoroutineScope? = null
     private var callStartTime: Long = 0L
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_HANG_UP -> {
-                stopSelf()
+                hangUp()
                 return START_NOT_STICKY
             }
             ACTION_TOGGLE_MUTE -> {
                 serviceScope?.launch {
                     roomManager?.toggleMicrophone()
                 }
-                return START_NOT_STICKY
+                return START_STICKY
+            }
+            ACTION_RETURN_TO_MEETING -> {
+                updateForegroundNotification()
+                return START_STICKY
             }
         }
 
@@ -63,71 +69,77 @@ class CallService : Service() {
         }
         val avatarUrl = intent.getStringExtra(EXTRA_AVATAR_URL)
 
-        // Grab the current RoomManager before any instance switch
+        if (isRunning && activeRoomName == roomName) {
+            // Already in this meeting — keep the foreground call alive.
+            updateForegroundNotification()
+            return START_STICKY
+        }
+
         val rm = instanceManager.roomManager.value ?: run {
             Log.e(TAG, "No RoomManager available")
             stopSelf()
             return START_NOT_STICKY
         }
         roomManager = rm
+        activeRoomName = roomName
+        isRunning = true
         callStartTime = SystemClock.elapsedRealtime()
 
-        // Create notification channel and start foreground immediately (Android 12+ 10s rule)
         createNotificationChannel()
-        val notification = buildNotification(roomName, isMuted = false)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID, notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        CallTelecom.registerPhoneAccount(this)
+        val callPlaced = CallConnectionService.placeCall(this, roomName)
+        if (!callPlaced) {
+            Log.e(TAG, "Telecom placeCall failed; stopping service")
+            stopSelf()
+            return START_NOT_STICKY
         }
+        startCallForeground(roomName)
 
-        // Place system call via ConnectionService
-        CallConnectionService.placeCall(this, roomName)
+        acquireWakeLock()
 
-        // Connect to LiveKit
         serviceScope?.cancel()
         serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
         serviceScope?.launch {
-            rm.connect(url, token, roomName, avatarUrl)
+            rm.connectIfNeeded(url, token, roomName, avatarUrl)
         }
 
-        // Set callback for server-side disconnects
         rm.onDisconnected = {
             Log.d(TAG, "Room disconnected by server, stopping service")
-            stopSelf()
+            hangUp()
         }
 
-        // Observe mute state to update notification
+        CallConnectionService.muteListener = { muted ->
+            serviceScope?.launch {
+                roomManager?.setMicrophoneEnabled(!muted)
+                updateForegroundNotification(isMuted = muted)
+            }
+        }
+
         serviceScope?.launch {
             rm.isMicEnabled.collectLatest { micEnabled ->
-                val updatedNotification = buildNotification(roomName, isMuted = !micEnabled)
-                val nm = getSystemService(NotificationManager::class.java)
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                    checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-                ) {
-                    nm.notify(NOTIFICATION_ID, updatedNotification)
-                }
+                updateForegroundNotification(isMuted = !micEnabled)
                 CallConnectionService.updateMuteState(!micEnabled)
             }
         }
 
-        isRunning = true
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
+        activeRoomName = null
+
+        releaseWakeLock()
 
         roomManager?.onDisconnected = null
-        roomManager?.disconnect()
+        if (userInitiatedHangUp) {
+            roomManager?.disconnect()
+        }
         roomManager = null
+        userInitiatedHangUp = false
 
+        CallConnectionService.muteListener = null
         CallConnectionService.endCall()
 
         serviceScope?.cancel()
@@ -136,52 +148,104 @@ class CallService : Service() {
         Log.d(TAG, "CallService destroyed")
     }
 
+    private fun hangUp() {
+        userInitiatedHangUp = true
+        stopSelf()
+    }
+
+    private fun startCallForeground(roomName: String) {
+        val notification = buildNotification(roomName, isMuted = false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL,
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
+    }
+
+    private fun updateForegroundNotification(isMuted: Boolean = roomManager?.isMicEnabled?.value == false) {
+        val roomName = activeRoomName ?: return
+        val notification = buildNotification(roomName, isMuted)
+        val nm = getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        ) {
+            nm.notify(NOTIFICATION_ID, notification)
+        }
+    }
+
+    private fun acquireWakeLock() {
+        releaseWakeLock()
+        val pm = getSystemService(PowerManager::class.java) ?: return
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "bedrud:active_call").apply {
+            setReferenceCounted(false)
+            acquire(MAX_CALL_DURATION_MS)
+        }
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.let { lock ->
+            if (lock.isHeld) lock.release()
+        }
+        wakeLock = null
+    }
+
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
             getString(R.string.call_channel_name),
-            NotificationManager.IMPORTANCE_LOW
+            NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
             description = getString(R.string.call_channel_description)
             setShowBadge(false)
+            lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            enableVibration(false)
+            setSound(null, null)
         }
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(channel)
     }
 
     private fun buildNotification(roomName: String, isMuted: Boolean): Notification {
-        // Content tap opens app
         val contentIntent = PendingIntent.getActivity(
-            this, 0,
+            this,
+            0,
             Intent(this, MainActivity::class.java).apply {
+                action = ACTION_RETURN_TO_MEETING
+                putExtra(EXTRA_ROOM_NAME, roomName)
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        // Mute action
         val muteIntent = PendingIntent.getService(
-            this, 1,
+            this,
+            1,
             Intent(this, CallService::class.java).apply { action = ACTION_TOGGLE_MUTE },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val muteAction = NotificationCompat.Action.Builder(
             if (isMuted) android.R.drawable.ic_lock_silent_mode
             else android.R.drawable.ic_lock_silent_mode_off,
             if (isMuted) getString(R.string.call_action_unmute) else getString(R.string.call_action_mute),
-            muteIntent
+            muteIntent,
         ).build()
 
-        // Hang up action
         val hangUpIntent = PendingIntent.getService(
-            this, 2,
+            this,
+            2,
             Intent(this, CallService::class.java).apply { action = ACTION_HANG_UP },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val hangUpAction = NotificationCompat.Action.Builder(
             android.R.drawable.ic_menu_close_clear_cancel,
             getString(R.string.call_action_hangUp),
-            hangUpIntent
+            hangUpIntent,
         ).build()
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -190,28 +254,40 @@ class CallService : Service() {
             .setSmallIcon(R.drawable.ic_call_notification)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
             .setUsesChronometer(true)
+            .setShowWhen(true)
             .setWhen(System.currentTimeMillis() - (SystemClock.elapsedRealtime() - callStartTime))
             .setContentIntent(contentIntent)
             .addAction(muteAction)
             .addAction(hangUpAction)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
     }
 
     companion object {
         private const val TAG = "CallService"
-        private const val CHANNEL_ID = "bedrud_call"
+        private const val CHANNEL_ID = "bedrud_call_ongoing"
         private const val NOTIFICATION_ID = 1001
-        private const val EXTRA_ROOM_NAME = "room_name"
+        const val EXTRA_ROOM_NAME = "room_name"
         private const val EXTRA_URL = "url"
         private const val EXTRA_TOKEN = "token"
         private const val EXTRA_AVATAR_URL = "avatar_url"
-        private const val ACTION_HANG_UP = "com.bedrud.app.HANG_UP"
-        private const val ACTION_TOGGLE_MUTE = "com.bedrud.app.TOGGLE_MUTE"
+        const val ACTION_HANG_UP = "com.bedrud.app.HANG_UP"
+        const val ACTION_TOGGLE_MUTE = "com.bedrud.app.TOGGLE_MUTE"
+        const val ACTION_RETURN_TO_MEETING = "com.bedrud.app.RETURN_TO_MEETING"
+        private const val MAX_CALL_DURATION_MS = 8 * 60 * 60 * 1000L
 
         var isRunning = false
             private set
+
+        var activeRoomName: String? = null
+            private set
+
+        private var userInitiatedHangUp = false
 
         fun start(context: Context, roomName: String, url: String, token: String, avatarUrl: String? = null) {
             val intent = Intent(context, CallService::class.java).apply {
@@ -224,6 +300,7 @@ class CallService : Service() {
         }
 
         fun stop(context: Context) {
+            userInitiatedHangUp = true
             context.stopService(Intent(context, CallService::class.java))
         }
     }

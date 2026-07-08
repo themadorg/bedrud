@@ -1,5 +1,5 @@
 {
-  "include": ["**/*.ts", "**/*.tsx"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "compilerOptions": {
     "ignoreDeprecations": "6.0",
     "target": "ES2022",
@@ -8,8 +8,23 @@
     "baseUrl": ".",
     "paths": {
       "#/*": ["./src/*"],
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@excalidraw/common": ["./src/vendor/excalidraw/packages/common/src/index.ts"],
+      "@excalidraw/common/*": ["./src/vendor/excalidraw/packages/common/src/*"],
+      "@excalidraw/element": ["./src/vendor/excalidraw/packages/element/src/index.ts"],
+      "@excalidraw/element/*": ["./src/vendor/excalidraw/packages/element/src/*"],
+      "@excalidraw/math": ["./src/vendor/excalidraw/packages/math/src/index.ts"],
+      "@excalidraw/math/*": ["./src/vendor/excalidraw/packages/math/src/*"],
+      "@excalidraw/utils": ["./src/vendor/excalidraw/packages/utils/src/index.ts"],
+      "@excalidraw/utils/*": ["./src/vendor/excalidraw/packages/utils/src/*"],
+      "@excalidraw/fractional-indexing": ["./src/vendor/excalidraw/packages/fractional-indexing/src/index.ts"],
+      "@excalidraw/laser-pointer": ["./src/vendor/excalidraw/packages/laser-pointer/src/index.ts"],
+      "@excalidraw/excalidraw/element/types": ["./src/vendor/excalidraw/packages/element/src/types.ts"],
+      "@excalidraw/excalidraw/types": ["./src/vendor/excalidraw/packages/excalidraw/types.ts"],
+      "@excalidraw/excalidraw": ["./src/vendor/excalidraw/packages/excalidraw/index.tsx"],
+      "@excalidraw/excalidraw/*": ["./src/vendor/excalidraw/packages/excalidraw/*"]
     },
+    "resolveJsonModule": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client", "@types/react"],
 

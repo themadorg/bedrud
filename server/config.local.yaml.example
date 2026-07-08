@@ -1,7 +1,7 @@
 # Copy this file to config.local.yaml and fill in your values.
 # NEVER commit config.local.yaml — it contains secrets.
 server:
-  port: "8090"
+  port: "7071"
   httpPort: ""  # HTTP listener when TLS enabled. Default: "80". Unprivileged: "8080". Env: SERVER_HTTP_PORT
   host: "0.0.0.0"
   readTimeout: 30
@@ -27,8 +27,10 @@ logger:
   outputPath: "" # Log to stdout
 
 livekit:
-  host: "http://localhost:8090/livekit"
-  internalHost: "http://127.0.0.1:7880"
+  # Browser signaling URL. Connect directly to LiveKit (avoids Vite/Bun WS proxy breaking /rtc/v1/validate).
+  # Production behind reverse proxy: use your public URL with /livekit path instead.
+  host: "ws://localhost:7072"
+  internalHost: "http://127.0.0.1:7072"
   apiKey: "devkey"
   apiSecret: "CHANGE_ME_LIVEKIT_SECRET"
   # configPath: "/etc/bedrud/livekit.yaml"  # External LiveKit YAML. Env: LIVEKIT_CONFIG_PATH
@@ -41,8 +43,8 @@ livekit:
   #   Uses same apiKey/apiSecret for JWT signing.
 
 auth:
-  jwtSecret: "CHANGE_ME_32_CHAR_RANDOM_STRING"
-  sessionSecret: "CHANGE_ME_32_CHAR_RANDOM_STRING"
+  jwtSecret: "CHANGE_ME_32_CHAR_RANDOM_STRING!"
+  sessionSecret: "CHANGE_ME_32_CHAR_RANDOM_STRING!"
   tokenDuration: 24
   passkeyChallengeTTL: 5  # passkey challenge expiry in minutes. Env: AUTH_PASSKEY_CHALLENGE_TTL
   # requireEmailVerification gates all local registration + login behind email verification.
@@ -59,19 +61,19 @@ auth:
   # that registered but never verified. 0 = disabled. Default: 48 hours.
   # Env: AUTH_UNVERIFIED_ACCOUNT_TTL_HOURS
   unverifiedAccountTTLHours: 48
-  frontendURL: "http://localhost:8090"
+  frontendURL: "http://localhost:7070"
   google:
     clientId: "CHANGE_ME_GOOGLE_CLIENT_ID"
     clientSecret: "CHANGE_ME_GOOGLE_CLIENT_SECRET"
-    redirectUrl: "http://localhost:8090/api/auth/google/callback"
+    redirectUrl: "http://localhost:7071/api/auth/google/callback"
   github:
     clientId: "CHANGE_ME_GITHUB_CLIENT_ID"
     clientSecret: "CHANGE_ME_GITHUB_CLIENT_SECRET"
-    redirectUrl: "http://localhost:8090/api/auth/github/callback"
+    redirectUrl: "http://localhost:7071/api/auth/github/callback"
   twitter:
     clientId: ""
     clientSecret: ""
-    redirectUrl: "http://localhost:8090/api/auth/twitter/callback"
+    redirectUrl: "http://localhost:7071/api/auth/twitter/callback"
 
 rateLimit:
   authMaxRequests: 10    # Max auth requests per window (login, register, refresh, passkey). 0 = disable
@@ -80,7 +82,7 @@ rateLimit:
   guestWindowSecs: 60    # Guest rate limit window in seconds
 
 cors:
-  allowedOrigins: "http://localhost:8090,http://localhost:3000,http://localhost:5173"
+  allowedOrigins: "http://localhost:7070,http://localhost:7071"
   allowedHeaders: "Origin, Content-Type, Accept, Authorization"
   allowedMethods: "GET, POST, PUT, DELETE, OPTIONS"
   allowCredentials: true

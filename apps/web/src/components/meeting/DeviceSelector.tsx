@@ -2,14 +2,9 @@ import { useRoomContext } from '@livekit/components-react'
 import { ConnectionState, RoomEvent } from 'livekit-client'
 import { Check, ChevronDown } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { readMeetingDeviceId, writeMeetingDeviceId } from '#/lib/meeting-device-storage'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-
-const STORAGE_KEYS: Record<DeviceSelectorProps['kind'], string> = {
-  audioinput: 'bedrud_mic_device',
-  videoinput: 'bedrud_cam_device',
-  audiooutput: 'bedrud_speaker_device',
-}
 
 export interface DeviceSelectorProps {
   kind: 'audioinput' | 'videoinput' | 'audiooutput'
@@ -18,7 +13,7 @@ export interface DeviceSelectorProps {
 export function DeviceSelector({ kind }: DeviceSelectorProps) {
   const room = useRoomContext()
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
-  const [activeId, setActiveId] = useState<string>(() => localStorage.getItem(STORAGE_KEYS[kind]) ?? '')
+  const [activeId, setActiveId] = useState<string>(() => readMeetingDeviceId(kind))
 
   const syncActiveFromRoom = useCallback(() => {
     const actual = room.getActiveDevice(kind)
@@ -44,7 +39,7 @@ export function DeviceSelector({ kind }: DeviceSelectorProps) {
 
   // Restore saved device — wait until the room is connected, then sync actual active
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS[kind])
+    const saved = readMeetingDeviceId(kind)
 
     async function applyDevice() {
       if (saved) {
@@ -79,7 +74,7 @@ export function DeviceSelector({ kind }: DeviceSelectorProps) {
   async function handleSelect(deviceId: string) {
     await room.switchActiveDevice(kind, deviceId).catch(() => {})
     setActiveId(deviceId)
-    localStorage.setItem(STORAGE_KEYS[kind], deviceId)
+    writeMeetingDeviceId(kind, deviceId)
   }
 
   if (devices.length <= 1) return null

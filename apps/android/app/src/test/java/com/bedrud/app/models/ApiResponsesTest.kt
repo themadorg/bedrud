@@ -41,11 +41,18 @@ class ApiResponsesTest {
     }
 
     @Test
-    fun `RegisterResponse Gson with SerializedName`() {
-        val json = """{"access_token": "acc123", "refresh_token": "ref456"}"""
-        val resp = gson.fromJson(json, RegisterResponse::class.java)
-        assertEquals("acc123", resp.accessToken)
-        assertEquals("ref456", resp.refreshToken)
+    fun `RegisterVerificationResponse Gson deserialization`() {
+        val json = """
+            {
+                "requiresVerification": true,
+                "message": "Please check your email",
+                "email": "a@b.com"
+            }
+        """.trimIndent()
+        val resp = gson.fromJson(json, RegisterVerificationResponse::class.java)
+        assertTrue(resp.requiresVerification)
+        assertEquals("Please check your email", resp.message)
+        assertEquals("a@b.com", resp.email)
     }
 
     @Test

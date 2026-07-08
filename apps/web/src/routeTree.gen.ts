@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as NewRouteImport } from './routes/new'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as SplatRouteImport } from './routes/$'
@@ -40,6 +41,11 @@ import { Route as DashboardAdminUsersUserIdRouteImport } from './routes/dashboar
 import { Route as DashboardAdminRoomsEventsRouteImport } from './routes/dashboard/admin/rooms_.events'
 import { Route as DashboardAdminRoomsRoomIdRouteImport } from './routes/dashboard/admin/rooms_.$roomId'
 
+const NewRoute = NewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -202,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/$': typeof SplatRoute
   '/auth': typeof AuthRouteWithChildren
   '/dashboard': typeof DashboardRouteWithChildren
+  '/new': typeof NewRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
@@ -232,6 +239,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/new': typeof NewRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
@@ -263,6 +271,7 @@ export interface FileRoutesById {
   '/$': typeof SplatRoute
   '/auth': typeof AuthRouteWithChildren
   '/dashboard': typeof DashboardRouteWithChildren
+  '/new': typeof NewRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
@@ -297,6 +306,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/auth'
     | '/dashboard'
+    | '/new'
     | '/auth/callback'
     | '/auth/forgot-password'
     | '/auth/login'
@@ -327,6 +337,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$'
+    | '/new'
     | '/auth/callback'
     | '/auth/forgot-password'
     | '/auth/login'
@@ -357,6 +368,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/auth'
     | '/dashboard'
+    | '/new'
     | '/auth/callback'
     | '/auth/forgot-password'
     | '/auth/login'
@@ -390,11 +402,19 @@ export interface RootRouteChildren {
   SplatRoute: typeof SplatRoute
   AuthRoute: typeof AuthRouteWithChildren
   DashboardRoute: typeof DashboardRouteWithChildren
+  NewRoute: typeof NewRoute
   MMeetIdRoute: typeof MMeetIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/new': {
+      id: '/new'
+      path: '/new'
+      fullPath: '/new'
+      preLoaderRoute: typeof NewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -700,6 +720,7 @@ const rootRouteChildren: RootRouteChildren = {
   SplatRoute: SplatRoute,
   AuthRoute: AuthRouteWithChildren,
   DashboardRoute: DashboardRouteWithChildren,
+  NewRoute: NewRoute,
   MMeetIdRoute: MMeetIdRoute,
 }
 export const routeTree = rootRouteImport

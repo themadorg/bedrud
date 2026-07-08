@@ -37,7 +37,7 @@ export function LiveKitTab({
             ce('livekitHost')
             setSettings({ ...settings, livekitHost: v })
           }}
-          placeholder="http://localhost:7880"
+          placeholder="http://localhost:7072"
           mono
           error={errors?.livekitHost}
         />

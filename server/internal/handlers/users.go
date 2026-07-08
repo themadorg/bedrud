@@ -71,8 +71,6 @@ func NewUsersHandler(
 	}
 }
 
-
-
 // @Summary List all users
 // @Description Get a list of all users in the system (requires superadmin access)
 // @Tags admin
@@ -327,10 +325,10 @@ func (h *UsersHandler) UpdateUserStatus(c *fiber.Ctx) error {
 			}
 		}
 
-	// When banning, atomically set is_active=false and clear the refresh token
-	// to immediately invalidate all sessions. Uses a single DB call to avoid
-	// the security gap where ban succeeds but token-clear fails independently.
-		
+		// When banning, atomically set is_active=false and clear the refresh token
+		// to immediately invalidate all sessions. Uses a single DB call to avoid
+		// the security gap where ban succeeds but token-clear fails independently.
+
 		if err := h.userRepo.UpdateUserStatusAndClearToken(userID, false); err != nil {
 			if err == gorm.ErrRecordNotFound {
 				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
@@ -825,8 +823,8 @@ func (h *UsersHandler) BulkDeleteUsers(c *fiber.Ctx) error {
 	}
 
 	userByID := make(map[string]*models.User, len(users))
-	for _, u := range users {
-		userByID[u.ID] = &u
+	for i := range users {
+		userByID[users[i].ID] = &users[i]
 	}
 
 	var toDelete []string
@@ -846,7 +844,10 @@ func (h *UsersHandler) BulkDeleteUsers(c *fiber.Ctx) error {
 
 		// Last superadmin guard
 		if containsAccess(u.Accesses, "superadmin") {
-			superadmins, _ := h.userRepo.GetUsersByAccess(models.AccessSuperAdmin)
+			superadmins, err := h.userRepo.GetUsersByAccess(models.AccessSuperAdmin)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch superadmins"})
+			}
 			if len(superadmins) <= 1 {
 				skipped = append(skipped, id+"(last-superadmin)")
 				continue
@@ -861,7 +862,9 @@ func (h *UsersHandler) BulkDeleteUsers(c *fiber.Ctx) error {
 	}
 
 	// Soft-deactivate
-	h.userRepo.BatchBan(toDelete)
+	if err := h.userRepo.BatchBan(toDelete); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to deactivate users"})
+	}
 	for _, id := range toDelete {
 		auth.BanUser(id)
 	}
@@ -893,6 +896,7 @@ func (h *UsersHandler) BulkDeleteUsers(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
 		"message": fmt.Sprintf("Deletion queued for %d users", len(toDelete)),
 		"count":   len(toDelete),
+		"skipped": skipped,
 	})
 }
 
@@ -987,7 +991,9 @@ func (h *UsersHandler) AdminVerifyEmail(c *fiber.Ctx) error {
 	if h.verifEventRepo != nil {
 		if claims, ok := c.Locals("user").(*auth.Claims); ok && claims != nil {
 			metadata := "admin_id: " + claims.UserID
-			h.verifEventRepo.RecordEvent(userID, user.Email, models.VerificationAdminForce, c.IP(), metadata)
+			if err := h.verifEventRepo.RecordEvent(userID, user.Email, models.VerificationAdminForce, c.IP(), metadata); err != nil {
+				log.Warn().Err(err).Str("userID", userID).Msg("AdminVerifyEmail: failed to record verification event")
+			}
 		}
 	}
 
@@ -1055,7 +1061,9 @@ func (h *UsersHandler) AdminResendVerification(c *fiber.Ctx) error {
 	if h.verifEventRepo != nil {
 		if claims, ok := c.Locals("user").(*auth.Claims); ok && claims != nil {
 			metadata := "admin_id: " + claims.UserID
-			h.verifEventRepo.RecordEvent(userID, user.Email, models.VerificationResent, c.IP(), metadata)
+			if err := h.verifEventRepo.RecordEvent(userID, user.Email, models.VerificationResent, c.IP(), metadata); err != nil {
+				log.Warn().Err(err).Str("userID", userID).Msg("AdminResendVerification: failed to record verification event")
+			}
 		}
 	}
 

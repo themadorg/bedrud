@@ -1,4 +1,6 @@
-.PHONY: help init dev dev-web dev-server dev-server-hot dev-api dev-livekit dev-ios dev-android dev-desktop dev-site build build-front build-back build-dist build-android-debug build-android install-android release-android build-ios export-ios build-ios-sim build-desktop build-site build-embed deploy docker docker-debian docker-alpine docker-distroless test-back fmt lint lint-fix push-dev push-prod run-front-dev local-build local-run swagger-gen swagger-open scalar-open clean full-clean ensure-zig
+.PHONY: help init build-devcli dev dev-status dev-status-remote dev-remote dev-remote-provision dev-remote-tunnel dev-remote-traefik dev-remote-status dev-remote-livekit-status dev-stop-all dev-web dev-server dev-server-hot dev-api dev-livekit dev-ios dev-android dev-desktop dev-site build build-front build-back build-dist build-android-debug build-android install-android release-android build-ios export-ios build-ios-sim build-desktop build-site build-embed deploy docker docker-debian docker-alpine docker-distroless test-back fmt lint lint-fix push-dev push-prod run-front-dev local-build local-run swagger-gen swagger-open scalar-open clean full-clean ensure-zig
+
+DEVCLI := $(CURDIR)/apps/dev/devcli/bin/devcli
 
 GREEN  := \033[0;32m
 RED    := \033[0;31m
@@ -41,9 +43,20 @@ help:
 	@echo "Usage: make <target>"
 	@echo ""
 	@echo "Development:"
-	@echo "  init                 Install all dependencies (web + server + air)"
-	@echo "  dev                  Run livekit + server + web concurrently"
-	@echo "  dev-web              Run frontend dev server (proxies /api → :8090)"
+	@echo "  init                 Build devcli + install all dependencies"
+	@echo "  build-devcli         Build apps/dev/devcli (compose-style dev runner)"
+	@echo "  dev                  Run livekit + api + web via devcli (:7070+)"
+	@echo "  dev-status           Check local web, api, livekit health"
+	@echo "  dev-status-remote    Check local api/web only (dev-remote; LiveKit on server)"
+	@echo "  dev-remote           Remote debug: devtunnel + local api/web + server LiveKit"
+
+	@echo "  dev-remote-tunnel    Start SSH/WireGuard tunnel only (see remote-debug.yaml)"
+	@echo "  dev-remote-traefik   Sync Traefik routes to server"
+	@echo "  dev-remote-status    Health-check all remote services (SSH, tunnel, LiveKit, …)"
+	@echo "  dev-remote-livekit-status  LiveKit-only health on remote server"
+	@echo "  dev-remote-provision Bootstrap fresh Debian debug server (WG+Traefik+LK)"
+	@echo "  dev-stop-all         Stop all Bedrud dev processes (web, API, LiveKit, Air)"
+	@echo "  dev-web              Run frontend dev server (:7070, proxies /api → :7071)"
 	@echo "  dev-server           Run backend server + LiveKit"
 	@echo "  dev-server-hot       Run backend with Air (hot reload on file changes)"
 	@echo "  dev-api              Run backend only, no LiveKit (fast API iteration)"
@@ -54,8 +67,8 @@ help:
 	@echo ""
 	@echo "API Docs:"
 	@echo "  swagger-gen          Regenerate Swagger docs from annotations (requires swag)"
-	@echo "  swagger-open         Open Swagger UI in browser (http://localhost:8090/api/swagger)"
-	@echo "  scalar-open          Open Scalar UI in browser (http://localhost:8090/api/scalar)"
+	@echo "  swagger-open         Open Swagger UI in browser (http://localhost:7071/api/swagger)"
+	@echo "  scalar-open          Open Scalar UI in browser (http://localhost:7071/api/scalar)"
 	@echo ""
 	@echo "Build:"
 	@echo "  build                Build frontend + backend (embedded)"
@@ -77,6 +90,7 @@ help:
 	@echo "  build-android-debug  Build debug APK"
 	@echo "  build-android        Build release APK"
 	@echo "  install-android      Install release APK on device"
+	@echo "  install-android-debug Install debug APK on device"
 	@echo "  release-android      Build + install release APK"
 	@echo ""
 	@echo "iOS:"
@@ -97,8 +111,14 @@ help:
 	@echo ""
 
 
+# Build the dev stack orchestrator (livekit + api + web, compose-style logs)
+build-devcli:
+	@mkdir -p apps/dev/devcli/bin
+	@cd apps/dev/devcli && go build -o bin/devcli ./cmd/devcli
+	@printf "$(GREEN)✅ devcli built: apps/dev/devcli/bin/devcli$(RESET)\n"
+
 # Initialize all dependencies
-init:
+init: build-devcli
 	@echo "➜ Setting up Bedrud development environment..."
 	@mkdir -p server/internal/livekit/bin
 	@OS=$$(uname -s); \
@@ -187,8 +207,23 @@ init:
 	fi
 	@# 2. Create backend config if missing
 	@if [ ! -f server/config.yaml ]; then \
-		cp server/config.local.yaml server/config.yaml; \
+		cp server/config.local.yaml.example server/config.yaml; \
 		echo "✅ Created server/config.yaml from local template"; \
+	fi
+	@# 2b. Create LiveKit config if missing
+	@if [ ! -f server/livekit.yaml ]; then \
+		cp server/livekit.yaml.example server/livekit.yaml; \
+		echo "✅ Created server/livekit.yaml from example"; \
+	fi
+	@# 2c. Create remote debug config if missing
+	@if [ ! -f server/remote-debug.yaml ]; then \
+		cp server/remote-debug.yaml.example server/remote-debug.yaml; \
+		echo "✅ Created server/remote-debug.yaml from example"; \
+	fi
+	@# 2d. Create server .env if missing (SSH for devcli remote)
+	@if [ ! -f server/.env ]; then \
+		cp server/.env.example server/.env; \
+		echo "✅ Created server/.env from example"; \
 	fi
 	@# 3. Install air for hot reload if not present
 	@if ! command -v air >/dev/null 2>&1; then \
@@ -198,20 +233,67 @@ init:
 	else \
 		echo "✅ air already installed"; \
 	fi
+	@# 3b. Install userspace WireGuard for dev-remote (wireguard-go / wireguard binary)
+	@if ! command -v wireguard-go >/dev/null 2>&1 && ! command -v wireguard >/dev/null 2>&1 && ! command -v amneziawg-go >/dev/null 2>&1; then \
+		echo "➜ Installing userspace WireGuard (golang.zx2c4.com/wireguard)..."; \
+		go install golang.zx2c4.com/wireguard@latest; \
+		echo "✅ userspace WireGuard installed (ensure $$(go env GOPATH)/bin is in PATH)"; \
+	else \
+		echo "✅ userspace WireGuard already installed"; \
+	fi
 	@# 4. Install frontend and backend dependencies
 	cd apps/web && bun install
 	cd apps/site && bun install
 	cd server && go mod tidy && go mod download
 	@echo "\n✅ Bedrud is ready! Run 'make dev' to start."
 
-# Run livekit + server (hot reload) + web concurrently (Ctrl+C kills all)
+# Run livekit + server (hot reload) + web via devcli (compose-style logs)
 dev:
-	@trap 'kill 0' INT TERM; \
-	$(MAKE) dev-livekit & \
-	sleep 1; \
-	$(MAKE) dev-server-hot & \
-	$(MAKE) dev-web & \
-	wait
+	@test -x "$(DEVCLI)" || (echo "❌ devcli not built. Run 'make init' or 'make build-devcli'." && exit 1)
+	@"$(DEVCLI)" run
+
+# Stop whatever `make dev` (and related targets) may have left running
+dev-stop-all: build-devcli
+	@"$(DEVCLI)" stop
+
+# Remote debug: LiveKit on server; local api/web via devtunnel + Traefik
+dev-remote: build-devcli
+	@"$(DEVCLI)" remote run --yes
+
+
+
+# Tunnel only (ssh or wireguard per server/remote-debug.yaml)
+dev-remote-tunnel:
+	@test -x "$(DEVCLI)" || (echo "❌ devcli not built. Run 'make init' or 'make build-devcli'." && exit 1)
+	@"$(DEVCLI)" remote tunnel up
+
+# Push Traefik dynamic routes (Host → local :7070/:7071, /livekit → server)
+dev-remote-traefik:
+	@test -x "$(DEVCLI)" || (echo "❌ devcli not built. Run 'make init' or 'make build-devcli'." && exit 1)
+	@"$(DEVCLI)" remote traefik sync
+
+# Health check: local web, api, livekit (use dev-status-remote for dev-remote local backends)
+dev-status:
+	@test -x "$(DEVCLI)" || (echo "❌ devcli not built. Run 'make init' or 'make build-devcli'." && exit 1)
+	@"$(DEVCLI)" status
+
+dev-status-remote:
+	@test -x "$(DEVCLI)" || (echo "❌ devcli not built. Run 'make init' or 'make build-devcli'." && exit 1)
+	@"$(DEVCLI)" status --remote
+
+# Health check: SSH, tunnel, LiveKit, backends, Traefik, public URLs
+dev-remote-status:
+	@test -x "$(DEVCLI)" || (echo "❌ devcli not built. Run 'make init' or 'make build-devcli'." && exit 1)
+	@"$(DEVCLI)" remote status
+
+dev-remote-livekit-status:
+	@test -x "$(DEVCLI)" || (echo "❌ devcli not built. Run 'make init' or 'make build-devcli'." && exit 1)
+	@"$(DEVCLI)" remote livekit status
+
+# Bootstrap fresh Debian debug server (WireGuard + Traefik + LiveKit)
+dev-remote-provision:
+	@test -x "$(DEVCLI)" || (echo "❌ devcli not built. Run 'make init' or 'make build-devcli'." && exit 1)
+	@"$(DEVCLI)" remote provision
 
 # Run frontend development server
 dev-web:
@@ -416,7 +498,10 @@ build-android:
 
 # Install Android release APK on connected device
 install-android:
-	adb install apps/android/app/build/outputs/apk/release/app-release.apk
+	adb install -r apps/android/app/build/outputs/apk/release/app-release.apk
+
+install-android-debug:
+	adb install -r apps/android/app/build/outputs/apk/debug/app-universal-debug.apk
 
 # Build + install Android release on device
 release-android: build-android install-android
@@ -480,11 +565,11 @@ swagger-gen:
 
 # Open Swagger UI in browser (server must be running)
 swagger-open:
-	@open http://localhost:8090/api/swagger || xdg-open http://localhost:8090/api/swagger
+	@open http://localhost:7071/api/swagger || xdg-open http://localhost:7071/api/swagger
 
 # Open Scalar UI in browser (server must be running)
 scalar-open:
-	@open http://localhost:8090/api/scalar || xdg-open http://localhost:8090/api/scalar
+	@open http://localhost:7071/api/scalar || xdg-open http://localhost:7071/api/scalar
 
 # Run backend tests
 test-back:
@@ -527,13 +612,13 @@ local-build: build-embed
 	@cd server && CGO_ENABLED=1 go build -ldflags "-X main.version=$(VERSION) -s -w" -o dist/bedrud ./cmd/bedrud/main.go && \
 		printf "$(GREEN)✅ Single binary ready: server/dist/bedrud$(RESET)\n" || \
 		( printf "$(RED)❌ Local build failed$(RESET)\n"; exit 1 )
-	@echo "   Run with: CONFIG_PATH=server/config.local.yaml server/dist/bedrud run"
+	@echo "   Run with: CONFIG_PATH=server/config.yaml server/dist/bedrud run"
 
 # Build and run the single binary locally (SQLite + embedded LiveKit)
 local-run: local-build
 	@echo "\n🚀 Starting Bedrud (single binary, SQLite, embedded LiveKit)..."
-	@echo "   Open http://localhost:8090\n"
-	CONFIG_PATH=$(CURDIR)/server/config.local.yaml $(CURDIR)/server/dist/bedrud run
+	@echo "   Open http://localhost:7071\n"
+	CONFIG_PATH=$(CURDIR)/server/config.yaml $(CURDIR)/server/dist/bedrud run
 
 # ---- Docker targets -----------------------------------------------------------
 

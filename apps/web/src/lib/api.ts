@@ -1,7 +1,7 @@
 import { useAuthStore } from './auth.store'
 
 // In dev, leave BASE_URL empty so requests go to /api/... and Vite's proxy
-// forwards them to localhost:8090 — no CORS. In production, set VITE_API_URL
+// forwards them to localhost:7071 — no CORS. In production, set VITE_API_URL
 // to the absolute server origin (e.g. https://api.bedrud.com).
 const BASE_URL = (import.meta.env['VITE_API_URL'] as string | undefined) ?? ''
 

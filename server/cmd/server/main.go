@@ -138,7 +138,7 @@ func run() error {
 	if err := database.Initialize(&cfg.Database); err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
-	defer database.Close()
+	defer func() { _ = database.Close() }()
 
 	// Run database migrations after database initialization
 	if err := database.RunMigrations(); err != nil {
@@ -178,7 +178,11 @@ func run() error {
 	// Proxy LiveKit traffic if we are using internal host
 	if strings.Contains(strings.ToLower(cfg.LiveKit.InternalHost), "127.0.0.1") ||
 		strings.Contains(strings.ToLower(cfg.LiveKit.InternalHost), "localhost") {
-		target, _ := url.Parse("http://127.0.0.1:7880")
+		lkProxy := cfg.LiveKit.InternalHost
+		if lkProxy == "" {
+			lkProxy = "http://127.0.0.1:7880"
+		}
+		target, _ := url.Parse(lkProxy)
 		rp := httputil.NewSingleHostReverseProxy(target)
 
 		// Custom director to handle path stripping and logging
@@ -291,10 +295,14 @@ func run() error {
 	api.Post("/auth/logout", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.Logout)
 	api.Get("/auth/me", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.GetMe)
 	api.Put("/auth/me", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.UpdateProfile)
+	api.Post("/auth/me/avatar", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.UploadAvatar)
+	api.Delete("/auth/me/avatar", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.DeleteAvatar)
 	api.Put("/auth/password", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.ChangePassword)
-	api.Get("/auth/verify", authHandler.VerifyEmail)
+	api.Post("/auth/verify", authHandler.VerifyEmail)
 	api.Get("/auth/verify/status", middleware.Protected(), authHandler.CheckVerificationStatus)
 	api.Post("/auth/verify/resend", middleware.ResendRateLimiter(cfg.RateLimit), authHandler.ResendVerification)
+	api.Post("/auth/forgot-password", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.ForgotPassword)
+	api.Post("/auth/reset-password", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.ResetPassword)
 	api.Get("/auth/:provider/login", middleware.AuthRateLimiter(cfg.RateLimit), handlers.BeginAuthHandler)
 	api.Get("/auth/:provider/callback", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.CallbackHandler)
 
@@ -339,7 +347,9 @@ func run() error {
 	api.Post("/room/create", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.CreateRoom)
 	api.Post("/room/join", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.JoinRoom)
 	api.Post("/room/guest-join", middleware.GuestRateLimiter(cfg.RateLimit), roomHandler.GuestJoinRoom)
+	api.Post("/room/refresh-token", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.RefreshLiveKitToken)
 	api.Get("/room/list", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.ListRooms)
+	api.Get("/room/archived", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.ListArchivedRooms)
 	api.Post("/room/:roomId/kick/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.KickParticipant)
 	api.Post("/room/:roomId/mute/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.MuteParticipant)
 	api.Post("/room/:roomId/ban/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.BanParticipant)
@@ -352,7 +362,9 @@ func run() error {
 	api.Post("/room/:roomId/ask/:identity/:action", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.AskParticipantAction)
 	api.Post("/room/:roomId/spotlight/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.SpotlightParticipant)
 	api.Post("/room/:roomId/screenshare/:identity/stop", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.StopScreenShare)
+	api.Get("/room/:roomId/presence", middleware.APIRateLimiter(cfg.RateLimit), roomHandler.GetRoomPresence)
 	api.Get("/room/:roomId/participant/:identity/info", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.GetParticipantInfo)
+	api.Get("/room/:roomId/participant/:identity/profile", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.GetParticipantProfile)
 	api.Post("/room/:roomId/stage/:identity/bring", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.BringToStage)
 	api.Post("/room/:roomId/stage/:identity/remove", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.RemoveFromStage)
 	api.Put("/room/:roomId/settings", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.UpdateSettings)
@@ -375,6 +387,22 @@ func run() error {
 			return c.Status(400).JSON(fiber.Map{"error": "Invalid path"})
 		}
 		return c.SendFile(filepath.Join(uploadDir, path))
+	})
+
+	avatarDir := storage.AvatarDir()
+	if err := os.MkdirAll(avatarDir, 0o755); err != nil {
+		log.Warn().Err(err).Str("dir", avatarDir).Msg("Could not create avatar upload dir")
+	}
+	app.Get("/uploads/avatars/*", func(c *fiber.Ctx) error {
+		path := c.Params("*")
+		if path == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "Missing file path"})
+		}
+		resolved, err := storage.ResolveAvatarFile(path)
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid path"})
+		}
+		return c.SendFile(resolved)
 	})
 
 	// Initialize handlers

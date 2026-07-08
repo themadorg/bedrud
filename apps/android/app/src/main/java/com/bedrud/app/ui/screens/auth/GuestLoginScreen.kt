@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,9 +20,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material3.Button
-import androidx.compose.material3.CardDefaults
+
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
+import com.bedrud.app.ui.components.BedrudOutlinedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,6 +53,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import com.bedrud.app.R
+import com.bedrud.app.ui.components.BedrudScaffoldContentInsets
 import com.bedrud.app.core.instance.InstanceManager
 import com.bedrud.app.models.GuestLoginRequest
 import kotlinx.coroutines.launch
@@ -112,6 +112,7 @@ fun GuestLoginScreen(
     }
 
     Scaffold(
+        contentWindowInsets = BedrudScaffoldContentInsets,
         topBar = {
             TopAppBar(
                 title = {},
@@ -130,7 +131,6 @@ fun GuestLoginScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 24.dp)
-                .imePadding()
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -158,12 +158,9 @@ fun GuestLoginScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            ElevatedCard(
+            BedrudOutlinedCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     OutlinedTextField(

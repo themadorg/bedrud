@@ -1,16 +1,15 @@
 package handlers
 
 import (
+	"bedrud/internal/auth"
+	"bedrud/internal/models"
+	"bedrud/internal/testutil"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
-
-	"bedrud/internal/auth"
-	"bedrud/internal/models"
-	"bedrud/internal/testutil"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -66,7 +65,7 @@ func TestAdminQueue_Empty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
@@ -125,12 +124,17 @@ func TestAdminQueue_Counts(t *testing.T) {
 	seedJob(t, h, uuid.New().String(), "room_delete", models.JobFailed, now, "timeout", 3)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/queue", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 	var stats models.QueueStats
-	json.Unmarshal(body, &stats)
+	if err := json.Unmarshal(body, &stats); err != nil {
+		t.Fatal(err)
+	}
 
 	if stats.Pending != 1 {
 		t.Errorf("expected pending=1, got %d", stats.Pending)
@@ -159,12 +163,17 @@ func TestAdminQueue_Outside24hWindow(t *testing.T) {
 	seedJob(t, h, uuid.New().String(), "user_delete", models.JobFailed, old, "expired", 2)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/queue", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 	var stats models.QueueStats
-	json.Unmarshal(body, &stats)
+	if err := json.Unmarshal(body, &stats); err != nil {
+		t.Fatal(err)
+	}
 
 	if stats.Done24h != 0 {
 		t.Errorf("expected done24h=0 (48h old), got %d", stats.Done24h)
@@ -184,18 +193,23 @@ func TestAdminQueue_RecentFailures(t *testing.T) {
 	now := time.Now()
 
 	// Create 12 failed jobs, only 10 should be returned
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		at := now.Add(-time.Duration(i) * time.Minute)
 		seedJob(t, h, uuid.New().String(), "room_delete", models.JobFailed, at, "err", i+1)
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/queue", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 	var stats models.QueueStats
-	json.Unmarshal(body, &stats)
+	if err := json.Unmarshal(body, &stats); err != nil {
+		t.Fatal(err)
+	}
 
 	if len(stats.RecentFailures) != 10 {
 		t.Fatalf("expected 10 recent failures, got %d", len(stats.RecentFailures))
@@ -235,20 +249,25 @@ func TestAdminQueue_Rates(t *testing.T) {
 	now := time.Now()
 
 	// 10 done + 5 failed in last 5 minutes = 2/min done, 1/min failed
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		seedJob(t, h, uuid.New().String(), "room_delete", models.JobDone, now.Add(-time.Duration(i)*10*time.Second), "", 0)
 	}
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		seedJob(t, h, uuid.New().String(), "user_delete", models.JobFailed, now.Add(-time.Duration(i)*30*time.Second), "err", 1)
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/queue", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 	var stats models.QueueStats
-	json.Unmarshal(body, &stats)
+	if err := json.Unmarshal(body, &stats); err != nil {
+		t.Fatal(err)
+	}
 
 	if stats.ProcessedPerMin != 2.0 {
 		t.Errorf("expected processedPerMin=2.0, got %f", stats.ProcessedPerMin)
@@ -268,12 +287,17 @@ func TestAdminQueue_FailRateZeroTotal(t *testing.T) {
 	seedJob(t, h, uuid.New().String(), "room_delete", models.JobPending, now, "", 0)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/queue", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 	var stats models.QueueStats
-	json.Unmarshal(body, &stats)
+	if err := json.Unmarshal(body, &stats); err != nil {
+		t.Fatal(err)
+	}
 
 	if stats.FailRate != 0 {
 		t.Errorf("expected failRate=0 (no 24h jobs), got %f", stats.FailRate)
@@ -293,20 +317,25 @@ func TestAdminQueue_FailRateWithData(t *testing.T) {
 	now := time.Now()
 
 	// 80 done, 20 failed in 24h → failRate = 0.2
-	for i := 0; i < 80; i++ {
+	for i := range 80 {
 		seedJob(t, h, uuid.New().String(), "room_delete", models.JobDone, now.Add(-time.Duration(i)*time.Minute), "", 0)
 	}
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		seedJob(t, h, uuid.New().String(), "user_delete", models.JobFailed, now.Add(-time.Duration(i)*time.Minute), "err", 1)
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/queue", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 	var stats models.QueueStats
-	json.Unmarshal(body, &stats)
+	if err := json.Unmarshal(body, &stats); err != nil {
+		t.Fatal(err)
+	}
 
 	expectedFailRate := 20.0 / 100.0 // 0.2
 	if stats.FailRate != expectedFailRate {
@@ -343,8 +372,11 @@ func TestAdminQueue_OldestPending(t *testing.T) {
 	t.Logf("pending count: %d", cnt)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/queue", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 	var stats models.QueueStats
@@ -373,12 +405,17 @@ func TestAdminQueue_OldestPendingNone(t *testing.T) {
 	seedJob(t, h, uuid.New().String(), "user_delete", models.JobActive, now, "", 1)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/queue", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 	var stats models.QueueStats
-	json.Unmarshal(body, &stats)
+	if err := json.Unmarshal(body, &stats); err != nil {
+		t.Fatal(err)
+	}
 
 	if stats.OldestPending != nil {
 		t.Errorf("expected oldestPending=nil, got %v", *stats.OldestPending)
@@ -400,12 +437,17 @@ func TestAdminQueue_MixedStates(t *testing.T) {
 	seedJob(t, h, uuid.New().String(), "user_delete", models.JobFailed, now.Add(-3*time.Hour), "not found", 2)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/queue", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 	var stats models.QueueStats
-	json.Unmarshal(body, &stats)
+	if err := json.Unmarshal(body, &stats); err != nil {
+		t.Fatal(err)
+	}
 
 	if stats.Pending != 2 {
 		t.Errorf("expected pending=2, got %d", stats.Pending)
@@ -445,12 +487,17 @@ func TestAdminQueue_FailedJobSummaryFields(t *testing.T) {
 	seedJob(t, h, "failure-1", "user_delete", models.JobFailed, now, "connection refused", 5)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/queue", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 	var stats models.QueueStats
-	json.Unmarshal(body, &stats)
+	if err := json.Unmarshal(body, &stats); err != nil {
+		t.Fatal(err)
+	}
 
 	if len(stats.RecentFailures) != 1 {
 		t.Fatalf("expected 1 failure, got %d", len(stats.RecentFailures))
@@ -532,7 +579,7 @@ func TestAdminQueue_NilDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusInternalServerError {
 		body, _ := io.ReadAll(resp.Body)

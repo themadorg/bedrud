@@ -8,7 +8,7 @@ import com.bedrud.app.models.MeResponse
 import com.bedrud.app.models.RefreshTokenRequest
 import com.bedrud.app.models.RefreshTokenResponse
 import com.bedrud.app.models.RegisterRequest
-import com.bedrud.app.models.RegisterResponse
+import com.google.gson.JsonObject
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -24,7 +24,7 @@ interface AuthApi {
     suspend fun guestLogin(@Body request: GuestLoginRequest): Response<LoginResponse>
 
     @POST("auth/register")
-    suspend fun register(@Body request: RegisterRequest): Response<RegisterResponse>
+    suspend fun register(@Body request: RegisterRequest): Response<JsonObject>
 
     @POST("auth/refresh")
     suspend fun refreshToken(@Body request: RefreshTokenRequest): Response<RefreshTokenResponse>

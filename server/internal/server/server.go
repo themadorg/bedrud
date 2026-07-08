@@ -57,7 +57,7 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-func Run(configPath string, version string) error {
+func Run(configPath, version string) error {
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		return err
@@ -160,7 +160,7 @@ func Run(configPath string, version string) error {
 	if err := database.Initialize(&cfg.Database); err != nil {
 		return err
 	}
-	defer database.Close()
+	defer func() { _ = database.Close() }()
 	if err := database.RunMigrations(); err != nil {
 		log.Error().Err(err).Msg("Failed to run database migrations")
 	}
@@ -347,6 +347,8 @@ func Run(configPath string, version string) error {
 	api.Post("/auth/logout", middleware.Protected(), authHandler.Logout)
 	api.Get("/auth/me", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.GetMe)
 	api.Put("/auth/me", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.UpdateProfile)
+	api.Post("/auth/me/avatar", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.UploadAvatar)
+	api.Delete("/auth/me/avatar", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.DeleteAvatar)
 	api.Put("/auth/password", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.ChangePassword)
 	api.Post("/auth/verify", authHandler.VerifyEmail)
 	api.Get("/auth/verify/status", middleware.Protected(), authHandler.CheckVerificationStatus)
@@ -386,7 +388,9 @@ func Run(configPath string, version string) error {
 	api.Post("/room/:roomId/ask/:identity/:action", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.AskParticipantAction)
 	api.Post("/room/:roomId/spotlight/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.SpotlightParticipant)
 	api.Post("/room/:roomId/screenshare/:identity/stop", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.StopScreenShare)
+	api.Get("/room/:roomId/presence", middleware.APIRateLimiter(cfg.RateLimit), roomHandler.GetRoomPresence)
 	api.Get("/room/:roomId/participant/:identity/info", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.GetParticipantInfo)
+	api.Get("/room/:roomId/participant/:identity/profile", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.GetParticipantProfile)
 	api.Post("/room/:roomId/stage/:identity/bring", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.BringToStage)
 	api.Post("/room/:roomId/stage/:identity/remove", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.RemoveFromStage)
 	api.Put("/room/:roomId/settings", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.UpdateSettings)
@@ -415,6 +419,22 @@ func Run(configPath string, version string) error {
 		}
 		resolved := filepath.Join(uploadDir, path)
 		if !strings.HasPrefix(resolved, filepath.Clean(uploadDir)+string(os.PathSeparator)) && resolved != filepath.Clean(uploadDir) {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid path"})
+		}
+		return c.SendFile(resolved)
+	})
+
+	avatarDir := storage.AvatarDir()
+	if err := os.MkdirAll(avatarDir, 0o755); err != nil {
+		log.Warn().Err(err).Str("dir", avatarDir).Msg("Could not create avatar upload dir")
+	}
+	app.Get("/uploads/avatars/*", func(c *fiber.Ctx) error {
+		path := c.Params("*")
+		if path == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "Missing file path"})
+		}
+		resolved, err := storage.ResolveAvatarFile(path)
+		if err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "Invalid path"})
 		}
 		return c.SendFile(resolved)
@@ -544,16 +564,27 @@ func Run(configPath string, version string) error {
 		addr := cfg.Server.Host + ":" + cfg.Server.Port
 		tlsEnabled := cfg.Server.EnableTLS && !cfg.Server.DisableTLS
 		if tlsEnabled {
-			// Start HTTP redirect for bots/local use
+			// Start a tiny HTTP app that only redirects to HTTPS. Do not expose API/auth on plain HTTP.
 			httpPort := cfg.Server.HTTPPort
 			if httpPort == "" {
 				httpPort = "80"
 			}
 			go func() {
 				httpAddr := cfg.Server.Host + ":" + httpPort
-				log.Info().Msgf("➜ Also listening on HTTP %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, httpPort), httpAddr)
-				if err := app.Listen(httpAddr); err != nil {
-					log.Debug().Err(err).Msg("HTTP server failed")
+				redirectApp := fiber.New()
+				redirectApp.All("*", func(c *fiber.Ctx) error {
+					host := cfg.Server.Domain
+					if host == "" {
+						host = c.Hostname()
+					}
+					if cfg.Server.Port != "" && cfg.Server.Port != "443" {
+						host += ":" + cfg.Server.Port
+					}
+					return c.Redirect("https://"+host+c.OriginalURL(), http.StatusPermanentRedirect)
+				})
+				log.Info().Msgf("➜ Redirecting HTTP %s to HTTPS (bound %s)", utils.DisplayAddr(cfg.Server.Host, httpPort), httpAddr)
+				if err := redirectApp.Listen(httpAddr); err != nil {
+					log.Debug().Err(err).Msg("HTTP redirect server failed")
 				}
 			}()
 			// Start HTTPS on primary port

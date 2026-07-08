@@ -1,8 +1,6 @@
 package com.bedrud.app.ui.screens.admin
 
 import androidx.annotation.StringRes
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,24 +34,23 @@ import androidx.compose.material.icons.filled.Token
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
+import com.bedrud.app.ui.components.BedrudOutlinedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
+import com.bedrud.app.ui.components.BedrudCompactTopBar
+import com.bedrud.app.ui.components.BedrudTabScaffoldContentInsets
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -67,10 +64,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import com.bedrud.app.ui.components.BottomNavTab
+import com.bedrud.app.ui.components.BedrudBottomNavigationBar
+
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -121,46 +118,21 @@ fun AdminScreen(
     }
 
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    val navScope = rememberCoroutineScope()
+    val adminTabs = AdminTab.entries.map { tab ->
+        BottomNavTab(
+            label = stringResource(tab.labelResId),
+            icon = tab.icon
+        )
+    }
 
     Scaffold(
         modifier = modifier,
         bottomBar = {
-            NavigationBar {
-                AdminTab.entries.forEachIndexed { index, tab ->
-                    val scale = remember { Animatable(1f) }
-                    val isSelected = selectedTab == index
-                    NavigationBarItem(
-                        selected = isSelected,
-                        onClick = {
-                            selectedTab = index
-                            navScope.launch {
-                                scale.animateTo(1.15f, spring(dampingRatio = 0.5f, stiffness = 300f))
-                                scale.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 150f))
-                            }
-                        },
-                        icon = {
-                            val baseScale = if (isSelected) 1.5f else 1f
-                            Box(
-                                modifier = Modifier.graphicsLayer {
-                                    scaleX = scale.value * baseScale
-                                    scaleY = scale.value * baseScale
-                                    transformOrigin = TransformOrigin.Center
-                                }
-                            ) {
-                                Icon(
-                                    tab.icon,
-                                    contentDescription = stringResource(tab.labelResId),
-                                    tint = if (isSelected) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        },
-                        label = { Text(stringResource(tab.labelResId)) }
-                    )
-                }
-            }
+            BedrudBottomNavigationBar(
+                tabs = adminTabs,
+                selectedIndex = selectedTab,
+                onTabSelected = { selectedTab = it }
+            )
         }
     ) { padding ->
         when (AdminTab.entries[selectedTab]) {
@@ -201,8 +173,6 @@ private fun AdminOverviewContent(
     var rooms by remember { mutableStateOf<List<AdminRoom>>(emptyList()) }
     var onlineCount by remember { mutableIntStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
     suspend fun load() {
         isLoading = true
         try {
@@ -229,11 +199,9 @@ private fun AdminOverviewContent(
 
     Scaffold(
         modifier = modifier,
+        contentWindowInsets = BedrudTabScaffoldContentInsets,
         topBar = {
-            LargeTopAppBar(
-                title = { Text(stringResource(R.string.admin_title_overview)) },
-                scrollBehavior = scrollBehavior
-            )
+            BedrudCompactTopBar(title = stringResource(R.string.admin_title_overview))
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
@@ -241,7 +209,6 @@ private fun AdminOverviewContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -266,7 +233,7 @@ private fun AdminOverviewContent(
                 }
 
                 // Recent users
-                ElevatedCard(shape = RoundedCornerShape(16.dp)) {
+                BedrudOutlinedCard(shape = RoundedCornerShape(16.dp)) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             stringResource(R.string.admin_section_recentSignups), style = MaterialTheme.typography.labelLarge,
@@ -307,7 +274,7 @@ private fun AdminOverviewContent(
 
 @Composable
 private fun StatCard(@StringRes labelResId: Int, value: Int, icon: ImageVector) {
-    ElevatedCard(shape = RoundedCornerShape(12.dp), modifier = Modifier.width(100.dp)) {
+    BedrudOutlinedCard(shape = RoundedCornerShape(12.dp), modifier = Modifier.width(100.dp)) {
         Column(
             modifier = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -340,8 +307,6 @@ private fun AdminUsersContent(
     var users by remember { mutableStateOf<List<AdminUser>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var search by remember { mutableStateOf("") }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
     LaunchedEffect(Unit) {
         isLoading = true
         try {
@@ -359,14 +324,14 @@ private fun AdminUsersContent(
 
     Scaffold(
         modifier = modifier,
-        topBar = { LargeTopAppBar(title = { Text(stringResource(R.string.admin_users)) }, scrollBehavior = scrollBehavior) },
+        contentWindowInsets = BedrudTabScaffoldContentInsets,
+        topBar = { BedrudCompactTopBar(title = stringResource(R.string.admin_users)) },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
+                .padding(padding),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
             item {
@@ -467,8 +432,6 @@ private fun AdminRoomsContent(
     val snackbarHostState = remember { SnackbarHostState() }
     var rooms by remember { mutableStateOf<List<AdminRoom>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
     LaunchedEffect(Unit) {
         isLoading = true
         try {
@@ -481,14 +444,14 @@ private fun AdminRoomsContent(
 
     Scaffold(
         modifier = modifier,
-        topBar = { LargeTopAppBar(title = { Text(stringResource(R.string.admin_tab_rooms)) }, scrollBehavior = scrollBehavior) },
+        contentWindowInsets = BedrudTabScaffoldContentInsets,
+        topBar = { BedrudCompactTopBar(title = stringResource(R.string.admin_tab_rooms)) },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
+                .padding(padding),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
             if (isLoading) {
@@ -575,8 +538,6 @@ private fun AdminSettingsContent(
     var isLoading by remember { mutableStateOf(true) }
     var tokenEmail by remember { mutableStateOf("") }
     var newToken by remember { mutableStateOf<InviteToken?>(null) }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
     LaunchedEffect(Unit) {
         isLoading = true
         try {
@@ -590,11 +551,9 @@ private fun AdminSettingsContent(
 
     Scaffold(
         modifier = modifier,
+        contentWindowInsets = BedrudTabScaffoldContentInsets,
         topBar = {
-            LargeTopAppBar(
-                title = { Text(stringResource(R.string.admin_title_systemSettings)) },
-                scrollBehavior = scrollBehavior
-            )
+            BedrudCompactTopBar(title = stringResource(R.string.admin_title_systemSettings))
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
@@ -602,14 +561,13 @@ private fun AdminSettingsContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             settings?.let { s ->
                 // Registration settings
-                ElevatedCard(shape = RoundedCornerShape(16.dp)) {
+                BedrudOutlinedCard(shape = RoundedCornerShape(16.dp)) {
                     Column {
                         Text(
                             stringResource(R.string.admin_section_registration), style = MaterialTheme.typography.labelLarge,
@@ -667,7 +625,7 @@ private fun AdminSettingsContent(
             }
 
             // Invite tokens
-            ElevatedCard(shape = RoundedCornerShape(16.dp)) {
+            BedrudOutlinedCard(shape = RoundedCornerShape(16.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = stringResource(R.string.admin_section_inviteTokens),
@@ -678,9 +636,9 @@ private fun AdminSettingsContent(
 
                     // New token generated highlight
                     newToken?.let { tok ->
-                        ElevatedCard(
+                        BedrudOutlinedCard(
                             shape = RoundedCornerShape(8.dp),
-                            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                         ) {
                             Row(
                                 modifier = Modifier

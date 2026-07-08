@@ -1,13 +1,12 @@
 package queue
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-
 	"bedrud/internal/models"
 	"bedrud/internal/repository"
 	"bedrud/internal/services"
+	"context"
+	"encoding/json"
+	"fmt"
 
 	"gorm.io/gorm"
 )

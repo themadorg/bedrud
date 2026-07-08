@@ -1,18 +1,17 @@
 package handlers
 
 import (
+	"bedrud/config"
+	"bedrud/internal/auth"
+	"bedrud/internal/models"
+	"bedrud/internal/repository"
+	"bedrud/internal/testutil"
 	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"bedrud/config"
-	"bedrud/internal/auth"
-	"bedrud/internal/models"
-	"bedrud/internal/repository"
-	"bedrud/internal/testutil"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/livekit"
@@ -44,9 +43,12 @@ func TestCreateRoom_DBFailure_CompensatesLK(t *testing.T) {
 	body1 := `{"name":"dup-room"}`
 	req1 := httptest.NewRequest(http.MethodPost, "/room/create", strings.NewReader(body1))
 	req1.Header.Set("Content-Type", "application/json")
-	resp1, _ := app.Test(req1, -1)
-	defer resp1.Body.Close()
-	if resp1.StatusCode != 200 {
+	resp1, err := app.Test(req1, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp1.Body.Close() }()
+	if resp1.StatusCode != http.StatusOK {
 		t.Fatalf("first create should succeed, got %d", resp1.StatusCode)
 	}
 
@@ -57,9 +59,12 @@ func TestCreateRoom_DBFailure_CompensatesLK(t *testing.T) {
 	body2 := `{"name":"dup-room"}`
 	req2 := httptest.NewRequest(http.MethodPost, "/room/create", strings.NewReader(body2))
 	req2.Header.Set("Content-Type", "application/json")
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
-	if resp2.StatusCode != 409 {
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
+	if resp2.StatusCode != http.StatusConflict {
 		bodyBytes, _ := io.ReadAll(resp2.Body)
 		t.Fatalf("expected 409 for duplicate, got %d: %s", resp2.StatusCode, string(bodyBytes))
 	}
@@ -98,9 +103,12 @@ func TestCreateRoom_LKFailure_NoCompensatingActionNeeded(t *testing.T) {
 	body := `{"name":"lk-fail-room"}`
 	req := httptest.NewRequest(http.MethodPost, "/room/create", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
-	if resp.StatusCode != 500 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusInternalServerError {
 		t.Fatalf("expected 500 for LK failure, got %d", resp.StatusCode)
 	}
 

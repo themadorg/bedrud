@@ -106,20 +106,38 @@ TURN 在直接媒体路径失败时激活。常见原因：
 
 ## 配置
 
-**文件：** `server/config/livekit.yaml`（开发环境）或 `/etc/bedrud/livekit.yaml`（生产环境）
+**文件：** `server/livekit.yaml`（开发环境）或 `/etc/bedrud/livekit.yaml`（生产环境）
 
-```yaml
-turn:
-  enabled: true
-  domain: "turn.example.com"
-  udp_port: 3478
-  tls_port: 5349
-  cert_file: /etc/bedrud/turn.crt
-  key_file: /etc/bedrud/turn.key
-  relay_range_start: 30000
-  relay_range_end: 40000
-  external_tls: false
-```
+<Tabs>
+  <TabsList>
+    <TabsTrigger value="production">生产 / 外部 (标准)</TabsTrigger>
+    <TabsTrigger value="development">本地开发 (回环)</TabsTrigger>
+  </TabsList>
+  <TabsContent value="production">
+
+  ```yaml
+  turn:
+    enabled: true
+    domain: "turn.example.com"
+    udp_port: 3478
+    tls_port: 5349
+    cert_file: /etc/bedrud/turn.crt
+    key_file: /etc/bedrud/turn.key
+    relay_range_start: 30000
+    relay_range_end: 40000
+    external_tls: false
+  ```
+
+  </TabsContent>
+  <TabsContent value="development">
+
+  ```yaml
+  turn:
+    enabled: false                # TURN is disabled for local dev (unnecessary on localhost)
+  ```
+
+  </TabsContent>
+</Tabs>
 
 ### 关键参考
 

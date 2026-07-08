@@ -1,14 +1,6 @@
 package handlers
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-
 	"bedrud/config"
 	"bedrud/internal/auth"
 	"bedrud/internal/middleware"
@@ -17,6 +9,13 @@ import (
 	"bedrud/internal/services"
 	"bedrud/internal/storage"
 	"bedrud/internal/testutil"
+	"bytes"
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"testing"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -174,14 +173,22 @@ func TestRecordingHandler_RecordingsDisabled_Returns403(t *testing.T) {
 	app, roomRepo := setupRecordingTestAppWithMiddleware(t, &mockEgressClient{}, settingsRepo)
 	room := createTestRoom(t, roomRepo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403 when recordings disabled, got %d", resp.StatusCode)
 	}
 
-	req2 := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/stop", nil)
-	resp2, _ := app.Test(req2, -1)
+	req2 := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/stop", http.NoBody)
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403 when recordings disabled, got %d", resp2.StatusCode)
 	}
@@ -192,11 +199,12 @@ func TestRecordingHandler_Start_Success(t *testing.T) {
 	app, roomRepo, _ := setupRecordingTestApp(t, &mockEgressClient{})
 	room := createTestRoom(t, roomRepo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", http.NoBody)
 	resp, err := app.Test(req, -1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201, got %d", resp.StatusCode)
 	}
@@ -218,14 +226,22 @@ func TestRecordingHandler_Start_AlreadyActive(t *testing.T) {
 	app, roomRepo, _ := setupRecordingTestApp(t, &mockEgressClient{})
 	room := createTestRoom(t, roomRepo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201 for first start, got %d", resp.StatusCode)
 	}
 
-	req2 := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", nil)
-	resp2, _ := app.Test(req2, -1)
+	req2 := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", http.NoBody)
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusConflict {
 		t.Fatalf("expected 409 for duplicate start, got %d", resp2.StatusCode)
 	}
@@ -236,14 +252,22 @@ func TestRecordingHandler_Stop_Success(t *testing.T) {
 	app, roomRepo, _ := setupRecordingTestApp(t, &mockEgressClient{})
 	room := createTestRoom(t, roomRepo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201 for start, got %d", resp.StatusCode)
 	}
 
-	req2 := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/stop", nil)
-	resp2, _ := app.Test(req2, -1)
+	req2 := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/stop", http.NoBody)
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp2.StatusCode)
 	}
@@ -262,8 +286,12 @@ func TestRecordingHandler_Stop_NoActive(t *testing.T) {
 	app, roomRepo, _ := setupRecordingTestApp(t, &mockEgressClient{})
 	room := createTestRoom(t, roomRepo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/stop", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/stop", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404 when no active recording, got %d", resp.StatusCode)
 	}
@@ -274,8 +302,12 @@ func TestRecordingHandler_Start_Denied_NonModerator(t *testing.T) {
 	app, roomRepo, _ := setupRecordingTestAppAs(t, &mockEgressClient{}, "stranger", "user")
 	room := createTestRoom(t, roomRepo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403 for non-moderator, got %d", resp.StatusCode)
 	}
@@ -286,14 +318,22 @@ func TestRecordingHandler_List_Success(t *testing.T) {
 	app, roomRepo, _ := setupRecordingTestApp(t, &mockEgressClient{})
 	room := createTestRoom(t, roomRepo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201 for start, got %d", resp.StatusCode)
 	}
 
-	req2 := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings", nil)
-	resp2, _ := app.Test(req2, -1)
+	req2 := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings", http.NoBody)
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp2.StatusCode)
 	}
@@ -317,8 +357,12 @@ func TestRecordingHandler_List_NonParticipant(t *testing.T) {
 	room := createTestRoom(t, roomRepo)
 
 	appStranger, _, _ := setupRecordingTestAppAs(t, &mockEgressClient{}, "stranger", "user")
-	req := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings", nil)
-	resp, _ := appStranger.Test(req, -1)
+	req := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings", http.NoBody)
+	resp, err := appStranger.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404 for non-participant, got %d", resp.StatusCode)
 	}
@@ -329,8 +373,12 @@ func TestRecordingHandler_List_Empty(t *testing.T) {
 	app, roomRepo, _ := setupRecordingTestApp(t, &mockEgressClient{})
 	room := createTestRoom(t, roomRepo)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -353,8 +401,12 @@ func TestRecordingHandler_Get_Success(t *testing.T) {
 	app, roomRepo, _ := setupRecordingTestApp(t, &mockEgressClient{})
 	room := createTestRoom(t, roomRepo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201 for start, got %d", resp.StatusCode)
 	}
@@ -368,8 +420,12 @@ func TestRecordingHandler_Get_Success(t *testing.T) {
 		t.Fatal("expected recording ID from start")
 	}
 
-	req2 := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings/"+recordingID, nil)
-	resp2, _ := app.Test(req2, -1)
+	req2 := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings/"+recordingID, http.NoBody)
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp2.StatusCode)
 	}
@@ -388,8 +444,12 @@ func TestRecordingHandler_Get_NonParticipant(t *testing.T) {
 	app, roomRepo, _ := setupRecordingTestApp(t, &mockEgressClient{})
 	room := createTestRoom(t, roomRepo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201 for start, got %d", resp.StatusCode)
 	}
@@ -401,8 +461,12 @@ func TestRecordingHandler_Get_NonParticipant(t *testing.T) {
 	recordingID, _ := startBody["id"].(string)
 
 	appStranger, _, _ := setupRecordingTestAppAs(t, &mockEgressClient{}, "stranger", "user")
-	req2 := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings/"+recordingID, nil)
-	resp2, _ := appStranger.Test(req2, -1)
+	req2 := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings/"+recordingID, http.NoBody)
+	resp2, err := appStranger.Test(req2, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404 for non-participant, got %d", resp2.StatusCode)
 	}
@@ -413,8 +477,12 @@ func TestRecordingHandler_Get_NotFound(t *testing.T) {
 	app, roomRepo, _ := setupRecordingTestApp(t, &mockEgressClient{})
 	room := createTestRoom(t, roomRepo)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings/nonexistent-id", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings/nonexistent-id", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404 for nonexistent recording, got %d", resp.StatusCode)
 	}
@@ -424,8 +492,12 @@ func TestRecordingHandler_Start_NonExistentRoom(t *testing.T) {
 	recordingTestSkipped(t)
 	app, _, _ := setupRecordingTestApp(t, &mockEgressClient{})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+uuid.NewString()+"/recording/start", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+uuid.NewString()+"/recording/start", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404 for nonexistent room, got %d", resp.StatusCode)
 	}
@@ -435,8 +507,12 @@ func TestRecordingHandler_Start_InvalidRoomID(t *testing.T) {
 	recordingTestSkipped(t)
 	app, _, _ := setupRecordingTestApp(t, &mockEgressClient{})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/nonexistent-room/recording/start", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/nonexistent-room/recording/start", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid room ID, got %d", resp.StatusCode)
 	}
@@ -447,8 +523,12 @@ func TestRecordingHandler_OwnerAllowedStart(t *testing.T) {
 	app, roomRepo, _ := setupRecordingTestApp(t, &mockEgressClient{})
 	room := createTestRoom(t, roomRepo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201 for room owner, got %d", resp.StatusCode)
 	}
@@ -459,8 +539,12 @@ func TestRecordingHandler_SuperadminBypass(t *testing.T) {
 	app, roomRepo, _ := setupRecordingTestAppAs(t, &mockEgressClient{}, "admin", "superadmin")
 	room := createTestRoom(t, roomRepo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201 for superadmin, got %d", resp.StatusCode)
 	}
@@ -470,8 +554,12 @@ func TestRecordingHandler_Stop_NonExistentRoom(t *testing.T) {
 	recordingTestSkipped(t)
 	app, _, _ := setupRecordingTestApp(t, &mockEgressClient{})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+uuid.NewString()+"/recording/stop", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+uuid.NewString()+"/recording/stop", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404 for nonexistent room, got %d", resp.StatusCode)
 	}
@@ -481,8 +569,12 @@ func TestRecordingHandler_Stop_InvalidRoomID(t *testing.T) {
 	recordingTestSkipped(t)
 	app, _, _ := setupRecordingTestApp(t, &mockEgressClient{})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/nonexistent-room/recording/stop", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/nonexistent-room/recording/stop", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid room ID, got %d", resp.StatusCode)
 	}
@@ -567,8 +659,12 @@ func TestRecordingHandler_AdminList_Success(t *testing.T) {
 		t.Fatalf("failed to create recording: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/admin/recordings", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/recordings", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -587,8 +683,12 @@ func TestRecordingHandler_AdminList_FilterByRoomID(t *testing.T) {
 	recordingTestSkipped(t)
 	app, _, _ := setupAdminRecordingTestApp(t, &mockEgressClient{})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/admin/recordings?roomId=nonexistent-room", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/recordings?roomId=nonexistent-room", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -619,8 +719,12 @@ func TestRecordingHandler_AdminList_FilterByStatus(t *testing.T) {
 		t.Fatalf("failed to create recording: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/admin/recordings?status=started", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/recordings?status=started", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -657,7 +761,11 @@ func TestRecordingHandler_AdminBulkDelete_Success(t *testing.T) {
 	body, _ := json.Marshal(deleteReq)
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/recordings/bulk/delete", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("expected 202, got %d", resp.StatusCode)
 	}
@@ -670,7 +778,11 @@ func TestRecordingHandler_AdminBulkDelete_EmptyIDs(t *testing.T) {
 	body, _ := json.Marshal(BulkIDsRequest{IDs: []string{}})
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/recordings/bulk/delete", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for empty IDs, got %d", resp.StatusCode)
 	}
@@ -687,7 +799,11 @@ func TestRecordingHandler_AdminBulkDelete_TooMany(t *testing.T) {
 	body, _ := json.Marshal(BulkIDsRequest{IDs: ids})
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/recordings/bulk/delete", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for too many IDs, got %d", resp.StatusCode)
 	}
@@ -719,8 +835,12 @@ func TestRecordingHandler_AdminList_Denied_NonAdmin(t *testing.T) {
 	app.Get("/api/admin/recordings", handler.AdminListRecordings)
 	app.Post("/api/admin/recordings/bulk/delete", handler.BulkDeleteRecordings)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/admin/recordings", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/recordings", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403 for non-admin, got %d", resp.StatusCode)
 	}
@@ -728,7 +848,11 @@ func TestRecordingHandler_AdminList_Denied_NonAdmin(t *testing.T) {
 	req2 := httptest.NewRequest(http.MethodPost, "/api/admin/recordings/bulk/delete",
 		bytes.NewReader([]byte(`{"ids":["`+uuid.NewString()+`"]}`)))
 	req2.Header.Set("Content-Type", "application/json")
-	resp2, _ := app.Test(req2, -1)
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403 for non-admin bulk delete, got %d", resp2.StatusCode)
 	}
@@ -738,8 +862,12 @@ func TestRecordingHandler_List_InvalidRoomID(t *testing.T) {
 	recordingTestSkipped(t)
 	app, _, _ := setupRecordingTestApp(t, &mockEgressClient{})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/rooms/invalid-uuid/recordings", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodGet, "/api/rooms/invalid-uuid/recordings", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid room ID, got %d", resp.StatusCode)
 	}
@@ -749,8 +877,12 @@ func TestRecordingHandler_Get_InvalidRoomID(t *testing.T) {
 	recordingTestSkipped(t)
 	app, _, _ := setupRecordingTestApp(t, &mockEgressClient{})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/rooms/invalid-uuid/recordings/some-recording", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodGet, "/api/rooms/invalid-uuid/recordings/some-recording", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid room ID, got %d", resp.StatusCode)
 	}
@@ -765,7 +897,7 @@ func TestRecordingHandler_ClearRoomRecordings_Success(t *testing.T) {
 	room := createTestRoom(t, roomRepo)
 
 	// Create two recordings with files — use unique EgressIDs to avoid UNIQUE constraint
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		rec := &models.Recording{
 			ID: uuid.NewString(), EgressID: uuid.NewString(),
 			RoomID: room.ID, RoomName: room.Name,
@@ -781,8 +913,12 @@ func TestRecordingHandler_ClearRoomRecordings_Success(t *testing.T) {
 		}
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/"+room.ID+"/recordings", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/"+room.ID+"/recordings", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -827,8 +963,12 @@ func TestRecordingHandler_ClearRoomRecordings_Denied_NonOwner(t *testing.T) {
 	})
 	app.Delete("/api/rooms/:id/recordings", handler.ClearRoomRecordings)
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/"+room.ID+"/recordings", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/"+room.ID+"/recordings", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403 for non-owner, got %d", resp.StatusCode)
 	}
@@ -838,8 +978,12 @@ func TestRecordingHandler_ClearRoomRecordings_NotFound(t *testing.T) {
 	recordingTestSkipped(t)
 	app, _, _ := setupAdminRecordingTestAppWithStore(t, &mockEgressClient{}, &mockRecordingStore{})
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/"+uuid.NewString()+"/recordings", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/"+uuid.NewString()+"/recordings", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404 for nonexistent room, got %d", resp.StatusCode)
 	}
@@ -849,8 +993,12 @@ func TestRecordingHandler_ClearRoomRecordings_InvalidRoomID(t *testing.T) {
 	recordingTestSkipped(t)
 	app, _, _ := setupAdminRecordingTestAppWithStore(t, &mockEgressClient{}, &mockRecordingStore{})
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/invalid-uuid/recordings", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/invalid-uuid/recordings", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid room ID, got %d", resp.StatusCode)
 	}
@@ -875,14 +1023,18 @@ func TestRecordingHandler_ClearSingleRecording_Success(t *testing.T) {
 		t.Fatalf("failed to create recording: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/"+room.ID+"/recordings/"+rec.ID, nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/"+room.ID+"/recordings/"+rec.ID, http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 
 	// Verify deleted from DB
-	_, err := recordingRepo.GetByID(rec.ID)
+	_, err = recordingRepo.GetByID(rec.ID)
 	if err == nil {
 		t.Fatal("expected recording to be deleted from DB")
 	}
@@ -930,8 +1082,12 @@ func TestRecordingHandler_ClearSingleRecording_Denied_NonOwner(t *testing.T) {
 	})
 	app.Delete("/api/rooms/:id/recordings/:recordingId", handler.ClearSingleRecording)
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/"+room.ID+"/recordings/"+rec.ID, nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/"+room.ID+"/recordings/"+rec.ID, http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403 for non-owner, got %d", resp.StatusCode)
 	}
@@ -943,8 +1099,12 @@ func TestRecordingHandler_ClearSingleRecording_NotFound(t *testing.T) {
 	app, roomRepo, _ := setupAdminRecordingTestAppWithStore(t, &mockEgressClient{}, mockStore)
 	room := createTestRoom(t, roomRepo)
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/"+room.ID+"/recordings/nonexistent-recording", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/"+room.ID+"/recordings/nonexistent-recording", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404 for nonexistent recording, got %d", resp.StatusCode)
 	}
@@ -954,8 +1114,12 @@ func TestRecordingHandler_ClearSingleRecording_InvalidRoomID(t *testing.T) {
 	recordingTestSkipped(t)
 	app, _, _ := setupAdminRecordingTestAppWithStore(t, &mockEgressClient{}, &mockRecordingStore{})
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/invalid-uuid/recordings/some-rec", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/invalid-uuid/recordings/some-rec", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid room ID, got %d", resp.StatusCode)
 	}
@@ -986,7 +1150,7 @@ func TestRecordingHandler_ClearRoomRecordings_PartialFileDelete(t *testing.T) {
 	room := createTestRoom(t, roomRepo)
 
 	// Create two recordings with files
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		rec := &models.Recording{
 			ID: uuid.NewString(), EgressID: uuid.NewString(),
 			RoomID: room.ID, RoomName: room.Name,
@@ -1002,8 +1166,12 @@ func TestRecordingHandler_ClearRoomRecordings_PartialFileDelete(t *testing.T) {
 		}
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/"+room.ID+"/recordings", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodDelete, "/api/rooms/"+room.ID+"/recordings", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusMultiStatus {
 		t.Fatalf("expected 207 for partial file delete failure, got %d", resp.StatusCode)
 	}
@@ -1059,14 +1227,20 @@ func TestRecordingHandler_List_DeletedRoom_CreatorWithRecordings(t *testing.T) {
 	app.Get("/api/rooms/:id/recordings", handler.ListRecordings)
 
 	// Creator should still see their recordings
-	req := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 for creator of deleted room, got %d", resp.StatusCode)
 	}
 
 	var body map[string]any
-	json.NewDecoder(resp.Body).Decode(&body)
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
 	if body["total"].(float64) != 1 {
 		t.Fatalf("expected 1 recording, got %v", body["total"])
 	}
@@ -1113,8 +1287,12 @@ func TestRecordingHandler_List_DeletedRoom_NonCreator(t *testing.T) {
 	})
 	appStranger.Get("/api/rooms/:id/recordings", handler.ListRecordings)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings", nil)
-	resp, _ := appStranger.Test(req, -1)
+	req := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings", http.NoBody)
+	resp, err := appStranger.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404 for stranger of deleted room, got %d", resp.StatusCode)
 	}
@@ -1151,8 +1329,12 @@ func TestRecordingHandler_List_DeletedRoom_CreatorNoRecordings(t *testing.T) {
 	app.Get("/api/rooms/:id/recordings", handler.ListRecordings)
 
 	// Creator should get 404 (no recordings to return)
-	req := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings", nil)
-	resp, _ := app.Test(req, -1)
+	req := httptest.NewRequest(http.MethodGet, "/api/rooms/"+room.ID+"/recordings", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404 for deleted room with no recordings, got %d", resp.StatusCode)
 	}
@@ -1196,15 +1378,23 @@ func TestRecordingHandler_Stop_DifferentModerator(t *testing.T) {
 	appModB.Post("/api/rooms/:id/recording/stop", handler.StopRecording)
 
 	// Moderator B starts the recording
-	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", nil)
-	resp, _ := appModB.Test(req, -1)
+	req := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/start", http.NoBody)
+	resp, err := appModB.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201 for mod-b start, got %d", resp.StatusCode)
 	}
 
 	// Moderator B can stop it too
-	req2 := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/stop", nil)
-	resp2, _ := appModB.Test(req2, -1)
+	req2 := httptest.NewRequest(http.MethodPost, "/api/rooms/"+room.ID+"/recording/stop", http.NoBody)
+	resp2, err := appModB.Test(req2, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 for mod-b stopping own recording, got %d", resp.StatusCode)
 	}

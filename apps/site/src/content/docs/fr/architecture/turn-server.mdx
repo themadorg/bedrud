@@ -106,20 +106,38 @@ Pour une 5-person meeting avec un relayed participant : le serveur handles ~1.5 
 
 ## Configuration
 
-**File :** `server/config/livekit.yaml` (dev) ou `/etc/bedrud/livekit.yaml` (production)
+**File :** `server/livekit.yaml` (dev) ou `/etc/bedrud/livekit.yaml` (production)
 
-```yaml
-turn:
-  enabled: true
-  domain: "turn.example.com"
-  udp_port: 3478
-  tls_port: 5349
-  cert_file: /etc/bedrud/turn.crt
-  key_file: /etc/bedrud/turn.key
-  relay_range_start: 30000
-  relay_range_end: 40000
-  external_tls: false
-```
+<Tabs>
+  <TabsList>
+    <TabsTrigger value="production">Production / Externe (Standard)</TabsTrigger>
+    <TabsTrigger value="development">Développement Local (Loopback)</TabsTrigger>
+  </TabsList>
+  <TabsContent value="production">
+
+  ```yaml
+  turn:
+    enabled: true
+    domain: "turn.example.com"
+    udp_port: 3478
+    tls_port: 5349
+    cert_file: /etc/bedrud/turn.crt
+    key_file: /etc/bedrud/turn.key
+    relay_range_start: 30000
+    relay_range_end: 40000
+    external_tls: false
+  ```
+
+  </TabsContent>
+  <TabsContent value="development">
+
+  ```yaml
+  turn:
+    enabled: false                # TURN is disabled for local dev (unnecessary on localhost)
+  ```
+
+  </TabsContent>
+</Tabs>
 
 ### Key Reference
 

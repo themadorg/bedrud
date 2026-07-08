@@ -89,7 +89,7 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected %d, got %d: %s", http.StatusOK, resp.StatusCode, string(respBody))
@@ -115,8 +115,11 @@ func TestAuthHandler_Register_InvalidBody(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader([]byte("invalid")))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected %d, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
@@ -133,13 +136,16 @@ func TestAuthHandler_Register_DuplicateEmail(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, _ := app.Test(req, -1)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// Try again
 	req2 := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
 	req2.Header.Set("Content-Type", "application/json")
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected %d for duplicate, got %d", http.StatusBadRequest, resp2.StatusCode)
 	}
@@ -158,8 +164,11 @@ func TestAuthHandler_Login_Success(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected %d, got %d: %s", http.StatusOK, resp.StatusCode, string(respBody))
@@ -177,8 +186,11 @@ func TestAuthHandler_Login_InvalidCredentials(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected %d, got %d", http.StatusUnauthorized, resp.StatusCode)
 	}
@@ -193,8 +205,11 @@ func TestAuthHandler_Login_NonexistentUser(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected %d, got %d", http.StatusUnauthorized, resp.StatusCode)
 	}
@@ -205,8 +220,11 @@ func TestAuthHandler_Login_InvalidBody(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader([]byte("{invalid")))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected %d, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
@@ -218,8 +236,11 @@ func TestAuthHandler_GuestLogin_Success(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"name": "Guest Player"})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/guest-login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected %d, got %d: %s", http.StatusOK, resp.StatusCode, string(respBody))
@@ -241,8 +262,11 @@ func TestAuthHandler_GuestLogin_EmptyName(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"name": ""})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/guest-login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected %d, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
@@ -253,8 +277,11 @@ func TestAuthHandler_GuestLogin_InvalidBody(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/guest-login", bytes.NewReader([]byte("{")))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected %d, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
@@ -266,8 +293,11 @@ func TestAuthHandler_GuestLogin_NullByteName(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"name": "\x00"})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/guest-login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected %d for null byte name, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
@@ -280,8 +310,11 @@ func TestAuthHandler_GuestLogin_NullByteTooShort(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"name": "\x00a"})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/guest-login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected %d for null-byte-padded short name, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
@@ -295,8 +328,11 @@ func TestAuthHandler_GetMe_Success(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected %d, got %d: %s", http.StatusOK, resp.StatusCode, string(respBody))
@@ -314,8 +350,11 @@ func TestAuthHandler_GetMe_NoToken(t *testing.T) {
 	app, _, _ := setupAuthTestApp(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected %d, got %d", http.StatusUnauthorized, resp.StatusCode)
 	}
@@ -326,8 +365,11 @@ func TestAuthHandler_GetMe_InvalidToken(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", http.NoBody)
 	req.Header.Set("Authorization", "Bearer invalid-jwt-token")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected %d, got %d", http.StatusUnauthorized, resp.StatusCode)
 	}
@@ -412,8 +454,11 @@ func TestAuthHandler_RefreshToken_Success(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected %d, got %d: %s", http.StatusOK, resp.StatusCode, string(respBody))
@@ -436,8 +481,11 @@ func TestAuthHandler_RefreshToken_InvalidToken(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"refresh_token": "not-a-real-token"})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected %d, got %d", http.StatusUnauthorized, resp.StatusCode)
 	}
@@ -451,8 +499,11 @@ func TestAuthHandler_RefreshToken_InvalidBody(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", bytes.NewReader([]byte("{invalid")))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected %d, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
@@ -470,8 +521,11 @@ func TestAuthHandler_UpdateProfile_Success(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/profile", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected %d, got %d: %s", http.StatusOK, resp.StatusCode, string(respBody))
@@ -488,8 +542,11 @@ func TestAuthHandler_UpdateProfile_ShortName(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/profile", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected %d, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
@@ -510,8 +567,11 @@ func TestAuthHandler_ChangePassword_Success(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected %d, got %d: %s", http.StatusOK, resp.StatusCode, string(respBody))
@@ -531,8 +591,11 @@ func TestAuthHandler_ChangePassword_TooShortNewPassword(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected %d, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
@@ -551,8 +614,11 @@ func TestAuthHandler_Logout_Success(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected %d, got %d: %s", http.StatusOK, resp.StatusCode, string(respBody))
@@ -642,8 +708,11 @@ func TestAuthHandler_Register_RequiresVerification(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, _ := io.ReadAll(resp.Body)
 	var result map[string]interface{}
@@ -674,8 +743,11 @@ func TestAuthHandler_Register_VerificationEmailURL(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, _ := io.ReadAll(resp.Body)
 	var result map[string]interface{}
@@ -735,8 +807,11 @@ func TestAuthHandler_Login_Unverified(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusForbidden {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -773,8 +848,11 @@ func TestAuthHandler_Login_Verified(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -803,8 +881,11 @@ func TestAuthHandler_VerifyEmail_Success(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"token": token})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 OK, got %d", resp.StatusCode)
@@ -852,8 +933,11 @@ func TestAuthHandler_VerifyEmail_TokenEmailMismatch(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"token": token})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 on email mismatch, got %d", resp.StatusCode)
@@ -872,8 +956,11 @@ func TestAuthHandler_VerifyEmail_MissingToken(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
@@ -900,8 +987,11 @@ func TestAuthHandler_VerifyEmail_AlreadyVerified(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"token": token})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatalf("expected 409 Conflict, got %d", resp.StatusCode)
@@ -921,8 +1011,11 @@ func TestAuthHandler_VerifyEmail_UserNotFound(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"token": token})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", resp.StatusCode)
@@ -937,8 +1030,11 @@ func TestAuthHandler_ResendVerification_Success(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"email": "resend@example.com"})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify/resend", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -964,13 +1060,16 @@ func TestAuthHandler_ResendVerification_Cooldown(t *testing.T) {
 	req1 := httptest.NewRequest(http.MethodPost, "/api/auth/verify/resend", bytes.NewReader(body))
 	req1.Header.Set("Content-Type", "application/json")
 	resp1, _ := app.Test(req1, -1)
-	resp1.Body.Close()
+	_ = resp1.Body.Close()
 
 	// Second request — cooldown active, but still returns 200 (enumeration safe)
 	req2 := httptest.NewRequest(http.MethodPost, "/api/auth/verify/resend", bytes.NewReader(body))
 	req2.Header.Set("Content-Type", "application/json")
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 
 	// Cooldown is enforced silently — always uniform 200
 	if resp2.StatusCode != http.StatusOK {
@@ -986,8 +1085,11 @@ func TestAuthHandler_ResendVerification_EnumerationSafe(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"email": "nobody@example.com"})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify/resend", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -1017,8 +1119,11 @@ func TestAuthHandler_RefreshToken_Unverified(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusForbidden {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -1047,8 +1152,11 @@ func TestAuthHandler_ResendVerification_AlreadyVerifiedReturns200(t *testing.T) 
 	body, _ := json.Marshal(map[string]string{"email": "alreadysent@example.com"})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify/resend", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -1066,8 +1174,11 @@ func TestAuthHandler_Logout_InvalidBody(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", bytes.NewReader([]byte("{invalid")))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected %d, got %d", http.StatusOK, resp.StatusCode)
 	}
@@ -1099,8 +1210,11 @@ func TestVerifyEmail_ExpiredToken(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"token": tokenStr})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for expired token, got %d", resp.StatusCode)
@@ -1116,7 +1230,7 @@ func TestConcurrentResend_SingleEmail(t *testing.T) {
 
 	var wg sync.WaitGroup
 	// Fire 5 goroutines to increase race-condition window
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -1124,7 +1238,7 @@ func TestConcurrentResend_SingleEmail(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			resp, _ := app.Test(req, 5000)
 			if resp != nil {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 			}
 		}()
 	}
@@ -1169,7 +1283,7 @@ func TestResend_AfterServerRestart(t *testing.T) {
 	req1 := httptest.NewRequest(http.MethodPost, "/api/auth/verify/resend", bytes.NewReader(body))
 	req1.Header.Set("Content-Type", "application/json")
 	resp1, _ := app1.Test(req1, -1)
-	resp1.Body.Close()
+	_ = resp1.Body.Close()
 
 	if resp1.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 on first resend, got %d", resp1.StatusCode)
@@ -1180,7 +1294,7 @@ func TestResend_AfterServerRestart(t *testing.T) {
 	req2 := httptest.NewRequest(http.MethodPost, "/api/auth/verify/resend", bytes.NewReader(body))
 	req2.Header.Set("Content-Type", "application/json")
 	resp2, _ := app2.Test(req2, -1)
-	resp2.Body.Close()
+	_ = resp2.Body.Close()
 
 	if resp2.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 on resend after restart (cooldown cleared), got %d", resp2.StatusCode)
@@ -1200,14 +1314,19 @@ func TestRegister_ThenVerify_ThenDoubleVerify(t *testing.T) {
 	body1, _ := json.Marshal(map[string]string{"token": token})
 	req1 := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body1))
 	req1.Header.Set("Content-Type", "application/json")
-	resp1, _ := app.Test(req1, -1)
-	defer resp1.Body.Close()
+	resp1, err := app.Test(req1, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp1.Body.Close() }()
 	if resp1.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 on first verify, got %d", resp1.StatusCode)
 	}
 	respBody1, _ := io.ReadAll(resp1.Body)
 	var result1 map[string]interface{}
-	json.Unmarshal(respBody1, &result1)
+	if err := json.Unmarshal(respBody1, &result1); err != nil {
+		t.Fatal(err)
+	}
 	if result1["verified"] != true {
 		t.Fatal("expected verified=true on first verify")
 	}
@@ -1216,8 +1335,11 @@ func TestRegister_ThenVerify_ThenDoubleVerify(t *testing.T) {
 	body2, _ := json.Marshal(map[string]string{"token": token})
 	req2 := httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body2))
 	req2.Header.Set("Content-Type", "application/json")
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusConflict {
 		t.Fatalf("expected 409 on double-verify, got %d", resp2.StatusCode)
 	}
@@ -1291,7 +1413,7 @@ func TestAdmin_ForceVerify(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, _ := app.Test(req, -1)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// Find user by email
 	user, _ := userRepo.GetUserByEmail("unverifieduser@test.com")
@@ -1305,8 +1427,11 @@ func TestAdmin_ForceVerify(t *testing.T) {
 
 	// Admin force-verify
 	req2 := httptest.NewRequest(http.MethodPost, "/api/admin/users/"+user.ID+"/verify", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 
 	if resp2.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp2.Body)
@@ -1333,7 +1458,7 @@ func TestAdmin_ResendVerification(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, _ := app.Test(req, -1)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	user, _ := userRepo.GetUserByEmail("resendadmin@test.com")
 	if user == nil {
@@ -1342,8 +1467,11 @@ func TestAdmin_ResendVerification(t *testing.T) {
 
 	// Admin resend
 	req2 := httptest.NewRequest(http.MethodPost, "/api/admin/users/"+user.ID+"/verify/resend", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 
 	if resp2.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp2.Body)
@@ -1366,8 +1494,11 @@ func TestPasskeySignup_RequiresVerification(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(loginBody))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, _ := io.ReadAll(resp.Body)
 	var result map[string]interface{}
@@ -1392,8 +1523,11 @@ func TestVerificationStatus_Endpoint(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/verify/status", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 for status endpoint, got %d", resp.StatusCode)
@@ -1456,8 +1590,11 @@ func TestEmailChange_AutoSendsVerification(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/profile", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -1578,8 +1715,11 @@ func TestAuthHandler_UpdateProfile_InvalidEmailFormat(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/profile", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -1652,8 +1792,11 @@ func TestAuthHandler_UpdateProfile_OAuthEmailBlocked(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/profile", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -1719,8 +1862,11 @@ func TestAuthHandler_EmailChangeThenReVerify(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/profile", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -1767,7 +1913,7 @@ func TestAuthHandler_EmailChangeThenReVerify(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPost, "/api/auth/verify", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, _ = app.Test(req, -1)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -1776,7 +1922,9 @@ func TestAuthHandler_EmailChangeThenReVerify(t *testing.T) {
 
 	respBody, _ := io.ReadAll(resp.Body)
 	var result map[string]interface{}
-	json.Unmarshal(respBody, &result)
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		t.Fatal(err)
+	}
 	if result["verified"] != true {
 		t.Fatal("expected verified=true in response")
 	}
@@ -1837,8 +1985,11 @@ func TestAuthHandler_EmailChangeCooldown(t *testing.T) {
 	req1 := httptest.NewRequest(http.MethodPut, "/api/auth/profile", bytes.NewReader(body1))
 	req1.Header.Set("Content-Type", "application/json")
 	req1.Header.Set("Authorization", "Bearer "+token)
-	resp1, _ := app.Test(req1, -1)
-	defer resp1.Body.Close()
+	resp1, err := app.Test(req1, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp1.Body.Close() }()
 
 	if resp1.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp1.Body)
@@ -1868,8 +2019,11 @@ func TestAuthHandler_EmailChangeCooldown(t *testing.T) {
 	req2 := httptest.NewRequest(http.MethodPut, "/api/auth/profile", bytes.NewReader(body2))
 	req2.Header.Set("Content-Type", "application/json")
 	req2.Header.Set("Authorization", "Bearer "+newToken)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 
 	if resp2.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp2.Body)
@@ -1978,8 +2132,11 @@ func TestForgotPassword_Success(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"email": "forgot@example.com"})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/forgot-password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
@@ -1999,8 +2156,11 @@ func TestForgotPassword_UnknownEmail(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"email": "nobody@example.com"})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/forgot-password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	// Must return 200 (enumeration safe)
 	if resp.StatusCode != http.StatusOK {
@@ -2028,8 +2188,11 @@ func TestForgotPassword_OAuthUser(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"email": "oauthforgot@example.com"})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/forgot-password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	// OAuth or not, always 200 (enumeration safe)
 	if resp.StatusCode != http.StatusOK {
@@ -2043,8 +2206,11 @@ func TestForgotPassword_EmptyEmail(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"email": ""})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/forgot-password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for empty email, got %d", resp.StatusCode)
@@ -2068,8 +2234,11 @@ func TestResetPassword_Success(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/reset-password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -2098,8 +2267,11 @@ func TestResetPassword_InvalidToken(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/reset-password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid token, got %d", resp.StatusCode)
@@ -2128,8 +2300,11 @@ func TestResetPassword_ExpiredToken(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/reset-password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for expired token, got %d", resp.StatusCode)
@@ -2148,8 +2323,11 @@ func TestResetPassword_TooShort(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/reset-password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for too short password, got %d", resp.StatusCode)
@@ -2182,8 +2360,11 @@ func TestResetPassword_OAuthUser(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/reset-password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	// OAuth users cannot reset passwords — expect 400
 	if resp.StatusCode != http.StatusBadRequest {
@@ -2205,7 +2386,7 @@ func TestForgotThenReset_FullFlow(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/forgot-password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, _ := app.Test(req, -1)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("forgot-password: expected 200, got %d", resp.StatusCode)
@@ -2242,8 +2423,12 @@ func TestForgotThenReset_FullFlow(t *testing.T) {
 	})
 	req2 := httptest.NewRequest(http.MethodPost, "/api/auth/reset-password", bytes.NewReader(body2))
 	req2.Header.Set("Content-Type", "application/json")
-	resp2, _ := app.Test(req2, -1)
-	defer resp.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp2.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp2.Body)
@@ -2251,7 +2436,7 @@ func TestForgotThenReset_FullFlow(t *testing.T) {
 	}
 
 	// Step 4: Verify old password fails
-	_, err := authService.Login("fullflow@example.com", "originalPass123")
+	_, err = authService.Login("fullflow@example.com", "originalPass123")
 	if err == nil {
 		t.Fatal("login with old password should fail after reset")
 	}
@@ -2269,8 +2454,12 @@ func TestForgotThenReset_FullFlow(t *testing.T) {
 	})
 	req3 := httptest.NewRequest(http.MethodPost, "/api/auth/reset-password", bytes.NewReader(body3))
 	req3.Header.Set("Content-Type", "application/json")
-	resp3, _ := app.Test(req3, -1)
-	defer resp.Body.Close()
+	resp3, err := app.Test(req3, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp3.Body.Close() }()
+	defer func() { _ = resp.Body.Close() }()
 
 	// After password change, the old token should be invalid (password_changed_at
 	// check in the handler rejects tokens issued before the last password change)
@@ -2290,13 +2479,16 @@ func TestForgotPassword_Cooldown(t *testing.T) {
 	req1 := httptest.NewRequest(http.MethodPost, "/api/auth/forgot-password", bytes.NewReader(body))
 	req1.Header.Set("Content-Type", "application/json")
 	resp1, _ := app.Test(req1, -1)
-	resp1.Body.Close()
+	_ = resp1.Body.Close()
 
 	// Second request — cooldown active, but still 200
 	req2 := httptest.NewRequest(http.MethodPost, "/api/auth/forgot-password", bytes.NewReader(body))
 	req2.Header.Set("Content-Type", "application/json")
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
 
 	if resp2.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 (cooldown is silent), got %d", resp2.StatusCode)
@@ -2311,8 +2503,11 @@ func TestResetPassword_NoToken(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/reset-password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for missing token, got %d", resp.StatusCode)
@@ -2353,8 +2548,11 @@ func TestGuestLogin_GuestLoginEnabled_Disabled_Returns403(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"name": "TestGuest"})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/guest-login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusForbidden {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 403, got %d: %s", resp.StatusCode, string(respBody))
@@ -2381,8 +2579,11 @@ func TestGuestJoinRoom_GuestLoginEnabled_Disabled_Returns403(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"roomName": "some-room", "guestName": "Guest"})
 	req := httptest.NewRequest(http.MethodPost, "/room/guest-join", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusForbidden {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 403, got %d: %s", resp.StatusCode, string(respBody))
@@ -2421,8 +2622,11 @@ func TestRegister_RegistrationDisabled_Returns403(t *testing.T) {
 		body, _ := json.Marshal(map[string]string{"email": "test@ex.com", "password": "securepass123", "name": "Test"})
 		req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
-		defer resp.Body.Close()
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusForbidden {
 			t.Fatalf("expected 403, got %d", resp.StatusCode)
 		}
@@ -2432,8 +2636,11 @@ func TestRegister_RegistrationDisabled_Returns403(t *testing.T) {
 		body, _ := json.Marshal(map[string]string{"name": "Guest"})
 		req := httptest.NewRequest(http.MethodPost, "/api/auth/guest-login", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
-		defer resp.Body.Close()
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusForbidden {
 			t.Fatalf("expected 403, got %d", resp.StatusCode)
 		}

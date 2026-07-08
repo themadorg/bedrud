@@ -262,9 +262,9 @@ func GenerateResetToken(userID, email string, passwordChangedAt *time.Time, cfg 
 		pca = &u
 	}
 	claims := &Claims{
-		UserID:           userID,
-		Email:            email,
-		Purpose:          "password_reset",
+		UserID:            userID,
+		Email:             email,
+		Purpose:           "password_reset",
 		PasswordChangedAt: pca,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "bedrud",

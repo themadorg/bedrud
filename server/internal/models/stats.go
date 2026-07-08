@@ -20,12 +20,12 @@ type RoomEvent struct {
 
 // OverviewHealth holds system health status.
 type OverviewHealth struct {
-	Status       string          `json:"status"` // healthy, degraded, down
-	TLS          *TLSStatus      `json:"tls"`
-	Realtime     string          `json:"realtime"` // connected, disconnected
-	AlertsCount  int             `json:"alertsCount"`
-	UptimeSeconds int64          `json:"uptimeSeconds"`
-	DBStatus     string          `json:"dbStatus"` // connected, error
+	Status        string     `json:"status"` // healthy, degraded, down
+	TLS           *TLSStatus `json:"tls"`
+	Realtime      string     `json:"realtime"` // connected, disconnected
+	AlertsCount   int        `json:"alertsCount"`
+	UptimeSeconds int64      `json:"uptimeSeconds"`
+	DBStatus      string     `json:"dbStatus"` // connected, error
 }
 
 // TLSStatus holds TLS certificate info.
@@ -38,12 +38,12 @@ type TLSStatus struct {
 
 // KpiEntry holds a single KPI value with optional delta.
 type KpiEntry struct {
-	Value       int    `json:"value"`
-	Delta       int    `json:"delta,omitempty"`
-	DeltaLabel  string `json:"deltaLabel,omitempty"`
-	DeltaPercent int   `json:"deltaPercent,omitempty"`
-	PeakToday   int    `json:"peakToday,omitempty"`
-	ActiveNow   int    `json:"activeNow,omitempty"`
+	Value        int    `json:"value"`
+	Delta        int    `json:"delta,omitempty"`
+	DeltaLabel   string `json:"deltaLabel,omitempty"`
+	DeltaPercent int    `json:"deltaPercent,omitempty"`
+	PeakToday    int    `json:"peakToday,omitempty"`
+	ActiveNow    int    `json:"activeNow,omitempty"`
 }
 
 // OverviewKPIs holds all KPI values.
@@ -66,7 +66,7 @@ type RoomComposition struct {
 
 // AttentionItem represents something needing operator review.
 type AttentionItem struct {
-	Type     string `json:"type"` // tls_expiry, stale_room, empty_room, auth_spike
+	Type     string `json:"type"`     // tls_expiry, stale_room, empty_room, auth_spike
 	Severity string `json:"severity"` // error, warning, info
 	Message  string `json:"message"`
 	DaysLeft int    `json:"daysLeft,omitempty"`
@@ -75,18 +75,18 @@ type AttentionItem struct {
 
 // InstanceInfo holds server metadata.
 type InstanceInfo struct {
-	Name         string `json:"name"`
-	Version      string `json:"version"`
+	Name          string `json:"name"`
+	Version       string `json:"version"`
 	UptimeSeconds int64  `json:"uptimeSeconds"`
-	StartedAt    string `json:"startedAt"`
+	StartedAt     string `json:"startedAt"`
 }
 
 // DayActivity holds one day of activity data.
 type DayActivity struct {
-	Date           string `json:"date"`
-	RoomsCreated   int    `json:"roomsCreated"`
-	RoomsActive    int    `json:"roomsActive"`
-	Participants   int    `json:"participants"`
+	Date         string `json:"date"`
+	RoomsCreated int    `json:"roomsCreated"`
+	RoomsActive  int    `json:"roomsActive"`
+	Participants int    `json:"participants"`
 }
 
 // RecentUser holds minimal user info for recent signups.

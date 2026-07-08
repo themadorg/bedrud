@@ -1,10 +1,15 @@
-import { useIsSpeaking, useParticipantInfo, VideoTrack } from '@livekit/components-react'
+import { useIsSpeaking, VideoTrack } from '@livekit/components-react'
 import type { Participant } from 'livekit-client'
 import { Track } from 'livekit-client'
 import { MicOff, Minimize2 } from 'lucide-react'
 import { useMemo } from 'react'
 
 import { getPalette } from '#/lib/participant-palette'
+import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
+import { shouldShowMicMutedIndicator } from '#/lib/push-to-talk-participant'
+import { ParticipantAvatar } from '#/components/meeting/ParticipantAvatar'
+import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
+import { hasCameraVideo, useCameraTrackPublication } from '@/components/meeting/useCameraTrackPublication'
 
 interface Props {
   participant: Participant
@@ -12,12 +17,14 @@ interface Props {
 }
 
 export function SpotlightView({ participant, onClose }: Props) {
-  const { name, identity } = useParticipantInfo({ participant })
   const isSpeaking = useIsSpeaking(participant)
-  const cameraTrack = participant.getTrackPublication(Track.Source.Camera)
-  const hasCameraVideo = Boolean(cameraTrack?.isSubscribed && !cameraTrack.isMuted)
-  const displayName = name ?? identity ?? '?'
+  const { getParticipantDisplayName, getParticipantAvatarUrl } = useMeetingRoomContext()
+  const cameraTrack = useCameraTrackPublication(participant)
+  const showCameraVideo = hasCameraVideo(cameraTrack)
+  const displayName = getParticipantDisplayName(participant)
+  const avatarUrl = getParticipantAvatarUrl(participant)
   const palette = useMemo(() => getPalette(displayName), [displayName])
+  const pushToTalkEnabled = useAudioPreferencesStore((s) => s.pushToTalkEnabled)
 
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-[#030308] px-6 py-5">
@@ -26,7 +33,7 @@ export function SpotlightView({ participant, onClose }: Props) {
         className="relative w-full h-full overflow-hidden rounded-2xl"
         style={{
           maxWidth: 'min(100%, calc(100vh * 16/9))',
-          background: hasCameraVideo
+          background: showCameraVideo
             ? '#000'
             : `radial-gradient(ellipse 80% 60% at 50% 35%, ${palette.glow.replace('0.5', '0.12')}, #0c0c1a 70%)`,
           boxShadow: isSpeaking
@@ -35,26 +42,25 @@ export function SpotlightView({ participant, onClose }: Props) {
           transition: 'box-shadow 0.3s ease',
         }}
       >
-        {hasCameraVideo && cameraTrack ? (
+        {showCameraVideo && cameraTrack ? (
           <VideoTrack
             trackRef={{ participant, source: Track.Source.Camera, publication: cameraTrack }}
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-5">
-            <div
-              className="flex items-center justify-center text-white font-bold"
+            <ParticipantAvatar
+              avatarUrl={avatarUrl}
+              initials={displayName.charAt(0).toUpperCase()}
+              paletteBackground={palette.avatar}
+              className="flex items-center justify-center"
               style={{
                 width: 110,
                 height: 110,
-                borderRadius: '50%',
-                background: palette.avatar,
                 fontSize: 42,
                 boxShadow: `0 0 70px ${palette.glow}`,
               }}
-            >
-              {displayName.charAt(0).toUpperCase()}
-            </div>
+            />
             <span className="text-white/65 text-lg font-medium">{displayName}</span>
             {isSpeaking && (
               <div className="flex items-center gap-1">
@@ -77,7 +83,9 @@ export function SpotlightView({ participant, onClose }: Props) {
         {/* Name + mute badge */}
         <div className="absolute bottom-4 left-4 flex items-center gap-[7px] bg-black/60 backdrop-blur-md rounded-lg px-3 py-[5px]">
           <span className="text-white text-[13px] font-medium">{displayName}</span>
-          {!participant.isMicrophoneEnabled && <MicOff size={13} className="shrink-0 text-red-400" />}
+          {shouldShowMicMutedIndicator(participant, pushToTalkEnabled) && (
+            <MicOff size={13} className="shrink-0 text-red-400" />
+          )}
         </div>
 
         {/* Exit spotlight */}

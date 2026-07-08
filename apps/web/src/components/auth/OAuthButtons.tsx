@@ -7,7 +7,11 @@ const _EXPLICIT_OAUTH = import.meta.env['VITE_OAUTH_URL'] as string | undefined
 const _API_URL = import.meta.env['VITE_API_URL'] as string | undefined
 
 function resolveOAuthBase(): string {
-  const base = _EXPLICIT_OAUTH || _API_URL || ''
+  // Dev: Vite proxies /api → :7071, so same-origin links work without env vars.
+  const base =
+    _EXPLICIT_OAUTH ||
+    _API_URL ||
+    (import.meta.env.DEV && typeof globalThis.location !== 'undefined' ? globalThis.location.origin : '')
   if (!base) {
     if (import.meta.env.DEV)
       console.error(

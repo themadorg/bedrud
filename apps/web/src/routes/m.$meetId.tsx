@@ -1,20 +1,34 @@
 // TODO oncoming feature
 import '@livekit/components-styles/components'
-import { LiveKitRoom, RoomAudioRenderer, useTracks } from '@livekit/components-react'
+import { LiveKitRoom, useRoomContext } from '@livekit/components-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { WhiteboardWatchProvider } from '@/components/meeting/whiteboard/WhiteboardWatchContext'
 import type { AudioCaptureOptions } from 'livekit-client'
-import { DisconnectReason, Track } from 'livekit-client'
+import { ConnectionState, DisconnectReason, RoomEvent } from 'livekit-client'
 import { WifiOff } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '#/lib/api'
+import {
+  getLiveKitPublishDiagnostics,
+  livekitConnectOptionsForUrl,
+  livekitRoomOptionsForUrl,
+  waitForRoomPublishReady,
+} from '#/lib/livekit-publish'
+import { LiveKitTransportFallback } from '@/components/meeting/LiveKitTransportFallback'
+import { getLiveKitTransportMode } from '#/lib/livekit-transport-type'
 import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
+import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
+import { useInterfacePreferencesStore } from '#/lib/interface-preferences.store'
+import { readMeetingDeviceId } from '#/lib/meeting-device-storage'
 import { useAuthStore } from '#/lib/auth.store'
 import { useRecentRoomsStore } from '#/lib/recent-rooms.store'
 import { usePinnedParticipants } from '#/lib/usePinnedParticipants'
 import { useVideoPreferencesStore } from '#/lib/video-preferences.store'
 import { ErrorPage } from '@/components/ErrorPage'
+import { MeetLoadingScreen } from '@/components/meeting/MeetLoadingScreen'
+import { MeetingWelcomeScreen, type WelcomeJoinChoices } from '@/components/meeting/MeetingWelcomeScreen'
 import { AskActionBanner } from '@/components/meeting/AskActionBanner'
 import { AudioProcessorManager } from '@/components/meeting/AudioProcessorManager'
 import { BeforeUnloadLock } from '@/components/meeting/BeforeUnloadLock'
@@ -22,11 +36,18 @@ import { FocusLayout } from '@/components/meeting/FocusLayout'
 import { KickDetector } from '@/components/meeting/KickDetector'
 import { MeetingProvider, type RoomDeletionEvent, useMeetingChatContext } from '@/components/meeting/MeetingContext'
 import { MeetingErrorBoundary } from '@/components/meeting/MeetingErrorBoundary'
-import { MeetingHeader } from '@/components/meeting/MeetingHeader'
-import { MeetingPanels } from '@/components/meeting/MeetingPanels'
+import { MeetingRoomAudioRenderer } from '@/components/meeting/MeetingRoomAudioRenderer'
+import { MeetingRoomShell } from '@/components/meeting/MeetingRoomShell'
 import { MeetingSoundEffects } from '@/components/meeting/MeetingSoundEffects'
 import { ParticipantGrid } from '@/components/meeting/ParticipantGrid'
 import { SecureContextBanner } from '@/components/meeting/SecureContextBanner'
+import { MeetingStageProvider, useMeetingStage } from '@/components/meeting/stage/MeetingStageContext'
+import { StageJoinNotifier } from '@/components/meeting/stage/StageJoinNotifier'
+import { StageScreenShareOverlay } from '@/components/meeting/stage/StageScreenShareOverlay'
+import { WhiteboardOverlay } from '@/components/meeting/whiteboard/WhiteboardOverlay'
+import { YoutubeShareDialog } from '@/components/meeting/youtube/YoutubeShareDialog'
+import { YoutubeWatchProvider } from '@/components/meeting/youtube/YoutubeWatchContext'
+import { YoutubeWatchOverlay } from '@/components/meeting/youtube/YoutubeWatchOverlay'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -36,6 +57,8 @@ interface JoinResponse {
   token: string
   livekitHost: string
   adminId: string
+  createdBy?: string
+  isPublic?: boolean
   settings?: {
     recordingsAllowed: boolean
   }
@@ -57,7 +80,57 @@ interface ArchivedOwnedResponse {
   }
 }
 
+/** Dev-only: logs WebSocket vs data-channel readiness (chat/whiteboard need open _reliable/_lossy DCs). */
+function LiveKitTransportDiagnostics({
+  connectOptions,
+}: {
+  connectOptions?: { rtcConfig?: RTCConfiguration }
+}) {
+  const room = useRoomContext()
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const log = (label: string) => {
+      console.log(`[livekit-transport] ${label}`, getLiveKitPublishDiagnostics(room, connectOptions))
+    }
+    const onConnected = () => {
+      log('connected')
+      void room.engine.getConnectedServerAddress?.().then((addr) => {
+        if (addr) console.log('[livekit-transport] selected ICE address', addr)
+      })
+      void getLiveKitTransportMode(room).then((mode) => {
+        if (mode !== 'unknown') {
+          console.log(`[livekit-transport] mode=${mode} (chat uses same peer connection)`)
+        }
+      })
+      void waitForRoomPublishReady(room, 45_000).then((ready) => {
+        log(ready ? 'data-channels-ready' : 'data-channels-timeout')
+        const diag = getLiveKitPublishDiagnostics(room, connectOptions)
+        if (diag.pcMode) {
+          console.log(`[livekit-transport] pcMode=${diag.pcMode}`)
+        }
+        if (!ready) {
+          console.warn(
+            '[livekit-transport] chat needs publisher + subscriber reliable channels',
+            {
+              pcMode: diag.pcMode,
+              publisher: diag.reliableDcState,
+              subscriber: diag.reliableDcSubState,
+            },
+          )
+        }
+      })
+    }
+    room.on(RoomEvent.Connected, onConnected)
+    if (room.state === ConnectionState.Connected) onConnected()
+    return () => {
+      room.off(RoomEvent.Connected, onConnected)
+    }
+  }, [room, connectOptions])
+  return null
+}
+
 export const Route = createFileRoute('/m/$meetId')({
+  ssr: false,
   head: () => ({ meta: [{ title: 'Meeting — Bedrud' }] }),
   component: MeetingPage,
 })
@@ -164,6 +237,23 @@ function MeetingPage() {
   const autoGainControl = useAudioPreferencesStore((s) => s.autoGainControl)
   const mergeAudioPrefs = useAudioPreferencesStore((s) => s.merge)
   const mergeVideoPrefs = useVideoPreferencesStore((s) => s.merge)
+  const mergeExperimentalPrefs = useExperimentalPreferencesStore((s) => s.merge)
+  const mergeInterfacePrefs = useInterfacePreferencesStore((s) => s.merge)
+  const [welcomeChoices, setWelcomeChoices] = useState<WelcomeJoinChoices | null>(null)
+  const welcomeSessionRef = useRef<{ roomKey: string; showWelcome: boolean } | null>(null)
+  const welcomeSessionKeyRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!joinData) {
+      welcomeSessionKeyRef.current = null
+      setWelcomeChoices(null)
+      return
+    }
+    if (welcomeSessionKeyRef.current !== joinData.id) {
+      welcomeSessionKeyRef.current = joinData.id
+      setWelcomeChoices(null)
+    }
+  }, [joinData])
 
   // Echo cancellation is always honoured from user preferences.
   // Noise suppression is only enabled for browser mode to avoid double-processing
@@ -188,6 +278,8 @@ function MeetingPage() {
           const parsed = JSON.parse(r.preferencesJson)
           if (parsed?.audio) mergeAudioPrefs(parsed.audio)
           if (parsed?.video) mergeVideoPrefs(parsed.video)
+          if (parsed?.experimental) mergeExperimentalPrefs(parsed.experimental)
+          if (parsed?.interface) mergeInterfacePrefs(parsed.interface)
         } catch {
           /* use local defaults */
         }
@@ -195,10 +287,24 @@ function MeetingPage() {
       .catch(() => {
         /* use local defaults on network failure */
       })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [joinData, mergeAudioPrefs, mergeVideoPrefs, tokens])
+  }, [joinData, mergeAudioPrefs, mergeExperimentalPrefs, mergeInterfacePrefs, mergeVideoPrefs, tokens])
+
+  const [preferRelayTransport, setPreferRelayTransport] = useState(false)
+  const livekitConnectOptions = useMemo(
+    () =>
+      typeof window !== 'undefined' && joinData?.livekitHost
+        ? livekitConnectOptionsForUrl(joinData.livekitHost, preferRelayTransport)
+        : undefined,
+    [joinData?.livekitHost, preferRelayTransport],
+  )
+  const livekitRoomOptions = useMemo(
+    () => (joinData?.livekitHost ? livekitRoomOptionsForUrl(joinData.livekitHost) : undefined),
+    [joinData?.livekitHost],
+  )
 
   const [currentToken, setCurrentToken] = useState<string | null>(null)
+  const freshTokenRef = useRef<string | null>(null)
+  const [liveKitEpoch, setLiveKitEpoch] = useState(0)
   const [showReconnectBanner, setShowReconnectBanner] = useState(false)
   const [fatalReconnectError, setFatalReconnectError] = useState<string | null>(null)
   const isDisconnectedRef = useRef(false)
@@ -212,6 +318,12 @@ function MeetingPage() {
   const disconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cancelledRef = useRef(false)
 
+  const handleTransportRelayFallback = useCallback(() => {
+    if (preferRelayTransport || cancelledRef.current) return
+    setPreferRelayTransport(true)
+    setLiveKitEpoch((epoch) => epoch + 1)
+  }, [preferRelayTransport])
+
   const attemptReconnect = useCallback(() => {
     if (!meetId) return
 
@@ -224,13 +336,16 @@ function MeetingPage() {
       .post<{ token: string }>('/api/room/refresh-token', { roomName: meetId })
       .then(({ token }) => {
         if (cancelledRef.current) return
+        freshTokenRef.current = token
         if (!isDisconnectedRef.current) {
-          console.log('[reconnect] already reconnected natively, caching token')
-          setCurrentToken(token)
+          // Never call setCurrentToken while connected — useLiveKitRoom re-runs room.connect()
+          // and tears down the peer connection (breaks chat / data channels).
+          console.log('[reconnect] already reconnected natively, cached token (skipped room.connect)')
           return
         }
-        console.log(`[reconnect] attempt=${attempt} succeeded`)
+        console.log(`[reconnect] attempt=${attempt} succeeded — remounting LiveKit session`)
         setCurrentToken(token)
+        setLiveKitEpoch((epoch) => epoch + 1)
       })
       .catch((err: Error) => {
         if (cancelledRef.current) return
@@ -366,7 +481,7 @@ function MeetingPage() {
         .then((data) => {
           if (cancelledRef.current) return
           addRecent(meetId)
-          setJoinData(data)
+          setJoinData({ ...data, isPublic: data.isPublic ?? false })
         })
         .catch((err: Error) => {
           if (!cancelledRef.current) setJoinError(err.message)
@@ -376,17 +491,7 @@ function MeetingPage() {
 
   // Still on server or waiting for client mount — show neutral spinner to avoid SSR flash
   if (!mounted) {
-    return (
-      <div className="fixed inset-0 bg-[#07070f] flex flex-col items-center justify-center gap-3.5">
-        <div
-          className="w-12 h-12 rounded-full animate-[meet-connecting-spin_0.9s_linear_infinite]"
-          style={{
-            border: '2px solid color-mix(in oklab, var(--primary) 30%, transparent)',
-            borderTopColor: 'var(--primary)',
-          }}
-        />
-      </div>
-    )
+    return <MeetLoadingScreen />
   }
 
   // Show guest name dialog for unauthenticated users
@@ -394,15 +499,12 @@ function MeetingPage() {
   // so guestName is always null and tokens always null during SSR.
   if (mounted && !tokens && guestName === null) {
     return (
-      <div className="fixed inset-0 bg-[#07070f] flex items-center justify-center">
-        <div
-          className="bg-white/[0.04] border border-white/[0.08] rounded-2xl px-7 py-8 flex flex-col gap-5"
-          style={{ width: 'min(340px, calc(100vw - 32px))' }}
-        >
+      <div className="meet-room fixed inset-0 flex items-center justify-center bg-[var(--meet-bg)]">
+        <div className="meet-prejoin-panel flex flex-col gap-5">
           <div>
-            <p className="text-white text-[17px] font-semibold m-0">Join as guest</p>
-            <p className="text-white/40 text-[13px] mt-1.5 m-0">
-              Enter your name to join <span className="text-teal-400">{meetId}</span>
+            <p className="m-0 text-[17px] font-semibold text-[var(--meet-fg)]">Join as guest</p>
+            <p className="m-0 mt-1.5 text-[13px] text-[var(--meet-fg-muted)]">
+              Enter your name to join <span className="text-[var(--meet-btn-muted-fg)]">{meetId}</span>
             </p>
           </div>
           <Input
@@ -412,22 +514,22 @@ function MeetingPage() {
               if (e.key === 'Enter' && guestInput.trim()) setGuestName(guestInput.trim())
             }}
             placeholder="Your name"
-            className="bg-white/[0.06] border-white/[0.12] text-white placeholder:text-white/40 h-auto py-2.5"
+            className="h-auto border-[var(--meet-border)] bg-[var(--meet-control)] py-2.5 text-[var(--meet-fg)] placeholder:text-[var(--meet-fg-subtle)]"
           />
           <div className="flex gap-2.5">
             <Button
               type="button"
               disabled={!guestInput.trim()}
               onClick={() => setGuestName(guestInput.trim())}
-              className="flex-1 py-2.5 rounded-lg"
+              className="flex-1 rounded-lg py-2.5"
             >
               Join
             </Button>
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               onClick={() => navigate({ to: '/auth/login', search: { redirect: `/m/${meetId}` } })}
-              className="px-3.5 py-2.5 rounded-lg border border-white/10 text-white/50 text-[13px]"
+              className="rounded-lg border-[var(--meet-border)] px-3.5 py-2.5 text-[13px] text-[var(--meet-fg-muted)]"
             >
               Sign in
             </Button>
@@ -440,16 +542,13 @@ function MeetingPage() {
   // Archived room owned by current user — show recreate dialog
   if (archivedRoom) {
     return (
-      <div className="fixed inset-0 bg-[#07070f] flex items-center justify-center">
-        <div
-          className="bg-white/[0.04] border border-white/[0.08] rounded-2xl px-7 py-8 flex flex-col gap-5"
-          style={{ width: 'min(380px, calc(100vw - 32px))' }}
-        >
+      <div className="meet-room fixed inset-0 flex items-center justify-center bg-[var(--meet-bg)]">
+        <div className="meet-prejoin-panel meet-prejoin-panel-wide flex flex-col gap-5">
           <div>
-            <p className="text-white text-[17px] font-semibold m-0">This meeting has ended</p>
-            <p className="text-white/40 text-[13px] mt-1.5 m-0">
-              <span className="text-teal-400">{archivedRoom.name}</span> was created by you. Start a new meeting with
-              this name?
+            <p className="m-0 text-[17px] font-semibold text-[var(--meet-fg)]">This meeting has ended</p>
+            <p className="m-0 mt-1.5 text-[13px] text-[var(--meet-fg-muted)]">
+              <span className="text-[var(--meet-btn-muted-fg)]">{archivedRoom.name}</span> was created by you. Start a
+              new meeting with this name?
             </p>
           </div>
           <div className="flex gap-2.5">
@@ -479,15 +578,15 @@ function MeetingPage() {
                     if (!cancelledRef.current) setJoinError(err.message)
                   })
               }}
-              className="flex-1 py-2.5 rounded-lg"
+              className="flex-1 rounded-lg py-2.5"
             >
               Start new meeting
             </Button>
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               onClick={() => navigate({ to: '/dashboard' })}
-              className="px-3.5 py-2.5 rounded-lg border border-white/10 text-white/50 text-[13px]"
+              className="rounded-lg border-[var(--meet-border)] px-3.5 py-2.5 text-[13px] text-[var(--meet-fg-muted)]"
             >
               Dashboard
             </Button>
@@ -513,35 +612,41 @@ function MeetingPage() {
   }
 
   if (!joinData) {
+    welcomeSessionRef.current = null
+    return <MeetLoadingScreen label="Joining room…" />
+  }
+
+  if (welcomeSessionRef.current?.roomKey !== joinData.id) {
+    welcomeSessionRef.current = {
+      roomKey: joinData.id,
+      showWelcome: useInterfacePreferencesStore.getState().showWelcomeScreen,
+    }
+  }
+
+  const skipWelcome = !welcomeSessionRef.current.showWelcome
+  if (!skipWelcome && welcomeChoices === null) {
     return (
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: '#07070f',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 14,
-        }}
-      >
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: '50%',
-            border: '2px solid color-mix(in oklab, var(--primary) 30%, transparent)',
-            borderTopColor: 'var(--primary)',
-            animation: 'meet-connecting-spin 0.9s linear infinite',
-          }}
-        />
-        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>Joining room…</p>
-      </div>
+      <MeetingWelcomeScreen
+        roomId={joinData.id}
+        roomName={joinData.name}
+        isPublic={joinData.isPublic ?? false}
+        onJoin={(choices) => setWelcomeChoices(choices)}
+      />
     )
   }
 
-  const { id, token: originalToken, livekitHost: wsUrl, name: roomName, adminId } = joinData
+  const joinMediaChoices = welcomeChoices ?? { micEnabled: true, camEnabled: false }
+  const micDeviceId = readMeetingDeviceId('audioinput')
+  const camDeviceId = readMeetingDeviceId('videoinput')
+  const livekitAudio: AudioCaptureOptions | boolean =
+    joinMediaChoices.micEnabled && typeof audioConstraints === 'object'
+      ? { ...audioConstraints, deviceId: micDeviceId || undefined }
+      : joinMediaChoices.micEnabled
+        ? audioConstraints
+        : false
+  const livekitVideo = joinMediaChoices.camEnabled ? { deviceId: camDeviceId || undefined } : false
+
+  const { id, token: originalToken, livekitHost: wsUrl, name: roomName, adminId, createdBy, isPublic = false } = joinData
   const token = currentToken ?? originalToken
 
   if (fatalReconnectError) {
@@ -553,46 +658,28 @@ function MeetingPage() {
   }
 
   if (wasRoomDeleted) {
-    return (
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: '#07070f',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 14,
-        }}
-      >
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: '50%',
-            border: '2px solid color-mix(in oklab, var(--primary) 30%, transparent)',
-            borderTopColor: 'var(--primary)',
-            animation: 'meet-connecting-spin 0.9s linear infinite',
-          }}
-        />
-        <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Room deleted. Redirecting…</p>
-      </div>
-    )
+    return <MeetLoadingScreen label="Room deleted. Redirecting…" />
   }
 
   return (
-    <MeetingErrorBoundary>
-      <LiveKitRoom
-        token={token}
-        serverUrl={wsUrl}
-        connect
-        audio={audioConstraints}
-        video={false}
-        onDisconnected={handleDisconnected}
-        onConnected={handleReconnected}
-      >
-        <RoomAudioRenderer />
+    <LiveKitRoom
+      key={liveKitEpoch}
+      token={token}
+      serverUrl={wsUrl}
+      connect
+      connectOptions={livekitConnectOptions}
+      options={livekitRoomOptions}
+      audio={livekitAudio}
+      video={livekitVideo}
+      onDisconnected={handleDisconnected}
+      onConnected={handleReconnected}
+    >
+      <MeetingErrorBoundary>
+        <LiveKitTransportDiagnostics connectOptions={livekitConnectOptions} />
+        <LiveKitTransportFallback
+          connectOptions={livekitConnectOptions}
+          onNeedRelay={handleTransportRelayFallback}
+        />
         {/* LiveKitRoom renders as display:contents — this div is the actual viewport container */}
         {showReconnectBanner && (
           <div className="fixed top-0 start-0 end-0 z-[9999] bg-yellow-500/15 border-b border-yellow-500/30 px-4 py-2 text-center text-[13px] text-amber-400 backdrop-blur-sm">
@@ -621,7 +708,7 @@ function MeetingPage() {
             }}
           />
         )}
-        <div className="fixed inset-0 overflow-hidden" style={{ background: '#07070f' }}>
+        <div className="meet-room fixed inset-0 overflow-hidden bg-[var(--meet-bg)]">
           {/* Skip links */}
           <a
             href="#meet-grid"
@@ -636,66 +723,75 @@ function MeetingPage() {
             Skip to controls
           </a>
           <SecureContextBanner />
-          <MeetingProvider
-            roomId={id}
-            roomName={roomName}
-            adminId={adminId ?? ''}
-            // TODO oncoming feature
-            recordingsAllowed={false}
-            // TODO oncoming feature
-            activeRecordingId={undefined}
-            onRoomDeletionMessage={handleRoomDeletionMessage}
-          >
-            <BeforeUnloadLock />
-            <KickDetector onKicked={() => setWasKicked(true)} onRoomDeleted={handleRoomDeleted} />
-            <AskActionBanner />
-            <AudioProcessorManager />
-            <MeetingSoundEffects />
-            {/* Ambient depth gradients */}
-            <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-              <div
-                className="absolute rounded-full"
-                style={{
-                  width: 900,
-                  height: 900,
-                  background:
-                    'radial-gradient(circle, color-mix(in oklab, var(--primary) 5.5%, transparent) 0%, transparent 65%)',
-                  top: '-300px',
-                  left: '-300px',
-                }}
-              />
-              <div
-                className="absolute rounded-full"
-                style={{
-                  width: 700,
-                  height: 700,
-                  background: 'radial-gradient(circle, rgba(6,182,212,0.04) 0%, transparent 65%)',
-                  bottom: '-200px',
-                  right: '-150px',
-                }}
-              />
-            </div>
+          <MeetingStageProvider>
+            <MeetingProvider
+              roomId={id}
+              roomName={roomName}
+              adminId={adminId ?? ''}
+              createdBy={createdBy ?? ''}
+              isPublic={isPublic}
+              // TODO oncoming feature
+              recordingsAllowed={false}
+              // TODO oncoming feature
+              activeRecordingId={undefined}
+              onRoomDeletionMessage={handleRoomDeletionMessage}
+            >
+              <YoutubeWatchProvider>
+                <WhiteboardWatchProvider>
+                  <StageJoinNotifier />
+                  <BeforeUnloadLock />
+                  <KickDetector onKicked={() => setWasKicked(true)} onRoomDeleted={handleRoomDeleted} />
+                  <AskActionBanner />
+                  <AudioProcessorManager />
+                  <MeetingRoomAudioRenderer />
+                  <MeetingSoundEffects />
+                  {/* Ambient depth gradients */}
+                  <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+                    <div
+                      className="absolute rounded-full"
+                      style={{
+                        width: 900,
+                        height: 900,
+                        background: 'radial-gradient(circle, var(--meet-ambient-a) 0%, transparent 65%)',
+                        top: '-300px',
+                        left: '-300px',
+                      }}
+                    />
+                    <div
+                      className="absolute rounded-full"
+                      style={{
+                        width: 700,
+                        height: 700,
+                        background: 'radial-gradient(circle, var(--meet-ambient-b) 0%, transparent 65%)',
+                        bottom: '-200px',
+                        right: '-150px',
+                      }}
+                    />
+                  </div>
 
-            <MeetingLayout />
+                  <MeetingRoomShell meetId={meetId} navigate={() => navigate({ to: '/dashboard' })}>
+                    <MeetingLayout />
+                    <YoutubeWatchOverlay />
+                    <WhiteboardOverlay />
+                    <StageScreenShareOverlay />
 
-            {/* Vignettes for header/controls legibility */}
-            <div
-              className="pointer-events-none absolute start-0 end-0 top-0 z-10 h-[calc(96px+env(safe-area-inset-top))]"
-              style={{ background: 'linear-gradient(to bottom, rgba(7,7,15,0.65) 0%, transparent 100%)' }}
-            />
-            <div
-              className="pointer-events-none absolute bottom-0 start-0 end-0 z-10 h-[calc(128px+env(safe-area-inset-bottom))]"
-              style={{ background: 'linear-gradient(to top, rgba(7,7,15,0.6) 0%, transparent 100%)' }}
-            />
-
-            <MeetingHeader meetId={meetId} />
-
-            {/* Side panels */}
-            <MeetingPanels navigate={() => navigate({ to: '/dashboard' })} />
-          </MeetingProvider>
+                    <div
+                      className="pointer-events-none absolute start-0 end-0 top-0 z-10 h-[calc(96px+env(safe-area-inset-top))]"
+                      style={{ background: 'linear-gradient(to bottom, var(--meet-vignette-top) 0%, transparent 100%)' }}
+                    />
+                    <div
+                      className="pointer-events-none absolute bottom-0 start-0 end-0 z-10 h-[calc(128px+env(safe-area-inset-bottom))]"
+                      style={{ background: 'linear-gradient(to top, var(--meet-vignette-bottom) 0%, transparent 100%)' }}
+                    />
+                  </MeetingRoomShell>
+                  <YoutubeShareDialog />
+                </WhiteboardWatchProvider>
+              </YoutubeWatchProvider>
+            </MeetingProvider>
+          </MeetingStageProvider>
         </div>
-      </LiveKitRoom>
-    </MeetingErrorBoundary>
+      </MeetingErrorBoundary>
+    </LiveKitRoom>
   )
 }
 
@@ -752,12 +848,11 @@ function DisconnectedOverlay({
 
 // ── Layout switcher (inside LiveKitRoom context) ───────────────
 function MeetingLayout() {
+  const { stage } = useMeetingStage()
   const { pinned, toggle, clear } = usePinnedParticipants()
   const { systemMessages } = useMeetingChatContext()
-  const screenShareTracks = useTracks([Track.Source.ScreenShare])
-  const isFocusMode = screenShareTracks.length > 0 || pinned.size > 0
+  const isFocusMode = pinned.size > 0
 
-  // Auto-pin on spotlight system message
   const lastSpotlightTsRef = useRef(0)
   useEffect(() => {
     const last = [...systemMessages].reverse().find((m) => m.event === 'spotlight')
@@ -767,6 +862,8 @@ function MeetingLayout() {
   }, [systemMessages, pinned, toggle])
 
   useEffect(() => () => clear(), [clear])
+
+  if (stage) return null
 
   if (isFocusMode) {
     return <FocusLayout pinnedIdentities={pinned} onTogglePin={toggle} />

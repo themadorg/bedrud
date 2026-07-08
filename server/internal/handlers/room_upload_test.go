@@ -185,10 +185,10 @@ func TestAdminCloseRoom_CleansS3Uploads(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/close", nil)
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/close", http.NoBody)
 	resp, _ := app.Test(req, -1)
-	resp.Body.Close()
-	if resp.StatusCode != 202 {
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("expected 202, got %d", resp.StatusCode)
 	}
 }
@@ -204,10 +204,10 @@ func TestAdminCloseRoom_CleansOnlyOwnS3Uploads(t *testing.T) {
 	_ = tracker.Record(room.ID, "admin-user", "s3obj2", ".jpg", 200, "s3")
 	_ = tracker.Record(room.ID, "admin-user", "inline1", ".gif", 50, "inline")
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/close", nil)
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/close", http.NoBody)
 	resp, _ := app.Test(req, -1)
-	resp.Body.Close()
-	if resp.StatusCode != 202 {
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("expected 202, got %d", resp.StatusCode)
 	}
 }
@@ -224,10 +224,10 @@ func TestAdminSuspendRoom_CleansS3Uploads(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/suspend", nil)
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/suspend", http.NoBody)
 	resp, _ := app.Test(req, -1)
-	resp.Body.Close()
-	if resp.StatusCode != 202 {
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("expected 202, got %d", resp.StatusCode)
 	}
 }
@@ -370,9 +370,12 @@ func TestUploadChatImage_OverLimit_Returns413(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/room/"+room.ID+"/chat/upload", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
-	if resp.StatusCode != 507 {
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusInsufficientStorage {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 507 (quota exceeded), got %d: %s", resp.StatusCode, string(respBody))
 	}

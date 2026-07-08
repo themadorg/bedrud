@@ -48,7 +48,7 @@ func TestProtected_Real_NoAuthHeader(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != fiber.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", resp.StatusCode)
 	}
@@ -68,7 +68,7 @@ func TestProtected_Real_ValidToken(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -87,7 +87,7 @@ func TestProtected_Real_InvalidToken(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("Authorization", "Bearer bad-token")
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != fiber.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", resp.StatusCode)
 	}
@@ -107,7 +107,7 @@ func TestProtected_Real_NoBearerPrefix(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("Authorization", token) // no "Bearer " prefix
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -124,7 +124,7 @@ func TestRequireAccess_Real_HasAccess(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/admin", http.NoBody)
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -141,7 +141,7 @@ func TestRequireAccess_Real_InsufficientAccess(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/admin", http.NoBody)
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != fiber.StatusForbidden {
 		t.Fatalf("expected 403, got %d", resp.StatusCode)
 	}
@@ -171,7 +171,7 @@ func TestProtected_NoAuthHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != fiber.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", resp.StatusCode)
 	}
@@ -210,7 +210,7 @@ func TestProtected_WithValidBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -249,7 +249,7 @@ func TestProtected_WithTokenWithoutBearerPrefix(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("Authorization", token) // No "Bearer " prefix
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -281,7 +281,7 @@ func TestProtected_InvalidToken(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("Authorization", "Bearer invalid-token-content")
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != fiber.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", resp.StatusCode)
 	}
@@ -312,7 +312,7 @@ func TestRequireAccess_HasAccess(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/admin", http.NoBody)
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -338,7 +338,7 @@ func TestRequireEmailVerified_Disabled(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 when verification disabled, got %d", resp.StatusCode)
 	}
@@ -371,7 +371,7 @@ func TestRequireEmailVerified_BlocksUnverified(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403 for unverified user, got %d", resp.StatusCode)
 	}
@@ -406,7 +406,7 @@ func TestRequireEmailVerified_AllowsVerified(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 for verified user, got %d", resp.StatusCode)
 	}
@@ -430,7 +430,7 @@ func TestRequireEmailVerified_ExemptsGuest(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 for guest, got %d", resp.StatusCode)
 	}
@@ -451,7 +451,7 @@ func TestRequireEmailVerified_NoUserClaims(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 when no user claims, got %d", resp.StatusCode)
 	}
@@ -475,7 +475,7 @@ func TestRequireEmailVerified_UserNotFound(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 when user not found, got %d", resp.StatusCode)
 	}
@@ -505,7 +505,7 @@ func TestRequireAccess_InsufficientAccess(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/admin", http.NoBody)
 	resp, _ := app.Test(req)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != fiber.StatusForbidden {
 		t.Fatalf("expected 403, got %d", resp.StatusCode)
 	}
@@ -548,7 +548,7 @@ func TestRequireEmailVerified_VerifiedUserInDB(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -594,7 +594,7 @@ func TestRequireEmailVerified_RejectsStaleClaim(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusForbidden {
 		respBody, _ := io.ReadAll(resp.Body)

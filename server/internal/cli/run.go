@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bedrud/internal/clioutput"
 	"bedrud/internal/server"
 	"fmt"
 	"os"
@@ -17,9 +18,18 @@ func newRunCmd() *cobra.Command {
 		Short:   "Start the meeting server",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if skipMigrate {
-				os.Setenv("BEDRUD_SKIP_MIGRATE", "1")
+				_ = os.Setenv("BEDRUD_SKIP_MIGRATE", "1")
 			}
 			path := resolveConfigPath(defaultConfigPath)
+			if clioutput.JSON() {
+				if err := clioutput.Success("starting server", map[string]any{
+					"configPath":  path,
+					"version":     Version,
+					"skipMigrate": skipMigrate,
+				}); err != nil {
+					return err
+				}
+			}
 			if err := server.Run(path, Version); err != nil {
 				return fmt.Errorf("server: %w", err)
 			}

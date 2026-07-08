@@ -61,9 +61,12 @@ class AuthApiTest {
     }
 
     @Test
-    fun `register sends POST to auth-register and parses RegisterResponse`() = runBlocking {
+    fun `register sends POST to auth-register and parses LoginResponse shape`() = runBlocking {
         val responseBody = gson.toJson(
-            RegisterResponse(accessToken = "acc", refreshToken = "ref")
+            LoginResponse(
+                tokens = AuthTokens(accessToken = "acc", refreshToken = "ref"),
+                user = User(id = "u1", email = "a@b.com", name = "Alice")
+            )
         )
         server.enqueue(MockResponse().setBody(responseBody).setResponseCode(200))
 
@@ -75,7 +78,8 @@ class AuthApiTest {
         assertEquals("POST", request.method)
         assertEquals("/auth/register", request.path)
         assertTrue(response.isSuccessful)
-        assertEquals("acc", response.body()!!.accessToken)
+        assertTrue(response.body()!!.has("tokens"))
+        assertEquals("acc", response.body()!!.getAsJsonObject("tokens").get("accessToken").asString)
     }
 
     @Test

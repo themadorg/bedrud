@@ -1,16 +1,15 @@
 package queue
 
 import (
+	"bedrud/config"
+	"bedrud/internal/models"
+	"bedrud/internal/utils"
 	"bytes"
 	"context"
 	"encoding/json"
 	"html/template"
 	"strings"
 	"testing"
-
-	"bedrud/config"
-	"bedrud/internal/models"
-	"bedrud/internal/utils"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
