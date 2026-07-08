@@ -17,7 +17,9 @@ export function MeetingRoomAudioRenderer() {
     }
 
     const muteAll = () => {
-      room.remoteParticipants.forEach((participant) => muteParticipant(participant))
+      room.remoteParticipants.forEach((participant) => {
+        muteParticipant(participant)
+      })
     }
 
     muteAll()

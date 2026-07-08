@@ -89,7 +89,6 @@ function ParticipantRow({ p, adminId }: RowProps): React.ReactElement {
   const isGuest = !isRoomAdmin && !isMod && participantAccesses.includes('guest')
 
   const row = (
-    // biome-ignore lint/a11y/noStaticElementInteractions: hover highlight is visual only, not interactive
     <div className="group flex cursor-default items-center gap-2.5 rounded-xl px-2 py-[7px] transition-[background] duration-[0.12s] hover:bg-[var(--meet-control)]">
       {/* Avatar */}
       <ParticipantAvatar

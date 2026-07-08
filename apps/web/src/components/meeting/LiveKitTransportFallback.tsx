@@ -20,6 +20,7 @@ export function LiveKitTransportFallback({
   const room = useRoomContext()
   const escalatedRef = useRef(false)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset on connectOptions change
   useEffect(() => {
     escalatedRef.current = false
   }, [connectOptions])

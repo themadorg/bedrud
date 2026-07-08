@@ -501,11 +501,11 @@ export function WelcomePresenceBackdrop({ roomId, enabled = true }: { roomId: st
 
   return (
     <div ref={containerRef} className="meet-welcome-presence absolute inset-0 z-[5] overflow-hidden" aria-hidden>
-      <svg className="meet-welcome-presence-aim pointer-events-none absolute inset-0 h-full w-full">
+      <svg role="presentation" className="meet-welcome-presence-aim pointer-events-none absolute inset-0 h-full w-full">
         <line ref={aimLineRef} visibility="hidden" />
         <polygon ref={aimHeadRef} visibility="hidden" />
       </svg>
-      {participants.map((participant, index) => {
+      {participants.map((participant) => {
         const palette = getPalette(participant.name || participant.identity)
         return (
           <div

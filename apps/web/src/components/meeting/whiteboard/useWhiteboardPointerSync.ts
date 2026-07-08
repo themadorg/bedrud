@@ -116,6 +116,7 @@ export function useWhiteboardPointerSync(apiRef: RefObject<ExcalidrawImperativeA
 
   const toSocketId = (identity: string) => identity as SocketId
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: toSocketId is stable local function
   const setCollaborator = useCallback(
     (identity: string, updates: Partial<Collaborator>) => {
       const socketId = toSocketId(identity)
@@ -131,6 +132,7 @@ export function useWhiteboardPointerSync(apiRef: RefObject<ExcalidrawImperativeA
     [pushCollaborators, room.localParticipant.identity],
   )
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: toSocketId is stable local function
   const removeCollaborator = useCallback(
     (identity: string) => {
       if (!collaboratorsRef.current.delete(toSocketId(identity))) return
@@ -139,6 +141,7 @@ export function useWhiteboardPointerSync(apiRef: RefObject<ExcalidrawImperativeA
     [pushCollaborators],
   )
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: toSocketId is stable local function
   const syncParticipants = useCallback(() => {
     const localId = room.localParticipant.identity
     const localName = room.localParticipant.name || localId

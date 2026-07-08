@@ -67,6 +67,7 @@ export function RoomAccessDialog({ open, onOpenChange }: Props) {
             disabled={!canManageRoomAccess}
           >
             <label
+              htmlFor="room-access-private"
               className={cn(
                 'flex flex-col items-start gap-1.5 rounded-lg border p-3 text-left transition-colors',
                 !selected ? 'border-primary/40 bg-primary/10' : 'border-white/[0.08] bg-white/[0.03] text-white/50',
@@ -74,7 +75,12 @@ export function RoomAccessDialog({ open, onOpenChange }: Props) {
                 !canManageRoomAccess && 'opacity-70 cursor-default',
               )}
             >
-              <RadioGroupItem value="private" className="sr-only" disabled={!canManageRoomAccess} />
+              <RadioGroupItem
+                id="room-access-private"
+                value="private"
+                className="sr-only"
+                disabled={!canManageRoomAccess}
+              />
               <div className="flex items-center gap-2">
                 <Lock className={cn('h-4 w-4', !selected ? 'text-primary' : 'text-white/40')} />
                 <span className={cn('text-sm font-medium', !selected ? 'text-white' : 'text-white/50')}>Private</span>
@@ -82,6 +88,7 @@ export function RoomAccessDialog({ open, onOpenChange }: Props) {
               <span className="text-[11px] text-white/40">Invite only</span>
             </label>
             <label
+              htmlFor="room-access-public"
               className={cn(
                 'flex flex-col items-start gap-1.5 rounded-lg border p-3 text-left transition-colors',
                 selected ? 'border-primary/40 bg-primary/10' : 'border-white/[0.08] bg-white/[0.03] text-white/50',
@@ -89,7 +96,12 @@ export function RoomAccessDialog({ open, onOpenChange }: Props) {
                 !canManageRoomAccess && 'opacity-70 cursor-default',
               )}
             >
-              <RadioGroupItem value="public" className="sr-only" disabled={!canManageRoomAccess} />
+              <RadioGroupItem
+                id="room-access-public"
+                value="public"
+                className="sr-only"
+                disabled={!canManageRoomAccess}
+              />
               <div className="flex items-center gap-2">
                 <Globe className={cn('h-4 w-4', selected ? 'text-primary' : 'text-white/40')} />
                 <span className={cn('text-sm font-medium', selected ? 'text-white' : 'text-white/50')}>Public</span>

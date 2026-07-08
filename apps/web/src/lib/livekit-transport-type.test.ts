@@ -8,7 +8,9 @@ function mockStats(entries: Record<string, unknown>[]): RTCStatsReport {
   }
   return {
     forEach(callback: (value: RTCStats) => void) {
-      map.forEach((value) => callback(value as RTCStats))
+      map.forEach((value) => {
+        callback(value as RTCStats)
+      })
     },
   } as RTCStatsReport
 }

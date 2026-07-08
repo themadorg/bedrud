@@ -298,6 +298,7 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
   const mutateRef = useRef(syncMutation.mutate)
   mutateRef.current = syncMutation.mutate
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional — save on any setting change
   useEffect(() => {
     const timer = setTimeout(() => mutateRef.current(), 1000)
     return () => clearTimeout(timer)

@@ -23,6 +23,7 @@ export function ExperimentalSettingsPanel({ tone = 'default' }: { tone?: Setting
   const mutateRef = useRef(syncMutation.mutate)
   mutateRef.current = syncMutation.mutate
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional — save on any toggle change
   useEffect(() => {
     const timer = setTimeout(() => mutateRef.current(), 1000)
     return () => clearTimeout(timer)

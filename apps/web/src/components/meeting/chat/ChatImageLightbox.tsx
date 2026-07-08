@@ -25,6 +25,7 @@ export function ChatImageLightbox({ url, onClose }: Props) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: url is intentional trigger to reset zoom/pan on image change
   useEffect(() => {
     setZoom(1)
     setPan({ x: 0, y: 0 })
@@ -155,6 +156,9 @@ export function ChatImageLightbox({ url, onClose }: Props) {
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose()
+      }}
     >
       <div className="absolute top-[calc(12px+env(safe-area-inset-top))] right-[calc(12px+env(safe-area-inset-right))] z-20 flex items-center gap-2">
         <button
@@ -176,6 +180,7 @@ export function ChatImageLightbox({ url, onClose }: Props) {
         </button>
       </div>
 
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive image viewport for pan/zoom/click-to-close */}
       <div
         ref={viewportRef}
         className={`flex flex-1 items-center justify-center overflow-hidden touch-none ${zoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
@@ -183,12 +188,17 @@ export function ChatImageLightbox({ url, onClose }: Props) {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: interactive image viewport for pan/zoom
+        tabIndex={0}
         onClick={(e) => {
           if (e.target !== e.currentTarget || pointerMoved.current) {
             pointerMoved.current = false
             return
           }
           onClose()
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') onClose()
         }}
       >
         <img

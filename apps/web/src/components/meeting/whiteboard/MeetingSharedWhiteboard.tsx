@@ -95,6 +95,7 @@ export function MeetingSharedWhiteboard({
     }
   }, [handleViewportChange, panSurface])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refs don't change, intentional exclusion
   useEffect(() => {
     const shell = shellRef.current
     const api = apiRef.current

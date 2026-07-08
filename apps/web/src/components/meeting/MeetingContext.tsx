@@ -552,7 +552,7 @@ export function MeetingProvider({
       applyLocalProfile(fallbackName, userAvatarRef.current)
       notifyProfileChanged()
     }
-  }, [accessToken, localIdentity, room.state, room.localParticipant, setUser, applyLocalProfile, notifyProfileChanged])
+  }, [accessToken, localIdentity, room, setUser, applyLocalProfile, notifyProfileChanged])
 
   const fetchAllRemoteProfiles = useCallback(() => {
     for (const participant of room.remoteParticipants.values()) {
@@ -566,8 +566,9 @@ export function MeetingProvider({
     userNameRef.current = trimmedName
     applyLocalProfile(trimmedName, userAvatarRef.current)
     notifyProfileChanged()
-  }, [user?.name, room.state, applyLocalProfile, notifyProfileChanged])
+  }, [user?.name, room, applyLocalProfile, notifyProfileChanged])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: profileSyncVersion is intentional trigger counter
   useEffect(() => {
     if (room.state !== ConnectionState.Connected || !isRoomSignalingReady(room)) return
     userAvatarRef.current = user?.avatarUrl?.trim() || undefined
@@ -575,15 +576,7 @@ export function MeetingProvider({
     if (!trimmedName) return
     applyLocalProfile(trimmedName, userAvatarRef.current)
     notifyProfileChanged()
-  }, [
-    user?.avatarUrl,
-    user?.name,
-    room.state,
-    room.localParticipant.name,
-    profileSyncVersion,
-    applyLocalProfile,
-    notifyProfileChanged,
-  ])
+  }, [user?.avatarUrl, user?.name, room, profileSyncVersion, applyLocalProfile, notifyProfileChanged])
 
   useEffect(() => {
     const syncParticipant = (participant: Participant) => {
@@ -1105,7 +1098,7 @@ export function MeetingProvider({
 
       void publishChatPackets(id, packets)
     },
-    [publishChatPackets, ttlHours],
+    [publishChatPackets, ttlHours, room.localParticipant],
   )
 
   const reactToMessage = useCallback(
@@ -1156,7 +1149,6 @@ export function MeetingProvider({
     [room],
   )
 
-  // Room context value — stable unless room metadata actually changes
   const roomValue = useMemo<MeetingRoomContextValue>(
     () => ({
       roomId,
@@ -1209,7 +1201,7 @@ export function MeetingProvider({
       toggleRecording,
       recordingsAllowed,
       recordingsEnabled,
-      room.localParticipant.identity,
+      hostUserId,
     ],
   )
 

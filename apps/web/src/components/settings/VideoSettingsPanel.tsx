@@ -145,6 +145,7 @@ export function VideoSettingsPanel({ tone = 'default', onCameraDeviceChange }: V
   const mutateRef = useRef(syncMutation.mutate)
   mutateRef.current = syncMutation.mutate
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional — save on mirror toggle
   useEffect(() => {
     const timer = setTimeout(() => mutateRef.current(), 1000)
     return () => clearTimeout(timer)

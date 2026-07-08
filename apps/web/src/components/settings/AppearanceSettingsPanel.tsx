@@ -54,6 +54,7 @@ export function AppearanceSettingsPanel({ tone = 'default' }: { tone?: SettingsP
     setMounted(true)
   }, [])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional trigger to re-save on welcome screen toggle
   useEffect(() => {
     if (!tokens) return
     const timer = setTimeout(() => mutateRef.current(), 1000)

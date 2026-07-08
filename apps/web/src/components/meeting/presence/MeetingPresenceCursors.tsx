@@ -32,7 +32,7 @@ type RemoteCursor = {
 function PresenceMarker({ color, username }: { color: string; username: string }) {
   return (
     <div className="relative" style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))' }}>
-      <svg width="11" height="14" viewBox="0 0 11 14" aria-hidden className="block overflow-visible">
+      <svg width="11" height="14" viewBox="0 0 11 14" role="presentation" className="block overflow-visible">
         <path d="M0,0 L0,14 L4,9 L11,8 Z" fill="#fff" stroke="#fff" strokeWidth="6" strokeLinejoin="round" />
         <path d="M0,0 L0,14 L4,9 L11,8 Z" fill={color} stroke={color} strokeWidth="2" strokeLinejoin="round" />
       </svg>
@@ -61,6 +61,7 @@ export function MeetingPresenceCursors() {
   const localVisibleRef = useRef(false)
   const enabled = false
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: layoutEpoch is intentional trigger to refresh portal target
   useEffect(() => {
     if (!enabled) {
       setPortalTarget(null)
@@ -69,6 +70,7 @@ export function MeetingPresenceCursors() {
     setPortalTarget(document.getElementById('meet-presence-layer'))
   }, [enabled, layoutEpoch])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: enabled is intentional trigger for setup/teardown
   useEffect(() => {
     if (!enabled) return
     const grid = document.getElementById('meet-grid')
@@ -105,6 +107,7 @@ export function MeetingPresenceCursors() {
     setCursors(Array.from(cursorsRef.current.values()).filter((c) => c.visible))
   }, [])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: stable refs intentionally excluded to prevent render loops
   useEffect(() => {
     if (!enabled) {
       cursorsRef.current.clear()

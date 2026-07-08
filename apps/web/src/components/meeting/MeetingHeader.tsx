@@ -117,7 +117,7 @@ export function MeetingHeader({ meetId, infoOpen = false, onToggleInfo }: Meetin
               width="10"
               height="10"
               viewBox="0 0 10 10"
-              aria-hidden
+              role="presentation"
               className={cn(
                 'shrink-0',
                 infoOpen

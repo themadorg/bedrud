@@ -15,6 +15,7 @@ export function ParticipantAvatar({ avatarUrl, initials, paletteBackground, clas
   const resolved = resolveAvatarUrl(avatarUrl)
   const [imageError, setImageError] = useState(false)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resolved is reactive prop
   useEffect(() => {
     setImageError(false)
   }, [resolved])

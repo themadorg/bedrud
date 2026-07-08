@@ -319,14 +319,9 @@ export { getTextFromElements } from "@excalidraw/element";
 export { isInvisiblySmallElement } from "@excalidraw/element";
 
 export { defaultLang, useI18n, languages } from "./i18n";
-export {
-  restoreAppState,
-  restoreElement,
-  restoreElements,
-  restoreLibraryItems,
-} from "./data/restore";
-
-export { reconcileElements } from "./data/reconcile";
+// ponytail: data/ directory never vendored. Only restoreElements used by app.
+// Re-implemented in ./data/restore.ts using vendored packages.
+export { restoreElements } from "./data/restore";
 
 export {
   exportToCanvas,
@@ -335,13 +330,7 @@ export {
   exportToClipboard,
 } from "@excalidraw/utils/export";
 
-export { serializeAsJSON, serializeLibraryAsJSON } from "./data/json";
-export {
-  loadFromBlob,
-  loadSceneOrLibraryFromBlob,
-  loadLibraryFromBlob,
-} from "./data/blob";
-export { mergeLibraryItems, getLibraryItemsHash } from "./data/library";
+
 export { isLinearElement } from "@excalidraw/element";
 
 export {
@@ -366,7 +355,7 @@ export {
 
 export { CaptureUpdateAction } from "@excalidraw/element";
 
-export { parseLibraryTokensFromUrl, useHandleLibrary } from "./data/library";
+
 
 export { Sidebar } from "./components/Sidebar/Sidebar";
 export { Button } from "./components/Button";
@@ -404,7 +393,7 @@ export {
 export { elementsOverlappingBBox } from "@excalidraw/element";
 
 export { DiagramToCodePlugin } from "./components/DiagramToCodePlugin/DiagramToCodePlugin";
-export { getDataURL } from "./data/blob";
+
 export { isElementLink } from "@excalidraw/element";
 
 export { Fonts } from "./fonts/Fonts";

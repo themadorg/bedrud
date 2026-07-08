@@ -62,6 +62,7 @@ export function YoutubeWatchOverlay() {
     }, 400)
   }, [isHost, playerRef, session])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional trigger counters to force re-sync
   useEffect(() => {
     applyRemote()
   }, [applyRemote, remoteSyncNonce, readyVersion])

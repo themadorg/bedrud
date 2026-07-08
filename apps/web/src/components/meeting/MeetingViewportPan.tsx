@@ -80,7 +80,7 @@ export function MeetingViewportPanProvider({ children }: { children: ReactNode }
         originPanY: transform.panY,
       }
     },
-    [enabled, transform.panX, transform.panY],
+    [transform.panX, transform.panY],
   )
 
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLElement>) => {
@@ -119,12 +119,9 @@ export function MeetingViewportPanProvider({ children }: { children: ReactNode }
     [endDrag],
   )
 
-  const onContextMenu = useCallback(
-    (e: React.MouseEvent<HTMLElement>) => {
-      if (enabled) e.preventDefault()
-    },
-    [enabled],
-  )
+  const onContextMenu = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    if (enabled) e.preventDefault()
+  }, [])
 
   const onWheel = useCallback(
     (e: React.WheelEvent<HTMLElement>) => {
@@ -139,9 +136,10 @@ export function MeetingViewportPanProvider({ children }: { children: ReactNode }
       transformRef.current = next
       setTransform(next)
     },
-    [enabled, transform],
+    [transform],
   )
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset on enable/disable toggle
   useEffect(() => {
     if (!enabled) {
       dragRef.current = null
@@ -175,10 +173,8 @@ export function MeetingViewportPanProvider({ children }: { children: ReactNode }
       },
     }),
     [
-      enabled,
       isPanning,
       transform,
-      transformRef,
       panTransform,
       onPointerDown,
       onPointerMove,
