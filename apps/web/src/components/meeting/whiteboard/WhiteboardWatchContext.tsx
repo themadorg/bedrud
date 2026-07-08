@@ -2,19 +2,19 @@ import { useRoomContext } from '@livekit/components-react'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type * as Y from 'yjs'
 import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
-import { createWhiteboardYDoc, LiveKitYjsProvider } from '@/components/meeting/whiteboard/livekitYjsProvider'
 import { useMeetingStage } from '@/components/meeting/stage/MeetingStageContext'
 import { stageOwnerLabel } from '@/components/meeting/stage/stageWire'
+import { createWhiteboardYDoc, LiveKitYjsProvider } from '@/components/meeting/whiteboard/livekitYjsProvider'
 import { WhiteboardExperimentalGate } from '@/components/meeting/whiteboard/WhiteboardExperimentalGate'
 import {
-  WhiteboardWatchContext,
   type WhiteboardSession,
+  WhiteboardWatchContext,
   type WhiteboardWatchContextValue,
   whiteboardSessionKey,
 } from '@/components/meeting/whiteboard/whiteboard-watch-context'
 
-export type { WhiteboardSession, WhiteboardWatchContextValue }
 export { useWhiteboardWatch } from '@/components/meeting/whiteboard/whiteboard-watch-context'
+export type { WhiteboardSession, WhiteboardWatchContextValue }
 
 export function WhiteboardWatchProvider({ children }: { children: ReactNode }) {
   const room = useRoomContext()
@@ -186,10 +186,8 @@ export function WhiteboardWatchProvider({ children }: { children: ReactNode }) {
   )
 
   const hostNeedsDisclaimer = pendingOpen
-  const viewerNeedsDisclaimer =
-    sessionKey != null && !accepted && !declined && !pendingConfirm && !whiteboardEnabled
-  const showGate =
-    !disclaimerAcknowledged && (hostNeedsDisclaimer || viewerNeedsDisclaimer)
+  const viewerNeedsDisclaimer = sessionKey != null && !accepted && !declined && !pendingConfirm && !whiteboardEnabled
+  const showGate = !disclaimerAcknowledged && (hostNeedsDisclaimer || viewerNeedsDisclaimer)
 
   return (
     <WhiteboardWatchContext.Provider value={value}>

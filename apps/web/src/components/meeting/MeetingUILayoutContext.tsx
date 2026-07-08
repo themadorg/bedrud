@@ -15,10 +15,7 @@ export function MeetingUILayoutProvider({
   participantsDocked,
   children,
 }: MeetingUILayoutState & { children: ReactNode }) {
-  const value = useMemo(
-    () => ({ chatDocked, participantsDocked }),
-    [chatDocked, participantsDocked],
-  )
+  const value = useMemo(() => ({ chatDocked, participantsDocked }), [chatDocked, participantsDocked])
   return <MeetingUILayoutContext.Provider value={value}>{children}</MeetingUILayoutContext.Provider>
 }
 

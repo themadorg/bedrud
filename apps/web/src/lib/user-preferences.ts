@@ -11,7 +11,9 @@ export function parseUserPreferences(json: string | undefined | null): UserPrefe
   if (!json) return {}
   try {
     const parsed = JSON.parse(json) as unknown
-    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? (parsed as UserPreferencesBlob) : {}
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as UserPreferencesBlob)
+      : {}
   } catch {
     return {}
   }

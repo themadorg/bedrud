@@ -107,10 +107,7 @@ export function qualityColorClass(quality: ConnectionQualityLabel) {
 }
 
 export function useMeetingConnectionStats(participant: Participant | undefined, enabled: boolean) {
-  const quality = useMemo(
-    () => (participant ? connectionQualityLabel(participant) : 'unknown'),
-    [participant],
-  )
+  const quality = useMemo(() => (participant ? connectionQualityLabel(participant) : 'unknown'), [participant])
   const [stats, setStats] = useState<MeetingConnectionStats | null>(null)
   const [loading, setLoading] = useState(false)
 

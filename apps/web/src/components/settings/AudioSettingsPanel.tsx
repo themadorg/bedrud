@@ -1,16 +1,20 @@
 import { useMutation } from '@tanstack/react-query'
 import { Brain, Check, Globe, Loader2, Mic, MicOff, Shield, Zap } from 'lucide-react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { type AudioPreferences, type NoiseSuppressionMode, useAudioPreferencesStore } from '#/lib/audio-preferences.store'
+import { PushToTalkKeyCapture } from '#/components/settings/PushToTalkKeyCapture'
+import {
+  type AudioPreferences,
+  type NoiseSuppressionMode,
+  useAudioPreferencesStore,
+} from '#/lib/audio-preferences.store'
+import { AudioProcessorService } from '#/lib/audio-processor.service'
 import { deviceIdToSelectValue, selectValueToDeviceId } from '#/lib/meeting-device-storage'
 import { patchUserPreferences } from '#/lib/user-preferences'
-import { AudioProcessorService } from '#/lib/audio-processor.service'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
-import { PushToTalkKeyCapture } from '#/components/settings/PushToTalkKeyCapture'
 import { cn } from '@/lib/utils'
 import { isMeetingTone, meetingSliderClass, type SettingsPanelTone } from './settingsPanelTone'
 
@@ -297,7 +301,17 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
   useEffect(() => {
     const timer = setTimeout(() => mutateRef.current(), 1000)
     return () => clearTimeout(timer)
-  }, [mode, echoCancellation, autoGainControl, inputGain, noiseGate, mutedBeepEnabled, mutedBeepInterval, pushToTalkEnabled, pushToTalkKey])
+  }, [
+    mode,
+    echoCancellation,
+    autoGainControl,
+    inputGain,
+    noiseGate,
+    mutedBeepEnabled,
+    mutedBeepInterval,
+    pushToTalkEnabled,
+    pushToTalkKey,
+  ])
 
   useEffect(() => {
     return () => {
@@ -333,28 +347,25 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
               const active = mode === value
               const disabled = value === 'krisp' && !krispSupported
               return (
-                <button
-                  type="button"
-                  key={value}
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => !disabled && setMode(value)}
-                  disabled={disabled}
-                  className={modeSegmentClass(active, meeting, disabled)}
-                >
+                <label key={value} className={cn(modeSegmentClass(active, meeting, disabled), 'cursor-pointer')}>
+                  <input
+                    type="radio"
+                    name="noise-suppression-mode"
+                    value={value}
+                    checked={active}
+                    onChange={() => setMode(value)}
+                    disabled={disabled}
+                    className="sr-only"
+                  />
                   <Icon className="h-3 w-3 shrink-0" />
                   <span className="truncate">{label}</span>
-                </button>
+                </label>
               )
             })}
           </div>
 
           <div className={cn('divide-y', meeting ? 'divide-white/[0.08]' : undefined)}>
-            <ToggleRow
-              title="Echo cancellation"
-              description="Reduce feedback from speakers"
-              meeting={meeting}
-            >
+            <ToggleRow title="Echo cancellation" description="Reduce feedback from speakers" meeting={meeting}>
               <Switch checked={echoCancellation} onCheckedChange={setEchoCancellation} />
             </ToggleRow>
             {mode === 'browser' && (
@@ -423,13 +434,20 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
           </div>
 
           {mic.testing && (
-            <p className={cn('text-[10px]', meeting ? 'text-white/50' : 'text-muted-foreground')}>Headphones recommended</p>
+            <p className={cn('text-[10px]', meeting ? 'text-white/50' : 'text-muted-foreground')}>
+              Headphones recommended
+            </p>
           )}
           {mic.error && <p className="text-[10px] text-destructive">{mic.error}</p>}
 
           <div>
             <VolumeMeter volume={mic.volume} meeting={meeting} />
-            <div className={cn('mt-1 flex justify-between text-[10px]', meeting ? 'text-white/50' : 'text-muted-foreground')}>
+            <div
+              className={cn(
+                'mt-1 flex justify-between text-[10px]',
+                meeting ? 'text-white/50' : 'text-muted-foreground',
+              )}
+            >
               <span>Silent</span>
               <span>Loud</span>
             </div>
@@ -440,7 +458,9 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
       <Card>
         <CardHeader className="border-b px-5 py-3">
           <CardTitle className="text-sm font-semibold">Input levels</CardTitle>
-          <CardDescription className="text-xs text-muted-foreground">Adjust gain and noise gate threshold</CardDescription>
+          <CardDescription className="text-xs text-muted-foreground">
+            Adjust gain and noise gate threshold
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-5">
           <div className="grid gap-6 sm:grid-cols-2">
@@ -457,7 +477,9 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
                 onValueChange={(v) => setInputGain(v[0])}
                 className={meeting ? meetingSliderClass : undefined}
               />
-              <p className={cn('text-[10px]', meeting ? 'text-white/50' : 'text-muted-foreground')}>100% = unity gain</p>
+              <p className={cn('text-[10px]', meeting ? 'text-white/50' : 'text-muted-foreground')}>
+                100% = unity gain
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -493,18 +515,34 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
           </div>
 
           {pushToTalkEnabled ? (
-            <div className={cn('divide-y rounded-lg border px-3', meeting ? 'border-white/[0.08] bg-white/[0.02] divide-white/[0.08]' : 'border-border bg-muted/20')}>
+            <div
+              className={cn(
+                'divide-y rounded-lg border px-3',
+                meeting ? 'border-white/[0.08] bg-white/[0.02] divide-white/[0.08]' : 'border-border bg-muted/20',
+              )}
+            >
               <ToggleRow title="Activation key" description="Click the key button to rebind" meeting={meeting}>
                 <PushToTalkKeyCapture value={pushToTalkKey} onChange={setPushToTalkKey} meeting={meeting} />
               </ToggleRow>
             </div>
           ) : (
-            <div className={cn('divide-y rounded-lg border px-3', meeting ? 'border-white/[0.08] bg-white/[0.02] divide-white/[0.08]' : 'border-border bg-muted/20')}>
-              <ToggleRow title="Mute shortcut" description="Press Space during a call to mute or unmute" meeting={meeting}>
+            <div
+              className={cn(
+                'divide-y rounded-lg border px-3',
+                meeting ? 'border-white/[0.08] bg-white/[0.02] divide-white/[0.08]' : 'border-border bg-muted/20',
+              )}
+            >
+              <ToggleRow
+                title="Mute shortcut"
+                description="Press Space during a call to mute or unmute"
+                meeting={meeting}
+              >
                 <kbd
                   className={cn(
                     'rounded-md border px-2.5 py-1 font-mono text-xs',
-                    meeting ? 'border-white/10 bg-white/[0.06] text-white/70' : 'border-border bg-muted/50 text-foreground',
+                    meeting
+                      ? 'border-white/10 bg-white/[0.06] text-white/70'
+                      : 'border-border bg-muted/50 text-foreground',
                   )}
                 >
                   Space
@@ -535,16 +573,17 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
                 {BEEP_INTERVALS.map(({ value, label }) => {
                   const active = mutedBeepInterval === value
                   return (
-                    <button
-                      type="button"
-                      key={value}
-                      role="radio"
-                      aria-checked={active}
-                      onClick={() => setMutedBeepInterval(value)}
-                      className={modeSegmentClass(active, meeting, false)}
-                    >
+                    <label key={value} className={cn(modeSegmentClass(active, meeting, false), 'cursor-pointer')}>
+                      <input
+                        type="radio"
+                        name="muted-mic-alert-interval"
+                        value={value}
+                        checked={active}
+                        onChange={() => setMutedBeepInterval(value)}
+                        className="sr-only"
+                      />
                       {label}
-                    </button>
+                    </label>
                   )
                 })}
               </div>
@@ -554,7 +593,12 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
       </Card>
 
       {syncStatus !== 'idle' && (
-        <div className={cn('flex items-center justify-end gap-1.5 text-[11px]', meeting ? 'text-white/50' : 'text-muted-foreground')}>
+        <div
+          className={cn(
+            'flex items-center justify-end gap-1.5 text-[11px]',
+            meeting ? 'text-white/50' : 'text-muted-foreground',
+          )}
+        >
           {syncStatus === 'saving' && <Loader2 className="h-3 w-3 animate-spin" />}
           {syncStatus === 'saved' && <Check className="h-3 w-3 text-emerald-500" />}
           <span>

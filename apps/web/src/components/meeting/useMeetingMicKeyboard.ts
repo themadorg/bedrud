@@ -131,11 +131,7 @@ export function useMeetingMicKeyboard(
     ? `${formatKeyboardCode(pushToTalkKey)} — Push to talk · Space — Mute / unmute`
     : 'Space — Mute / unmute'
 
-  const micTip = isSelfDeafened
-    ? 'Undeafen & Unmute'
-    : micUiEnabled
-      ? 'Mute (Space)'
-      : 'Unmute (Space)'
+  const micTip = isSelfDeafened ? 'Undeafen & Unmute' : micUiEnabled ? 'Mute (Space)' : 'Unmute (Space)'
 
   const pttTip = !pushToTalkEnabled
     ? ''

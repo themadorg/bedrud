@@ -90,10 +90,7 @@ export function ChatMessageList({
         onScroll={handleScroll}
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
-        className={cn(
-          'meet-scroll flex h-full flex-col overflow-y-auto py-2 pl-2.5 pr-1',
-          showScrollBtn && 'pb-14',
-        )}
+        className={cn('meet-scroll flex h-full flex-col overflow-y-auto py-2 pl-2.5 pr-1', showScrollBtn && 'pb-14')}
       >
         {items.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-2.5">
@@ -137,13 +134,16 @@ export function ChatMessageList({
               )
             }
 
-            const isSelfCluster =
-              item.isLocal || (!!currentIdentity && item.identity === currentIdentity)
+            const isSelfCluster = item.isLocal || (!!currentIdentity && item.identity === currentIdentity)
 
             return (
               <div
                 key={item.id}
-                className={cn('w-full', index > 0 && (isSelfCluster ? 'mt-1.5' : 'mt-3'), isSelfCluster && 'flex justify-end')}
+                className={cn(
+                  'w-full',
+                  index > 0 && (isSelfCluster ? 'mt-1.5' : 'mt-3'),
+                  isSelfCluster && 'flex justify-end',
+                )}
               >
                 <ChatMessageCluster
                   cluster={item}

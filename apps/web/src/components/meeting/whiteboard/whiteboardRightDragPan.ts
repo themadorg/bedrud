@@ -14,11 +14,7 @@ function setPanCursor(container: HTMLElement, api: ExcalidrawImperativeAPI | nul
   }
 }
 
-export function attachWhiteboardRightDragPan(
-  container: HTMLElement,
-  getApi: GetApi,
-  onViewportChange?: () => void,
-) {
+export function attachWhiteboardRightDragPan(container: HTMLElement, getApi: GetApi, onViewportChange?: () => void) {
   const onContextMenu = (event: Event) => {
     event.preventDefault()
     event.stopImmediatePropagation()

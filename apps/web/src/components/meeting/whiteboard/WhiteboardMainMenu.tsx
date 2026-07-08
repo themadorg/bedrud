@@ -41,7 +41,9 @@ export function WhiteboardMainMenu({ apiRef }: WhiteboardMainMenuProps) {
       <MainMenu.Item onSelect={() => runAsyncWithApi(apiRef, copyWhiteboardAsPng)} shortcut="Shift+Alt+C">
         Copy to clipboard as PNG
       </MainMenu.Item>
-      <MainMenu.Item onSelect={() => runAsyncWithApi(apiRef, copyWhiteboardAsSvg)}>Copy to clipboard as SVG</MainMenu.Item>
+      <MainMenu.Item onSelect={() => runAsyncWithApi(apiRef, copyWhiteboardAsSvg)}>
+        Copy to clipboard as SVG
+      </MainMenu.Item>
       <MainMenu.Separator />
       <MainMenu.Item onSelect={() => runWithApi(apiRef, selectAllWhiteboardElements)} shortcut="Ctrl+A">
         Select all

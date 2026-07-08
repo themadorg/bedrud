@@ -1,6 +1,10 @@
 // TODO oncoming feature
 import { useRoomContext } from '@livekit/components-react'
 import { ConnectionState, type Participant, type Room, RoomEvent } from 'livekit-client'
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { api } from '#/lib/api'
+import { useAuthStore } from '#/lib/auth.store'
+import { decodeBedrudJwt } from '#/lib/jwt-user'
 import {
   isPublishUnavailableError,
   isRoomPublishReady,
@@ -8,12 +12,8 @@ import {
   MEETING_CHAT_TOPIC,
   waitForRoomPublishReady,
 } from '#/lib/livekit-publish'
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { api } from '#/lib/api'
-import { getPublicSettings } from '#/lib/use-public-settings'
-import { useAuthStore } from '#/lib/auth.store'
 import { useProfileSyncStore } from '#/lib/profile-sync.store'
-import { decodeBedrudJwt } from '#/lib/jwt-user'
+import { getPublicSettings } from '#/lib/use-public-settings'
 import { type User, useUserStore } from '#/lib/user.store'
 import {
   applyChatChunkPart,
@@ -29,8 +29,8 @@ import {
 } from './chat/chatDataChannel'
 import { applyReactionToggle } from './chat/chatReactions'
 import { isMeetingChatDataTopic } from './chat/chatTopic'
-import { fetchMeetingParticipantProfile } from './meetingParticipantProfile'
 import { useChatPersistence } from './chat/useChatPersistence'
+import { fetchMeetingParticipantProfile } from './meetingParticipantProfile'
 
 /** Generate a unique ID with fallback for non-secure contexts (HTTP). */
 function generateID(): string {
@@ -379,9 +379,7 @@ export function MeetingProvider({
   const localIdentity = room.localParticipant.identity
   const isGuestParticipant = localIdentity.startsWith('guest-')
   const isCreator =
-    !isGuestParticipant &&
-    !!hostUserId &&
-    (currentUserId === hostUserId || localIdentity === hostUserId)
+    !isGuestParticipant && !!hostUserId && (currentUserId === hostUserId || localIdentity === hostUserId)
   const isSuperAdmin = accesses.includes('superadmin')
   const canManageRoomAccess = isCreator || isSuperAdmin
 
@@ -554,15 +552,7 @@ export function MeetingProvider({
       applyLocalProfile(fallbackName, userAvatarRef.current)
       notifyProfileChanged()
     }
-  }, [
-    accessToken,
-    localIdentity,
-    room.state,
-    room.localParticipant,
-    setUser,
-    applyLocalProfile,
-    notifyProfileChanged,
-  ])
+  }, [accessToken, localIdentity, room.state, room.localParticipant, setUser, applyLocalProfile, notifyProfileChanged])
 
   const fetchAllRemoteProfiles = useCallback(() => {
     for (const participant of room.remoteParticipants.values()) {
@@ -657,13 +647,7 @@ export function MeetingProvider({
       room.off(RoomEvent.ParticipantConnected, onParticipantConnected)
       room.off(RoomEvent.Connected, onConnected)
     }
-  }, [
-    room,
-    advertiseDeafenedState,
-    fetchRemoteParticipantProfile,
-    refreshLocalProfile,
-    fetchAllRemoteProfiles,
-  ])
+  }, [room, advertiseDeafenedState, fetchRemoteParticipantProfile, refreshLocalProfile, fetchAllRemoteProfiles])
 
   const isParticipantDeafened = useCallback(
     (participant: Participant) => {
@@ -763,7 +747,9 @@ export function MeetingProvider({
     if (chatPublishInFlightRef.current || !isRoomPublishReady(room)) return
     chatPublishInFlightRef.current = true
     try {
-      const pending = chatMessagesRef.current.filter((m) => m.isLocal && (m.status === 'sending' || m.status === 'failed'))
+      const pending = chatMessagesRef.current.filter(
+        (m) => m.isLocal && (m.status === 'sending' || m.status === 'failed'),
+      )
       for (const msg of pending) {
         const wirePayload: ChatWirePayload = {
           type: 'chat',
@@ -781,9 +767,7 @@ export function MeetingProvider({
         } catch {
           continue
         }
-        setChatMessages((prev) =>
-          prev.map((m): ChatMessage => (m.id === msg.id ? { ...m, status: 'sending' } : m)),
-        )
+        setChatMessages((prev) => prev.map((m): ChatMessage => (m.id === msg.id ? { ...m, status: 'sending' } : m)))
         await publishChatPackets(msg.id, packets)
       }
     } finally {
@@ -829,11 +813,7 @@ export function MeetingProvider({
           return
         }
 
-        if (
-          topic === 'presence' &&
-          raw.type === 'profile_changed' &&
-          typeof raw.identity === 'string'
-        ) {
+        if (topic === 'presence' && raw.type === 'profile_changed' && typeof raw.identity === 'string') {
           const changedIdentity = raw.identity
           if (changedIdentity !== localIdentityRef.current && typeof raw.name === 'string') {
             const messageName = raw.name.trim()

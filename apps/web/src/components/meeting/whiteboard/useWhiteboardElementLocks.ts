@@ -1,15 +1,15 @@
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
 import { useRoomContext } from '@livekit/components-react'
 import { RoomEvent } from 'livekit-client'
-import { useCallback, useEffect, useRef, type RefObject } from 'react'
+import { type RefObject, useCallback, useEffect, useRef } from 'react'
 import type * as Y from 'yjs'
 import {
   acquireElementLocks,
+  type ElementLockSnapshot,
   heldLockElementIds,
   readLockSnapshot,
   releaseAllLocksForIdentity,
   releaseElementLocks,
-  type ElementLockSnapshot,
 } from '@/components/meeting/whiteboard/whiteboardElementLocks'
 
 export function useWhiteboardElementLocks(

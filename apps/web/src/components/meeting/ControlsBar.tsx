@@ -21,21 +21,21 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { BedrudSettingsDialog } from '#/components/settings/BedrudSettingsDialog'
 import { DeafenHeadphonesIcon } from '#/components/meeting/DeafenHeadphonesIcon'
 import { useMeetingMicKeyboard } from '#/components/meeting/useMeetingMicKeyboard'
+import { BedrudSettingsDialog } from '#/components/settings/BedrudSettingsDialog'
 import { type NoiseSuppressionMode, useAudioPreferencesStore } from '#/lib/audio-preferences.store'
 import { AudioProcessorService } from '#/lib/audio-processor.service'
 import { useAuthStore } from '#/lib/auth.store'
+import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
 import { readMeetingDeviceId, writeMeetingDeviceId } from '#/lib/meeting-device-storage'
 import { cn } from '#/lib/utils'
 import { DeviceSelector } from '@/components/meeting/DeviceSelector'
 import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
 import { meetControlsDockClass, useMeetingUILayout } from '@/components/meeting/MeetingUILayoutContext'
 import { useMeetingStage } from '@/components/meeting/stage/MeetingStageContext'
-import { waitForScreenSharePublication } from '@/components/meeting/stage/waitForScreenShare'
 import { stageOwnerLabel } from '@/components/meeting/stage/stageWire'
-import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
+import { waitForScreenSharePublication } from '@/components/meeting/stage/waitForScreenShare'
 import { useWhiteboardWatch } from '@/components/meeting/whiteboard/whiteboard-watch-context'
 import { useYoutubeWatch } from '@/components/meeting/youtube/youtube-watch-context'
 import {
@@ -353,9 +353,7 @@ export function ControlsBar({ onLeave }: Props) {
                       return
                     }
                     await localParticipant?.setScreenShareEnabled(true)
-                    const ready = localParticipant
-                      ? await waitForScreenSharePublication(localParticipant)
-                      : false
+                    const ready = localParticipant ? await waitForScreenSharePublication(localParticipant) : false
                     if (!ready) {
                       clearStage()
                       await localParticipant?.setScreenShareEnabled(false).catch(() => {})
@@ -446,11 +444,7 @@ export function ControlsBar({ onLeave }: Props) {
               toggleMic()
             }}
           >
-            {isSelfDeafened || !micUiEnabled ? (
-              <MicOff size={iconSize} />
-            ) : (
-              <Mic size={iconSize} />
-            )}
+            {isSelfDeafened || !micUiEnabled ? <MicOff size={iconSize} /> : <Mic size={iconSize} />}
           </CtrlBtn>
 
           <CtrlBtn
@@ -481,9 +475,7 @@ export function ControlsBar({ onLeave }: Props) {
               {/* Microphone devices */}
               {mics.devices.length > 0 && (
                 <>
-                  <DropdownMenuLabel className={meetMenuLabelCn}>
-                    Microphone
-                  </DropdownMenuLabel>
+                  <DropdownMenuLabel className={meetMenuLabelCn}>Microphone</DropdownMenuLabel>
                   {mics.devices.map((d, i) => (
                     <DropdownMenuItem
                       key={d.deviceId}
@@ -507,9 +499,7 @@ export function ControlsBar({ onLeave }: Props) {
               {/* Speaker devices */}
               {speakers.devices.length > 0 && (
                 <>
-                  <DropdownMenuLabel className={meetMenuLabelCn}>
-                    Speaker
-                  </DropdownMenuLabel>
+                  <DropdownMenuLabel className={meetMenuLabelCn}>Speaker</DropdownMenuLabel>
                   {speakers.devices.map((d, i) => (
                     <DropdownMenuItem
                       key={d.deviceId}
@@ -531,9 +521,7 @@ export function ControlsBar({ onLeave }: Props) {
               )}
 
               {/* Noise suppression */}
-              <DropdownMenuLabel className={meetMenuLabelCn}>
-                Noise Suppression
-              </DropdownMenuLabel>
+              <DropdownMenuLabel className={meetMenuLabelCn}>Noise Suppression</DropdownMenuLabel>
               {NOISE_MODES.map(({ value, label }) => {
                 const disabled = value === 'krisp' && !AudioProcessorService.isKrispSupported()
                 return (
@@ -607,10 +595,7 @@ export function ControlsBar({ onLeave }: Props) {
               </DropdownMenuItem>
             )}
 
-            <DropdownMenuItem
-              onClick={() => setSettingsOpen(true)}
-              className={meetMenuItemCn}
-            >
+            <DropdownMenuItem onClick={() => setSettingsOpen(true)} className={meetMenuItemCn}>
               <Settings size={13} className="shrink-0" />
               Settings
             </DropdownMenuItem>
@@ -620,10 +605,7 @@ export function ControlsBar({ onLeave }: Props) {
                 <DropdownMenuSeparator className={meetMenuSeparatorCn} />
 
                 {stage?.kind === 'whiteboard' && isWhiteboardHost ? (
-                  <DropdownMenuItem
-                    onClick={() => clearStage()}
-                    className={meetMenuItemCn}
-                  >
+                  <DropdownMenuItem onClick={() => clearStage()} className={meetMenuItemCn}>
                     <PenLine size={13} className="shrink-0 text-primary" />
                     Close whiteboard
                   </DropdownMenuItem>
@@ -647,10 +629,7 @@ export function ControlsBar({ onLeave }: Props) {
 
             {(youtubeEnabled || (stage?.kind === 'youtube' && isYoutubeHost)) &&
               (stage?.kind === 'youtube' && isYoutubeHost ? (
-                <DropdownMenuItem
-                  onClick={() => stopYoutubeShare()}
-                  className={meetMenuItemCn}
-                >
+                <DropdownMenuItem onClick={() => stopYoutubeShare()} className={meetMenuItemCn}>
                   <Film size={13} className="shrink-0 text-red-400" />
                   Stop YouTube
                 </DropdownMenuItem>

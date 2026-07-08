@@ -41,10 +41,7 @@ export function whiteboardToolCursor(appState: Pick<AppState, 'activeTool' | 'th
   return null
 }
 
-function setWhiteboardToolCursor(
-  api: ExcalidrawImperativeAPI,
-  state: Pick<AppState, 'activeTool' | 'theme'>,
-) {
+function setWhiteboardToolCursor(api: ExcalidrawImperativeAPI, state: Pick<AppState, 'activeTool' | 'theme'>) {
   const cursor = whiteboardToolCursor(state)
   const nextKey = cursor ? `${state.activeTool.type}:${state.theme}` : null
 
@@ -69,9 +66,7 @@ export function applyWhiteboardToolCursor(
   if (!api) return
 
   const state = appState ?? api.getAppState()
-  const nextKey = whiteboardToolCursor(state)
-    ? `${state.activeTool.type}:${state.theme}`
-    : null
+  const nextKey = whiteboardToolCursor(state) ? `${state.activeTool.type}:${state.theme}` : null
   if (nextKey === lastAppliedKey) return
 
   setWhiteboardToolCursor(api, state)

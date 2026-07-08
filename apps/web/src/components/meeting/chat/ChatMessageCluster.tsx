@@ -127,112 +127,112 @@ export function ChatMessageCluster({ cluster, currentIdentity, onImageOpen, onVo
   const initials = avatarInitials(sender)
 
   const messageRows = messages.map((msg, idx) => {
-            const pos = bubblePosition(idx, total)
-            const stacked = total > 1
-            const loneEmoji = isSingleEmojiMessage(msg)
-            const chrome = loneEmoji ? null : bubbleChrome(isSelf, pos, stacked)
-            const hasAttachments = msg.attachments.length > 0
-            const hasPoll = Boolean(msg.poll)
-            const hasRichContent = hasAttachments || hasPoll
+    const pos = bubblePosition(idx, total)
+    const stacked = total > 1
+    const loneEmoji = isSingleEmojiMessage(msg)
+    const chrome = loneEmoji ? null : bubbleChrome(isSelf, pos, stacked)
+    const hasAttachments = msg.attachments.length > 0
+    const hasPoll = Boolean(msg.poll)
+    const hasRichContent = hasAttachments || hasPoll
 
-            return (
-              <div
-                key={msg.id}
-                className={cn(
-                  'group/msg flex flex-col',
-                  isSelf ? 'items-end' : 'w-full items-start',
-                  loneEmoji && (isSelf ? 'py-0.5' : 'py-1 mb-2'),
-                )}
-              >
-                <div className="relative max-w-full">
-                  <div
-                    className={cn(
-                      'absolute top-1/2 z-[2] -translate-y-1/2 opacity-0 transition-opacity pointer-events-none',
-                      'group-hover/msg:opacity-100 group-hover/msg:pointer-events-auto',
-                      'group-focus-within/msg:opacity-100 group-focus-within/msg:pointer-events-auto',
-                      isSelf ? 'right-full mr-0.5' : 'left-full ml-0.5',
-                    )}
+    return (
+      <div
+        key={msg.id}
+        className={cn(
+          'group/msg flex flex-col',
+          isSelf ? 'items-end' : 'w-full items-start',
+          loneEmoji && (isSelf ? 'py-0.5' : 'py-1 mb-2'),
+        )}
+      >
+        <div className="relative max-w-full">
+          <div
+            className={cn(
+              'absolute top-1/2 z-[2] -translate-y-1/2 opacity-0 transition-opacity pointer-events-none',
+              'group-hover/msg:opacity-100 group-hover/msg:pointer-events-auto',
+              'group-focus-within/msg:opacity-100 group-focus-within/msg:pointer-events-auto',
+              isSelf ? 'right-full mr-0.5' : 'left-full ml-0.5',
+            )}
+          >
+            <ChatReactionPicker isLocal={isSelf} onReact={(emoji) => onReactToMessage(msg.id, emoji)} />
+          </div>
+          <ChatMessageContextMenu message={msg} senderName={sender} currentIdentity={currentIdentity}>
+            <div
+              className={
+                loneEmoji
+                  ? 'min-w-0 text-[56px] leading-none select-none'
+                  : 'min-w-0 text-[13px] leading-[1.45] break-words overflow-hidden'
+              }
+              style={
+                loneEmoji
+                  ? undefined
+                  : {
+                      padding: hasRichContent && !msg.message ? '4px' : '7px 12px',
+                      ...chrome,
+                    }
+              }
+            >
+              {msg.attachments.map((att, ai) => {
+                if (att.kind !== 'image' && !att.mime.startsWith('image/')) return null
+                if (!isSafeUrl(att.url)) return null
+                return (
+                  <button
+                    key={ai}
+                    type="button"
+                    onClick={() => onImageOpen?.(att.url)}
+                    className="block cursor-pointer rounded-xl border-none bg-transparent p-0"
+                    aria-label="View image"
                   >
-                    <ChatReactionPicker isLocal={isSelf} onReact={(emoji) => onReactToMessage(msg.id, emoji)} />
-                  </div>
-                  <ChatMessageContextMenu message={msg} senderName={sender} currentIdentity={currentIdentity}>
-                    <div
-                      className={
-                        loneEmoji
-                          ? 'min-w-0 text-[56px] leading-none select-none'
-                          : 'min-w-0 text-[13px] leading-[1.45] break-words overflow-hidden'
-                      }
-                      style={
-                        loneEmoji
-                          ? undefined
-                          : {
-                              padding: hasRichContent && !msg.message ? '4px' : '7px 12px',
-                              ...chrome,
-                            }
-                      }
-                    >
-                      {msg.attachments.map((att, ai) => {
-                        if (att.kind !== 'image' && !att.mime.startsWith('image/')) return null
-                        if (!isSafeUrl(att.url)) return null
-                        return (
-                          <button
-                            key={ai}
-                            type="button"
-                            onClick={() => onImageOpen?.(att.url)}
-                            className="block cursor-pointer rounded-xl border-none bg-transparent p-0"
-                            aria-label="View image"
-                          >
-                            <img
-                              src={att.url}
-                              alt="attachment"
-                              loading="lazy"
-                              width={att.w}
-                              height={att.h}
-                              className="block max-h-60 max-w-full rounded-xl object-contain"
-                            />
-                          </button>
-                        )
-                      })}
-                      {msg.poll && (
-                        <div className={hasAttachments || msg.message ? 'px-2 py-1.5' : 'p-1'}>
-                          <ChatPollBubble
-                            poll={msg.poll}
-                            messageId={msg.id}
-                            isLocal={isSelf}
-                            currentIdentity={currentIdentity}
-                            onVote={onVotePoll}
-                          />
-                        </div>
-                      )}
-                      {msg.message &&
-                        (loneEmoji ? (
-                          <span aria-label="Emoji message" dir={textDirectionFor(msg.message)}>
-                            {msg.message.trim()}
-                          </span>
-                        ) : (
-                          <div className={hasRichContent ? 'px-2 pb-0.5 pt-1.5' : 'p-0'}>
-                            <ChatMarkdown content={msg.message} isLocal={isSelf} />
-                          </div>
-                        ))}
-                      {isSelf && msg.status === 'failed' && (
-                        <div className="mt-1 flex items-center gap-1 opacity-90">
-                          <AlertCircle size={12} style={{ color: 'var(--destructive, #ef4444)' }} />
-                          <span className="text-[11px]" style={{ color: 'var(--destructive, #ef4444)' }}>
-                            Failed to send
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </ChatMessageContextMenu>
+                    <img
+                      src={att.url}
+                      alt="attachment"
+                      loading="lazy"
+                      width={att.w}
+                      height={att.h}
+                      className="block max-h-60 max-w-full rounded-xl object-contain"
+                    />
+                  </button>
+                )
+              })}
+              {msg.poll && (
+                <div className={hasAttachments || msg.message ? 'px-2 py-1.5' : 'p-1'}>
+                  <ChatPollBubble
+                    poll={msg.poll}
+                    messageId={msg.id}
+                    isLocal={isSelf}
+                    currentIdentity={currentIdentity}
+                    onVote={onVotePoll}
+                  />
                 </div>
-                <ChatReactionList
-                  reactions={msg.reactions}
-                  currentIdentity={currentIdentity}
-                  isLocal={isSelf}
-                  onReact={(emoji) => onReactToMessage(msg.id, emoji)}
-                />
-              </div>
-            )
+              )}
+              {msg.message &&
+                (loneEmoji ? (
+                  <span role="img" aria-label="Emoji message" dir={textDirectionFor(msg.message)}>
+                    {msg.message.trim()}
+                  </span>
+                ) : (
+                  <div className={hasRichContent ? 'px-2 pb-0.5 pt-1.5' : 'p-0'}>
+                    <ChatMarkdown content={msg.message} isLocal={isSelf} />
+                  </div>
+                ))}
+              {isSelf && msg.status === 'failed' && (
+                <div className="mt-1 flex items-center gap-1 opacity-90">
+                  <AlertCircle size={12} style={{ color: 'var(--destructive, #ef4444)' }} />
+                  <span className="text-[11px]" style={{ color: 'var(--destructive, #ef4444)' }}>
+                    Failed to send
+                  </span>
+                </div>
+              )}
+            </div>
+          </ChatMessageContextMenu>
+        </div>
+        <ChatReactionList
+          reactions={msg.reactions}
+          currentIdentity={currentIdentity}
+          isLocal={isSelf}
+          onReact={(emoji) => onReactToMessage(msg.id, emoji)}
+        />
+      </div>
+    )
   })
 
   return (
@@ -274,7 +274,6 @@ export function ChatMessageCluster({ cluster, currentIdentity, onImageOpen, onVo
       >
         {relativeTime(messages[total - 1].timestamp)}
       </span>
-
     </div>
   )
 }

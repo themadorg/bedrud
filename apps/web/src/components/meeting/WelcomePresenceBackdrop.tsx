@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { API_URL } from '#/lib/api'
-import { getPalette } from '#/lib/participant-palette'
 import { avatarInitials } from '#/components/meeting/chat/chatGrouping'
 import { ParticipantAvatar } from '#/components/meeting/ParticipantAvatar'
+import { API_URL } from '#/lib/api'
+import { getPalette } from '#/lib/participant-palette'
 
 export interface WelcomePresenceParticipant {
   identity: string
@@ -189,12 +189,7 @@ function applyMinDrift(body: PresenceBody, bodies: PresenceBody[], width: number
   body.vy = Math.sin(angle) * MIN_DRIFT_SPEED
 }
 
-function simulatePhysics(
-  bodies: PresenceBody[],
-  width: number,
-  height: number,
-  drag: DragState | null,
-) {
+function simulatePhysics(bodies: PresenceBody[], width: number, height: number, drag: DragState | null) {
   const dt = 1 / PHYSICS_SUBSTEPS
 
   for (let step = 0; step < PHYSICS_SUBSTEPS; step++) {

@@ -1,10 +1,7 @@
 import type { LocalParticipant } from 'livekit-client'
 import { ParticipantEvent, Track } from 'livekit-client'
 
-export function waitForScreenSharePublication(
-  participant: LocalParticipant,
-  timeoutMs = 12_000,
-): Promise<boolean> {
+export function waitForScreenSharePublication(participant: LocalParticipant, timeoutMs = 12_000): Promise<boolean> {
   if (participant.getTrackPublication(Track.Source.ScreenShare)?.track) {
     return Promise.resolve(true)
   }

@@ -477,8 +477,7 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
                     <StatRow label="Ping">
                       <span
                         style={{
-                          color:
-                            stats.ping < 80 ? '#34d399' : stats.ping < 200 ? '#fbbf24' : '#f87171',
+                          color: stats.ping < 80 ? '#34d399' : stats.ping < 200 ? '#fbbf24' : '#f87171',
                           fontFamily: 'monospace',
                         }}
                       >

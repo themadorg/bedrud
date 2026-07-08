@@ -2,9 +2,9 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { MeetingHeader } from '@/components/meeting/MeetingHeader'
 import { MeetingPanels } from '@/components/meeting/MeetingPanels'
 import { MeetingUILayoutProvider, participantsDockOffset } from '@/components/meeting/MeetingUILayoutContext'
-import { MeetingPresenceCursors } from '@/components/meeting/presence/MeetingPresenceCursors'
 import { MeetingViewportPanProvider } from '@/components/meeting/MeetingViewportPan'
 import { ParticipantVideoSidebar } from '@/components/meeting/ParticipantVideoSidebar'
+import { MeetingPresenceCursors } from '@/components/meeting/presence/MeetingPresenceCursors'
 import { useMeetingStage } from '@/components/meeting/stage/MeetingStageContext'
 
 interface MeetingRoomShellProps {
@@ -47,13 +47,13 @@ export function MeetingRoomShell({ meetId, navigate, children }: MeetingRoomShel
       <MeetingViewportPanProvider>
         <MeetingPresenceCursors />
         {children}
-      {stage && videoSidebarOpen && (
-        <ParticipantVideoSidebar
-          stackOffset={participantsDockOffset(chatDocked)}
-          onClose={() => setVideoSidebarOpen(false)}
-        />
-      )}
-      <MeetingHeader meetId={meetId} infoOpen={infoOpen} onToggleInfo={toggleInfo} />
+        {stage && videoSidebarOpen && (
+          <ParticipantVideoSidebar
+            stackOffset={participantsDockOffset(chatDocked)}
+            onClose={() => setVideoSidebarOpen(false)}
+          />
+        )}
+        <MeetingHeader meetId={meetId} infoOpen={infoOpen} onToggleInfo={toggleInfo} />
         <MeetingPanels
           navigate={navigate}
           chatOpen={chatOpen}

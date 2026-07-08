@@ -1,15 +1,13 @@
 import {
+  type ContentInsets,
   clientToContentNorm,
   contentNormToClient,
   readElementContentInsets,
-  type ContentInsets,
   type ViewportTransform,
   ZERO_CONTENT_INSETS,
 } from '@/components/meeting/meetingViewportTransform'
 
-export { contentNormToClient }
-
-export { readElementContentInsets }
+export { contentNormToClient, readElementContentInsets }
 
 export const MEETING_POINTER_TOPIC = 'meeting-pointer'
 

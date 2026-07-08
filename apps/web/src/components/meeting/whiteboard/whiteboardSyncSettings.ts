@@ -3,7 +3,10 @@ import type { AppState } from '@excalidraw/excalidraw/types'
 /** Canvas-level settings shared across all whiteboard participants. */
 export type WhiteboardSyncSettings = Pick<AppState, 'viewBackgroundColor' | 'gridModeEnabled'>
 
-const SYNCABLE_SETTINGS_KEYS = ['viewBackgroundColor', 'gridModeEnabled'] as const satisfies readonly (keyof WhiteboardSyncSettings)[]
+const SYNCABLE_SETTINGS_KEYS = [
+  'viewBackgroundColor',
+  'gridModeEnabled',
+] as const satisfies readonly (keyof WhiteboardSyncSettings)[]
 
 export function pickSyncableSettings(appState: AppState): WhiteboardSyncSettings {
   return {

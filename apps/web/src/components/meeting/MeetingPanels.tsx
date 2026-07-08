@@ -117,7 +117,10 @@ function VideoSidebarToggle({ isOpen, onToggle }: { isOpen: boolean; onToggle: (
     <button
       type="button"
       onClick={onToggle}
-      className={meetChromeButtonClass(isOpen, 'flex items-center gap-1.5 rounded-xl px-3 py-[7px] text-xs font-semibold')}
+      className={meetChromeButtonClass(
+        isOpen,
+        'flex items-center gap-1.5 rounded-xl px-3 py-[7px] text-xs font-semibold',
+      )}
       aria-label={isOpen ? 'Close video panel' : 'Show video panel'}
     >
       <Video size={14} />
@@ -133,7 +136,10 @@ function ParticipantsToggle({ isOpen, onToggle }: { isOpen: boolean; onToggle: (
     <button
       type="button"
       onClick={onToggle}
-      className={meetChromeButtonClass(isOpen, 'flex items-center gap-1.5 rounded-xl px-3 py-[7px] text-xs font-semibold')}
+      className={meetChromeButtonClass(
+        isOpen,
+        'flex items-center gap-1.5 rounded-xl px-3 py-[7px] text-xs font-semibold',
+      )}
       aria-label={isOpen ? 'Close participants' : 'Show participants'}
     >
       <Users size={14} />

@@ -61,50 +61,50 @@ export function FocusLayout({ pinnedIdentities, onTogglePin }: FocusLayoutProps)
   return (
     <MeetingViewportGrid>
       <div className="flex h-full w-full min-h-0 flex-col">
-      {/* ── Main focus area ─────────────────────────────────────── */}
-      <div
-        className="flex-1 grid gap-[5px] p-[5px_5px_0] min-h-0"
-        style={{
-          gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-          gridAutoRows: '1fr',
-        }}
-      >
-        {pinnedParticipants.map((p, i) => (
-          <ParticipantTile
-            key={p.identity}
-            participant={p}
-            totalCount={mainCount}
-            index={i}
-            isPinned
-            onTogglePin={() => onTogglePin(p.identity)}
-          />
-        ))}
-      </div>
-
-      {/* ── Bottom filmstrip ─────────────────────────────────────── */}
-      {hasStrip && (
+        {/* ── Main focus area ─────────────────────────────────────── */}
         <div
-          className="relative mt-[5px] shrink-0 border-t border-[var(--meet-border-subtle)] bg-[var(--meet-filmstrip-bg)] backdrop-blur-lg"
-          style={{ height: STRIP_OUTER }}
+          className="flex-1 grid gap-[5px] p-[5px_5px_0] min-h-0"
+          style={{
+            gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+            gridAutoRows: '1fr',
+          }}
         >
-          {/* Scrollable row */}
-          <div className="meet-scroll-none h-full flex items-center gap-1.5 overflow-x-auto px-2.5 [scrollbar-width:none]">
-            {stripParticipants.map((p, i) => (
-              <StripTile key={p.identity} participant={p} index={i} onTogglePin={() => onTogglePin(p.identity)} />
-            ))}
-
-            {/* Right padding sentinel so last tile isn't occluded by fade */}
-            <div className="w-8 shrink-0" />
-          </div>
-
-          {/* Right-edge fade — hints at horizontal scroll */}
-          <div className="meet-filmstrip-fade pointer-events-none absolute right-0 top-0 h-full w-16" />
-
-          <div className="pointer-events-none absolute right-3.5 top-2 rounded-md border border-[color-mix(in_oklab,var(--accent-600)_28%,transparent)] bg-[var(--meet-btn-muted-bg)] px-[7px] py-0.5 text-[11px] font-semibold text-[var(--meet-btn-muted-fg)]">
-            {stripParticipants.length}
-          </div>
+          {pinnedParticipants.map((p, i) => (
+            <ParticipantTile
+              key={p.identity}
+              participant={p}
+              totalCount={mainCount}
+              index={i}
+              isPinned
+              onTogglePin={() => onTogglePin(p.identity)}
+            />
+          ))}
         </div>
-      )}
+
+        {/* ── Bottom filmstrip ─────────────────────────────────────── */}
+        {hasStrip && (
+          <div
+            className="relative mt-[5px] shrink-0 border-t border-[var(--meet-border-subtle)] bg-[var(--meet-filmstrip-bg)] backdrop-blur-lg"
+            style={{ height: STRIP_OUTER }}
+          >
+            {/* Scrollable row */}
+            <div className="meet-scroll-none h-full flex items-center gap-1.5 overflow-x-auto px-2.5 [scrollbar-width:none]">
+              {stripParticipants.map((p, i) => (
+                <StripTile key={p.identity} participant={p} index={i} onTogglePin={() => onTogglePin(p.identity)} />
+              ))}
+
+              {/* Right padding sentinel so last tile isn't occluded by fade */}
+              <div className="w-8 shrink-0" />
+            </div>
+
+            {/* Right-edge fade — hints at horizontal scroll */}
+            <div className="meet-filmstrip-fade pointer-events-none absolute right-0 top-0 h-full w-16" />
+
+            <div className="pointer-events-none absolute right-3.5 top-2 rounded-md border border-[color-mix(in_oklab,var(--accent-600)_28%,transparent)] bg-[var(--meet-btn-muted-bg)] px-[7px] py-0.5 text-[11px] font-semibold text-[var(--meet-btn-muted-fg)]">
+              {stripParticipants.length}
+            </div>
+          </div>
+        )}
       </div>
     </MeetingViewportGrid>
   )

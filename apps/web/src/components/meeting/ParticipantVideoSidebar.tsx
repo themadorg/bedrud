@@ -10,14 +10,23 @@ interface Props {
   onClose: () => void
 }
 
-function SidebarTile({ participant, index, totalCount }: { participant: Participant; index: number; totalCount: number }) {
+function SidebarTile({
+  participant,
+  index,
+  totalCount,
+}: {
+  participant: Participant
+  index: number
+  totalCount: number
+}) {
   const isSpeaking = useIsSpeaking(participant)
 
   return (
     <div
       className={cn(
         'relative aspect-video w-full shrink-0 overflow-hidden rounded-[10px] transition-[box-shadow] duration-200',
-        isSpeaking && 'shadow-[0_0_0_1.5px_color-mix(in_oklab,var(--primary)_75%,transparent),0_0_14px_color-mix(in_oklab,var(--primary)_30%,transparent)]',
+        isSpeaking &&
+          'shadow-[0_0_0_1.5px_color-mix(in_oklab,var(--primary)_75%,transparent),0_0_14px_color-mix(in_oklab,var(--primary)_30%,transparent)]',
       )}
     >
       <ParticipantTile participant={participant} totalCount={totalCount} index={index} />

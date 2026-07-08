@@ -4,7 +4,14 @@ import { toast } from 'sonner'
 import { api } from '#/lib/api'
 import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { getErrorMessage } from '@/lib/errors'
 import { cn } from '@/lib/utils'
@@ -62,9 +69,7 @@ export function RoomAccessDialog({ open, onOpenChange }: Props) {
             <label
               className={cn(
                 'flex flex-col items-start gap-1.5 rounded-lg border p-3 text-left transition-colors',
-                !selected
-                  ? 'border-primary/40 bg-primary/10'
-                  : 'border-white/[0.08] bg-white/[0.03] text-white/50',
+                !selected ? 'border-primary/40 bg-primary/10' : 'border-white/[0.08] bg-white/[0.03] text-white/50',
                 canManageRoomAccess && 'cursor-pointer hover:border-white/20',
                 !canManageRoomAccess && 'opacity-70 cursor-default',
               )}
@@ -79,9 +84,7 @@ export function RoomAccessDialog({ open, onOpenChange }: Props) {
             <label
               className={cn(
                 'flex flex-col items-start gap-1.5 rounded-lg border p-3 text-left transition-colors',
-                selected
-                  ? 'border-primary/40 bg-primary/10'
-                  : 'border-white/[0.08] bg-white/[0.03] text-white/50',
+                selected ? 'border-primary/40 bg-primary/10' : 'border-white/[0.08] bg-white/[0.03] text-white/50',
                 canManageRoomAccess && 'cursor-pointer hover:border-white/20',
                 !canManageRoomAccess && 'opacity-70 cursor-default',
               )}

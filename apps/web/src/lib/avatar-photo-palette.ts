@@ -8,9 +8,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function toHex(r: number, g: number, b: number) {
-  return `#${[r, g, b]
-    .map((channel) => clamp(Math.round(channel), 0, 255).toString(16).padStart(2, '0'))
-    .join('')}`
+  return `#${[r, g, b].map((channel) => clamp(Math.round(channel), 0, 255).toString(16).padStart(2, '0')).join('')}`
 }
 
 function loadImage(url: string): Promise<HTMLImageElement> {

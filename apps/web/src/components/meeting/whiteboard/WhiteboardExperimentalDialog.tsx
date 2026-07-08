@@ -33,17 +33,10 @@ export function WhiteboardExperimentalDialog({ open, onContinue, onCancel }: Whi
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex-col gap-2 sm:flex-col">
-          <Button
-            className="w-full border-none bg-primary text-white hover:bg-primary/90"
-            onClick={onContinue}
-          >
+          <Button className="w-full border-none bg-primary text-white hover:bg-primary/90" onClick={onContinue}>
             Continue
           </Button>
-          <Button
-            variant="ghost"
-            className="w-full text-white/50 hover:text-white/70"
-            onClick={onCancel}
-          >
+          <Button variant="ghost" className="w-full text-white/50 hover:text-white/70" onClick={onCancel}>
             Cancel
           </Button>
         </DialogFooter>

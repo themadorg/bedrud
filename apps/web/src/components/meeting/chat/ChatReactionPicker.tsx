@@ -24,10 +24,7 @@ export function ChatReactionPicker({ isLocal, onReact }: Props) {
       size="sm"
       variant="boxed"
       ariaLabel="Add reaction"
-      className={cn(
-        'border-white/10 bg-[#0f0f1c]/90',
-        'hover:text-white/55 data-[state=open]:opacity-100',
-      )}
+      className={cn('border-white/10 bg-[#0f0f1c]/90', 'hover:text-white/55 data-[state=open]:opacity-100')}
     />
   )
 }

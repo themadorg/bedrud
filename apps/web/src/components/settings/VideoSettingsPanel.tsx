@@ -7,8 +7,8 @@ import {
   selectValueToDeviceId,
   writeMeetingDeviceId,
 } from '#/lib/meeting-device-storage'
-import { useVideoPreferencesStore } from '#/lib/video-preferences.store'
 import { patchUserPreferences } from '#/lib/user-preferences'
+import { useVideoPreferencesStore } from '#/lib/video-preferences.store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -48,14 +48,11 @@ function useVideoInputDevices() {
     return () => navigator.mediaDevices?.removeEventListener('devicechange', refresh)
   }, [refresh])
 
-  const setDeviceId = useCallback(
-    (next: string, onChange?: (deviceId: string) => void | Promise<void>) => {
-      setDeviceIdState(next)
-      writeMeetingDeviceId('videoinput', next)
-      void onChange?.(next)
-    },
-    [],
-  )
+  const setDeviceId = useCallback((next: string, onChange?: (deviceId: string) => void | Promise<void>) => {
+    setDeviceIdState(next)
+    writeMeetingDeviceId('videoinput', next)
+    void onChange?.(next)
+  }, [])
 
   return { devices, deviceId, setDeviceId, refresh }
 }
@@ -187,9 +184,7 @@ export function VideoSettingsPanel({ tone = 'default', onCameraDeviceChange }: V
             {cameras.devices.length > 0 && (
               <Select
                 value={deviceIdToSelectValue(cameras.deviceId)}
-                onValueChange={(value) =>
-                  cameras.setDeviceId(selectValueToDeviceId(value), onCameraDeviceChange)
-                }
+                onValueChange={(value) => cameras.setDeviceId(selectValueToDeviceId(value), onCameraDeviceChange)}
               >
                 <SelectTrigger className={selectTriggerClass}>
                   <SelectValue placeholder="Select camera" />
@@ -239,7 +234,12 @@ export function VideoSettingsPanel({ tone = 'default', onCameraDeviceChange }: V
               />
             ) : (
               <div className="flex aspect-video w-full flex-col items-center justify-center gap-2">
-                <VideoOff className={cn('h-10 w-10 opacity-50', meeting ? 'text-[var(--meet-fg-muted)]' : 'text-muted-foreground')} />
+                <VideoOff
+                  className={cn(
+                    'h-10 w-10 opacity-50',
+                    meeting ? 'text-[var(--meet-fg-muted)]' : 'text-muted-foreground',
+                  )}
+                />
                 <span className={cn('text-xs', meeting ? 'text-[var(--meet-fg-muted)]' : 'text-muted-foreground')}>
                   Preview is off
                 </span>

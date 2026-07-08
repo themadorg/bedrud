@@ -2,9 +2,7 @@ import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
 import { describe, expect, test, vi } from 'vitest'
 import { deselectWhiteboard, handleWhiteboardEscapeKey } from './whiteboardKeyboard'
 
-function mockApi(
-  appState: Partial<ReturnType<ExcalidrawImperativeAPI['getAppState']>> = {},
-): ExcalidrawImperativeAPI {
+function mockApi(appState: Partial<ReturnType<ExcalidrawImperativeAPI['getAppState']>> = {}): ExcalidrawImperativeAPI {
   let state = {
     selectedElementIds: {},
     editingTextElement: null,

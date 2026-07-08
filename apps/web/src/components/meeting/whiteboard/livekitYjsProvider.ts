@@ -1,9 +1,9 @@
 import * as decoding from 'lib0/decoding'
 import * as encoding from 'lib0/encoding'
 import { type Room, RoomEvent } from 'livekit-client'
-import { isPublishUnavailableError, isRoomConnected } from '#/lib/livekit-publish'
 import * as syncProtocol from 'y-protocols/sync'
 import * as Y from 'yjs'
+import { isPublishUnavailableError, isRoomConnected } from '#/lib/livekit-publish'
 import {
   applyYjsChunkPart,
   assembledYjsFromChunks,

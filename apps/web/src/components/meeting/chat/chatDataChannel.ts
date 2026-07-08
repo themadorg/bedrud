@@ -78,11 +78,7 @@ function splitUtf8ByMaxBytes(text: string, maxBytes: number, build: (part: strin
   return parts
 }
 
-function chunkSection(
-  id: string,
-  kind: ChatChunkKind,
-  text: string,
-): ChatChunkWire[] {
+function chunkSection(id: string, kind: ChatChunkKind, text: string): ChatChunkWire[] {
   const parts = splitUtf8ByMaxBytes(text, CHAT_DATA_SAFE_BYTES, (part) => ({
     type: 'chat_chunk',
     id,
@@ -152,16 +148,11 @@ export function createChunkBuffer(): Map<string, PendingChatChunks> {
 
 function metaMatches(a: ChatChunkMetaWire, b: ChatChunkMetaWire): boolean {
   return (
-    a.messageChunks === b.messageChunks &&
-    a.attachmentChunks === b.attachmentChunks &&
-    a.pollChunks === b.pollChunks
+    a.messageChunks === b.messageChunks && a.attachmentChunks === b.attachmentChunks && a.pollChunks === b.pollChunks
   )
 }
 
-export function ingestChatChunk(
-  buffers: Map<string, PendingChatChunks>,
-  meta: ChatChunkMetaWire,
-): PendingChatChunks {
+export function ingestChatChunk(buffers: Map<string, PendingChatChunks>, meta: ChatChunkMetaWire): PendingChatChunks {
   const existing = buffers.get(meta.id)
   if (existing && metaMatches(existing.meta, meta)) {
     existing.updatedAt = Date.now()
@@ -198,10 +189,7 @@ function isChunkAssemblyComplete(entry: PendingChatChunks): boolean {
   )
 }
 
-export function applyChatChunkPart(
-  entry: PendingChatChunks,
-  chunk: ChatChunkWire,
-): PendingChatChunks | null {
+export function applyChatChunkPart(entry: PendingChatChunks, chunk: ChatChunkWire): PendingChatChunks | null {
   const { meta } = entry
   if (chunk.id !== meta.id) return null
 

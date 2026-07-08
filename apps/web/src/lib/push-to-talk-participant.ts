@@ -24,10 +24,7 @@ export function isPushToTalkParticipant(participant: Participant, localPushToTal
   return readPushToTalkFromMetadata(participant.metadata)
 }
 
-export function shouldShowMicMutedIndicator(
-  participant: Participant,
-  localPushToTalkEnabled = false,
-): boolean {
+export function shouldShowMicMutedIndicator(participant: Participant, localPushToTalkEnabled = false): boolean {
   if (isPushToTalkParticipant(participant, localPushToTalkEnabled)) {
     return readPttMicHardMutedFromMetadata(participant.metadata)
   }

@@ -100,7 +100,11 @@ export function RoomCard({ room, onJoin, onDelete, onSettings }: Props) {
           aria-label="Copy link"
           title={copied ? 'Copied!' : 'Copy invite link'}
         >
-          {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
+          {copied ? (
+            <Check className="h-3.5 w-3.5 text-emerald-500" />
+          ) : (
+            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+          )}
         </Button>
       </div>
 

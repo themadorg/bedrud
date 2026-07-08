@@ -2,10 +2,7 @@ import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
 import { resetWhiteboardToolCursorState } from '@/components/meeting/whiteboard/whiteboardToolCursors'
 
 /** Reset custom whiteboard cursors and stray Excalidraw DOM after the overlay unmounts. */
-export function releaseWhiteboardCursors(
-  api?: ExcalidrawImperativeAPI | null,
-  shell?: HTMLElement | null,
-) {
+export function releaseWhiteboardCursors(api?: ExcalidrawImperativeAPI | null, shell?: HTMLElement | null) {
   api?.resetCursor()
   resetWhiteboardToolCursorState()
 

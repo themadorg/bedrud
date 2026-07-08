@@ -7,9 +7,7 @@ export function textElementContent(textEl: ExcalidrawTextElement): string {
 }
 
 /** Align new/edited RTL text (e.g. Persian) to the right on the whiteboard. */
-export function alignRtlTextElements(
-  elements: readonly OrderedExcalidrawElement[],
-): OrderedExcalidrawElement[] | null {
+export function alignRtlTextElements(elements: readonly OrderedExcalidrawElement[]): OrderedExcalidrawElement[] | null {
   let changed = false
 
   const next = elements.map((el) => {

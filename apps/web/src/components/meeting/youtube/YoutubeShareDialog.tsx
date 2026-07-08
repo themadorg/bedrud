@@ -76,7 +76,12 @@ export function YoutubeShareDialog() {
           >
             Cancel
           </Button>
-          <Button type="button" onClick={handleSubmit} disabled={!url.trim()} className="bg-primary text-primary-foreground">
+          <Button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!url.trim()}
+            className="bg-primary text-primary-foreground"
+          >
             Share with room
           </Button>
         </DialogFooter>

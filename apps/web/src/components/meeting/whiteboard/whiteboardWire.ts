@@ -1,5 +1,5 @@
-import type { ExcalidrawTextElement, OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import { restoreElements } from '@excalidraw/excalidraw'
+import type { ExcalidrawTextElement, OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import type { AppState, BinaryFiles } from '@excalidraw/excalidraw/types'
 
 export const WHITEBOARD_DATA_TOPIC = 'whiteboard'
@@ -71,10 +71,7 @@ function isElementArray(value: unknown): value is readonly OrderedExcalidrawElem
   return Array.isArray(value)
 }
 
-export function pickReferencedFiles(
-  elements: readonly OrderedExcalidrawElement[],
-  files: BinaryFiles,
-): BinaryFiles {
+export function pickReferencedFiles(elements: readonly OrderedExcalidrawElement[], files: BinaryFiles): BinaryFiles {
   const fileIds = new Set<string>()
   for (const el of elements) {
     if (el.type === 'image' && 'fileId' in el && typeof el.fileId === 'string' && el.fileId) {
@@ -89,10 +86,7 @@ export function pickReferencedFiles(
   return picked
 }
 
-function markSavedImageElements(
-  elements: OrderedExcalidrawElement[],
-  files?: BinaryFiles,
-): OrderedExcalidrawElement[] {
+function markSavedImageElements(elements: OrderedExcalidrawElement[], files?: BinaryFiles): OrderedExcalidrawElement[] {
   if (!files) return elements
   return elements.map((el) => {
     if (el.type !== 'image' || !('fileId' in el) || !el.fileId || !files[el.fileId]?.dataURL) return el

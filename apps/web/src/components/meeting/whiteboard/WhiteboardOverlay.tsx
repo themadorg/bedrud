@@ -1,13 +1,13 @@
+import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
+import { useCallback, useEffect, useRef } from 'react'
+import { meetRightInsetClass, useMeetingUILayout } from '@/components/meeting/MeetingUILayoutContext'
 import { MeetingSharedWhiteboard } from '@/components/meeting/whiteboard/MeetingSharedWhiteboard'
-import { releaseWhiteboardCursors } from '@/components/meeting/whiteboard/whiteboardTeardown'
-import { useWhiteboardWatch } from '@/components/meeting/whiteboard/whiteboard-watch-context'
 import { useWhiteboardElementLocks } from '@/components/meeting/whiteboard/useWhiteboardElementLocks'
 import { useWhiteboardFollowSync } from '@/components/meeting/whiteboard/useWhiteboardFollowSync'
 import { useWhiteboardPointerSync } from '@/components/meeting/whiteboard/useWhiteboardPointerSync'
-import { meetRightInsetClass, useMeetingUILayout } from '@/components/meeting/MeetingUILayoutContext'
-import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
+import { useWhiteboardWatch } from '@/components/meeting/whiteboard/whiteboard-watch-context'
+import { releaseWhiteboardCursors } from '@/components/meeting/whiteboard/whiteboardTeardown'
 import { cn } from '@/lib/utils'
-import { useCallback, useEffect, useRef } from 'react'
 
 export function WhiteboardOverlay() {
   const layout = useMeetingUILayout()
@@ -15,8 +15,12 @@ export function WhiteboardOverlay() {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
   const { onPointerUpdate, notifyApiReady: notifyPointerApiReady } = useWhiteboardPointerSync(apiRef, whiteboardVisible)
   const { notifyApiReady: notifyFollowApiReady, relayViewport } = useWhiteboardFollowSync(apiRef, whiteboardVisible)
-  const { getLocks, localIdentity, onPointerUp: onLockPointerUp, notifyApiReady: notifyLocksApiReady } =
-    useWhiteboardElementLocks(apiRef, ydoc, whiteboardVisible)
+  const {
+    getLocks,
+    localIdentity,
+    onPointerUp: onLockPointerUp,
+    notifyApiReady: notifyLocksApiReady,
+  } = useWhiteboardElementLocks(apiRef, ydoc, whiteboardVisible)
   const handleViewportChange = useCallback(() => relayViewport(), [relayViewport])
 
   useEffect(() => {
@@ -36,10 +40,7 @@ export function WhiteboardOverlay() {
     >
       {/* Blur on a backdrop layer only — filter on an ancestor breaks Excalidraw's fixed SVGLayer (laser/eraser trails). */}
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/[0.08] shadow-2xl">
-        <div
-          className="pointer-events-none absolute inset-0 rounded-xl bg-[#030308]/95 backdrop-blur-md"
-          aria-hidden
-        />
+        <div className="pointer-events-none absolute inset-0 rounded-xl bg-[#030308]/95 backdrop-blur-md" aria-hidden />
         <div className="relative min-h-0 flex-1 bg-[#12121f]">
           <MeetingSharedWhiteboard
             ydoc={ydoc}

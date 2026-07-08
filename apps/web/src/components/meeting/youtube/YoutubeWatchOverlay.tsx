@@ -3,9 +3,9 @@ import { useCallback, useEffect, useRef } from 'react'
 import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
 import { meetRightInsetClass, useMeetingUILayout } from '@/components/meeting/MeetingUILayoutContext'
 import { cn } from '@/lib/utils'
+import { isYoutubePlayerReady } from './loadYoutubeIframeApi'
 import { useYoutubePlayer } from './useYoutubePlayer'
 import { useYoutubeWatch } from './youtube-watch-context'
-import { isYoutubePlayerReady } from './loadYoutubeIframeApi'
 
 const SYNC_DRIFT_SECONDS = 1.5
 const HOST_HEARTBEAT_MS = 2500

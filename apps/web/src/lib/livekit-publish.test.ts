@@ -60,7 +60,11 @@ describe('livekit-publish', () => {
 
     const noReliableDc = {
       state: ConnectionState.Connected,
-      engine: { verifyTransport: () => true, reliableDC: { readyState: 'connecting' }, lossyDC: { readyState: 'open' } },
+      engine: {
+        verifyTransport: () => true,
+        reliableDC: { readyState: 'connecting' },
+        lossyDC: { readyState: 'open' },
+      },
     } as unknown as Room
     expect(isRoomPublishReady(noReliableDc)).toBe(false)
 
@@ -128,7 +132,9 @@ describe('livekit-publish', () => {
     expect(livekitHostnameFromUrl('wss://debug.example.com/livekit')).toBe('debug.example.com')
     expect(livekitHostnameFromUrl('ws://127.0.0.1:7072')).toBe('127.0.0.1')
     expect(livekitConnectOptionsForUrl('wss://debug.example.com/livekit')?.peerConnectionTimeout).toBe(45_000)
-    expect(livekitConnectOptionsForUrl('wss://debug.example.com/livekit')?.rtcConfig?.iceTransportPolicy).toBeUndefined()
+    expect(
+      livekitConnectOptionsForUrl('wss://debug.example.com/livekit')?.rtcConfig?.iceTransportPolicy,
+    ).toBeUndefined()
     expect(livekitConnectOptionsForUrl('ws://127.0.0.1:7072')).toBeUndefined()
   })
 

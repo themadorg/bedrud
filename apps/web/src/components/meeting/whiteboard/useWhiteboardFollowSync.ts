@@ -1,9 +1,8 @@
 import { getVisibleSceneBounds, zoomToFitBounds } from '@excalidraw/excalidraw'
-import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
-import type { SocketId } from '@excalidraw/excalidraw/types'
+import type { ExcalidrawImperativeAPI, SocketId } from '@excalidraw/excalidraw/types'
 import { useRoomContext } from '@livekit/components-react'
 import { RoomEvent } from 'livekit-client'
-import { useCallback, useEffect, useRef, type RefObject } from 'react'
+import { type RefObject, useCallback, useEffect, useRef } from 'react'
 import { isPublishUnavailableError, isRoomConnected } from '#/lib/livekit-publish'
 import {
   decodeWhiteboardFollowPacket,

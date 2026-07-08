@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildViewportTransformCss,
-  clientToContentNorm,
   clampViewportZoom,
+  clientToContentNorm,
   contentNormToClient,
   contentNormToGridLocal,
   zoomAtClientPoint,
@@ -34,9 +34,7 @@ describe('meetingViewportTransform', () => {
   })
 
   it('builds css transform with pan and zoom', () => {
-    expect(buildViewportTransformCss({ panX: 10, panY: -4, zoom: 1.5 })).toBe(
-      'translate(10px, -4px) scale(1.5)',
-    )
+    expect(buildViewportTransformCss({ panX: 10, panY: -4, zoom: 1.5 })).toBe('translate(10px, -4px) scale(1.5)')
   })
 
   it('clamps zoom', () => {

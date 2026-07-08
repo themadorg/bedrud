@@ -1,10 +1,10 @@
 import { Check, Loader2, Shield, Trash2, Upload } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '#/lib/api'
-import { resolveAvatarUrl } from '#/lib/avatar-url'
 import { useAuthStore } from '#/lib/auth.store'
-import { useProfileSyncStore } from '#/lib/profile-sync.store'
+import { resolveAvatarUrl } from '#/lib/avatar-url'
 import { getPalette } from '#/lib/participant-palette'
+import { useProfileSyncStore } from '#/lib/profile-sync.store'
 import type { User } from '#/lib/user.store'
 import { useUserStore } from '#/lib/user.store'
 import { Alert } from '@/components/ui/alert'
@@ -63,7 +63,9 @@ function roleBadgeClass(role: string, meeting: boolean): string {
       ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300'
       : 'border-amber-500/30 bg-amber-500/10 text-amber-600'
   }
-  return meeting ? 'border-[var(--meet-border)] bg-[var(--meet-control)] text-[var(--meet-fg-muted)]' : 'border-border bg-muted/40 text-muted-foreground'
+  return meeting
+    ? 'border-[var(--meet-border)] bg-[var(--meet-control)] text-[var(--meet-fg-muted)]'
+    : 'border-border bg-muted/40 text-muted-foreground'
 }
 
 function sectionBorderClass(meeting: boolean) {
@@ -215,7 +217,12 @@ export function ProfileSettingsPanel({ tone = 'default' }: { tone?: SettingsPane
         <div className="relative shrink-0">
           <Avatar className={cn('h-16 w-16 ring-2', meeting ? 'ring-white/10' : 'ring-border')}>
             {displayedAvatarUrl ? (
-              <AvatarImage key={displayedAvatarUrl} src={displayedAvatarUrl} alt={user?.name} referrerPolicy="no-referrer" />
+              <AvatarImage
+                key={displayedAvatarUrl}
+                src={displayedAvatarUrl}
+                alt={user?.name}
+                referrerPolicy="no-referrer"
+              />
             ) : null}
             <AvatarFallback className="text-lg font-bold text-white" style={{ background: palette.avatar }}>
               {initials}
@@ -279,7 +286,10 @@ export function ProfileSettingsPanel({ tone = 'default' }: { tone?: SettingsPane
               variant="outline"
               size="sm"
               disabled={avatarUploading || avatarRemoving || isHydrating}
-              className={cn('gap-1.5', meeting && 'border-white/10 bg-white/[0.04] text-white/90 hover:bg-white/[0.08]')}
+              className={cn(
+                'gap-1.5',
+                meeting && 'border-white/10 bg-white/[0.04] text-white/90 hover:bg-white/[0.08]',
+              )}
               onClick={() => void handleRemoveAvatar()}
             >
               <Trash2 className="h-3 w-3" />
@@ -298,7 +308,10 @@ export function ProfileSettingsPanel({ tone = 'default' }: { tone?: SettingsPane
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="settings-name" className={cn('text-xs font-medium', meeting ? 'text-white/50' : 'text-muted-foreground')}>
+            <Label
+              htmlFor="settings-name"
+              className={cn('text-xs font-medium', meeting ? 'text-white/50' : 'text-muted-foreground')}
+            >
               Name
             </Label>
             <Input
@@ -315,7 +328,9 @@ export function ProfileSettingsPanel({ tone = 'default' }: { tone?: SettingsPane
           </div>
           {user?.email && (
             <div className="space-y-1.5">
-              <Label className={cn('text-xs font-medium', meeting ? 'text-white/50' : 'text-muted-foreground')}>Email</Label>
+              <Label className={cn('text-xs font-medium', meeting ? 'text-white/50' : 'text-muted-foreground')}>
+                Email
+              </Label>
               <Input
                 value={user.email}
                 disabled
@@ -339,7 +354,13 @@ export function ProfileSettingsPanel({ tone = 'default' }: { tone?: SettingsPane
 
       <div className="px-5 py-4">
         <p className="mb-3 text-sm font-medium">Account details</p>
-        <div className={cn('overflow-hidden rounded-lg border', sectionBorderClass(meeting), meeting ? 'bg-white/[0.02]' : 'bg-muted/20')}>
+        <div
+          className={cn(
+            'overflow-hidden rounded-lg border',
+            sectionBorderClass(meeting),
+            meeting ? 'bg-white/[0.02]' : 'bg-muted/20',
+          )}
+        >
           {accountRows.map(({ label, value, mono }, index) => (
             <div
               key={label}
@@ -349,7 +370,13 @@ export function ProfileSettingsPanel({ tone = 'default' }: { tone?: SettingsPane
               )}
             >
               <span className={cn('text-xs', meeting ? 'text-white/50' : 'text-muted-foreground')}>{label}</span>
-              <span className={cn('max-w-[min(100%,280px)] truncate text-xs font-medium', mono && 'font-mono', meeting ? 'text-white/80' : undefined)}>
+              <span
+                className={cn(
+                  'max-w-[min(100%,280px)] truncate text-xs font-medium',
+                  mono && 'font-mono',
+                  meeting ? 'text-white/80' : undefined,
+                )}
+              >
                 {value}
               </span>
             </div>

@@ -1,5 +1,5 @@
 import { type RefObject, useEffect, useRef, useState } from 'react'
-import { type YTPlayer, isYoutubePlayerReady, loadYoutubeIframeApi } from './loadYoutubeIframeApi'
+import { isYoutubePlayerReady, loadYoutubeIframeApi, type YTPlayer } from './loadYoutubeIframeApi'
 
 interface UseYoutubePlayerOptions {
   videoId: string | null

@@ -1,6 +1,10 @@
 import type { AppState } from '@excalidraw/excalidraw/types'
 import { describe, expect, it, vi } from 'vitest'
-import { applyWhiteboardToolCursor, resetWhiteboardToolCursorState, whiteboardToolCursor } from '@/components/meeting/whiteboard/whiteboardToolCursors'
+import {
+  applyWhiteboardToolCursor,
+  resetWhiteboardToolCursorState,
+  whiteboardToolCursor,
+} from '@/components/meeting/whiteboard/whiteboardToolCursors'
 
 function toolState(type: AppState['activeTool']['type'], theme: AppState['theme'] = 'dark') {
   return { activeTool: { type }, theme } as Pick<AppState, 'activeTool' | 'theme'>

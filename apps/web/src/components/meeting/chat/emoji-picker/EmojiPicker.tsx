@@ -102,7 +102,10 @@ export function EmojiPicker({
     >
       <div className="flex items-center gap-2 border-b border-[var(--meet-border)] px-2.5 py-2">
         <div className="relative flex-1">
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--meet-fg-subtle)]" />
+          <Search
+            size={14}
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--meet-fg-subtle)]"
+          />
           <input
             ref={inputRef}
             type="text"
@@ -126,7 +129,9 @@ export function EmojiPicker({
 
       <div className="meet-scroll overflow-y-auto overscroll-contain" style={{ height: containerHeight }}>
         {!groups ? (
-          <div className="flex h-full items-center justify-center text-xs text-[var(--meet-fg-muted)]">Loading emojis…</div>
+          <div className="flex h-full items-center justify-center text-xs text-[var(--meet-fg-muted)]">
+            Loading emojis…
+          </div>
         ) : searchResults ? (
           searchResults.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-1 px-4 text-center">

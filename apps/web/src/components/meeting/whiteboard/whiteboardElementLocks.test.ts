@@ -1,5 +1,5 @@
-import * as Y from 'yjs'
 import { describe, expect, it } from 'vitest'
+import * as Y from 'yjs'
 import {
   acquireElementLocks,
   canEditElement,

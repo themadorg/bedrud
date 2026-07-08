@@ -1,16 +1,8 @@
 import type { ExcalidrawTextElement, OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import type { AppState, BinaryFileData, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
 import * as Y from 'yjs'
-import {
-  normalizeRemoteScene,
-  sceneElementsSignature,
-  type WhiteboardScenePayload,
-} from './excalidrawSceneUtils'
-import {
-  filterElementsForLocalSync,
-  mergeElementsWithLocks,
-  type ElementLockSnapshot,
-} from './whiteboardElementLocks'
+import { normalizeRemoteScene, sceneElementsSignature, type WhiteboardScenePayload } from './excalidrawSceneUtils'
+import { type ElementLockSnapshot, filterElementsForLocalSync, mergeElementsWithLocks } from './whiteboardElementLocks'
 import {
   pickSyncableSettings,
   settingsSignature,
@@ -76,10 +68,7 @@ function pointCount(el: OrderedExcalidrawElement): number {
   return (el.points as PointList).length
 }
 
-function pickNewerElement(
-  local: OrderedExcalidrawElement,
-  remote: OrderedExcalidrawElement,
-): OrderedExcalidrawElement {
+function pickNewerElement(local: OrderedExcalidrawElement, remote: OrderedExcalidrawElement): OrderedExcalidrawElement {
   if (remote.version > local.version) return remote
   if (local.version > remote.version) return local
 
@@ -102,9 +91,7 @@ function elementChanged(prev: OrderedExcalidrawElement | undefined, next: Ordere
   if (prev.version !== next.version) return true
 
   if (prev.type === 'text' && next.type === 'text') {
-    return (
-      (prev as ExcalidrawTextElement).originalText !== (next as ExcalidrawTextElement).originalText
-    )
+    return (prev as ExcalidrawTextElement).originalText !== (next as ExcalidrawTextElement).originalText
   }
 
   const prevPoints = 'points' in prev ? (prev.points as PointList | undefined) : undefined
@@ -174,11 +161,7 @@ function syncSceneToDoc(doc: Y.Doc, scene: WhiteboardScenePayload) {
 }
 
 export interface ExcalidrawYjsBinding {
-  onExcalidrawChange: (
-    elements: readonly OrderedExcalidrawElement[],
-    appState: AppState,
-    files: BinaryFiles,
-  ) => void
+  onExcalidrawChange: (elements: readonly OrderedExcalidrawElement[], appState: AppState, files: BinaryFiles) => void
   flush: () => void
   destroy: () => void
 }

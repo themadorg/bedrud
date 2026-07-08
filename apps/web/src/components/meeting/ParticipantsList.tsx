@@ -1,14 +1,11 @@
 import { useParticipants } from '@livekit/components-react'
 import { Mic, MicOff, Users, Video, VideoOff, X } from 'lucide-react'
 import { useMemo } from 'react'
-import { getPalette } from '#/lib/participant-palette'
-import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
-import {
-  isPushToTalkParticipant,
-  shouldShowMicMutedIndicator,
-} from '#/lib/push-to-talk-participant'
 import { DeafenHeadphonesIcon } from '#/components/meeting/DeafenHeadphonesIcon'
 import { ParticipantAvatar } from '#/components/meeting/ParticipantAvatar'
+import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
+import { getPalette } from '#/lib/participant-palette'
+import { isPushToTalkParticipant, shouldShowMicMutedIndicator } from '#/lib/push-to-talk-participant'
 import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
 
 import { useFocusTrap } from './useFocusTrap'
@@ -145,7 +142,6 @@ function ParticipantRow({ p, adminId }: RowProps): React.ReactElement {
         ) : (
           <VideoOff size={13} className="shrink-0 text-[var(--meet-fg-muted)]" />
         )}
-
       </div>
     </div>
   )

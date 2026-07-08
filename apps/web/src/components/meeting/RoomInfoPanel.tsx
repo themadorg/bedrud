@@ -77,7 +77,11 @@ export function RoomInfoPanel({ open, onOpenChange, roomId }: RoomInfoPanelProps
             </p>
             <div className="flex flex-col gap-2">
               <InfoRow label="Status">
-                <span className={connected ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>
+                <span
+                  className={
+                    connected ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+                  }
+                >
                   {connectionStateLabel(connectionState)}
                 </span>
               </InfoRow>
@@ -85,9 +89,7 @@ export function RoomInfoPanel({ open, onOpenChange, roomId }: RoomInfoPanelProps
                 <InfoRow label="Transport">
                   <span
                     className={cn(
-                      transportMode === 'p2p'
-                        ? 'text-teal-600 dark:text-teal-400'
-                        : 'text-sky-600 dark:text-sky-400',
+                      transportMode === 'p2p' ? 'text-teal-600 dark:text-teal-400' : 'text-sky-600 dark:text-sky-400',
                     )}
                   >
                     {liveKitTransportModeLabel(transportMode)}
@@ -98,9 +100,7 @@ export function RoomInfoPanel({ open, onOpenChange, roomId }: RoomInfoPanelProps
                 <InfoRow label="Chat channel">
                   <span
                     className={cn(
-                      chatReady
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-amber-600 dark:text-amber-400',
+                      chatReady ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400',
                     )}
                   >
                     {chatReady ? 'Ready (send + receive)' : 'Opening send/receive channels…'}

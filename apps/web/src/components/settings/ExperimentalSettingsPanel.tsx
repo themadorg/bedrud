@@ -57,10 +57,7 @@ export function ExperimentalSettingsPanel({ tone = 'default' }: { tone?: Setting
       </div>
 
       <div
-        className={cn(
-          'flex items-center justify-between gap-4 border-b px-5 py-4',
-          meeting && 'border-white/[0.08]',
-        )}
+        className={cn('flex items-center justify-between gap-4 border-b px-5 py-4', meeting && 'border-white/[0.08]')}
       >
         <div className="flex min-w-0 items-start gap-3">
           <PenLine className={cn('mt-0.5 h-4 w-4 shrink-0', meeting ? 'text-white/50' : 'text-muted-foreground')} />
@@ -88,7 +85,9 @@ export function ExperimentalSettingsPanel({ tone = 'default' }: { tone?: Setting
       </div>
 
       {syncStatus !== 'idle' && (
-        <div className={cn('flex items-center justify-end gap-1.5 border-t px-5 py-2.5', meeting && 'border-white/[0.08]')}>
+        <div
+          className={cn('flex items-center justify-end gap-1.5 border-t px-5 py-2.5', meeting && 'border-white/[0.08]')}
+        >
           {syncStatus === 'saving' && (
             <Loader2 className={cn('h-3 w-3 animate-spin', meeting ? 'text-white/40' : 'text-muted-foreground/50')} />
           )}

@@ -129,7 +129,10 @@ export function AppearanceSettingsPanel({ tone = 'default' }: { tone?: SettingsP
         <div className={cn('flex items-center justify-end gap-1.5 border-t px-5 py-2.5', sectionBorderClass(meeting))}>
           {syncStatus === 'saving' && (
             <Loader2
-              className={cn('h-3 w-3 animate-spin', meeting ? 'text-[var(--meet-fg-subtle)]' : 'text-muted-foreground/50')}
+              className={cn(
+                'h-3 w-3 animate-spin',
+                meeting ? 'text-[var(--meet-fg-subtle)]' : 'text-muted-foreground/50',
+              )}
             />
           )}
           {syncStatus === 'saved' && <Check className="h-3 w-3 text-emerald-500" />}

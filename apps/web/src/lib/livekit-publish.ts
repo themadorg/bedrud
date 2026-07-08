@@ -1,4 +1,4 @@
-import { ConnectionState, Room, RoomEvent, type RoomConnectOptions, type RoomOptions } from 'livekit-client'
+import { ConnectionState, Room, type RoomConnectOptions, RoomEvent, type RoomOptions } from 'livekit-client'
 import { useEffect, useState } from 'react'
 
 type EngineWithDataChannels = {
@@ -181,13 +181,9 @@ export function ensureRemoteLiveKitTransportPatch(): void {
   const original = engineProto.makeRTCConfiguration
   if (!original) return
 
-  engineProto.makeRTCConfiguration = function (
-    this: { rtcConfig?: RTCConfiguration },
-    serverResponse: unknown,
-  ) {
+  engineProto.makeRTCConfiguration = function (this: { rtcConfig?: RTCConfiguration }, serverResponse: unknown) {
     const config = original.call(this, serverResponse) as RTCConfiguration
-    const forceRelay =
-      config.iceTransportPolicy === 'relay' || this.rtcConfig?.iceTransportPolicy === 'relay'
+    const forceRelay = config.iceTransportPolicy === 'relay' || this.rtcConfig?.iceTransportPolicy === 'relay'
     if (config.iceServers?.length) {
       config.iceServers = forceRelay
         ? filterIceServersToTurnsTls(config.iceServers)
@@ -212,10 +208,7 @@ function relayRtcConnectOptions(): RoomConnectOptions {
  * Remote LiveKit: prefer direct P2P first (chat shares the same peer connection).
  * Pass preferRelay=true after P2P fails to open data channels (SCTP over UDP is flaky on some NATs).
  */
-export function livekitConnectOptionsForHost(
-  hostname: string,
-  preferRelay = false,
-): RoomConnectOptions | undefined {
+export function livekitConnectOptionsForHost(hostname: string, preferRelay = false): RoomConnectOptions | undefined {
   if (isLocalLiveKitHostname(hostname)) return undefined
   ensureRemoteLiveKitTransportPatch()
   if (preferRelay || shouldForceLiveKitIceRelay()) {
@@ -225,10 +218,7 @@ export function livekitConnectOptionsForHost(
 }
 
 /** Prefer livekitHost from join response over window.location (user may open UI via localhost tunnel). */
-export function livekitConnectOptionsForUrl(
-  livekitUrl: string,
-  preferRelay = false,
-): RoomConnectOptions | undefined {
+export function livekitConnectOptionsForUrl(livekitUrl: string, preferRelay = false): RoomConnectOptions | undefined {
   const hostname = livekitHostnameFromUrl(livekitUrl)
   if (!hostname) return undefined
   return livekitConnectOptionsForHost(hostname, preferRelay)

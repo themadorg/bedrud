@@ -26,11 +26,7 @@ export function MeetingRoomAudioRenderer() {
       muteParticipant(participant)
     }
 
-    const onTrackSubscribed = (
-      _track: unknown,
-      _publication: unknown,
-      participant: RemoteParticipant,
-    ) => {
+    const onTrackSubscribed = (_track: unknown, _publication: unknown, participant: RemoteParticipant) => {
       if (!participant.isLocal) muteParticipant(participant)
     }
 

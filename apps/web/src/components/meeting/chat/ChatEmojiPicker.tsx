@@ -36,13 +36,10 @@ export function ChatEmojiPicker({
   const [open, setOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
 
-  const handleOpenChange = useCallback(
-    (next: boolean) => {
-      setOpen(next)
-      if (!next) setExpanded(false)
-    },
-    [],
-  )
+  const handleOpenChange = useCallback((next: boolean) => {
+    setOpen(next)
+    if (!next) setExpanded(false)
+  }, [])
 
   const pickEmoji = useCallback(
     (emoji: string) => {
@@ -130,7 +127,11 @@ export function ChatEmojiPicker({
           <Smile size={iconSize} />
         </button>
       </PopoverTrigger>
-      <PopoverContent side={side} align={align} className="w-auto border-[var(--meet-border)] bg-transparent p-0 shadow-none">
+      <PopoverContent
+        side={side}
+        align={align}
+        className="w-auto border-[var(--meet-border)] bg-transparent p-0 shadow-none"
+      >
         {pickerContent}
       </PopoverContent>
     </Popover>

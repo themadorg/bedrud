@@ -47,12 +47,7 @@ const config = defineConfig({
       'lib0/decoding',
     ],
   },
-  plugins: [
-    devtools({ eventBusConfig: { port: DEV_PORT_DEVTOOLS } }),
-    tailwindcss(),
-    tanstackStart(),
-    viteReact(),
-  ],
+  plugins: [devtools({ eventBusConfig: { port: DEV_PORT_DEVTOOLS } }), tailwindcss(), tanstackStart(), viteReact()],
   test: {
     environment: 'jsdom',
     globals: true,

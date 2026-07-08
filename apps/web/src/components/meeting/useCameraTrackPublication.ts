@@ -14,9 +14,7 @@ const CAMERA_TRACK_EVENTS = [
 ] as const
 
 export function useCameraTrackPublication(participant: Participant): TrackPublication | undefined {
-  const [cameraTrack, setCameraTrack] = useState(
-    () => participant.getTrackPublication(Track.Source.Camera),
-  )
+  const [cameraTrack, setCameraTrack] = useState(() => participant.getTrackPublication(Track.Source.Camera))
 
   useEffect(() => {
     const refresh = () => setCameraTrack(participant.getTrackPublication(Track.Source.Camera))

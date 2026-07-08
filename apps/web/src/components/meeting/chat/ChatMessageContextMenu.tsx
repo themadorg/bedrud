@@ -12,10 +12,10 @@ import {
 } from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
 import type { ChatMessage } from '../MeetingContext'
-import { absoluteTime } from './chatGrouping'
-import { groupReactionsByEmoji } from './chatReactions'
 import { ChatMessageInfoModal, messagePreview } from './ChatMessageInfoModal'
 import { ChatPollResultsModal } from './ChatPollResultsModal'
+import { absoluteTime } from './chatGrouping'
+import { groupReactionsByEmoji } from './chatReactions'
 
 interface Props {
   message: ChatMessage

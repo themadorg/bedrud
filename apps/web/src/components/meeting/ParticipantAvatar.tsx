@@ -23,7 +23,10 @@ export function ParticipantAvatar({ avatarUrl, initials, paletteBackground, clas
 
   return (
     <div
-      className={cn('meet-avatar-circle flex items-center justify-center overflow-hidden font-bold text-white', className)}
+      className={cn(
+        'meet-avatar-circle flex items-center justify-center overflow-hidden font-bold text-white',
+        className,
+      )}
       style={{
         ...style,
         background: paletteBackground,

@@ -1,9 +1,8 @@
 import { useRoomContext } from '@livekit/components-react'
+import type { RoomConnectOptions } from 'livekit-client'
 import { ConnectionState, RoomEvent } from 'livekit-client'
 import { useEffect, useRef } from 'react'
-
 import { isLiveKitRelayConnectOptions, waitForRoomPublishReady } from '#/lib/livekit-publish'
-import type { RoomConnectOptions } from 'livekit-client'
 
 const P2P_DATA_CHANNEL_TIMEOUT_MS = 12_000
 
@@ -31,9 +30,7 @@ export function LiveKitTransportFallback({
     const escalate = () => {
       if (escalatedRef.current) return
       escalatedRef.current = true
-      console.warn(
-        '[livekit-transport] P2P ICE ok but data channels closed — switching to TURN/TLS relay for chat',
-      )
+      console.warn('[livekit-transport] P2P ICE ok but data channels closed — switching to TURN/TLS relay for chat')
       onNeedRelay()
     }
 

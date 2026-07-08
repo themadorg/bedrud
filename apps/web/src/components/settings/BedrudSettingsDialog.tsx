@@ -72,7 +72,13 @@ export function BedrudSettingsDialog({ open, onOpenChange }: Props) {
             </TabsList>
           </div>
 
-          <div className={cn('min-h-0 min-w-0 flex-1 overflow-y-auto p-4', settingsDialogScrollClass, meetingPanelScopeClass)}>
+          <div
+            className={cn(
+              'min-h-0 min-w-0 flex-1 overflow-y-auto p-4',
+              settingsDialogScrollClass,
+              meetingPanelScopeClass,
+            )}
+          >
             <TabsContent value="profile" className="mt-0 outline-none">
               <ProfileSettingsPanel tone="meeting" />
             </TabsContent>

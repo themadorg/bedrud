@@ -18,11 +18,7 @@ export function isSingleEmojiText(text: string): boolean {
   return cluster === trimmed && isEmojiGrapheme(cluster)
 }
 
-export function isSingleEmojiMessage(message: {
-  message: string
-  attachments: unknown[]
-  poll?: unknown
-}): boolean {
+export function isSingleEmojiMessage(message: { message: string; attachments: unknown[]; poll?: unknown }): boolean {
   if (message.attachments.length > 0 || message.poll) return false
   return isSingleEmojiText(message.message)
 }

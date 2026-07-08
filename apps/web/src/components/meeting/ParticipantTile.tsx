@@ -3,19 +3,16 @@ import type { Participant, RemoteParticipant } from 'livekit-client'
 import { Track } from 'livekit-client'
 import { MicOff, Pin } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
+import { DeafenHeadphonesIcon } from '#/components/meeting/DeafenHeadphonesIcon'
+import { ParticipantAvatar } from '#/components/meeting/ParticipantAvatar'
+import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
 import { useAvatarPhotoPalette } from '#/lib/avatar-photo-palette'
 import { resolveAvatarUrl } from '#/lib/avatar-url'
 import { selectVolume, useParticipantOverridesStore } from '#/lib/participant-overrides.store'
 import { getPalette } from '#/lib/participant-palette'
-import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
-import {
-  isPushToTalkParticipant,
-  shouldShowMicMutedIndicator,
-} from '#/lib/push-to-talk-participant'
+import { isPushToTalkParticipant, shouldShowMicMutedIndicator } from '#/lib/push-to-talk-participant'
 import { cn } from '#/lib/utils'
 import { useVideoPreferencesStore } from '#/lib/video-preferences.store'
-import { DeafenHeadphonesIcon } from '#/components/meeting/DeafenHeadphonesIcon'
-import { ParticipantAvatar } from '#/components/meeting/ParticipantAvatar'
 import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
 import { hasCameraVideo, useCameraTrackPublication } from '@/components/meeting/useCameraTrackPublication'
 
@@ -82,7 +79,8 @@ function MicStatusIcon({
 export function ParticipantTile({ participant, totalCount, index, isPinned = false, onTogglePin }: Props) {
   const { identity } = useParticipantInfo({ participant })
   const isSpeaking = useIsSpeaking(participant)
-  const { isSelfDeafened, isParticipantDeafened, getParticipantDisplayName, getParticipantAvatarUrl } = useMeetingRoomContext()
+  const { isSelfDeafened, isParticipantDeafened, getParticipantDisplayName, getParticipantAvatarUrl } =
+    useMeetingRoomContext()
 
   const volume = useParticipantOverridesStore(selectVolume(identity ?? ''))
 
@@ -207,79 +205,74 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
 
   return (
     <div className={cn('meet-tile group h-full w-full', isSpeaking && 'meet-speaking')} style={tileStyle}>
-        {showCameraVideo && cameraTrack ? (
-          <div
-            className="absolute inset-0"
-            style={{ transform: participant.isLocal && mirrorWebcam ? 'scaleX(-1)' : undefined }}
-          >
-            <VideoTrack
-              trackRef={{ participant, source: Track.Source.Camera, publication: cameraTrack }}
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-          </div>
-        ) : (
-          /* No video: gradient avatar */
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3.5">
-            <ParticipantAvatar
-              avatarUrl={avatarUrl}
-              initials={initial}
-              paletteBackground={palette.avatar}
-              style={avatarStyle}
-              textClassName=""
-            />
+      {showCameraVideo && cameraTrack ? (
+        <div
+          className="absolute inset-0"
+          style={{ transform: participant.isLocal && mirrorWebcam ? 'scaleX(-1)' : undefined }}
+        >
+          <VideoTrack
+            trackRef={{ participant, source: Track.Source.Camera, publication: cameraTrack }}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        </div>
+      ) : (
+        /* No video: gradient avatar */
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3.5">
+          <ParticipantAvatar
+            avatarUrl={avatarUrl}
+            initials={initial}
+            paletteBackground={palette.avatar}
+            style={avatarStyle}
+            textClassName=""
+          />
 
-            {/* Name label + mute indicator (only when large enough to be readable) */}
-            {totalCount <= 2 && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-medium text-white/60">
-                  {displayName}
-                  {participant.isLocal && (
-                    <span className="ms-1.5 text-xs text-[var(--meet-btn-muted-fg)]">you</span>
-                  )}
-                </span>
-                <MicStatusIcon
-                  participant={participant}
-                  isSpeaking={isSpeaking}
-                  size={13}
-                  localPushToTalkEnabled={pushToTalkEnabled}
-                />
-                {isDeafened && <DeafenHeadphonesIcon size={13} off className="text-red-400" />}
-              </div>
-            )}
-          </div>
-        )}
+          {/* Name label + mute indicator (only when large enough to be readable) */}
+          {totalCount <= 2 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-medium text-white/60">
+                {displayName}
+                {participant.isLocal && <span className="ms-1.5 text-xs text-[var(--meet-btn-muted-fg)]">you</span>}
+              </span>
+              <MicStatusIcon
+                participant={participant}
+                isSpeaking={isSpeaking}
+                size={13}
+                localPushToTalkEnabled={pushToTalkEnabled}
+              />
+              {isDeafened && <DeafenHeadphonesIcon size={13} off className="text-red-400" />}
+            </div>
+          )}
+        </div>
+      )}
 
-        {/* Name + mute badge at bottom-left — for video tiles or dense grids */}
-        {(showCameraVideo || totalCount > 2) && (
-          <div className="absolute bottom-2 left-2 flex max-w-[calc(100%-50px)] items-center gap-[5px] rounded-[7px] border border-[var(--meet-tile-action-border)] bg-[var(--meet-tile-action-bg)] px-2 py-[3px] backdrop-blur-sm">
-            <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium text-[var(--meet-tile-action-fg)]">
-              {displayName}
-              {participant.isLocal && (
-                <span className="ms-1 text-[11px] text-[var(--meet-btn-muted-fg)]">you</span>
-              )}
-            </span>
-            <MicStatusIcon
-              participant={participant}
-              isSpeaking={isSpeaking}
-              size={11}
-              localPushToTalkEnabled={pushToTalkEnabled}
-            />
-            {isDeafened && <DeafenHeadphonesIcon size={11} off className="text-red-400" />}
-          </div>
-        )}
+      {/* Name + mute badge at bottom-left — for video tiles or dense grids */}
+      {(showCameraVideo || totalCount > 2) && (
+        <div className="absolute bottom-2 left-2 flex max-w-[calc(100%-50px)] items-center gap-[5px] rounded-[7px] border border-[var(--meet-tile-action-border)] bg-[var(--meet-tile-action-bg)] px-2 py-[3px] backdrop-blur-sm">
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium text-[var(--meet-tile-action-fg)]">
+            {displayName}
+            {participant.isLocal && <span className="ms-1 text-[11px] text-[var(--meet-btn-muted-fg)]">you</span>}
+          </span>
+          <MicStatusIcon
+            participant={participant}
+            isSpeaking={isSpeaking}
+            size={11}
+            localPushToTalkEnabled={pushToTalkEnabled}
+          />
+          {isDeafened && <DeafenHeadphonesIcon size={11} off className="text-red-400" />}
+        </div>
+      )}
 
-        {/* Pin button — always visible when pinned, appears on hover otherwise */}
-        {onTogglePin && (
-          <button
-            type="button"
-            onClick={onTogglePin}
-            className={pinButtonClass}
-            aria-label={isPinned ? 'Unpin participant' : 'Pin participant'}
-          >
-            <Pin size={13} className={isPinned ? 'fill-current' : ''} />
-          </button>
-        )}
-
-      </div>
+      {/* Pin button — always visible when pinned, appears on hover otherwise */}
+      {onTogglePin && (
+        <button
+          type="button"
+          onClick={onTogglePin}
+          className={pinButtonClass}
+          aria-label={isPinned ? 'Unpin participant' : 'Pin participant'}
+        >
+          <Pin size={13} className={isPinned ? 'fill-current' : ''} />
+        </button>
+      )}
+    </div>
   )
 }

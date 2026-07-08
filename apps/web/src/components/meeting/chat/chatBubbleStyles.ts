@@ -23,9 +23,7 @@ export function bubbleChrome(isLocal: boolean, pos: BubblePosition, stacked: boo
   const base = {
     borderRadius: bubbleRadius(isLocal, pos),
     background: isLocal ? 'var(--meet-chat-bubble-out-bg)' : 'var(--meet-chat-bubble-in-bg)',
-    border: isLocal
-      ? '1px solid var(--meet-chat-bubble-out-border)'
-      : '1px solid var(--meet-chat-bubble-in-border)',
+    border: isLocal ? '1px solid var(--meet-chat-bubble-out-border)' : '1px solid var(--meet-chat-bubble-in-border)',
     marginTop: connect ? -1 : 0,
     color: isLocal ? 'var(--meet-chat-bubble-out-fg)' : 'var(--meet-chat-bubble-in-fg)',
     boxShadow: isLocal ? 'var(--meet-chat-bubble-out-shadow)' : 'var(--meet-chat-bubble-in-shadow)',

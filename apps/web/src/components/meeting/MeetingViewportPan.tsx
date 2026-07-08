@@ -1,7 +1,7 @@
 import {
+  createContext,
   type ReactNode,
   type RefObject,
-  createContext,
   useCallback,
   useContext,
   useEffect,
@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { meetRightInsetClass, useMeetingUILayout } from '@/components/meeting/MeetingUILayoutContext'
 import {
   buildViewportTransformCss,
   clampViewportZoom,
@@ -17,7 +18,6 @@ import {
   wheelZoomFactor,
   zoomAtClientPoint,
 } from '@/components/meeting/meetingViewportTransform'
-import { meetRightInsetClass, useMeetingUILayout } from '@/components/meeting/MeetingUILayoutContext'
 import { cn } from '@/lib/utils'
 
 const DEFAULT_TRANSFORM: ViewportTransform = { panX: 0, panY: 0, zoom: 1 }
@@ -224,10 +224,7 @@ export function MeetingViewportGrid({ className, children }: MeetingViewportGrid
       )}
       {...shellProps}
     >
-      <div
-        className="h-full w-full origin-top-left"
-        style={{ transform: panTransform, willChange: 'transform' }}
-      >
+      <div className="h-full w-full origin-top-left" style={{ transform: panTransform, willChange: 'transform' }}>
         {children}
       </div>
       <div id="meet-presence-layer" className="pointer-events-none absolute inset-0 z-[1]" />

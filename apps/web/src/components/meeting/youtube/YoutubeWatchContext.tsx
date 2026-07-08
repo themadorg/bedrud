@@ -4,14 +4,11 @@ import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.
 import { useMeetingStage } from '@/components/meeting/stage/MeetingStageContext'
 import type { MeetingStage } from '@/components/meeting/stage/stageWire'
 import { parseYoutubeVideoId } from './parseYoutubeVideoId'
-import {
-  YoutubeWatchContext,
-  type YoutubeWatchContextValue,
-} from './youtube-watch-context'
+import { YoutubeWatchContext, type YoutubeWatchContextValue } from './youtube-watch-context'
 import type { YoutubeSession } from './youtubeWire'
 
-export type { YoutubeWatchContextValue }
 export { useYoutubeWatch } from './youtube-watch-context'
+export type { YoutubeWatchContextValue }
 
 function sessionFromStage(stage: Extract<MeetingStage, { kind: 'youtube' }>): YoutubeSession {
   return {

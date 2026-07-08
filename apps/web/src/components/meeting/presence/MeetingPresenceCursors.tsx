@@ -2,11 +2,11 @@ import { useRoomContext } from '@livekit/components-react'
 import { ConnectionState, RoomEvent } from 'livekit-client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { avatarColor } from '@/components/meeting/chat/chatGrouping'
-import { contentNormToGridLocal } from '@/components/meeting/meetingViewportTransform'
-import { useMeetingViewportPan } from '@/components/meeting/MeetingViewportPan'
 import { isPublishUnavailableError, isRoomConnected } from '#/lib/livekit-publish'
 import { textDirectionFor } from '#/lib/text-direction'
+import { avatarColor } from '@/components/meeting/chat/chatGrouping'
+import { useMeetingViewportPan } from '@/components/meeting/MeetingViewportPan'
+import { contentNormToGridLocal } from '@/components/meeting/meetingViewportTransform'
 import {
   clientToSurfaceNorm,
   decodeMeetingPointerPacket,
@@ -33,20 +33,8 @@ function PresenceMarker({ color, username }: { color: string; username: string }
   return (
     <div className="relative" style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))' }}>
       <svg width="11" height="14" viewBox="0 0 11 14" aria-hidden className="block overflow-visible">
-        <path
-          d="M0,0 L0,14 L4,9 L11,8 Z"
-          fill="#fff"
-          stroke="#fff"
-          strokeWidth="6"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M0,0 L0,14 L4,9 L11,8 Z"
-          fill={color}
-          stroke={color}
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
+        <path d="M0,0 L0,14 L4,9 L11,8 Z" fill="#fff" stroke="#fff" strokeWidth="6" strokeLinejoin="round" />
+        <path d="M0,0 L0,14 L4,9 L11,8 Z" fill={color} stroke={color} strokeWidth="2" strokeLinejoin="round" />
       </svg>
       <span
         dir={textDirectionFor(username)}
@@ -177,13 +165,7 @@ export function MeetingPresenceCursors() {
 
       const surface = gridSurface()
       if (!surface) return
-      const norm = clientToSurfaceNorm(
-        clientX,
-        clientY,
-        surface.rect,
-        transformRef.current,
-        surface.insets,
-      )
+      const norm = clientToSurfaceNorm(clientX, clientY, surface.rect, transformRef.current, surface.insets)
       if (!norm) {
         if (localVisibleRef.current) {
           localVisibleRef.current = false
@@ -306,30 +288,23 @@ export function MeetingPresenceCursors() {
   void layoutEpoch
 
   return createPortal(
-    <>
-      {cursors.map((cursor) => {
-        if (cursor.identity === room.localParticipant.identity) return null
-        const point = contentNormToGridLocal(
-          { x: cursor.x, y: cursor.y },
-          surface.rect,
-          transform,
-          surface.insets,
-        )
-        const color = avatarColor(cursor.identity)
-        return (
-          <div
-            key={cursor.identity}
-            className="pointer-events-none absolute will-change-[left,top]"
-            style={{
-              left: point.x,
-              top: point.y,
-            }}
-          >
-            <PresenceMarker color={color} username={cursor.username} />
-          </div>
-        )
-      })}
-    </>,
+    cursors.map((cursor) => {
+      if (cursor.identity === room.localParticipant.identity) return null
+      const point = contentNormToGridLocal({ x: cursor.x, y: cursor.y }, surface.rect, transform, surface.insets)
+      const color = avatarColor(cursor.identity)
+      return (
+        <div
+          key={cursor.identity}
+          className="pointer-events-none absolute will-change-[left,top]"
+          style={{
+            left: point.x,
+            top: point.y,
+          }}
+        >
+          <PresenceMarker color={color} username={cursor.username} />
+        </div>
+      )
+    }),
     portalTarget,
   )
 }

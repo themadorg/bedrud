@@ -3,48 +3,48 @@ import '@livekit/components-styles/components'
 import { LiveKitRoom, useRoomContext } from '@livekit/components-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { WhiteboardWatchProvider } from '@/components/meeting/whiteboard/WhiteboardWatchContext'
 import type { AudioCaptureOptions } from 'livekit-client'
 import { ConnectionState, DisconnectReason, RoomEvent } from 'livekit-client'
 import { WifiOff } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '#/lib/api'
+import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
+import { useAuthStore } from '#/lib/auth.store'
+import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
+import { useInterfacePreferencesStore } from '#/lib/interface-preferences.store'
 import {
   getLiveKitPublishDiagnostics,
   livekitConnectOptionsForUrl,
   livekitRoomOptionsForUrl,
   waitForRoomPublishReady,
 } from '#/lib/livekit-publish'
-import { LiveKitTransportFallback } from '@/components/meeting/LiveKitTransportFallback'
 import { getLiveKitTransportMode } from '#/lib/livekit-transport-type'
-import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
-import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
-import { useInterfacePreferencesStore } from '#/lib/interface-preferences.store'
 import { readMeetingDeviceId } from '#/lib/meeting-device-storage'
-import { useAuthStore } from '#/lib/auth.store'
 import { useRecentRoomsStore } from '#/lib/recent-rooms.store'
 import { usePinnedParticipants } from '#/lib/usePinnedParticipants'
 import { useVideoPreferencesStore } from '#/lib/video-preferences.store'
 import { ErrorPage } from '@/components/ErrorPage'
-import { MeetLoadingScreen } from '@/components/meeting/MeetLoadingScreen'
-import { MeetingWelcomeScreen, type WelcomeJoinChoices } from '@/components/meeting/MeetingWelcomeScreen'
 import { AskActionBanner } from '@/components/meeting/AskActionBanner'
 import { AudioProcessorManager } from '@/components/meeting/AudioProcessorManager'
 import { BeforeUnloadLock } from '@/components/meeting/BeforeUnloadLock'
 import { FocusLayout } from '@/components/meeting/FocusLayout'
 import { KickDetector } from '@/components/meeting/KickDetector'
+import { LiveKitTransportFallback } from '@/components/meeting/LiveKitTransportFallback'
 import { MeetingProvider, type RoomDeletionEvent, useMeetingChatContext } from '@/components/meeting/MeetingContext'
 import { MeetingErrorBoundary } from '@/components/meeting/MeetingErrorBoundary'
 import { MeetingRoomAudioRenderer } from '@/components/meeting/MeetingRoomAudioRenderer'
 import { MeetingRoomShell } from '@/components/meeting/MeetingRoomShell'
 import { MeetingSoundEffects } from '@/components/meeting/MeetingSoundEffects'
+import { MeetingWelcomeScreen, type WelcomeJoinChoices } from '@/components/meeting/MeetingWelcomeScreen'
+import { MeetLoadingScreen } from '@/components/meeting/MeetLoadingScreen'
 import { ParticipantGrid } from '@/components/meeting/ParticipantGrid'
 import { SecureContextBanner } from '@/components/meeting/SecureContextBanner'
 import { MeetingStageProvider, useMeetingStage } from '@/components/meeting/stage/MeetingStageContext'
 import { StageJoinNotifier } from '@/components/meeting/stage/StageJoinNotifier'
 import { StageScreenShareOverlay } from '@/components/meeting/stage/StageScreenShareOverlay'
 import { WhiteboardOverlay } from '@/components/meeting/whiteboard/WhiteboardOverlay'
+import { WhiteboardWatchProvider } from '@/components/meeting/whiteboard/WhiteboardWatchContext'
 import { YoutubeShareDialog } from '@/components/meeting/youtube/YoutubeShareDialog'
 import { YoutubeWatchProvider } from '@/components/meeting/youtube/YoutubeWatchContext'
 import { YoutubeWatchOverlay } from '@/components/meeting/youtube/YoutubeWatchOverlay'
@@ -81,11 +81,7 @@ interface ArchivedOwnedResponse {
 }
 
 /** Dev-only: logs WebSocket vs data-channel readiness (chat/whiteboard need open _reliable/_lossy DCs). */
-function LiveKitTransportDiagnostics({
-  connectOptions,
-}: {
-  connectOptions?: { rtcConfig?: RTCConfiguration }
-}) {
+function LiveKitTransportDiagnostics({ connectOptions }: { connectOptions?: { rtcConfig?: RTCConfiguration } }) {
   const room = useRoomContext()
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -109,14 +105,11 @@ function LiveKitTransportDiagnostics({
           console.log(`[livekit-transport] pcMode=${diag.pcMode}`)
         }
         if (!ready) {
-          console.warn(
-            '[livekit-transport] chat needs publisher + subscriber reliable channels',
-            {
-              pcMode: diag.pcMode,
-              publisher: diag.reliableDcState,
-              subscriber: diag.reliableDcSubState,
-            },
-          )
+          console.warn('[livekit-transport] chat needs publisher + subscriber reliable channels', {
+            pcMode: diag.pcMode,
+            publisher: diag.reliableDcState,
+            subscriber: diag.reliableDcSubState,
+          })
         }
       })
     }
@@ -646,7 +639,15 @@ function MeetingPage() {
         : false
   const livekitVideo = joinMediaChoices.camEnabled ? { deviceId: camDeviceId || undefined } : false
 
-  const { id, token: originalToken, livekitHost: wsUrl, name: roomName, adminId, createdBy, isPublic = false } = joinData
+  const {
+    id,
+    token: originalToken,
+    livekitHost: wsUrl,
+    name: roomName,
+    adminId,
+    createdBy,
+    isPublic = false,
+  } = joinData
   const token = currentToken ?? originalToken
 
   if (fatalReconnectError) {
@@ -676,10 +677,7 @@ function MeetingPage() {
     >
       <MeetingErrorBoundary>
         <LiveKitTransportDiagnostics connectOptions={livekitConnectOptions} />
-        <LiveKitTransportFallback
-          connectOptions={livekitConnectOptions}
-          onNeedRelay={handleTransportRelayFallback}
-        />
+        <LiveKitTransportFallback connectOptions={livekitConnectOptions} onNeedRelay={handleTransportRelayFallback} />
         {/* LiveKitRoom renders as display:contents — this div is the actual viewport container */}
         {showReconnectBanner && (
           <div className="fixed top-0 start-0 end-0 z-[9999] bg-yellow-500/15 border-b border-yellow-500/30 px-4 py-2 text-center text-[13px] text-amber-400 backdrop-blur-sm">
@@ -777,11 +775,15 @@ function MeetingPage() {
 
                     <div
                       className="pointer-events-none absolute start-0 end-0 top-0 z-10 h-[calc(96px+env(safe-area-inset-top))]"
-                      style={{ background: 'linear-gradient(to bottom, var(--meet-vignette-top) 0%, transparent 100%)' }}
+                      style={{
+                        background: 'linear-gradient(to bottom, var(--meet-vignette-top) 0%, transparent 100%)',
+                      }}
                     />
                     <div
                       className="pointer-events-none absolute bottom-0 start-0 end-0 z-10 h-[calc(128px+env(safe-area-inset-bottom))]"
-                      style={{ background: 'linear-gradient(to top, var(--meet-vignette-bottom) 0%, transparent 100%)' }}
+                      style={{
+                        background: 'linear-gradient(to top, var(--meet-vignette-bottom) 0%, transparent 100%)',
+                      }}
                     />
                   </MeetingRoomShell>
                   <YoutubeShareDialog />

@@ -1,8 +1,13 @@
-import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
-import type { Collaborator, CollaboratorPointer, Gesture, SocketId } from '@excalidraw/excalidraw/types'
+import type {
+  Collaborator,
+  CollaboratorPointer,
+  ExcalidrawImperativeAPI,
+  Gesture,
+  SocketId,
+} from '@excalidraw/excalidraw/types'
 import { useRoomContext } from '@livekit/components-react'
 import { RoomEvent } from 'livekit-client'
-import { useCallback, useEffect, useRef, type RefObject } from 'react'
+import { type RefObject, useCallback, useEffect, useRef } from 'react'
 import { isPublishUnavailableError, isRoomConnected } from '#/lib/livekit-publish'
 import { avatarColor } from '@/components/meeting/chat/chatGrouping'
 import { selectedElementIds } from '@/components/meeting/whiteboard/whiteboardElementLocks'
@@ -80,15 +85,12 @@ function toCollaboratorSelection(ids?: string[]): Record<string, boolean> | unde
   return Object.fromEntries(ids.map((id) => [id, true]))
 }
 
-export function useWhiteboardPointerSync(
-  apiRef: RefObject<ExcalidrawImperativeAPI | null>,
-  enabled: boolean,
-) {
+export function useWhiteboardPointerSync(apiRef: RefObject<ExcalidrawImperativeAPI | null>, enabled: boolean) {
   const room = useRoomContext()
   const collaboratorsRef = useRef(new Map<SocketId, Collaborator>())
-  const publishRef = useRef<
-    (pointer: CollaboratorPointer, button: 'up' | 'down', selectedIds?: string[]) => void
-  >(() => {})
+  const publishRef = useRef<(pointer: CollaboratorPointer, button: 'up' | 'down', selectedIds?: string[]) => void>(
+    () => {},
+  )
   const teardownRef = useRef<(() => void) | null>(null)
   const lastPointerRef = useRef<CollaboratorPointer>({ x: 0, y: 0, tool: 'pointer', renderCursor: false })
   const lastSelectionKeyRef = useRef('')
@@ -199,11 +201,13 @@ export function useWhiteboardPointerSync(
         selectedElementIds: selectedIds,
       })
 
-      void room.localParticipant.publishData(packet, { reliable: false, topic: WHITEBOARD_POINTER_TOPIC }).catch((err) => {
-        if (!isPublishUnavailableError(err) && import.meta.env.DEV) {
-          console.error('[useWhiteboardPointerSync] publish failed:', err)
-        }
-      })
+      void room.localParticipant
+        .publishData(packet, { reliable: false, topic: WHITEBOARD_POINTER_TOPIC })
+        .catch((err) => {
+          if (!isPublishUnavailableError(err) && import.meta.env.DEV) {
+            console.error('[useWhiteboardPointerSync] publish failed:', err)
+          }
+        })
     }
 
     publishRef.current = throttlePointerSync(publish)
@@ -261,11 +265,7 @@ export function useWhiteboardPointerSync(
   }, [apiRef, enabled, removeCollaborator, room, setCollaborator, syncParticipants])
 
   const onPointerUpdate = useCallback(
-    (payload: {
-      pointer: CollaboratorPointer
-      button: 'up' | 'down'
-      pointersMap: Gesture['pointers']
-    }) => {
+    (payload: { pointer: CollaboratorPointer; button: 'up' | 'down'; pointersMap: Gesture['pointers'] }) => {
       if (payload.pointersMap.size >= 2) return
       lastPointerRef.current = payload.pointer
       const api = apiRef.current

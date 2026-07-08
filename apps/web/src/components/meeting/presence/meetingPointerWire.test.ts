@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  clientToSurfaceNorm,
-  decodeMeetingPointerPacket,
-  encodeMeetingPointerPacket,
-} from './meetingPointerWire'
+import { clientToSurfaceNorm, decodeMeetingPointerPacket, encodeMeetingPointerPacket } from './meetingPointerWire'
 
 describe('meetingPointerWire', () => {
   it('maps client coords into surface-normalized space', () => {
