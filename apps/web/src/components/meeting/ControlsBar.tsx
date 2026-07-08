@@ -1,10 +1,11 @@
 // TODO oncoming feature
 import { useLocalParticipant, useRoomContext } from '@livekit/components-react'
+
 import { ConnectionState, RoomEvent } from 'livekit-client'
 import {
   Check,
   ChevronDown,
-  Keyboard,
+  Film,
   Link2,
   Maximize,
   Mic,
@@ -12,20 +13,31 @@ import {
   MonitorOff,
   MonitorUp,
   MoreVertical,
+  PenLine,
   PhoneOff,
   Settings,
   Video,
   VideoOff,
-  Volume2,
-  VolumeX,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { BedrudSettingsDialog } from '#/components/settings/BedrudSettingsDialog'
+import { DeafenHeadphonesIcon } from '#/components/meeting/DeafenHeadphonesIcon'
+import { useMeetingMicKeyboard } from '#/components/meeting/useMeetingMicKeyboard'
 import { type NoiseSuppressionMode, useAudioPreferencesStore } from '#/lib/audio-preferences.store'
 import { AudioProcessorService } from '#/lib/audio-processor.service'
 import { useAuthStore } from '#/lib/auth.store'
+import { readMeetingDeviceId, writeMeetingDeviceId } from '#/lib/meeting-device-storage'
 import { cn } from '#/lib/utils'
 import { DeviceSelector } from '@/components/meeting/DeviceSelector'
 import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
+import { meetControlsDockClass, useMeetingUILayout } from '@/components/meeting/MeetingUILayoutContext'
+import { useMeetingStage } from '@/components/meeting/stage/MeetingStageContext'
+import { waitForScreenSharePublication } from '@/components/meeting/stage/waitForScreenShare'
+import { stageOwnerLabel } from '@/components/meeting/stage/stageWire'
+import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
+import { useWhiteboardWatch } from '@/components/meeting/whiteboard/whiteboard-watch-context'
+import { useYoutubeWatch } from '@/components/meeting/youtube/youtube-watch-context'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,15 +68,27 @@ function useIsMobile(breakpoint = 640) {
 
 /* ── CtrlBtn: tooltip-wrapped control button ─────────────────────────────── */
 
-function btnIconCn(active = false, danger = false, isMobile = false) {
+function btnIconCn(active = false, danger = false, ptt = false, isMobile = false) {
   return cn(
-    'flex items-center justify-center shrink-0 border-none cursor-pointer transition-[background,color] duration-150',
+    'flex items-center justify-center shrink-0 border-none cursor-pointer transition-[background,color,box-shadow,border-color] duration-150',
     isMobile ? 'h-[38px] w-[38px] rounded-[10px]' : 'h-11 w-11 rounded-xl',
-    danger
-      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-      : active
-        ? 'bg-primary/25 text-teal-400 hover:bg-primary/30'
-        : 'bg-white/[0.07] text-white/75 hover:bg-white/[0.12]',
+    ptt
+      ? 'meet-ptt-btn'
+      : danger
+        ? 'bg-[var(--meet-btn-alert-bg)] text-[var(--meet-btn-alert-fg)] hover:bg-[var(--meet-btn-alert-hover)]'
+        : active
+          ? 'bg-[var(--meet-btn-muted-bg)] text-[var(--meet-btn-muted-fg)] hover:bg-[var(--meet-btn-muted-hover)]'
+          : 'bg-[var(--meet-control)] text-[var(--meet-control-fg)] hover:bg-[var(--meet-control-hover)]',
+  )
+}
+
+function PushToTalkIcon({ size, speaking }: { size: number; speaking: boolean }) {
+  if (speaking) return <Mic size={size} />
+  return (
+    <span className="flex flex-col items-center gap-0.5 leading-none">
+      <Mic size={Math.max(size - 2, 14)} strokeWidth={2.25} />
+      <span className="text-[8px] font-bold uppercase tracking-[0.12em] text-[var(--meet-btn-muted-fg)]">ptt</span>
+    </span>
   )
 }
 
@@ -72,17 +96,27 @@ function CtrlBtn({
   tip,
   active = false,
   danger = false,
+  ptt = false,
   isMobile = false,
   className,
   onClick,
+  onPointerDown,
+  onPointerUp,
+  onPointerLeave,
+  onPointerCancel,
   children,
 }: {
   tip: string
   active?: boolean
   danger?: boolean
+  ptt?: boolean
   isMobile?: boolean
   className?: string
   onClick?: () => void
+  onPointerDown?: (event: React.PointerEvent<HTMLButtonElement>) => void
+  onPointerUp?: (event: React.PointerEvent<HTMLButtonElement>) => void
+  onPointerLeave?: (event: React.PointerEvent<HTMLButtonElement>) => void
+  onPointerCancel?: (event: React.PointerEvent<HTMLButtonElement>) => void
   children: React.ReactNode
 }) {
   return (
@@ -91,8 +125,13 @@ function CtrlBtn({
         <button
           type="button"
           onClick={onClick}
-          className={cn(btnIconCn(active, danger, isMobile), className)}
+          onPointerDown={onPointerDown}
+          onPointerUp={onPointerUp}
+          onPointerLeave={onPointerLeave}
+          onPointerCancel={onPointerCancel}
+          className={cn(btnIconCn(active, danger, ptt, isMobile), className)}
           aria-label={tip}
+          aria-pressed={active}
         >
           {children}
         </button>
@@ -104,9 +143,18 @@ function CtrlBtn({
   )
 }
 
-const dividerCn = 'w-px h-7 bg-white/[0.08] mx-0.5 shrink-0 max-sm:hidden'
+const dividerCn = 'w-px h-7 bg-[var(--meet-border)] mx-0.5 shrink-0 max-sm:hidden'
 
-const darkMenuCn = 'min-w-60 max-w-[calc(100vw-24px)] bg-[#0f0f1c]/98 border border-white/5 rounded-xl backdrop-blur-xl'
+const meetMenuCn =
+  'meet-dialog min-w-60 max-w-[calc(100vw-24px)] rounded-xl border border-[var(--meet-border-subtle)] !bg-[var(--meet-bg-panel)] !text-[var(--meet-fg)] shadow-[var(--meet-shadow)] backdrop-blur-xl'
+
+const meetMenuItemCn =
+  'rounded-md gap-2 text-xs !text-[var(--meet-control-fg)] focus:!bg-[var(--meet-control-hover)] focus:!text-[var(--meet-fg)] data-[highlighted]:!bg-[var(--meet-control-hover)] data-[highlighted]:!text-[var(--meet-fg)]'
+
+const meetMenuLabelCn =
+  'px-2 pb-0.5 pt-1.5 text-[10px] font-medium uppercase tracking-wider !text-[var(--meet-fg-muted)]'
+
+const meetMenuSeparatorCn = '!bg-[var(--meet-border-subtle)]'
 
 const NOISE_MODES: { value: NoiseSuppressionMode; label: string }[] = [
   { value: 'none', label: 'Off' },
@@ -115,17 +163,12 @@ const NOISE_MODES: { value: NoiseSuppressionMode; label: string }[] = [
   { value: 'krisp', label: 'Krisp AI' },
 ]
 
-const STORAGE_KEYS: Record<string, string> = {
-  audioinput: 'bedrud_mic_device',
-  audiooutput: 'bedrud_speaker_device',
-}
-
 /* ── Device list hook (replaces individual DeviceSelector for audio) ──────── */
 
 function useDeviceList(kind: 'audioinput' | 'audiooutput') {
   const room = useRoomContext()
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
-  const [activeId, setActiveId] = useState(() => localStorage.getItem(STORAGE_KEYS[kind]) ?? '')
+  const [activeId, setActiveId] = useState(() => readMeetingDeviceId(kind))
 
   // Sync activeId from the room's actual active device
   const syncActiveFromRoom = useCallback(() => {
@@ -159,7 +202,7 @@ function useDeviceList(kind: 'audioinput' | 'audiooutput') {
 
   // Restore saved device on room connect, then sync actual active device
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS[kind])
+    const saved = readMeetingDeviceId(kind)
 
     const applyDevice = async () => {
       if (saved) {
@@ -197,7 +240,7 @@ function useDeviceList(kind: 'audioinput' | 'audiooutput') {
     async (deviceId: string) => {
       await room.switchActiveDevice(kind, deviceId).catch(() => {})
       setActiveId(deviceId)
-      localStorage.setItem(STORAGE_KEYS[kind], deviceId)
+      writeMeetingDeviceId(kind, deviceId)
     },
     [room, kind],
   )
@@ -209,12 +252,21 @@ function useDeviceList(kind: 'audioinput' | 'audiooutput') {
 
 export function ControlsBar({ onLeave }: Props) {
   const isMobile = useIsMobile()
-  const { localParticipant } = useLocalParticipant()
+  const layout = useMeetingUILayout()
+  const { stage, isOwner, claimStage, clearStage } = useMeetingStage()
+  const isWhiteboardHost = stage?.kind === 'whiteboard' && isOwner
+  const whiteboardEnabled = useExperimentalPreferencesStore((s) => s.whiteboardEnabled)
+  const youtubeEnabled = useExperimentalPreferencesStore((s) => s.youtubeEnabled)
+  const { requestStartWhiteboard } = useWhiteboardWatch()
+  const { isHost: isYoutubeHost, openShareDialog, stopShare: stopYoutubeShare } = useYoutubeWatch()
+  const {
+    localParticipant,
+    isMicrophoneEnabled: micEnabled,
+    isCameraEnabled: camEnabled,
+    isScreenShareEnabled,
+  } = useLocalParticipant()
+  const stageTakenByOther = Boolean(stage && !isOwner)
   const { isSelfDeafened, toggleSelfDeafen } = useMeetingRoomContext()
-
-  const micEnabled = localParticipant?.isMicrophoneEnabled ?? false
-  const camEnabled = localParticipant?.isCameraEnabled ?? false
-  const isScreenShareEnabled = localParticipant?.isScreenShareEnabled ?? false
 
   const tokens = useAuthStore((s) => s.tokens)
   const canShare = Boolean(tokens) && Boolean(navigator.mediaDevices?.getDisplayMedia)
@@ -222,9 +274,11 @@ export function ControlsBar({ onLeave }: Props) {
     ? 'Sign in to share screen'
     : !navigator.mediaDevices?.getDisplayMedia
       ? 'Screen sharing not supported'
-      : isScreenShareEnabled
-        ? 'Stop sharing'
-        : 'Share screen'
+      : stageTakenByOther
+        ? `${stage ? stageOwnerLabel(stage) : 'Someone'} is on stage`
+        : isScreenShareEnabled
+          ? 'Stop sharing'
+          : 'Share screen'
 
   const noiseMode = useAudioPreferencesStore((s) => s.noiseSuppressionMode)
   const setMode = useAudioPreferencesStore((s) => s.setMode)
@@ -235,51 +289,14 @@ export function ControlsBar({ onLeave }: Props) {
   const iconSize = isMobile ? 16 : 18
   const iconSizeSm = isMobile ? 15 : 17
 
-  // ── Push-to-talk ──
-  const pttActiveRef = useRef(false)
-  const pttInitMicRef = useRef(false)
-  const [pttInitMic, setPttInitMic] = useState(false)
-  const [pttVisible, setPttVisible] = useState(false)
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.code !== 'Space' || e.repeat || pttActiveRef.current) return
-      const tgt = e.target as HTMLElement
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tgt.tagName) || tgt.isContentEditable) return
-      if (!localParticipant || isSelfDeafened) return
-      pttActiveRef.current = true
-      pttInitMicRef.current = localParticipant.isMicrophoneEnabled
-      setPttInitMic(localParticipant.isMicrophoneEnabled)
-      localParticipant.setMicrophoneEnabled(!pttInitMicRef.current)
-      setPttVisible(true)
-      e.preventDefault()
-    }
-    function handleKeyUp(e: KeyboardEvent) {
-      if (e.code !== 'Space' || !pttActiveRef.current) return
-      pttActiveRef.current = false
-      localParticipant?.setMicrophoneEnabled(pttInitMicRef.current)
-      setPttVisible(false)
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    document.addEventListener('keyup', handleKeyUp)
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      document.removeEventListener('keyup', handleKeyUp)
-
-      // Restore original mic state if PTT was active on unmount (e.g. Space held while leaving meeting)
-      if (pttActiveRef.current) {
-        if (localParticipant) {
-          localParticipant.setMicrophoneEnabled(pttInitMicRef.current).catch(() => {})
-        }
-        pttActiveRef.current = false
-        setPttVisible(false)
-      }
-    }
-  }, [localParticipant, isSelfDeafened])
+  const { pttVisible, pttAvailable, micUiEnabled, micTip, pttTip, pushToTalkEnabled, toggleMic, startPtt, stopPtt } =
+    useMeetingMicKeyboard(localParticipant, isSelfDeafened, micEnabled)
 
   // ── Copy link feedback ──
   const [linkCopied, setLinkCopied] = useState(false)
   const linkCopiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
     return () => {
@@ -292,19 +309,12 @@ export function ControlsBar({ onLeave }: Props) {
 
   return (
     <TooltipProvider delayDuration={300}>
-      {/* Push-to-talk badge */}
-      {pttVisible && (
-        <div className="fixed bottom-20 left-1/2 z-50 flex items-center gap-2 bg-primary/90 border border-teal-400/40 rounded-full px-4 py-1.5 text-white text-xs font-semibold shadow-[0_4px_24px_color-mix(in_oklab,var(--primary)_50%,transparent)]">
-          <Mic size={13} />
-          {pttInitMic ? 'Push-to-Mute active' : 'Push-to-Talk active'}
-        </div>
-      )}
-
       {/* Floating controls pill */}
       <div
         id="meet-controls"
         className={cn(
-          'absolute left-1/2 -translate-x-1/2 z-30 flex items-center bg-[#0c0c16]/90 backdrop-blur-xl border border-white/[0.07] whitespace-nowrap shadow-[0_8px_40px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.04)]',
+          'absolute -translate-x-1/2 z-30 flex items-center bg-[var(--meet-chrome)] backdrop-blur-xl border border-[var(--meet-border-subtle)] whitespace-nowrap shadow-[var(--meet-shadow),var(--meet-shadow-inset)] transition-[left] duration-200',
+          meetControlsDockClass(layout),
           isMobile
             ? 'bottom-[calc(12px+env(safe-area-inset-bottom))] gap-[2px] rounded-2xl p-1.5'
             : 'bottom-5 gap-[3px] rounded-[18px] p-2',
@@ -329,9 +339,37 @@ export function ControlsBar({ onLeave }: Props) {
           danger={isScreenShareEnabled}
           isMobile={isMobile}
           onClick={
-            canShare ? () => localParticipant?.setScreenShareEnabled(!isScreenShareEnabled).catch(() => {}) : undefined
+            canShare && !stageTakenByOther
+              ? async () => {
+                  if (isScreenShareEnabled) {
+                    await localParticipant?.setScreenShareEnabled(false).catch(() => {})
+                    if (isOwner && stage?.kind === 'screenshare') clearStage()
+                    return
+                  }
+                  try {
+                    const err = claimStage('screenshare')
+                    if (err) {
+                      toast.error(err)
+                      return
+                    }
+                    await localParticipant?.setScreenShareEnabled(true)
+                    const ready = localParticipant
+                      ? await waitForScreenSharePublication(localParticipant)
+                      : false
+                    if (!ready) {
+                      clearStage()
+                      await localParticipant?.setScreenShareEnabled(false).catch(() => {})
+                      toast.error('Screen share track did not start')
+                    }
+                  } catch {
+                    clearStage()
+                    await localParticipant?.setScreenShareEnabled(false).catch(() => {})
+                    toast.error('Could not start screen sharing')
+                  }
+                }
+              : undefined
           }
-          className={cn(!canShare && 'opacity-40 cursor-not-allowed')}
+          className={cn((!canShare || stageTakenByOther) && 'opacity-40 cursor-not-allowed')}
         >
           {isScreenShareEnabled ? <MonitorOff size={iconSizeSm} /> : <MonitorUp size={iconSizeSm} />}
         </CtrlBtn>
@@ -347,9 +385,9 @@ export function ControlsBar({ onLeave }: Props) {
               type="button"
               onClick={onLeave}
               className={cn(
-                'flex items-center gap-2 shrink-0 border-none cursor-pointer text-white text-[13px] font-semibold transition-[background,box-shadow] duration-150',
+                'flex items-center gap-2 shrink-0 border-none cursor-pointer text-[var(--meet-btn-leave-fg)] text-[13px] font-semibold transition-[background,box-shadow] duration-150',
                 isMobile ? 'h-[38px] rounded-[10px] px-3 mx-0.5' : 'h-11 rounded-xl px-[18px] mx-0.5',
-                'bg-red-500/80 shadow-[0_2px_12px_rgba(239,68,68,0.35)] hover:bg-red-500/90',
+                'bg-[var(--meet-btn-leave-bg)] shadow-[0_2px_12px_color-mix(in_oklab,var(--meet-btn-leave-bg)_45%,transparent)] hover:bg-[var(--meet-btn-leave-hover)]',
               )}
               aria-label="Leave meeting"
             >
@@ -366,19 +404,53 @@ export function ControlsBar({ onLeave }: Props) {
 
         {/* ── Right: Mic + Speaker/Deafen + Combined Audio Dropdown ── */}
         <div className="flex items-center gap-px">
+          {pushToTalkEnabled && (
+            <CtrlBtn
+              tip={pttTip}
+              active={pttVisible}
+              ptt={pttAvailable && !pttVisible}
+              isMobile={isMobile}
+              className={cn(!pttAvailable && 'opacity-40 cursor-not-allowed')}
+              onPointerDown={(event) => {
+                if (!pttAvailable) return
+                event.currentTarget.setPointerCapture(event.pointerId)
+                startPtt()
+              }}
+              onPointerUp={(event) => {
+                if (!pushToTalkEnabled) return
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                  event.currentTarget.releasePointerCapture(event.pointerId)
+                }
+                stopPtt()
+              }}
+              onPointerLeave={() => {
+                if (pushToTalkEnabled) stopPtt()
+              }}
+              onPointerCancel={() => {
+                if (pushToTalkEnabled) stopPtt()
+              }}
+            >
+              <PushToTalkIcon size={iconSize} speaking={pttVisible} />
+            </CtrlBtn>
+          )}
+
           <CtrlBtn
-            tip={isSelfDeafened ? 'Undeafen & Unmute' : micEnabled ? 'Mute (Space)' : 'Unmute (Space)'}
-            danger={!micEnabled || isSelfDeafened}
+            tip={micTip}
+            danger={isSelfDeafened || !micUiEnabled}
             isMobile={isMobile}
             onClick={() => {
               if (isSelfDeafened) {
                 toggleSelfDeafen()
                 return
               }
-              localParticipant?.setMicrophoneEnabled(!micEnabled).catch(() => {})
+              toggleMic()
             }}
           >
-            {micEnabled ? <Mic size={iconSize} /> : <MicOff size={iconSize} />}
+            {isSelfDeafened || !micUiEnabled ? (
+              <MicOff size={iconSize} />
+            ) : (
+              <Mic size={iconSize} />
+            )}
           </CtrlBtn>
 
           <CtrlBtn
@@ -387,7 +459,7 @@ export function ControlsBar({ onLeave }: Props) {
             isMobile={isMobile}
             onClick={toggleSelfDeafen}
           >
-            {isSelfDeafened ? <VolumeX size={iconSizeSm} /> : <Volume2 size={iconSizeSm} />}
+            <DeafenHeadphonesIcon size={iconSizeSm} off={isSelfDeafened} />
           </CtrlBtn>
 
           {/* Combined audio dropdown: devices + noise mode + settings */}
@@ -396,7 +468,7 @@ export function ControlsBar({ onLeave }: Props) {
               <button
                 type="button"
                 className={cn(
-                  'flex items-center justify-center shrink-0 border-none bg-transparent cursor-pointer text-white/50 transition-colors duration-150 hover:text-white/60',
+                  'flex items-center justify-center shrink-0 border-none bg-transparent cursor-pointer text-[var(--meet-fg-muted)] transition-colors duration-150 hover:text-[var(--meet-fg-strong)]',
                   isMobile ? 'w-5 h-[38px]' : 'w-6 h-11',
                   'rounded-lg',
                 )}
@@ -405,18 +477,18 @@ export function ControlsBar({ onLeave }: Props) {
                 <ChevronDown size={isMobile ? 12 : 13} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="end" sideOffset={12} className={darkMenuCn}>
+            <DropdownMenuContent side="top" align="end" sideOffset={12} className={meetMenuCn}>
               {/* Microphone devices */}
               {mics.devices.length > 0 && (
                 <>
-                  <DropdownMenuLabel className="text-white/50 text-[10px] uppercase tracking-wider px-2 pt-1.5 pb-0.5">
+                  <DropdownMenuLabel className={meetMenuLabelCn}>
                     Microphone
                   </DropdownMenuLabel>
                   {mics.devices.map((d, i) => (
                     <DropdownMenuItem
                       key={d.deviceId}
                       onClick={() => mics.select(d.deviceId)}
-                      className="rounded-md gap-2 text-xs text-white/75 focus:text-white focus:bg-white/10"
+                      className={meetMenuItemCn}
                     >
                       <Check
                         size={12}
@@ -428,21 +500,21 @@ export function ControlsBar({ onLeave }: Props) {
                       <span className="truncate">{d.label || `Microphone ${i + 1}`}</span>
                     </DropdownMenuItem>
                   ))}
-                  <DropdownMenuSeparator className="bg-white/[0.06]" />
+                  <DropdownMenuSeparator className={meetMenuSeparatorCn} />
                 </>
               )}
 
               {/* Speaker devices */}
               {speakers.devices.length > 0 && (
                 <>
-                  <DropdownMenuLabel className="text-white/50 text-[10px] uppercase tracking-wider px-2 pt-1.5 pb-0.5">
+                  <DropdownMenuLabel className={meetMenuLabelCn}>
                     Speaker
                   </DropdownMenuLabel>
                   {speakers.devices.map((d, i) => (
                     <DropdownMenuItem
                       key={d.deviceId}
                       onClick={() => speakers.select(d.deviceId)}
-                      className="rounded-md gap-2 text-xs text-white/75 focus:text-white focus:bg-white/10"
+                      className={meetMenuItemCn}
                     >
                       <Check
                         size={12}
@@ -454,12 +526,12 @@ export function ControlsBar({ onLeave }: Props) {
                       <span className="truncate">{d.label || `Speaker ${i + 1}`}</span>
                     </DropdownMenuItem>
                   ))}
-                  <DropdownMenuSeparator className="bg-white/[0.06]" />
+                  <DropdownMenuSeparator className={meetMenuSeparatorCn} />
                 </>
               )}
 
               {/* Noise suppression */}
-              <DropdownMenuLabel className="text-white/50 text-[10px] uppercase tracking-wider px-2 pt-1.5 pb-0.5">
+              <DropdownMenuLabel className={meetMenuLabelCn}>
                 Noise Suppression
               </DropdownMenuLabel>
               {NOISE_MODES.map(({ value, label }) => {
@@ -469,10 +541,7 @@ export function ControlsBar({ onLeave }: Props) {
                     key={value}
                     disabled={disabled}
                     onSelect={() => setMode(value)}
-                    className={cn(
-                      'rounded-md gap-2 text-xs text-white/75 focus:text-white focus:bg-white/10',
-                      disabled && 'cursor-not-allowed',
-                    )}
+                    className={cn(meetMenuItemCn, disabled && 'cursor-not-allowed')}
                   >
                     <Check
                       size={12}
@@ -483,17 +552,6 @@ export function ControlsBar({ onLeave }: Props) {
                   </DropdownMenuItem>
                 )
               })}
-
-              <DropdownMenuSeparator className="bg-white/[0.06]" />
-
-              {/* Settings link */}
-              <DropdownMenuItem
-                onClick={() => window.open('/dashboard/settings/audio', '_blank')}
-                className="rounded-md gap-2 text-xs text-white/50 focus:text-white focus:bg-white/10"
-              >
-                <Settings size={12} className="shrink-0" />
-                Audio settings
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -507,7 +565,7 @@ export function ControlsBar({ onLeave }: Props) {
               type="button"
               className={cn(
                 'flex items-center justify-center shrink-0 border-none cursor-pointer transition-[background,color] duration-150',
-                'bg-white/[0.07] text-white/75 hover:bg-white/[0.12]',
+                'bg-[var(--meet-control)] text-[var(--meet-control-fg)] hover:bg-[var(--meet-control-hover)]',
                 isMobile ? 'h-[34px] w-[34px] rounded-[10px]' : 'h-11 w-[36px] rounded-xl',
               )}
               aria-label="More options"
@@ -515,7 +573,7 @@ export function ControlsBar({ onLeave }: Props) {
               <MoreVertical size={iconSizeSm} />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="end" sideOffset={12} className={cn(darkMenuCn, 'min-w-[200px]')}>
+          <DropdownMenuContent side="top" align="end" sideOffset={12} className={cn(meetMenuCn, 'min-w-[200px]')}>
             <DropdownMenuItem
               onClick={() => {
                 navigator.clipboard.writeText(window.location.href)
@@ -526,7 +584,7 @@ export function ControlsBar({ onLeave }: Props) {
                   linkCopiedTimerRef.current = null
                 }, 2000)
               }}
-              className="rounded-md gap-2 text-xs text-white/75 focus:text-white focus:bg-white/10"
+              className={meetMenuItemCn}
             >
               {linkCopied ? (
                 <Check size={13} className="shrink-0 text-emerald-400" />
@@ -542,22 +600,77 @@ export function ControlsBar({ onLeave }: Props) {
                   if (document.fullscreenElement) document.exitFullscreen()
                   else document.documentElement.requestFullscreen()
                 }}
-                className="rounded-md gap-2 text-xs text-white/75 focus:text-white focus:bg-white/10"
+                className={meetMenuItemCn}
               >
                 <Maximize size={13} className="shrink-0" />
                 {typeof document !== 'undefined' && document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen'}
               </DropdownMenuItem>
             )}
 
-            <DropdownMenuSeparator className="bg-white/[0.06]" />
-
-            <DropdownMenuItem disabled className="rounded-md gap-2 text-[11px] text-white/50 focus:text-white/50">
-              <Keyboard size={12} className="shrink-0" />
-              Space — Push to talk/mute
+            <DropdownMenuItem
+              onClick={() => setSettingsOpen(true)}
+              className={meetMenuItemCn}
+            >
+              <Settings size={13} className="shrink-0" />
+              Settings
             </DropdownMenuItem>
+
+            {(whiteboardEnabled || (stage?.kind === 'whiteboard' && isWhiteboardHost)) && (
+              <>
+                <DropdownMenuSeparator className={meetMenuSeparatorCn} />
+
+                {stage?.kind === 'whiteboard' && isWhiteboardHost ? (
+                  <DropdownMenuItem
+                    onClick={() => clearStage()}
+                    className={meetMenuItemCn}
+                  >
+                    <PenLine size={13} className="shrink-0 text-primary" />
+                    Close whiteboard
+                  </DropdownMenuItem>
+                ) : (
+                  whiteboardEnabled && (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        const err = requestStartWhiteboard()
+                        if (err) toast.error(err)
+                      }}
+                      disabled={stageTakenByOther}
+                      className={meetMenuItemCn}
+                    >
+                      <PenLine size={13} className="shrink-0 text-primary" />
+                      {stage?.kind === 'whiteboard' ? 'Whiteboard on stage' : 'Open whiteboard'}
+                    </DropdownMenuItem>
+                  )
+                )}
+              </>
+            )}
+
+            {(youtubeEnabled || (stage?.kind === 'youtube' && isYoutubeHost)) &&
+              (stage?.kind === 'youtube' && isYoutubeHost ? (
+                <DropdownMenuItem
+                  onClick={() => stopYoutubeShare()}
+                  className={meetMenuItemCn}
+                >
+                  <Film size={13} className="shrink-0 text-red-400" />
+                  Stop YouTube
+                </DropdownMenuItem>
+              ) : (
+                youtubeEnabled && (
+                  <DropdownMenuItem
+                    onClick={() => openShareDialog()}
+                    disabled={stageTakenByOther}
+                    className={meetMenuItemCn}
+                  >
+                    <Film size={13} className="shrink-0 text-red-400" />
+                    {stage?.kind === 'youtube' ? 'YouTube on stage' : 'Share YouTube'}
+                  </DropdownMenuItem>
+                )
+              ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <BedrudSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </TooltipProvider>
   )
 }

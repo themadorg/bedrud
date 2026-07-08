@@ -1,6 +1,7 @@
 import { useParticipants } from '@livekit/components-react'
 
 import { cn } from '#/lib/utils'
+import { MeetingViewportGrid } from '@/components/meeting/MeetingViewportPan'
 import { ParticipantTile } from './ParticipantTile'
 
 interface ParticipantGridProps {
@@ -18,17 +19,8 @@ function gridCols(count: number): string {
 export function ParticipantGrid({ pinnedIdentities, onTogglePin }: ParticipantGridProps) {
   const participants = useParticipants()
 
-  // Note: useParticipants() from LiveKit always includes the local participant once connected.
-  // Therefore participants.length is effectively always >= 1 in normal usage.
-  // We do not render a special "empty" state here. If length ever becomes 0 (e.g. very early mount
-  // or certain error states), the grid simply renders nothing — this is intentional future-proofing
-  // rather than dead code that needs removal.
-
   return (
-    <div
-      id="meet-grid"
-      className="absolute inset-0 z-0 pt-[calc(56px+env(safe-area-inset-top))] pb-[calc(88px+env(safe-area-inset-bottom))]"
-    >
+    <MeetingViewportGrid>
       <div
         className={cn(
           'grid h-full w-full grid-auto-rows-[1fr]',
@@ -47,6 +39,6 @@ export function ParticipantGrid({ pinnedIdentities, onTogglePin }: ParticipantGr
           />
         ))}
       </div>
-    </div>
+    </MeetingViewportGrid>
   )
 }

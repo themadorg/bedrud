@@ -85,6 +85,7 @@ function useMutedMicMonitor() {
   // room.localParticipant.isMicrophoneEnabled is a plain property that does NOT
   // trigger React re-renders, which caused the monitor to stay active after unmuting.
   const { isMicrophoneEnabled } = useLocalParticipant()
+  const pushToTalkEnabled = useAudioPreferencesStore((s) => s.pushToTalkEnabled)
   const mutedBeepEnabled = useAudioPreferencesStore((s) => s.mutedBeepEnabled)
   const mutedBeepInterval = useAudioPreferencesStore((s) => s.mutedBeepInterval)
   // Use refs so the tick loop always reads the latest values without restarting
@@ -100,7 +101,7 @@ function useMutedMicMonitor() {
   useEffect(() => {
     // Only monitor when mic is disabled and user is NOT deafened
     // (deafened users intentionally silenced everything — don't nag them).
-    if (isMicrophoneEnabled || isSelfDeafened) return
+    if (isMicrophoneEnabled || isSelfDeafened || pushToTalkEnabled) return
 
     let cancelled = false
     let stream: MediaStream | null = null
@@ -153,5 +154,5 @@ function useMutedMicMonitor() {
       })
       ac?.close()
     }
-  }, [isMicrophoneEnabled, isSelfDeafened])
+  }, [isMicrophoneEnabled, isSelfDeafened, pushToTalkEnabled])
 }

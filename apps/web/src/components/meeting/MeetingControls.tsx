@@ -50,7 +50,7 @@ export function MeetingControls({ onNavigate }: MeetingControlsProps) {
     <>
       <ControlsBar onLeave={handleLeaveRequest} />
       <Dialog open={endDialogOpen} onOpenChange={setEndDialogOpen}>
-        <DialogContent className="sm:max-w-sm bg-[#0f0f1e] border-white/[0.08]">
+        <DialogContent className="meet-dialog sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-white">Leave meeting?</DialogTitle>
             <DialogDescription className="text-white/50">

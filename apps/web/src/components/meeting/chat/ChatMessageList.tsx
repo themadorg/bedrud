@@ -1,6 +1,8 @@
 import { MessageSquare } from 'lucide-react'
 import { type DragEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { cn } from '@/lib/utils'
 import type { ChatMessage, SystemMessage } from '../MeetingContext'
+import { ChatImageLightbox } from './ChatImageLightbox'
 import { ChatMessageCluster } from './ChatMessageCluster'
 import { ChatScrollManager } from './ChatScrollManager'
 import { groupMessages } from './chatGrouping'
@@ -8,17 +10,29 @@ import { groupMessages } from './chatGrouping'
 interface Props {
   chatMessages: ChatMessage[]
   systemMessages: SystemMessage[]
+  currentIdentity: string
+  onVotePoll: (messageId: string, optionId: string) => void
+  onReactToMessage: (messageId: string, emoji: string) => void
   onScrollUnreadChange: (n: number) => void
   onDrop: (file: File) => void
 }
 
-export function ChatMessageList({ chatMessages, systemMessages, onScrollUnreadChange, onDrop }: Props) {
+export function ChatMessageList({
+  chatMessages,
+  systemMessages,
+  currentIdentity,
+  onVotePoll,
+  onReactToMessage,
+  onScrollUnreadChange,
+  onDrop,
+}: Props) {
   const messagesRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const autoFollowRef = useRef(true)
   const prevCountRef = useRef(0)
   const [showScrollBtn, setShowScrollBtn] = useState(false)
   const [scrollUnread, setScrollUnread] = useState(0)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   const handleScroll = useCallback(() => {
     const el = messagesRef.current
@@ -76,7 +90,10 @@ export function ChatMessageList({ chatMessages, systemMessages, onScrollUnreadCh
         onScroll={handleScroll}
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
-        className="h-full overflow-y-auto px-3.5 py-3 flex flex-col gap-2.5 meet-chat-scroll"
+        className={cn(
+          'meet-scroll flex h-full flex-col overflow-y-auto py-2 pl-2.5 pr-1',
+          showScrollBtn && 'pb-14',
+        )}
       >
         {items.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-2.5">
@@ -96,10 +113,12 @@ export function ChatMessageList({ chatMessages, systemMessages, onScrollUnreadCh
             </p>
           </div>
         ) : (
-          items.map((item) => {
+          items.map((item, index) => {
+            const stackGap = index > 0 ? 'mt-3' : undefined
+
             if (item.kind === 'date-separator') {
               return (
-                <div key={item.id} className="flex items-center gap-2.5 py-1">
+                <div key={item.id} className={cn('flex items-center gap-2.5 py-1', stackGap)}>
                   <div className="flex-1 h-px bg-white/[0.06]" />
                   <span className="text-[11px] text-white/50 font-medium">{item.label}</span>
                   <div className="flex-1 h-px bg-white/[0.06]" />
@@ -110,7 +129,7 @@ export function ChatMessageList({ chatMessages, systemMessages, onScrollUnreadCh
             if (item.kind === 'system') {
               const label = item.msg.event === 'kick' ? 'was kicked by' : 'was banned by'
               return (
-                <div key={item.id} className="flex justify-center py-0.5">
+                <div key={item.id} className={cn('flex justify-center py-0.5', stackGap)}>
                   <span className="text-[11px] text-white/50 bg-white/[0.05] border border-white/[0.08] rounded-full px-2.5 py-[3px] italic">
                     {item.msg.target} {label} {item.msg.actor}
                   </span>
@@ -118,13 +137,31 @@ export function ChatMessageList({ chatMessages, systemMessages, onScrollUnreadCh
               )
             }
 
-            return <ChatMessageCluster key={item.id} cluster={item} />
+            const isSelfCluster =
+              item.isLocal || (!!currentIdentity && item.identity === currentIdentity)
+
+            return (
+              <div
+                key={item.id}
+                className={cn('w-full', index > 0 && (isSelfCluster ? 'mt-1.5' : 'mt-3'), isSelfCluster && 'flex justify-end')}
+              >
+                <ChatMessageCluster
+                  cluster={item}
+                  currentIdentity={currentIdentity}
+                  onImageOpen={setPreviewUrl}
+                  onVotePoll={onVotePoll}
+                  onReactToMessage={onReactToMessage}
+                />
+              </div>
+            )
           })
         )}
         <div ref={bottomRef} />
       </div>
 
       <ChatScrollManager show={showScrollBtn} unreadCount={scrollUnread} onScrollToBottom={scrollToBottom} />
+
+      <ChatImageLightbox url={previewUrl} onClose={() => setPreviewUrl(null)} />
     </div>
   )
 }

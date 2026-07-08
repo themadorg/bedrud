@@ -9,6 +9,7 @@ function makeMsg(overrides: Partial<ChatMessage> & { timestamp: number }): ChatM
     senderIdentity: 'alice',
     message: 'hello',
     attachments: [],
+    reactions: {},
     isLocal: false,
     ...overrides,
   }

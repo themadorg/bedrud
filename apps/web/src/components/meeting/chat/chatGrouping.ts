@@ -134,6 +134,7 @@ export function groupMessages(chatMessages: ChatMessage[], systemMessages: Syste
       result.push(currentCluster)
     } else {
       currentCluster.messages.push(msg)
+      currentCluster.isLocal = currentCluster.isLocal || msg.isLocal
     }
   }
 
