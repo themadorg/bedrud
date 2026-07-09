@@ -1,784 +1,434 @@
 ---
 name: bedrud-api
-description: Complete Bedrud API endpoint reference. Every route, middleware, request/response shape, status code, DTO definition.
+description: Complete Bedrud API endpoint reference. Dense index of every route, middleware, status code; deep detail in leaf skills.
 license: Apache License
 ---
+
 # Skill: bedrud-api
 
-Complete Bedrud API endpoint reference. Every route, middleware, request/response shape, status code, DTO definition.
+Umbrella API map for Bedrud. **Canonical prod routes:** `server/internal/server/server.go`. Dev Air: `server/cmd/server/main.go` (minor drift — see below).
+
+Deep detail (bodies, guards, notes):
+| Area | Leaf |
+|------|------|
+| Auth / JWT / verify / passkey / OAuth / prefs / health | `bedrud-api-auth` |
+| Room CRUD / moderation / presence / recording contracts | `bedrud-api-rooms` |
+| Admin users / rooms / queue / settings / invites / webhooks | `bedrud-api-admin` |
+| DTOs, models, queue payloads, Swagger | `bedrud-api-types` |
+
+**Path prefix rule**
+- Room CRUD / join / moderation / chat / presence → **singular** `/api/room/...`
+- Room-scoped recording (handlers shipped, routes **commented**) → **plural** `/api/rooms/:id/...`
+- Admin → `/api/admin/...`
 
 ---
 
-## Authentication
+## Authentication (summary)
 
-### JWT Flow
+Access + refresh pair, HMAC-SHA256.
 
-Access + refresh token pair. HMAC-SHA256.
+| Token | Duration | Cookie | Login JSON |
+|-------|----------|--------|------------|
+| Access | `tokenDuration` hours | `access_token` HttpOnly | `tokens.accessToken` |
+| Refresh | 7 days | `refresh_token` HttpOnly | `tokens.refreshToken` |
 
-- Access token: configurable duration (`tokenDuration` in settings)
-- Refresh token: 7-day expiry
-- Tokens set as `HttpOnly` cookies (`access_token`, `refresh_token`) AND returned in JSON body
-- Refresh rotation: old refresh token blocked on `POST /auth/refresh`
+- Refresh body / refresh response keys: **snake_case** `refresh_token` / `access_token`.
+- Login body tokens: **camelCase** under `tokens`.
+- Refresh rotation; concurrent reuse → **409**.
+- Password length: **12–128** (`MinPasswordLength` / `MaxPasswordLength`).
+- Errors: `{"error":"<message>"}` (+ optional `requiresVerification`, `email`, `already_verified`).
 
 ### Middleware
 
-| Middleware | Behavior | Status on Fail |
-|-----------|----------|----------------|
-| `Protected()` | Extract JWT from `Authorization: Bearer` header, fallback `access_token` cookie. Store `*auth.Claims` in `c.Locals("user")` | 401 |
-| `RequireAccess(level)` | Check `claims.Accesses` contains level. Chained after `Protected()` | 403 |
-| `AuthRateLimiter()` | 10 req/min per IP | 429 |
-| `GuestRateLimiter()` | 5 req/min per IP | 429 |
+| Middleware | Behavior | Fail |
+|-----------|----------|------|
+| `Protected()` | Bearer or `access_token` cookie; banned → 403 | 401 / 403 |
+| `RequireAccess(level)` | Hierarchical: superadmin(4) > admin(3) > moderator(2) > user(1) | 403 |
+| `RequireEmailVerified` | When verification required; guests exempt | 403 |
+| `AuthRateLimiter` | ~10/min/IP (config) | 429 |
+| `ResendRateLimiter` | ~3/min/IP | 429 |
+| `GuestRateLimiter` | ~5/min/IP — **guest-join only** | 429 |
+| `APIRateLimiter` | ~30/min/IP — create / refresh-token / chat upload / presence | 429 |
+| `RecordingsEnabled` | System setting gate (for recording routes when wired) | 403 |
 
-### Access Levels
+`RequireBearerForMutations` / `RejectGuest` exist but are **not mounted**.
+
+### Access levels
 
 `superadmin` > `admin` > `moderator` > `user` > `guest`
 
-### Auth Header Format
+### Global middleware (all routes)
 
-```
-Authorization: Bearer <access_token>
-```
+1. `recover` → 2. `helmet` → 3. `cors` → 4. body limit 2MB
 
-### Error Format
-
-All errors: `{"error": "<message>"}` with appropriate HTTP status.
+API group prefix: `/api`.
 
 ---
 
-## Global Middleware (all routes)
+## Health / public static
 
-| Order | Middleware | Purpose |
-|-------|-----------|---------|
-| 1 | `recover.New()` | Panic recovery |
-| 2 | `helmet.New()` | XSS, Content-Type nosniff, X-Frame DENY |
-| 3 | `cors.New()` | Config-driven origins/headers/methods |
-| 4 | Body limit: 2MB | Custom Fiber config |
+| Method | Path | Auth | Res | Status |
+|--------|------|------|-----|--------|
+| GET | `/api/health` | none | `{status:"healthy",time}` | 200 |
+| GET | `/api/ready` | none | ready / DB fail | 200 / 503 |
+| GET | `/health`, `/ready` | none | redirect → `/api/...` | 307 |
+| GET | `/api/cert` | none | PEM download | 200 / 404 |
+| GET | `/uploads/avatars/*` | none | avatar file | 200 / 400 |
+| GET | `/uploads/chat/*` | P+EV | chat upload file | 200 / … |
+| POST | `/api/livekit/webhook` | LK JWT | disconnect (+ recording when wired) | — |
 
----
-
-## Health
-
-| Method | Path | Auth | Handler | Res |
-|--------|------|------|---------|-----|
-| GET | `/api/health` | none | `healthCheck` | `{"status":"healthy","time":<unix>}` |
-| GET | `/api/ready` | none | `readinessCheck` | `{"status":"ready","time":<unix>}` |
-| GET | `/health` | none | redirect | 307 → `/api/health` |
-| GET | `/ready` | none | redirect | 307 → `/api/ready` |
+Swagger (dev `cmd/server` typically): `GET /api/swagger/*`, `GET /api/scalar`.
 
 ---
 
 ## Auth — Local
 
-| Method | Path | Auth | Rate Limit | Handler | Req | Res | Status |
-|--------|------|------|-----------|---------|-----|-----|--------|
-| POST | `/api/auth/register` | none | AuthRate | `authHandler.Register` | `{email, password, name, inviteToken}` | `LoginResponse` | 201 / 400 / 403 |
-| POST | `/api/auth/login` | none | AuthRate | `authHandler.Login` | `{email, password}` | `LoginResponse` | 200 / 401 |
-| POST | `/api/auth/guest-login` | none | AuthRate | `authHandler.GuestLogin` | `{name}` | `LoginResponse` | 200 / 400 |
-| POST | `/api/auth/refresh` | none | AuthRate | `authHandler.RefreshToken` | `RefreshRequest` | `{accessToken, refreshToken}` | 200 / 401 |
-| POST | `/api/auth/logout` | Protected | — | `authHandler.Logout` | `LogoutRequest` | `{"message":"Successfully logged out"}` | 200 |
-| GET | `/api/auth/me` | Protected | — | `authHandler.GetMe` | — | `models.User` | 200 |
-| PUT | `/api/auth/me` | Protected | — | `authHandler.UpdateProfile` | `{name}` | `models.User` | 200 / 400 |
-| PUT | `/api/auth/password` | Protected | — | `authHandler.ChangePassword` | `{currentPassword, newPassword}` | `{"message":"Password updated successfully"}` | 200 / 400 / 401 |
+Auth: none + AuthRate unless noted. `P+EV` = Protected + RequireEmailVerified.
 
-### Notes
+| Method | Path | Auth | Req | Res | Status |
+|--------|------|------|-----|-----|--------|
+| POST | `/api/auth/register` | AuthRate | `{email,password,name,inviteToken?}` | `LoginResponse` or verification gate | 200 / 400 / 403 / 409 / 500 |
+| POST | `/api/auth/login` | AuthRate | `{email,password}` | `LoginResponse` | 200 / 400 / 401 / 403 |
+| POST | `/api/auth/guest-login` | AuthRate | `{name}` | `LoginResponse` | 200 / 400 / 403 / 500 |
+| POST | `/api/auth/refresh` | AuthRate | `{refresh_token}` or cookie | `{access_token,refresh_token}` | 200 / 400 / 401 / 403 / 409 |
+| POST | `/api/auth/logout` | Protected† | `{refresh_token?}` or cookie | `{message}` | 200 |
+| GET | `/api/auth/me` | P+EV | — | `models.User` | 200 |
+| PUT | `/api/auth/me` | P+EV | `{name,email?}` | profile (+ verify fields) | 200 / 400 |
+| POST | `/api/auth/me/avatar` | P+EV | multipart `avatar` | profile | 200 / 400 / 500 |
+| DELETE | `/api/auth/me/avatar` | P+EV | — | profile | 200 / 400 |
+| PUT | `/api/auth/password` | P+EV | `{currentPassword,newPassword}` | `{message}` | 200 / 400 |
 
-- Register: checks `registrationEnabled` + `tokenRegistrationOnly` settings. If token-only, `inviteToken` required.
-- Guest login: creates transient user with `guest-` prefixed ID, `guest` access level.
-- Password min length: 6 chars. Display name min: 2 chars.
-- Logout: blocks refresh token + clears cookies.
+† Prod: logout = `Protected()` only. Dev Air also mounts `RequireEmailVerified` on logout.
 
----
+### Password reset
 
-## Auth — OAuth (Goth)
+| Method | Path | Req | Status |
+|--------|------|-----|--------|
+| POST | `/api/auth/forgot-password` | `{email}` | 200 (uniform, no enum) / 400 |
+| POST | `/api/auth/reset-password` | `{token,newPassword}` | 200 / 400 / 500 |
 
-| Method | Path | Auth | Handler | Res |
-|--------|------|------|---------|-----|
-| GET | `/api/auth/:provider/login` | none | `BeginAuthHandler` | 307 redirect to provider |
-| GET | `/api/auth/:provider/callback` | none | `CallbackHandler` | Redirect to `/auth/callback?token=...` |
+New password 12–128. Local/passkey only.
 
-### Providers
+### Email verification
 
-`google`, `github`, `twitter` (configured via SystemSettings client ID/secret).
+| Method | Path | Auth | Req | Status |
+|--------|------|------|-----|--------|
+| **POST** | `/api/auth/verify` | none | `{token}` | 200 / 400 / 401 / 404 / 409 / 500 |
+| GET | `/api/auth/verify/status` | Protected | — | 200 |
+| POST | `/api/auth/verify/resend` | ResendRate | `{email}` | 200 (uniform) / 400 |
 
-### Flow
+Prod verify is **POST body token** (not GET query). Dev Air still registers `GET /auth/verify` (drift).
 
-1. `GET /api/auth/google/login` → redirect to Google consent
-2. Google redirects to `GET /api/auth/google/callback`
-3. Upsert user (email + provider) → set JWT cookies → redirect to frontend with token
+Success verify returns snake_case tokens + `verified:true` (no cookies set by handler).
 
----
+### OAuth (Goth)
 
-## Auth — Passkeys (WebAuthn)
+| Method | Path | Res |
+|--------|------|-----|
+| GET | `/api/auth/:provider/login` | 307 → IdP |
+| GET | `/api/auth/:provider/callback` | redirect `{frontendURL}/auth/callback` (cookies only) or JSON |
 
-| Method | Path | Auth | Rate Limit | Handler | Req | Res |
-|--------|------|------|-----------|---------|-----|-----|
-| POST | `/api/auth/passkey/register/begin` | Protected | — | `authHandler.PasskeyRegisterBegin` | — | WebAuthn creation options |
-| POST | `/api/auth/passkey/register/finish` | Protected | — | `authHandler.PasskeyRegisterFinish` | `{clientDataJSON, attestationObject}` | `{"message":"Passkey registered successfully"}` |
-| POST | `/api/auth/passkey/login/begin` | none | AuthRate | `authHandler.PasskeyLoginBegin` | — | WebAuthn request options |
-| POST | `/api/auth/passkey/login/finish` | none | AuthRate | `authHandler.PasskeyLoginFinish` | `{credentialId, clientDataJSON, authenticatorData, signature}` | `LoginResponse` |
-| POST | `/api/auth/passkey/signup/begin` | none | AuthRate | `authHandler.PasskeySignupBegin` | `{email, name, inviteToken}` | WebAuthn creation options |
-| POST | `/api/auth/passkey/signup/finish` | none | AuthRate | `authHandler.PasskeySignupFinish` | `{clientDataJSON, attestationObject}` | `LoginResponse` |
+Providers from `ConfiguredProviders()` when secrets set: `google`, `github`, `twitter`.
 
-### Notes
+### Passkeys
 
-- Register begin/finish: add passkey to existing logged-in user.
-- Login begin/finish: authenticate existing user via passkey.
-- Signup begin/finish: create new account + passkey in one flow (no password).
-- RP ID derived from request origin. Relying party name: "Bedrud".
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| POST | `/api/auth/passkey/register/begin` | P+EV | creation options |
+| POST | `/api/auth/passkey/register/finish` | P+EV | `{clientDataJSON,attestationObject}` |
+| POST | `/api/auth/passkey/login/begin` | AuthRate | request options |
+| POST | `/api/auth/passkey/login/finish` | AuthRate | → `LoginResponse` |
+| POST | `/api/auth/passkey/signup/begin` | AuthRate | `{email,name,inviteToken?}` |
+| POST | `/api/auth/passkey/signup/finish` | AuthRate | → `LoginResponse` or verification gate |
 
----
+### Preferences + public settings
 
-## Preferences
-
-| Method | Path | Auth | Handler | Req | Res |
-|--------|------|------|---------|-----|-----|
-| GET | `/api/auth/preferences` | Protected | `preferencesHandler.GetPreferences` | — | `{"preferencesJson":"..."}` |
-| PUT | `/api/auth/preferences` | Protected | `preferencesHandler.UpdatePreferences` | `{preferencesJson}` | `{"message":"Preferences updated"}` |
-
-### Notes
-
-- JSON string, max 4KB.
-- Upsert: `ON CONFLICT (user_id) DO UPDATE`.
+| Method | Path | Auth | Req / Res |
+|--------|------|------|-----------|
+| GET | `/api/auth/preferences` | P+EV | `{preferencesJson}` (default `{}`) |
+| PUT | `/api/auth/preferences` | P+EV | body ≤4KB JSON **object** |
+| GET | `/api/auth/settings` | none | public: `serverName`, `registrationEnabled`, `tokenRegistrationOnly`, `guestLoginEnabled`, `passkeysEnabled`, `oauthProviders`, `requireEmailVerification`, `chatMaxMessageCount`, `chatMessageTTLHours`, `recordingsEnabled` |
 
 ---
 
-## Public Settings
+## Rooms — CRUD + join + presence
 
-| Method | Path | Auth | Handler | Res |
-|--------|------|------|---------|-----|
-| GET | `/api/auth/settings` | none | `adminHandler.GetPublicSettings` | `{registrationEnabled, tokenRegistrationOnly, passkeysEnabled, oauthProviders}` |
+Most: `P+EV`. Exceptions noted.
 
-No secrets exposed.
-
----
-
-## Rooms — CRUD + Join
-
-| Method | Path | Auth | Handler | Req | Res | Status |
-|--------|------|------|---------|-----|-----|--------|
-| POST | `/api/room/create` | Protected | `roomHandler.CreateRoom` | `CreateRoomRequest` | inline room obj + livekitHost | 201 / 409 |
-| POST | `/api/room/join` | Protected | `roomHandler.JoinRoom` | `JoinRoomRequest` | inline room obj + token + livekitHost | 200 / 404 |
-| POST | `/api/room/guest-join` | GuestRate | `roomHandler.GuestJoinRoom` | `GuestJoinRoomRequest` | inline `{id, name, token, adminId, livekitHost}` | 200 / 404 |
-| GET | `/api/room/list` | Protected | `roomHandler.ListRooms` | — | `[]models.Room` | 200 |
-| DELETE | `/api/room/:roomId` | Protected | `roomHandler.DeleteRoom` | — | `{"status":"success"}` | 200 / 403 / 404 |
-| PUT | `/api/room/:roomId/settings` | Protected | `roomHandler.UpdateSettings` | `{isPublic *bool, maxParticipants *int, settings *RoomSettings}` | `models.Room` | 200 / 403 / 404 |
-| POST | `/api/room/:roomId/chat/upload` | Protected | `roomHandler.UploadChatImage` | multipart `{file}` | `ChatAttachment` | 200 / 400 / 413 |
+| Method | Path | MW | Handler | Req | Status |
+|--------|------|-----|---------|-----|--------|
+| POST | `/api/room/create` | P+EV + APIRate | `CreateRoom` | `CreateRoomRequest` | **200** / 400 / 403 / 409 / 500 |
+| POST | `/api/room/join` | P+EV | `JoinRoom` | `{roomName}` | 200 / 403 / 404 / 410 |
+| POST | `/api/room/guest-join` | GuestRate | `GuestJoinRoom` | `{roomName,guestName}` | 200 / 400 / 403 / 404 / 410 |
+| POST | `/api/room/refresh-token` | P+EV + APIRate | `RefreshLiveKitToken` | `{roomName}` | 200 → `{token}` |
+| GET | `/api/room/list` | P+EV | `ListRooms` | — | 200 `[]Room` |
+| GET | `/api/room/archived` | P+EV | `ListArchivedRooms` | `?page&limit` | 200 |
+| PUT | `/api/room/:roomId/settings` | P+EV | `UpdateSettings` | partial | 200 / 403 / 404 |
+| DELETE | `/api/room/:roomId` | P+EV | `DeleteRoom` | — | **202** queued / 403 / 404 / 409 |
+| POST | `/api/room/:roomId/chat/upload` | P+EV + APIRate | `UploadChatImage` | multipart `file` | 200 / **202** S3 queue / 413 / 507 |
+| GET | `/api/room/:roomId/presence` | **APIRate only** | `GetRoomPresence` | `?countOnly` | 200 (no JWT) |
 
 ### CreateRoomRequest
 
 ```go
-{
-    name            string       // auto-gen if empty
-    maxParticipants int          // default 20
-    isPublic        bool
-    mode            string       // "standard" default
-    settings        RoomSettings
-}
+{ name string, maxParticipants int, isPublic bool, mode string, settings RoomSettings }
+// mode: standard|webinar|broadcast; empty name → auto slug
+// create forces settings.recordingsAllowed = true
+// isPersistent stripped for non-superadmin
 ```
 
-### Create Response
+### Create / join response highlights
 
-```json
-{
-    "id": "uuid",
-    "name": "xxx-xxxx-xxx",
-    "createdBy": "uuid",
-    "isActive": true,
-    "isPublic": false,
-    "maxParticipants": 20,
-    "settings": {},
-    "livekitHost": "ws://...",
-    "mode": "standard"
-}
-```
+- Create: room fields + `livekitHost` (HTTP **200**, not 201).
+- Join: + `token`, `adminId`, `expiresAt`, `activeRecordingId`.
+- Archived owned: 200 `{status:"archived_owned",...}`; inactive non-owner: **410**.
+- Guest: public+active only; needs `guestLoginEnabled`; `guest-` identity.
 
-### Join Response
+### Delete / upload notes
 
-```json
-{
-    "id": "uuid",
-    "name": "room-name",
-    "token": "lk-jwt-token",
-    "createdBy": "uuid",
-    "adminId": "uuid",
-    "isActive": true,
-    "isPublic": false,
-    "maxParticipants": 20,
-    "expiresAt": "2025-01-02T00:00:00Z",
-    "settings": {},
-    "livekitHost": "ws://...",
-    "mode": "standard"
-}
-```
-
-### Notes
-
-- Create: auto-generates name if empty (`xxx-xxxx-xxx`). 409 on name conflict. Strips `isPersistent` from settings (superadmin-only, set via AdminUpdateRoom). Creator auto-added as approved participant + admin perms. 24h expiry.
-- Join: looks up room by name. Adds participant. Generates LK token with user metadata. Rejects banned users.
-- Guest join: public rooms only. Restricted LK token. `guest-` prefixed identity.
-- Delete: creator or superadmin only.
-- Settings update: partial — only sent fields updated (pointer fields). Preserves `isPersistent` (only changeable via AdminUpdateRoom).
-- Chat upload: MIME must be png/jpeg/gif/webp. SHA256 content hash filename. Max size from `chatUploadMaxBytes` config.
+- User delete room: enqueues `room_delete` with `Purge:false` (archive; recordings preserved) → **202**.
+- Chat upload: participant + `allowChat`; MIME png/jpeg/gif/webp; S3 over threshold → 202 `{status:"upload_queued",job_type:"chat_upload_s3"}`.
 
 ---
 
 ## Rooms — Moderation
 
-All require `Protected()`. All use path params `:roomId` + `:identity`.
+All `P+EV`. Path `:roomId` + `:identity` (ask also `:action`).
 
-| Method | Path | Handler | Action | Res |
-|--------|------|---------|--------|-----|
-| POST | `/api/room/:roomId/kick/:identity` | `KickParticipant` | Remove from LK + broadcast "kick" system msg | `{"status":"success"}` |
-| POST | `/api/room/:roomId/ban/:identity` | `BanParticipant` | Remove from LK + mark banned in DB + broadcast "ban" | `{"status":"success"}` |
-| POST | `/api/room/:roomId/mute/:identity` | `MuteParticipant` | Mute all audio tracks via LK | `{"status":"success"}` |
-| POST | `/api/room/:roomId/video/:identity/off` | `DisableParticipantVideo` | Mute camera track | `{"status":"success"}` |
-| POST | `/api/room/:roomId/screenshare/:identity/stop` | `StopScreenShare` | Mute screen-share + screen-share-audio tracks | `{"status":"success"}` |
-| POST | `/api/room/:roomId/promote/:identity` | `PromoteParticipant` | Add "moderator" to LK metadata | `{"status":"success"}` |
-| POST | `/api/room/:roomId/demote/:identity` | `DemoteParticipant` | Remove "moderator" from LK metadata | `{"status":"success"}` |
-| POST | `/api/room/:roomId/chat/:identity/block` | `BlockChat` | Set `chatBlocked: true` in LK metadata | `{"status":"success"}` |
-| POST | `/api/room/:roomId/deafen/:identity` | `DeafenParticipant` | Send targeted "deafen" data msg | `{"status":"success"}` |
-| POST | `/api/room/:roomId/undeafen/:identity` | `UndeafenParticipant` | Send targeted "undeafen" data msg | `{"status":"success"}` |
-| POST | `/api/room/:roomId/ask/:identity/:action` | `AskParticipantAction` | Send "ask_unmute" or "ask_camera". `:action` = `unmute` or `camera` | `{"status":"success"}` |
-| POST | `/api/room/:roomId/spotlight/:identity` | `SpotlightParticipant` | Broadcast "spotlight" to room | `{"status":"success"}` |
-| GET | `/api/room/:roomId/participant/:identity/info` | `GetParticipantInfo` | Identity, name, state, tracks from LK | inline obj |
-| POST | `/api/room/:roomId/stage/:identity/bring` | `BringToStage` | Stub | 501 |
-| POST | `/api/room/:roomId/stage/:identity/remove` | `RemoveFromStage` | Stub | 501 |
+| Method | Path | Handler | Authz | Notes |
+|--------|------|---------|-------|-------|
+| POST | `.../kick/:identity` | `KickParticipant` | room admin / superadmin | LK remove + system msg |
+| POST | `.../ban/:identity` | `BanParticipant` | room admin / superadmin | + DB ban |
+| POST | `.../mute/:identity` | `MuteParticipant` | room admin / superadmin | mute audio |
+| POST | `.../video/:identity/off` | `DisableParticipantVideo` | `isRoomModerator` | mute camera |
+| POST | `.../screenshare/:identity/stop` | `StopScreenShare` | `isRoomModerator` | mute SS tracks |
+| POST | `.../promote/:identity` | `PromoteParticipant` | room admin / superadmin | + DB moderator |
+| POST | `.../demote/:identity` | `DemoteParticipant` | room admin / superadmin | |
+| POST | `.../chat/:identity/block` | `BlockChat` | `isRoomModerator` | metadata |
+| POST | `.../deafen/:identity` | `DeafenParticipant` | `isRoomModerator` | data msg |
+| POST | `.../undeafen/:identity` | `UndeafenParticipant` | `isRoomModerator` | |
+| POST | `.../ask/:identity/:action` | `AskParticipantAction` | `isRoomModerator` | `unmute`\|`camera` |
+| POST | `.../spotlight/:identity` | `SpotlightParticipant` | `isRoomModerator` | broadcast |
+| GET | `.../participant/:identity/info` | `GetParticipantInfo` | self or mod | LK tracks |
+| GET | `.../participant/:identity/profile` | `GetParticipantProfile` | caller in LK room | `{id,name,avatarUrl}` |
+| POST | `.../stage/:identity/bring` | `BringToStage` | P+EV | **501** `{error:"not yet implemented"}` |
+| POST | `.../stage/:identity/remove` | `RemoveFromStage` | P+EV | **501** same |
 
-### Participant Info Response
+`isRoomModerator` = superadmin **or** room admin (AdminID‖CreatedBy) **or** DB `room_participants.is_moderator`. Kick/ban/mute/promote/demote are **stricter** (admin/superadmin only).
 
+There is **no** live `/api/room/online-count` — use `GET /api/admin/online-count`.
+
+---
+
+## Recording — handlers shipped, routes not live
+
+Handlers + service + tests exist. **Route registration is commented** in both entrypoints (`// TODO oncoming feature: recording routes`). Queue handlers `process_recording` / `recording_delete` **not registered**.
+
+Prefix when enabled: **`/api/rooms/:id/...`** (plural). Intended MW: P+EV + `RecordingsEnabled`.
+
+| Method | Path | Handler | Status (contract) |
+|--------|------|---------|-------------------|
+| POST | `/api/rooms/:id/recording/start` | `StartRecording` | 201 |
+| POST | `/api/rooms/:id/recording/stop` | `StopRecording` | 200 |
+| GET | `/api/rooms/:id/recordings` | `ListRecordings` | 200 |
+| GET | `/api/rooms/:id/recordings/:rid` | `GetRecording` | 200 |
+| GET | `/api/rooms/:id/recordings/:rid/wait` | `WaitRecordingReady` | 200 / 408 |
+| DELETE | `/api/rooms/:id/recordings` | `ClearRoomRecordings` | 200 / 207 |
+| DELETE | `/api/rooms/:id/recordings/:recordingId` | `ClearSingleRecording` | 200 |
+
+Admin global (also commented): `GET /api/admin/recordings`, `POST /api/admin/recordings/bulk/delete` (`{ids}`).
+
+Gates: system `recordingsEnabled` → room `settings.recordingsAllowed` → user role. Lifecycle: `pending→started→processing→completed|failed` (+`deleting`). DTO: see `bedrud-api-types` `RecordingDTO`.
+
+---
+
+## Admin
+
+All: `Protected()` + `RequireEmailVerified` + `RequireAccess(superadmin)`. Prefix `/api/admin`.
+
+**Bulk body:** `{ids: []string}` (`BulkIDsRequest`). Max 500.
+
+**Bulk result:**
 ```json
-{
-    "identity": "uuid",
-    "name": "John",
-    "state": "ACTIVE",
-    "joinedAt": "2025-01-01T12:00:00Z",
-    "tracks": [
-        {"sid": "TR_xxx", "type": "AUDIO", "source": "MICROPHONE", "muted": false}
-    ]
-}
+{"results":{"<id>":{"success":true,"name":"...","error":"..."}},"totalProcessed":N,"totalFailed":N}
 ```
 
-### Authorization
+### Users
 
-- Room actions: creator, room admin, or user with `superadmin`/`admin` access.
-- Self-info: participant can view own info. Admin/mod can view any.
+| Method | Path | Handler | Req | Status |
+|--------|------|---------|-----|--------|
+| GET | `/users` | `ListUsers` | filters: page,limit,q,provider,role,status,verified,created,sort,order | 200 |
+| GET | `/users/recent` | `ListRecentSignups` | page,limit,q,provider,dateFrom/To,sort,order | 200 |
+| GET | `/users/:id` | `GetUserDetail` | — | 200 / 404 |
+| GET | `/users/:id/sessions` | `ListUserSessions` | page,limit | 200 †prod |
+| PUT | `/users/:id/status` | `UpdateUserStatus` | `{active}` | 200 / 400 / 409 |
+| PUT | `/users/:id/accesses` | `UpdateUserAccesses` | `{accesses:[]string}` | 200 / 400 / 409 |
+| PUT | `/users/:id/password` | `SetUserPassword` | `{password}` 12–128 | 200 / 400 |
+| POST | `/users/:id/force-logout` | `ForceLogout` | — | 200 |
+| POST | `/users/:id/verify` | `AdminVerifyEmail` | — | 200 / 400 |
+| POST | `/users/:id/verify/resend` | `AdminResendVerification` | — | 200 / 400 |
+| DELETE | `/users/:id` | `DeleteUser` | — | **202** queued / 400 / 409 |
+| POST | `/users/bulk/ban` | `BulkBanUsers` | `{ids}` | 200 |
+| POST | `/users/bulk/promote` | `BulkPromoteUsers` | `{ids}` | 200 |
+| POST | `/users/bulk/delete` | `BulkDeleteUsers` | `{ids}` | **202** `{message,count,skipped}` |
+
+DeleteUser: soft-deactivate + ban then enqueue `user_delete`. Self / last-superadmin guards.
+
+### Rooms & dashboard
+
+| Method | Path | Handler | Status |
+|--------|------|---------|--------|
+| GET | `/overview` | `GetOverview` | 200 |
+| GET | `/stats` | `GetAdminStats` | 200 **dev only** |
+| GET | `/rooms` | `AdminListRooms` | 200 (rich filters) |
+| GET | `/rooms/events` | `ListRoomEvents` | 200 |
+| **DELETE** | `/rooms/:roomId` | `AdminCloseRoom` | **202** `{message:"Room close queued"}` / 409 |
+| POST | `/rooms/:roomId/suspend` | `AdminSuspendRoom` | **202** |
+| POST | `/rooms/:roomId/reactivate` | `AdminReactivateRoom` | 200 |
+| PUT | `/rooms/:roomId` | `AdminUpdateRoom` | 200 partial settings |
+| POST | `/rooms/:roomId/token` | `AdminGenerateToken` | **501** not implemented |
+| GET | `/rooms/:roomId/participants` | `AdminGetRoomParticipants` | 200 |
+| POST | `/rooms/.../participants/:identity/kick` | `AdminKickParticipant` | 200 |
+| POST | `/rooms/.../participants/:identity/mute` | `AdminMuteParticipant` | 200 |
+| POST | `/rooms/bulk/suspend` | `BulkSuspendRooms` | **202** `{ids}` |
+| POST | `/rooms/bulk/close` | `BulkCloseRooms` | **202** `{ids}` |
+| GET | `/online-count` | `GetOnlineCount` | 200 `{count}` |
+| GET | `/livekit/stats` | `AdminLiveKitStats` | 200 |
+| GET | `/cert-info` | `GetCertInfo` | 200 / 503 |
+
+| Action | Method | Job | Effect |
+|--------|--------|-----|--------|
+| Close | `DELETE .../:roomId` | `room_delete` Purge=true | Full wipe LK + DB |
+| Suspend | `POST .../suspend` | `room_suspend` | End calls; keep row inactive |
+| Reactivate | `POST .../reactivate` | sync | IsActive=true, new 24h expiry, recreate LK |
+
+AdminUpdateRoom: `{maxParticipants *int, settings *AdminUpdateRoomSettingsInput}` — `allowChat/Video/Audio`, `requireApproval`, `e2ee`, `isPersistent` (*bool merge). No `recordingsAllowed` in admin input.
+
+### Queue
+
+| Method | Path | Res |
+|--------|------|-----|
+| GET | `/queue` | `QueueStats` (+ email fields: pendingEmail, failedEmail24h, lastSendError*) |
+
+### Job types (worker map in `server.go`)
+
+| Type | Status |
+|------|--------|
+| `user_delete` | **active** |
+| `room_delete` | **active** |
+| `room_suspend` | **active** |
+| `chat_upload_s3` | **active** |
+| `send_email` | **active** (not a stub) |
+| `dispatch_webhook` | **active** (not a stub) |
+| `process_recording` | **not registered** (TODO) |
+| `recording_delete` | **not registered** (TODO) |
+
+Worker: poll + concurrency from `QueueConfig` / env.
+
+### Settings
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/settings` | secrets masked as `••••••••` |
+| PUT | `/settings` | **partial merge**; masked placeholder keeps existing |
+| POST | `/settings/validate` | LiveKit / TLS / S3 / email checks |
+| POST | `/settings/send-test-email` | `{to}` — **prod only** |
+
+Masked: OAuth secrets, `jwtSecret`, `sessionSecret`, `livekitApiSecret`, `chatUploadS3AccessKey`, `chatUploadS3SecretKey`, `emailPassword`.
+
+### Invite tokens
+
+| Method | Path | Req | Status |
+|--------|------|-----|--------|
+| GET | `/invite-tokens` | page, limit | 200 `{tokens,total}` (+ computed `used`) |
+| POST | `/invite-tokens` | `{email?, expiresInHours?}` | **201** |
+| DELETE | `/invite-tokens/:id` | — | 200 |
+
+`expiresInHours`: default **72**, max **720**. Token: 16 random bytes → 32 hex.
+
+### Webhooks
+
+| Method | Path | Req | Status |
+|--------|------|-----|--------|
+| GET | `/webhooks` | page, limit | 200 |
+| POST | `/webhooks` | `{name,url,events[]}` | 201 (plaintext secret once) |
+| PUT | `/webhooks/:id` | partial | 200 |
+| DELETE | `/webhooks/:id` | — | 200 |
+| POST | `/webhooks/:id/rotate-secret` | — | 200 `{secret}` |
+| POST | `/webhooks/:id/test` | — | 200 status/latency |
+
+Events: `room.created`, `room.ended`, `participant.joined`, `recording.completed`, `ping`.
+
+### Admin recordings (not live)
+
+Handlers exist; routes commented. Contracts: `GET /recordings`, `POST /recordings/bulk/delete` with `{ids}` → 202.
 
 ---
 
-## Online Count
+## Key DTO index (full shapes → `bedrud-api-types`)
 
-| Method | Path | Auth | Handler | Res |
-|--------|------|------|---------|-----|
-| GET | `/api/room/online-count` | Protected | `roomHandler.GetOnlineCount` | `{"count": <int>}` |
+| Name | Location |
+|------|----------|
+| `LoginResponse` / `TokenPair` | `internal/auth` — `tokens.accessToken` / `refreshToken` |
+| `RefreshRequest` / `LogoutRequest` | snake_case `refresh_token` |
+| `User` / `UserDetails` | includes `emailVerifiedAt`, accesses |
+| `CreateRoomRequest`, `JoinRoomRequest`, `GuestJoinRoomRequest` | room handler |
+| `RefreshLiveKitTokenRequest` | `{roomName}` → `{token}` |
+| `Room` / `RoomSettings` | + `recordingsAllowed`, `isPersistent` |
+| `BulkIDsRequest` / `BulkResult` | `{ids}` |
+| `RecordingDTO` | shipped type; routes may be unwired |
+| `SystemSettings` / public settings | admin + auth |
+| `InviteToken` | create: `expiresInHours` |
+| `QueueStats` | + email counters |
+| `OverviewResponse` | admin overview |
+| `webhookDTO` / create/update webhook | admin |
+| Queue payloads | snake_case in `internal/queue/job.go` |
 
----
-
-## Admin — Users
-
-All routes: `Protected()` + `RequireAccess(superadmin)`. Prefix: `/api/admin`.
-
-| Method | Path | Handler | Req | Res | Status |
-|--------|------|---------|-----|-----|--------|
-| GET | `/api/admin/users` | `usersHandler.ListUsers` | query: `page`, `limit` | `{"users":[UserDetails],"total":int,"page":int,"limit":int}` | 200 |
-| GET | `/api/admin/users/:id` | `usersHandler.GetUserDetail` | — | `{"user":UserDetails,"rooms":[Room]}` | 200 |
-| PUT | `/api/admin/users/:id/status` | `usersHandler.UpdateUserStatus` | `{active: bool}` | `{"message":"User status updated successfully"}` | 200 |
-| PUT | `/api/admin/users/:id/accesses` | `usersHandler.UpdateUserAccesses` | `{accesses: []string}` | `{"message":"User accesses updated"}` | 200 |
-| DELETE | `/api/admin/users/:id` | `usersHandler.DeleteUser` | — | `202 {"message":"User deletion started","rooms":N}` (async 3-phase, 202 Accepted) | 202 / 400 / 403 / 404 / 500 |
-
-### DeleteUser Notes
-- **Self-deletion guard**: 400 if the requesting superadmin targets their own ID.
-- **3-phase async goroutine**: Phase 1 (notify + stop LiveKit rooms, best-effort) → Phase 2 (hard-delete rooms from DB + chat upload cleanup, critical — abort on failure) → Phase 3 (delete passkeys, preferences, user record in transaction).
-- **202 Accepted**: Returns immediately. Rooms stopped and participants see "This room has been deleted by an administrator".
-- **Partial failure**: LiveKit failures are non-fatal (rooms auto-expire). DB room deletion failures abort the entire deletion (user stays intact).
-
-### UserDetails DTO
-
-```go
-{
-    id        string
-    email     string
-    name      string
-    provider  string    // "local" | "google" | "github" | "twitter"
-    isActive  bool
-    isAdmin   bool      // computed: "admin" in accesses
-    accesses  []string  // ["user","admin","superadmin",...]
-    createdAt string
-}
-```
+Password constants: `MinPasswordLength=12`, `MaxPasswordLength=128`.
 
 ---
 
-## Admin — Rooms
+## Entrypoint drift (prod vs dev)
 
-All routes: `Protected()` + `RequireAccess(superadmin)`. Prefix: `/api/admin`.
+| Item | Prod `server.go` | Dev `cmd/server/main.go` |
+|------|------------------|--------------------------|
+| `GET /admin/stats` | ❌ | ✅ |
+| `GET /admin/users/:id/sessions` | ✅ | ❌ |
+| `POST /admin/settings/send-test-email` | ✅ | ❌ |
+| Verify email | **POST** `/auth/verify` | **GET** `/auth/verify` |
+| Logout MW | `Protected` only | + `RequireEmailVerified` |
+| Recording room/admin routes | commented | commented |
+| Swagger / Scalar | often prod-off | mounted in dev |
 
-| Method | Path | Handler | Req | Res |
-|--------|------|---------|-----|-----|
-| GET | `/api/admin/rooms` | `roomHandler.AdminListRooms` | query: `page`, `limit` | `{"rooms":[],"total":int,"page":int,"limit":int}` |
-| POST | `/api/admin/rooms/:roomId/close` | `roomHandler.AdminCloseRoom` | — | `{"status":"success"}` |
-| PUT | `/api/admin/rooms/:roomId` | `roomHandler.AdminUpdateRoom` | `{maxParticipants *int, settings *AdminUpdateRoomSettingsInput}` | `models.Room` |
-| POST | `/api/admin/rooms/:roomId/token` | `roomHandler.AdminGenerateToken` | — | 501 `{"error":"not yet implemented"}` |
-| GET | `/api/admin/rooms/:roomId/participants` | `roomHandler.AdminGetRoomParticipants` | — | `{"participants":[...],"room":Room}` |
-| POST | `/api/admin/rooms/:roomId/participants/:identity/kick` | `roomHandler.AdminKickParticipant` | — | `{"status":"success"}` |
-| POST | `/api/admin/rooms/:roomId/participants/:identity/mute` | `roomHandler.AdminMuteParticipant` | — | `{"status":"success"}` |
-| GET | `/api/admin/online-count` | `roomHandler.GetOnlineCount` | — | `{"count":int}` |
-| GET | `/api/admin/livekit/stats` | `roomHandler.AdminLiveKitStats` | — | Stats obj |
-
-### LiveKit Stats Response
-
-```json
-{
-    "totalParticipants": 42,
-    "totalPublishers": 10,
-    "activeRooms": 5,
-    "rooms": [
-        {"room": "xxx-xxxx-xxx", "participants": 8, "publishers": 3}
-    ]
-}
-```
-
-### AdminUpdateRoom Request Body
-
-```go
-{
-    maxParticipants *int                          // optional
-    settings        *AdminUpdateRoomSettingsInput // optional, merge-patched
-}
-
-// AdminUpdateRoomSettingsInput — all fields are *bool for merge semantics
-AdminUpdateRoomSettingsInput {
-    allowChat       *bool
-    allowVideo      *bool
-    allowAudio      *bool
-    requireApproval *bool
-    e2ee            *bool
-    isPersistent    *bool   // superadmin toggle for persistent room
-}
-```
-
-### AdminUpdateRoom Notes
-
-- Partial merge: only sent fields override existing room settings. Unsent fields unchanged.
-- `isPersistent` can only be set via this endpoint (superadmin-only).
-- After settings + maxParticipants update, the room is re-fetched from DB and returned.
-
-### Admin Close vs Delete
-
-- `close`: removes from LK, sets `IsActive = false` in DB. Room record preserved.
-- `DELETE /admin/rooms/:roomId` (normal delete): creator or superadmin. Removes from LK + DB.
-- `DELETE /api/admin/users/:id` (hard delete user): superadmin-only. 3-phase async: closes all user's rooms (LK + DB + chat upload files), then deletes user + passkeys + preferences.
+**Canonical for agents:** prod bootstrap `server/internal/server/server.go`.
 
 ---
 
-## Admin — Queue
-
-All routes: `Protected()` + `RequireAccess(superadmin)`. Prefix: `/api/admin`.
-
-| Method | Path | Handler | Res |
-|--------|------|---------|-----|
-| GET | `/api/admin/queue` | `adminQueueHandler.GetQueueStats` | `QueueStats` |
-
-### Queue Stats Response
-
-```json
-{
-    "pending": 3,
-    "active": 1,
-    "done24h": 150,
-    "failed24h": 2,
-    "total": 200,
-    "maxDepth": 50,
-    "oldestPending": "2025-01-01T12:00:00Z",
-    "recentFailures": [
-        {"id": "...", "type": "room_delete", "error": "...", "attempts": 3, "updatedAt": "...", "age": "10m ago"}
-    ],
-    "processedPerMin": 5.2,
-    "failedPerMin": 0.1,
-    "failRate": 0.013
-}
-```
-
-### Queue Types
-
-7 job types: `user_delete`, `room_delete`, `room_suspend`, `chat_upload_s3` (active) + `send_email`, `dispatch_webhook`, `process_recording` (stubs). Worker polls every 500ms, retries with exponential backoff (max 3 attempts).
-
----
-
-## Admin — Settings
-
-All routes: `Protected()` + `RequireAccess(superadmin)`. Prefix: `/api/admin`.
-
-| Method | Path | Handler | Req | Res |
-|--------|------|---------|-----|-----|
-| GET | `/api/admin/settings` | `adminHandler.GetSettings` | — | `SystemSettings` (secrets masked) |
-| PUT | `/api/admin/settings` | `adminHandler.UpdateSettings` | `SystemSettings` (full body) | `SystemSettings` (secrets masked) |
-
-### Masked Fields in Response
-
-These fields return `"******"` instead of actual values:
-- `googleClientSecret`
-- `githubClientSecret`
-- `twitterClientSecret`
-- `jwtSecret`
-- `sessionSecret`
-- `livekitApiSecret`
-- `chatUploadS3SecretKey`
-
-### Notes
-
-- PUT replaces entire settings object. Send all fields.
-- Singleton: always ID=1.
-
----
-
-## Admin — Invite Tokens
-
-All routes: `Protected()` + `RequireAccess(superadmin)`. Prefix: `/api/admin`.
-
-| Method | Path | Handler | Req | Res | Status |
-|--------|------|---------|-----|-----|--------|
-| GET | `/api/admin/invite-tokens` | `adminHandler.ListInviteTokens` | — | `{"tokens":[{InviteToken + used bool}]}` | 200 |
-| POST | `/api/admin/invite-tokens` | `adminHandler.CreateInviteToken` | `{email string, expiresIn int}` | `InviteToken` | 201 |
-| DELETE | `/api/admin/invite-tokens/:id` | `adminHandler.DeleteInviteToken` | — | `{"status":"success"}` | 200 |
-
-### Notes
-
-- Token: crypto-random hex, varchar(64).
-- Email: optional pre-bind. If set, only that email can use the token.
-- `expiresIn`: hours. Default 72.
-- List response adds computed `used` bool (true if `usedAt` not nil).
-
----
-
-## All DTO Definitions
-
-### auth.LoginResponse
-
-```go
-type LoginResponse struct {
-    User  *models.User `json:"user"`
-    Token TokenPair    `json:"tokens"`
-}
-```
-
-### auth.TokenPair
-
-```go
-type TokenPair struct {
-    AccessToken  string `json:"accessToken"`
-    RefreshToken string `json:"refreshToken"`
-}
-```
-
-### auth.Claims (JWT payload)
-
-```go
-type Claims struct {
-    UserID   string   `json:"userId"`
-    Email    string   `json:"email"`
-    Name     string   `json:"name"`
-    Provider string   `json:"provider"`
-    Accesses []string `json:"accesses"`
-    // + jwt.RegisteredClaims (sub, exp, iat, etc.)
-}
-```
-
-### handlers.ErrorResponse
-
-```go
-type ErrorResponse struct {
-    Error string `json:"error"`
-}
-```
-
-### handlers.UserResponse
-
-```go
-type UserResponse struct {
-    ID        string `json:"id"`
-    Email     string `json:"email"`
-    Name      string `json:"name"`
-    Provider  string `json:"provider"`
-    AvatarURL string `json:"avatarUrl"`
-}
-```
-
-### handlers.UserDetails
-
-```go
-type UserDetails struct {
-    ID        string   `json:"id"`
-    Email     string   `json:"email"`
-    Name      string   `json:"name"`
-    Provider  string   `json:"provider"`
-    IsActive  bool     `json:"isActive"`
-    IsAdmin   bool     `json:"isAdmin"`
-    Accesses  []string `json:"accesses"`
-    CreatedAt string   `json:"createdAt"`
-}
-```
-
-### handlers.UserStatusUpdateRequest
-
-```go
-type UserStatusUpdateRequest struct {
-    Active bool `json:"active"`
-}
-```
-
-### handlers.RefreshRequest
-
-```go
-type RefreshRequest struct {
-    RefreshToken string `json:"refresh_token"`
-}
-```
-
-### handlers.LogoutRequest
-
-```go
-type LogoutRequest struct {
-    RefreshToken string `json:"refresh_token"`
-}
-```
-
-### handlers.CreateRoomRequest
-
-```go
-type CreateRoomRequest struct {
-    Name            string              `json:"name"`
-    MaxParticipants int                 `json:"maxParticipants"`
-    IsPublic        bool                `json:"isPublic"`
-    Mode            string              `json:"mode"`
-    Settings        models.RoomSettings `json:"settings"`
-}
-```
-
-### handlers.JoinRoomRequest
-
-```go
-type JoinRoomRequest struct {
-    RoomName string `json:"roomName"`
-}
-```
-
-### handlers.GuestJoinRoomRequest
-
-```go
-type GuestJoinRoomRequest struct {
-    RoomName  string `json:"roomName"`
-    GuestName string `json:"guestName"`
-}
-```
-
-### models.RoomSettings
-
-```go
-type RoomSettings struct {
-    AllowChat       bool `json:"allowChat"       default:true`
-    AllowVideo      bool `json:"allowVideo"      default:true`
-    AllowAudio      bool `json:"allowAudio"      default:true`
-    RequireApproval bool `json:"requireApproval" default:false`
-    E2EE            bool `json:"e2ee"            default:false`
-    IsPersistent    bool `json:"isPersistent"    default:false` // superadmin-only, skips idle cleanup
-}
-```
-
-### models.Room
-
-```go
-type Room struct {
-    ID              string       `json:"id"`
-    Name            string       `json:"name"`
-    CreatedBy       string       `json:"createdBy"`
-    IsActive        bool         `json:"isActive"`
-    MaxParticipants int          `json:"maxParticipants"`
-    CreatedAt       time.Time    `json:"createdAt"`
-    UpdatedAt       time.Time    `json:"updatedAt"`
-    ExpiresAt       time.Time    `json:"expiresAt"`
-    AdminID         string       `json:"adminId"`
-    IsPublic        bool         `json:"isPublic"`
-    Settings        RoomSettings `json:"settings"`
-    Mode            string       `json:"mode"`
-}
-```
-
-### models.User
-
-```go
-type User struct {
-    ID        string      `json:"id"`
-    Email     string      `json:"email"`
-    Name      string      `json:"name"`
-    Provider  string      `json:"provider"`
-    AvatarURL string      `json:"avatarUrl"`
-    Password  string      `json:"-"`           // never serialized
-    Accesses  StringArray `json:"accesses"`
-    IsActive  bool        `json:"isActive"`
-    CreatedAt time.Time   `json:"createdAt"`
-    UpdatedAt time.Time   `json:"updatedAt"`
-}
-```
-
-### models.SystemSettings
-
-```go
-type SystemSettings struct {
-    RegistrationEnabled   bool   `json:"registrationEnabled"   default:true`
-    TokenRegistrationOnly bool   `json:"tokenRegistrationOnly" default:false`
-    PasskeysEnabled       bool   `json:"passkeysEnabled"`
-    GoogleClientID        string `json:"googleClientId"`
-    GoogleClientSecret    string `json:"googleClientSecret"`   // masked
-    GoogleRedirectURL     string `json:"googleRedirectUrl"`
-    GithubClientID        string `json:"githubClientId"`
-    GithubClientSecret    string `json:"githubClientSecret"`   // masked
-    GithubRedirectURL     string `json:"githubRedirectUrl"`
-    TwitterClientID       string `json:"twitterClientId"`
-    TwitterClientSecret   string `json:"twitterClientSecret"`  // masked
-    JWTSecret             string `json:"jwtSecret"`            // masked
-    TokenDuration         int    `json:"tokenDuration"`
-    SessionSecret         string `json:"sessionSecret"`        // masked
-    FrontendURL           string `json:"frontendUrl"`
-    ServerPort            string `json:"serverPort"`
-    ServerHost            string `json:"serverHost"`
-    ServerDomain          string `json:"serverDomain"`
-    ServerEnableTLS       bool   `json:"serverEnableTls"`
-    ServerCertFile        string `json:"serverCertFile"`
-    ServerKeyFile         string `json:"serverKeyFile"`
-    ServerUseACME         bool   `json:"serverUseAcme"`
-    ServerEmail           string `json:"serverEmail"`
-    BehindProxy           bool   `json:"behindProxy"`
-    LiveKitHost           string `json:"livekitHost"`
-    LiveKitAPIKey         string `json:"livekitApiKey"`
-    LiveKitAPISecret      string `json:"livekitApiSecret"`     // masked
-    LiveKitExternal       bool   `json:"livekitExternal"`
-    CORSAllowedOrigins    string `json:"corsAllowedOrigins"`
-    CORSAllowedHeaders    string `json:"corsAllowedHeaders"`
-    CORSAllowedMethods    string `json:"corsAllowedMethods"`
-    CORSAllowCredentials  bool   `json:"corsAllowCredentials"`
-    CORSMaxAge            int    `json:"corsMaxAge"`
-    ChatUploadBackend     string `json:"chatUploadBackend"`
-    ChatUploadMaxBytes    int64  `json:"chatUploadMaxBytes"`
-    ChatUploadInlineMax   int64  `json:"chatUploadInlineMax"`
-    ChatUploadDiskDir     string `json:"chatUploadDiskDir"`
-    ChatUploadS3Endpoint  string `json:"chatUploadS3Endpoint"`
-    ChatUploadS3Bucket    string `json:"chatUploadS3Bucket"`
-    ChatUploadS3Region    string `json:"chatUploadS3Region"`
-    ChatUploadS3AccessKey string `json:"chatUploadS3AccessKey"`
-    ChatUploadS3SecretKey string `json:"chatUploadS3SecretKey"` // masked
-    ChatUploadS3PublicURL string `json:"chatUploadS3PublicUrl"`
-    LogLevel              string `json:"logLevel"`
-    UpdatedAt             time.Time `json:"updatedAt"`
-}
-```
-
-### models.InviteToken
-
-```go
-type InviteToken struct {
-    ID        string     `json:"id"`
-    Token     string     `json:"token"`
-    Email     string     `json:"email"`
-    CreatedBy string     `json:"createdBy"`
-    ExpiresAt time.Time  `json:"expiresAt"`
-    UsedAt    *time.Time `json:"usedAt"`
-    UsedBy    string     `json:"usedBy"`
-    CreatedAt time.Time  `json:"createdAt"`
-}
-```
-
-### models.UserPreferences
-
-```go
-type UserPreferences struct {
-    UserID          string    `json:"userId"`
-    PreferencesJSON string    `json:"preferencesJson"`
-    UpdatedAt       time.Time `json:"updatedAt"`
-}
-```
-
-### storage.ChatAttachment
-
-```go
-type ChatAttachment struct {
-    URL    string `json:"url"`
-    Mime   string `json:"mime"`
-    Size   int64  `json:"size"`
-    Width  int    `json:"w"`
-    Height int    `json:"h"`
-}
-```
-
-### models.QueueStats
-
-```go
-type QueueStats struct {
-    Pending         int64              `json:"pending"`
-    Active          int64              `json:"active"`
-    Done24h         int64              `json:"done24h"`
-    Failed24h       int64              `json:"failed24h"`
-    Total           int64              `json:"total"`
-    MaxDepth        int64              `json:"maxDepth"`
-    OldestPending   *time.Time         `json:"oldestPending,omitempty"`
-    RecentFailures  []FailedJobSummary `json:"recentFailures,omitempty"`
-    ProcessedPerMin float64            `json:"processedPerMin"`
-    FailedPerMin    float64            `json:"failedPerMin"`
-    FailRate        float64            `json:"failRate"`
-}
-
-type FailedJobSummary struct {
-    ID        string    `json:"id"`
-    Type      string    `json:"type"`
-    Error     string    `json:"error"`
-    Attempts  int       `json:"attempts"`
-    UpdatedAt time.Time `json:"updatedAt"`
-    Age       string    `json:"age"`
-}
-```
-
----
-
-## Source File Index
-
-| Concern | File |
-|---------|------|
-| Route registration | `cmd/server/main.go` |
-| Shared handler DTOs | `internal/handlers/models.go` |
-| Auth handler (local + passkey) | `internal/handlers/auth_handler.go` |
-| OAuth handler | `internal/handlers/auth.go` |
-| Room handler | `internal/handlers/room.go` |
-| Users handler | `internal/handlers/users.go` |
-| Admin handler | `internal/handlers/admin_handler.go` |
-| Preferences handler | `internal/handlers/preferences_handler.go` |
-| Auth middleware | `internal/middleware/auth.go` |
-| Rate limit middleware | `internal/middleware/ratelimit.go` |
-| Auth service DTOs | `internal/auth/auth.go` |
-| JWT Claims | `internal/auth/jwt.go` |
-| User model | `internal/models/user.go` |
-| Room model + RoomSettings | `internal/models/room.go` |
-| SystemSettings model | `internal/models/settings.go` |
-| InviteToken model | `internal/models/invite_token.go` |
-| UserPreferences model | `internal/models/user_preferences.go` |
-| ChatAttachment DTO | `internal/storage/chat_upload.go` |
-| ChatUploadTracker (Record + DeleteByRoom) | `internal/storage/chat_upload.go` |
-| ChatUpload model | `internal/models/chat_upload.go` |
-| Shared LiveKit helpers (NewClient, AuthContext, SendSystemMessage) | `internal/lkutil/lkutil.go` |
-| User handler (DeleteUser, Shutdown) | `internal/handlers/users.go` |
-| Admin queue handler (GetQueueStats) | `internal/handlers/admin_queue.go` |
-| Job GORM model | `internal/models/job.go` |
-| QueueStats model | `internal/models/queue_stats.go` |
-| Queue engine (Enqueue, Worker, Handler) | `internal/queue/queue.go` |
-| Queue worker (claim loop, retry) | `internal/queue/worker.go` |
-| Queue job types (7 payloads) | `internal/queue/job.go` |
-| Queue handlers (room/user delete, suspend, upload, stubs) | `internal/queue/handler_*.go` |
-| RoomCleanupService (CascadeDeleteRoom, SuspendRoom) | `internal/services/room_cleanup.go` |
+## Source file index (high traffic)
+
+| Concern | Path under `server/` |
+|---------|----------------------|
+| Routes prod | `internal/server/server.go` |
+| Routes dev | `cmd/server/main.go` |
+| Auth handler | `internal/handlers/auth_handler.go` |
+| OAuth | `internal/handlers/auth.go` |
+| Rooms | `internal/handlers/room.go`, `room_auth.go` |
+| Recording (unwired routes) | `internal/handlers/recording_handler.go` |
+| Users admin | `internal/handlers/users.go` |
+| Settings / invites / webhooks | `internal/handlers/admin_handler.go` |
+| Overview | `internal/handlers/admin_overview.go` |
+| Queue stats | `internal/handlers/admin_queue.go` |
+| Preferences | `internal/handlers/preferences_handler.go` |
+| Shared DTOs | `internal/handlers/models.go` |
+| Middleware | `internal/middleware/auth.go`, `ratelimit.go` |
+| Queue types / handlers | `internal/queue/job.go`, `handler_*.go` |
+| Models | `internal/models/*.go` |
+| Swagger | `docs/swagger.yaml` — regen `make swagger-gen` |
 
 ---
 
 ## Swagger
 
-- Swagger UI: `GET /api/swagger/*`
-- Scalar UI: `GET /api/scalar`
-- Base path: `/api`
-- Security: Bearer token in Authorization header
-- Regenerate: `make swagger-gen` (requires `swag` CLI)
+- UI: `GET /api/swagger/*` · Scalar: `GET /api/scalar`
+- Base path `/api` · Bearer security
+- Regen: `make swagger-gen` (`swag` CLI)

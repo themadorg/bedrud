@@ -6,529 +6,453 @@ license: Apache License
 
 # Bedrud Cerberus Email Templates
 
-Go module `bedrud`. `internal/queue/templates/cerberus-hybrid.html` is the canonical Cerberus hybrid baseline.
+Go module `bedrud`. Canonical upstream baseline:
 
-**Rule: Never edit `cerberus-hybrid.html`.** Always `cp` to a new file and edit the copy. Original is upstream reference for re-merging Cerberus updates.
+`server/internal/queue/templates/cerberus-hybrid.html`
+
+**Rule: Never edit `cerberus-hybrid.html`.** Always `cp` to a new file and edit the copy. Original is the Cerberus hybrid reference for re-merging upstream updates.
+
+Production templates live beside it under `server/internal/queue/templates/` and are loaded by `handler_email.go` via `//go:embed`.
+
+---
+
+## Files
+
+| File | Role |
+|------|------|
+| `server/internal/queue/templates/cerberus-hybrid.html` | Untouched Cerberus hybrid baseline (680px, hybrid grid, demo sections) |
+| `welcome.html` + `.txt` | Welcome after register |
+| `verify_email.html` + `.txt` | Email verification |
+| `password_reset.html` + `.txt` | Password reset link |
+| `password_changed.html` + `.txt` | Password-changed security notice |
+| `room_invite.html` + `.txt` | Room invite (template registered; **not enqueued by any handler yet**) |
+| `generic.html` + `.txt` | Fallback key/value dump for unknown template names |
+| `server/internal/queue/handler_email.go` | Parse/register templates, branding, SMTP send |
+| `server/internal/queue/job.go` | `SendEmailPayload` |
+| `server/config/config.go` | `EmailConfig` / `EmailTemplateConfig` |
+| `server/internal/models/settings.go` | Admin DB overrides for branding/subjects/preheaders |
+
+Registered names (must match disk + parse loop):
+
+```text
+welcome | room_invite | password_reset | password_changed | verify_email | generic
+```
 
 ---
 
 ## Go Template Engine — Not Fiber View
 
-The email system uses **Go `html/template` directly** — not Fiber's `c.Render()` or any template framework.
+Uses **Go `html/template` directly** — not Fiber `c.Render()`.
 
-### How Templates Load
+### Load (`NewSendEmailHandler`)
 
 ```go
 //go:embed templates/*.html templates/*.txt
 var emailTemplatesFS embed.FS
 
-// In handler_email.go NewSendEmailHandler:
-h.tmpls = make(map[string]*template.Template)
-for _, name := range []string{"welcome", "room_invite", "password_reset",
-    "password_changed", "verify_email", "generic"} {
+for _, name := range []string{
+    "welcome", "room_invite", "password_reset",
+    "password_changed", "verify_email", "generic",
+} {
     t, err := template.ParseFS(emailTemplatesFS, "templates/"+name+".html")
-    // ...
+    // on error: warn + skip HTML (falls back toward plaintext / generic)
     h.tmpls[name] = t
+
+    pt, err := template.ParseFS(emailTemplatesFS, "templates/"+name+".txt")
+    if err == nil {
+        h.plainTmpls[name] = pt
+    }
 }
 ```
 
-### How Templates Render
+### Render
 
 ```go
-var buf bytes.Buffer
-tmpl.Execute(&buf, payload.TemplateData) // payload.TemplateData is map[string]any
-return buf.String()
+tmpl.Execute(&buf, payload.TemplateData) // map[string]any
 ```
 
-### Data Flow
+### Job payload
 
-1. `SendEmailPayload{To, Subject, TemplateName, TemplateData map[string]any}` enqueued as job
-2. `loadBranding()` fetches `SystemSettings` from DB, overlays on `config.yaml` defaults
-3. `injectBranding()` merges `InstanceName`, `SupportEmail`, `InstanceURL`, `HeaderBg`, `ButtonBg`, `Preheader` into `TemplateData`
-4. Template executes with the merged `map[string]any` — all vars are top-level keys like `{{.InstanceName}}`
-5. Auto-escaped by `html/template` — safe against XSS, works in style attrs and hrefs
-
----
-
-## Template Anatomy & Section Reference
-
-`cerberus-hybrid.html` (680px max-width, hybrid grid) has these named sections. Use as building blocks:
-
-| Section | Lines (approx) | Purpose | Use For |
-|---------|---------------|---------|---------|
-| Preheader | 105-111 | Hidden preview text (`{{.Preheader}}`) | All emails |
-| Email Header | 126-133 | Logo image, `{{.InstanceName}}` fallback | All emails |
-| Hero Image, Flush | 136-143 | Full-width bleed image | Welcome, announcements |
-| 1 Column Text + Button | 146-177 | Body text + CTA button | Verify email, password reset |
-| Background Image w/ Text | 179-207 | Bulletproof bg image + text overlay | Promotional |
-| 2 Even Columns | 209-264 | Side-by-side content (hybrid grid) | Features, room details |
-| 3 Even Columns | 266-345 | Triple columns (hybrid grid) | Pricing, gallery |
-| Thumbnail Left, Text Right | 348-398 | Image + text beside each other | Room invites with preview |
-| Thumbnail Right, Text Left | 401-452 | Same, flipped alignment | Alternating layouts |
-| Clear Spacer | 455-459 | Vertical whitespace | Separation |
-| 1 Column Text | 462-476 | Simple text block | Notifications |
-| Footer | 479-489 | webversion, unsubscribe, address | All emails |
-| Full Bleed Background | 492-525 | Full-width colored section outside container | Callout banners |
-
-### Email Types → Section Mapping
-
-| Template | Sections Used |
-|----------|--------------|
-| `welcome` | Preheader + Header + Hero + 1-Column Text+Button + Footer |
-| `verify_email` | Preheader + Header + 1-Column Text+Button + Footer |
-| `password_reset` | Preheader + Header + 1-Column Text+Button + Footer |
-| `password_changed` | Preheader + Header + 1-Column Text + Footer |
-| `room_invite` | Preheader + Header + 1-Column Text+Button + Thumbnail Layout + Footer |
-| `generic` | Preheader + Header + Key-Value Table + Footer (fallback when template name unknown) |
-
----
-
-## Branding Variables Available
-
-All injected by `injectBranding()` in `handler_email.go`. Sources: `config.yaml` → SystemSettings DB table (admin UI overrides).
-
-### Core Branding
-
-| Var | Config YAML | DB Field | Example | Used In |
-|-----|------------|----------|---------|---------|
-| `{{.InstanceName}}` | `email.templates.instanceName` | `EmailInstanceName` | `"Bedrud"` | Header `<h1>`, body intro |
-| `{{.SupportEmail}}` | `email.templates.supportEmail` | `EmailSupportEmail` | `"help@example.com"` | Footer contact link |
-| `{{.InstanceURL}}` | `email.templates.instanceUrl` | `EmailInstanceURL` | `"https://bedrud.org"` | Footer link |
-| `{{.HeaderBg}}` | `email.templates.headerBgColor` | `EmailHeaderBg` | `"#1a1a2e"` | Header `<td>` background |
-| `{{.ButtonBg}}` | `email.templates.buttonBgColor` | `EmailButtonBg` | `"#e11d48"` | Primary button background |
-| `{{.Preheader}}` | `email.templates.preheaderText` (per-template) | `EmailPreheader*` | `"Verify your email..."` | Hidden preview `div` |
-
-### Per-Template Custom Vars
-
-Passed via `payload.TemplateData` when enqueueing the job. Not auto-injected — must be in the enqueue call.
-
-| Var | Used In | Source |
-|-----|---------|--------|
-| `{{.Name}}` | welcome, verify_email | User's display name |
-| `{{.VerifyURL}}` | verify_email | Verification link |
-| `{{.ResetURL}}` | password_reset | Password reset link |
-| `{{.RoomName}}` | room_invite | Room name being shared |
-| `{{.RoomURL}}` | room_invite | Direct join link |
-| `{{.InviterName}}` | room_invite | Who invited them |
-
-### How Branding Resolves (Priority: DB > Config)
-
-1. Hardcoded defaults in `loadBranding()` (InstanceName = "Bedrud", HeaderBg = "#1a1a2e", ButtonBg = "#e11d48")
-2. Overlaid with `config.yaml` `email.templates.*` values
-3. Overlaid with `SystemSettings` DB table row 1 values (set via admin panel)
-4. Template keys that are already set in `TemplateData` are **not** overwritten (caller can override branding per-email)
-
----
-
-## Dark Mode Patterns
-
-Cerberus uses `@media (prefers-color-scheme: dark)` inside `<style>` blocks. Bedrud's Cerberus copy must preserve this pattern.
-
-### Structure
-
-```css
-/* Dark Mode Styles : BEGIN */
-@media (prefers-color-scheme: dark) {
-    .email-bg {
-        background: #111111 !important;
-    }
-    .darkmode-bg {
-        background: #222222 !important;
-    }
-    h1, h2, h3, p, li, .darkmode-text,
-    .email-container a:not([class]) {
-        color: #F7F7F9 !important;
-    }
-    td.button-td-primary,
-    td.button-td-primary a {
-        background: #ffffff !important;
-        border-color: #ffffff !important;
-        color: #222222 !important;
-    }
-    .footer td {
-        color: #aaaaaa !important;
-    }
-    .darkmode-fullbleed-bg {
-        background-color: #0F3016 !important;
-    }
-}
-/* Dark Mode Styles : END */
-```
-
-### Utility Classes (already defined in cerberus-hybrid.html)
-
-| Class | Dark Mode Effect | Apply To |
-|-------|-----------------|----------|
-| `.darkmode-bg` | `background: #222222` | `<td>` with white/light background in light mode |
-| `.darkmode-text` | `color: #F7F7F9` | Text elements that need color override |
-| `.email-bg` | `background: #111111` | `<body>` and `<center>` (outer canvas) |
-| `.darkmode-fullbleed-bg` | `background-color: #0F3016` | Full-bleed colored sections |
-
-### How to Apply in Your Template Copy
-
-Every `<td>` with a light background color in light mode must also have the appropriate dark mode class:
-
-```html
-<!-- Light mode: white bg. Dark mode: #222 via .darkmode-bg -->
-<td style="background-color: #ffffff;" class="darkmode-bg">
-```
-
-Text colors should be defined inline for light mode and overridden via class or element selector for dark mode:
-
-```html
-<p style="color: #555555;" class="darkmode-text">
-    Text that is #555 in light mode, #F7F7F9 in dark mode.
-</p>
-```
-
-### Buttons
-
-The primary button pattern in Cerberus inverts in dark mode (white bg + dark text instead of dark bg + white text):
-
-```html
-<td class="button-td button-td-primary" style="border-radius: 4px; background: #222222;">
-    <a class="button-a button-a-primary" href="..."
-       style="background: #222222; border: 1px solid #000000; color: #ffffff;">
-        Download
-    </a>
-</td>
-```
-
-The dark mode CSS handles the inversion automatically via `.button-td-primary` selector. Don't remove or rename these classes.
-
-### Extending Dark Mode for Custom Sections
-
-If your template copy adds new colored sections, add new dark mode utility classes:
-
-```css
-@media (prefers-color-scheme: dark) {
-    .darkmode-card {
-        background: #2a2a2a !important;
-        border-color: #444444 !important;
-    }
-    .darkmode-border {
-        border-color: #444444 !important;
-    }
-    .darkmode-accent {
-        color: #60a5fa !important;
-    }
+```go
+type SendEmailPayload struct {
+    To           string         `json:"to"`
+    Subject      string         `json:"subject"`
+    TemplateName string         `json:"template_name"`
+    TemplateData map[string]any `json:"template_data,omitempty"`
 }
 ```
 
-All dark mode rules **must use `!important`** to override inline styles (email clients strip embedded styles otherwise).
+Job type: `"send_email"` (wired in `server/internal/server/server.go`).
 
-### Image Swapping for Dark Mode
+### Data flow
 
-Since SVG is not supported in email, swap raster images by toggling display:
+1. Handler enqueues `SendEmailPayload` (`queue.Enqueue(..., "send_email", payload)`).
+2. Worker runs `NewSendEmailHandler`.
+3. `loadBranding(ctx, db, cfg)` merges defaults ← `config.yaml` `email.templates` ← `SystemSettings` row `1`.
+4. `resolveSubject(branding, templateName, payload.Subject)`: DB/config subject map wins over payload subject.
+5. `injectBranding(...)` fills missing keys on `TemplateData`: `InstanceName`, `SupportEmail`, `InstanceURL`, `HeaderBg`, `ButtonBg`, `Preheader`.
+6. HTML from named template (or `generic` / `renderFallback`); multipart MIME via `utils.BuildMessage`.
+7. If SMTP unset (`smtpHost` empty or port 0): log body + data, return nil (no error).
 
-```html
-<img src="logo-light.png" class="display-only-in-light-mode">
-<!--[if !mso]><!-->
-<img src="logo-dark.png" class="display-only-in-dark-mode">
-<!--<![endif]-->
-```
-
-CSS: `.display-only-in-dark-mode { display: none !important; }` (reversed in `@media (prefers-color-scheme: dark)`).
-
-**Outlook limitation:** Outlook ignores `prefers-color-scheme` AND the `[if !mso]` guard. Both images render in Outlook. Mitigations:
-- Keep light-mode logo filename as default for Outlook users
-- Use same image for both if Outlook audience is significant
-- Accept that Outlook always shows light mode — it's the least capable client
-
-### Removing Dark Mode Entirely
-
-If the template copy doesn't need dark mode, remove everything between:
-
-```css
-/* Dark Mode Styles : BEGIN */
-...
-/* Dark Mode Styles : END */
-```
-
-And remove `color-scheme` meta tags from `<head>`. (Recommended to keep dark mode — users expect it.)
+Caller-supplied `TemplateData` keys are **not** overwritten by branding.
 
 ---
 
-## Hybrid Grid System (Responsive Columns)
+## Who Enqueues What
 
-Cerberus hybrid uses `inline-block` + ghost tables for responsive columns without media queries. Outlook gets fixed-width tables; everyone else gets inline-block that wraps at `max-width`.
+| Template | Source | Typical `TemplateData` | Default `Subject` in enqueue |
+|----------|--------|------------------------|------------------------------|
+| `welcome` | `auth_handler.go` Register | `Name`, `LoginURL` | `"Welcome to Bedrud"` |
+| `verify_email` | `auth_handler.go` `enqueueVerificationEmail`; `users.go` AdminResendVerification | `Name`, `VerifyURL` | `"Verify your Bedrud email"` / admin resend variant |
+| `password_reset` | `auth_handler.go` `enqueuePasswordResetEmail` | `ResetURL`, `IPAddress` | `"Reset your Bedrud password"` |
+| `password_changed` | `auth_handler.go` ChangePassword + ResetPassword success | `IPAddress` (optional `UserAgent` supported by template, not set by handlers today) | `"Your Bedrud password was changed"` |
+| `room_invite` | **none yet** | expected: `InviterName`, `RoomName`, `JoinURL` | — |
+| `generic` | fallback only | any keys (branding keys filtered out of table rows) | payload subject |
 
-### 2-Column Pattern
+---
+
+## Production Template Anatomy
+
+All six production HTML templates are **simplified Cerberus shells** (not full demo layouts):
+
+| Template | Sections used |
+|----------|---------------|
+| `welcome` | Preheader + Header pill + 1-Column Text+Button (`LoginURL`) + Footer |
+| `verify_email` | Preheader + Header + 1-Column Text+Button (`VerifyURL`) + monospace URL fallback + Footer |
+| `password_reset` | Preheader + Header + 1-Column Text+Button (`ResetURL`) + optional IP + Footer |
+| `password_changed` | Preheader + Header + 1-Column Text (no button) + optional IP/UserAgent + Footer |
+| `room_invite` | Preheader + Header + 1-Column Text+Button (`JoinURL`) + Footer |
+| `generic` | Preheader + Header + 1-Column key/value table + Footer |
+
+Shared production patterns:
+
+- Max width **680px** + MSO fixed-width table.
+- Header is **text pill** (`{{.InstanceName}}` + `.header-name-pill`), not a logo image.
+- CTA uses `button-td` / `button-td-primary` + `{{.ButtonBg}}`.
+- Optional fields wrapped in `{{if .Field}}…{{end}}`.
+- Footer: contact / instance URL when set; no Cerberus webversion/unsubscribe demo copy.
+
+---
+
+## Cerberus Baseline Section Map
+
+`cerberus-hybrid.html` section markers (line numbers approximate; search `<!-- … : BEGIN -->`):
+
+| Section | ~Lines | Purpose | Typical use |
+|---------|--------|---------|-------------|
+| Visually Hidden Preheader | 256–260 | Inbox preview (static demo text in baseline) | Replace with `{{.Preheader}}` in copies |
+| Preview Text Spacing Hack | 263–267 | Zero-width padding after preheader | Keep |
+| Email Header | 284–290 | Logo / brand | Replace with InstanceName pill |
+| Hero Image, Flush | 292–298 | Full-width bleed image | Announcements |
+| 1 Column Text + Button | 300–332 | Body + CTA | Most transactional emails |
+| Background Image with Text | 334–369 | VML + CSS bg image | Promotional |
+| 2 Even Columns | 371–430 | Hybrid 2-col | Feature pairs |
+| 3 Even Columns | 432–515 | Hybrid 3-col | Gallery / pricing |
+| Thumbnail Left, Text Right | 517–571 | Image + text (`dir=rtl` swap) | Media + copy |
+| Thumbnail Right, Text Left | 573–627 | Flipped alignment | Alternating rows |
+| Clear Spacer | 629–635 | Vertical gap | Separation |
+| 1 Column Text | 637–649 | Text only | Notices |
+| Email Footer | 654–666 | Demo footer | Replace with SupportEmail/InstanceURL |
+| Full Bleed Background | 675–701 | Full-width band outside container | Callouts |
+
+Baseline preheader is **static Cerberus copy**, not `{{.Preheader}}`. Wire Go vars only in template **copies**.
+
+---
+
+## Branding Variables
+
+Injected by `injectBranding()` when key absent. Priority: **DB `SystemSettings` > config.yaml > code defaults**.
+
+### Core (auto-injected)
+
+| Var | Config YAML | DB field | Default | Used |
+|-----|-------------|---------|---------|------|
+| `{{.InstanceName}}` | `email.templates.instanceName` | `EmailInstanceName` | `"Bedrud"` | Header, body |
+| `{{.SupportEmail}}` | `email.templates.supportEmail` | `EmailSupportEmail` | `""` | Footer `mailto:` |
+| `{{.InstanceURL}}` | `email.templates.instanceUrl` | `EmailInstanceURL` | `""` | Footer link |
+| `{{.HeaderBg}}` | `email.templates.headerBgColor` | `EmailHeaderBg` | `"#1a1a2e"` | Header `td` bg |
+| `{{.ButtonBg}}` | `email.templates.buttonBgColor` | `EmailButtonBg` | `"#e11d48"` | CTA button |
+| `{{.Preheader}}` | `email.templates.preheaderText.<name>` | `EmailPreheader*` | only if configured | Hidden preview |
+
+Code defaults in `loadBranding`: InstanceName=`Bedrud`, HeaderBg=`#1a1a2e`, ButtonBg=`#e11d48`. No hardcoded per-template preheaders/subjects — those come from config/DB or enqueue `Subject`.
+
+### Per-template vars (enqueue only)
+
+| Var | Templates | Notes |
+|-----|-----------|-------|
+| `{{.Name}}` | welcome, verify_email | Display name |
+| `{{.LoginURL}}` | welcome | Optional; button omitted if empty/missing |
+| `{{.VerifyURL}}` | verify_email | Button + monospace copy block |
+| `{{.ResetURL}}` | password_reset | Reset CTA |
+| `{{.IPAddress}}` | password_reset, password_changed | Optional security context |
+| `{{.UserAgent}}` | password_changed | Optional; template-ready, handlers do not pass yet |
+| `{{.InviterName}}` | room_invite | Who invited |
+| `{{.RoomName}}` | room_invite | Optional room label |
+| `{{.JoinURL}}` | room_invite | Join CTA (**not** `RoomURL`) |
+
+### Subject resolution
+
+`resolveSubject`: `branding.SubjectLines[templateName]` if non-empty, else `payload.Subject`.
+
+Config keys / DB columns:
+
+| Template | Config map key | DB subject field | DB preheader field |
+|----------|----------------|------------------|--------------------|
+| verify_email | `subjectLines.verify_email` | `EmailSubjectVerify` | `EmailPreheaderVerify` |
+| welcome | `subjectLines.welcome` | `EmailSubjectWelcome` | `EmailPreheaderWelcome` |
+| password_reset | `subjectLines.password_reset` | `EmailSubjectReset` | `EmailPreheaderReset` |
+| password_changed | `subjectLines.password_changed` | `EmailSubjectChanged` | `EmailPreheaderChanged` |
+| room_invite | `subjectLines.room_invite` | `EmailSubjectInvite` | `EmailPreheaderInvite` |
+
+Example `config.yaml` (commented defaults often present):
+
+```yaml
+email:
+  templates:
+    instanceName: "Bedrud"
+    supportEmail: ""
+    instanceUrl: ""
+    headerBgColor: "#1a1a2e"
+    buttonBgColor: "#e11d48"
+    subjectLines:
+      verify_email: "Verify your Bedrud email"
+      welcome: "Welcome to Bedrud"
+      password_reset: "Reset your Bedrud password"
+      password_changed: "Your Bedrud password was changed"
+      room_invite: "You're invited to a room on Bedrud"
+    preheaderText:
+      verify_email: "Verify your email address to get started with Bedrud"
+      # ...
+```
+
+---
+
+## Dark Mode
+
+Baseline and production copies use `@media (prefers-color-scheme: dark)` with **`!important`** to beat inline styles.
+
+### Utility classes
+
+| Class | Dark effect | Apply to |
+|-------|-------------|----------|
+| `.email-bg` | bg `#111` | `body` / `center` |
+| `.darkmode-bg` | bg `#222` | Light content `<td>`s |
+| `.darkmode-text` | text `#F7F7F9` | Body copy needing override |
+| `.darkmode-fullbleed-bg` | bg `#0F3016` | Full-bleed bands (baseline) |
+| `.header-name-pill` | bg `#2a2a4e` | **Bedrud production** header pill |
+| `.button-td-primary` / `a` | invert to white bg / dark text | Keep class names |
+
+Production dark CSS also recolors `h1–h3, p, li, .footer td`.
+
+### Apply when customizing
+
+```html
+<td style="background-color:#ffffff;" class="darkmode-bg">
+<p style="color:#555555;" class="darkmode-text">…</p>
+```
+
+Do not rename `button-td-primary` / `button-a-primary` — dark invert depends on them.
+
+### Image swap (optional)
+
+SVG unsupported in email. Toggle rasters with light/dark classes; Outlook ignores `prefers-color-scheme` and `[if !mso]` guards mean light logo is the safe default.
+
+### Strip dark mode
+
+Delete between `/* Dark Mode Styles : BEGIN */` … `END`, plus `color-scheme` meta/`:root`. Prefer keeping dark mode.
+
+---
+
+## Hybrid Grid (Baseline Only)
+
+Cerberus hybrid: `inline-block` + MSO ghost tables. Production emails are single-column; use hybrid sections only when copying multi-col layouts from the baseline.
+
+### 2-column sketch
 
 ```html
 <!--[if mso]>
 <table role="presentation" border="0" cellspacing="0" cellpadding="0" width="660">
-<tr>
-<td valign="top" width="330">
-<![endif]-->
-<div style="display:inline-block; margin: 0 -1px; width:100%; min-width:200px; max-width:330px; vertical-align:top;" class="stack-column">
-    <!-- Column 1 content -->
+<tr><td valign="top" width="330"><![endif]-->
+<div style="display:inline-block; margin:0 -1px; width:100%; min-width:200px; max-width:330px; vertical-align:top;" class="stack-column">
+  <!-- col 1 -->
 </div>
-<!--[if mso]>
-</td>
-<td valign="top" width="330">
-<![endif]-->
-<div style="display:inline-block; margin: 0 -1px; width:100%; min-width:200px; max-width:330px; vertical-align:top;" class="stack-column">
-    <!-- Column 2 content -->
+<!--[if mso]></td><td valign="top" width="330"><![endif]-->
+<div style="display:inline-block; margin:0 -1px; width:100%; min-width:200px; max-width:330px; vertical-align:top;" class="stack-column">
+  <!-- col 2 -->
 </div>
-<!--[if mso]>
-</td>
-</tr>
-</table>
-<![endif]-->
+<!--[if mso]></td></tr></table><![endif]-->
 ```
 
-### Column Widths (680px container)
+| Layout | Per-col | Notes |
+|--------|---------|-------|
+| 2 columns | 330px | MSO table width 660 |
+| 3 columns | 220px | MSO table width 660 |
+| Thumb + text | 220 + 440 | `dir="rtl"` / `ltr` to swap |
 
-| Layout | Per-Column | Notes |
-|--------|-----------|-------|
-| 2 columns | 330px each | 660px total, 10px padding each side |
-| 3 columns | 220px each | 660px total |
-| Thumbnail + Text | 220px + 440px | Use `dir="rtl"` or `dir="ltr"` for alignment swap |
+Mobile (`max-width: 480px`): `.stack-column`, `.stack-column-center`, `.center-on-narrow`.
 
-### Mobile Stacking Classes
-
-Defined in `@media screen and (max-width: 480px)`:
-
-| Class | Effect |
-|-------|--------|
-| `.stack-column` | Forces `display:block; width:100%; max-width:100%` |
-| `.stack-column-center` | Same as above + `text-align:center` |
-| `.center-on-narrow` | Centers images, buttons, tables on mobile |
-| `table.center-on-narrow` | `display:inline-block` variant for table elements |
-
-### When to Use What
-
-- **Hybrid grid** (`div` + ghost tables): main layout columns — best for responsive + Outlook
-- **Flat table rows**: single-column content (header, hero, 1-column text) — simpler, no grid needed
-- **Full-bleed section**: outside `.email-container` div, wrapped in `width:100%` table — for background color that spans full viewport
-
-### Column Number Gotchas
-
-- MSO ghost table `width` must match sum of column `width` attributes exactly (660px for 2×330 or 3×220)
-- Non-MSO divs use `min-width` + `max-width` — the `margin: 0 -1px` fixes 1px gap from inline-block whitespace
-- If adding/removing columns, update both the MSO table widths and the div `max-width` values
+Gotchas: MSO widths must sum exactly; `margin: 0 -1px` kills inline-block gaps; update both MSO and div max-widths when changing columns.
 
 ---
 
-## Registering a New Cerberus-based Template
+## Register a New Template
 
-Step-by-step to create a new email template using the Cerberus baseline.
-
-### Step 1: Copy the Cerberus Template
+### 1. Copy baseline (or a close production template)
 
 ```bash
 cp server/internal/queue/templates/cerberus-hybrid.html \
    server/internal/queue/templates/{name}.html
+# or start from welcome.html for a thinner transactional shell
 ```
 
-Never edit `cerberus-hybrid.html`. Only edit the copy.
+Never edit `cerberus-hybrid.html`.
 
-### Step 2: Customize the Copy
+### 2. Customize copy
 
-Replace Cerberus placeholder text with Go template vars:
+| Baseline placeholder | Replace with |
+|----------------------|--------------|
+| Long preheader paragraph | `{{.Preheader}}` |
+| Logo / Company Name | Header pill `{{.InstanceName}}` + `{{.HeaderBg}}` |
+| Demo body / `Praesent…` | Real copy + `{{.Var}}` |
+| Button href / colors | `{{.CTAURL}}`, `{{.ButtonBg}}` |
+| Footer address / webversion | `{{.SupportEmail}}`, `{{.InstanceURL}}` |
 
-| Cerberus Placeholder | Replace With |
-|---------------------|--------------|
-| `Praesent laoreet malesuada&nbsp;cursus.` | `{{.Title}}` or hardcoded subject |
-| `Maecenas sed ante pellentesque...` | `{{.Message}}` or hardcoded body |
-| `alt_text` | Meaningful alt text or template var |
-| `https://via.placeholder.com/...` | `{{.ImageURL}}` or embedded asset |
-| `Company Name` | `{{.InstanceName}}` |
-| `123 Fake Street...` | Leave as example or remove |
-
-Key integration points for branding:
+Minimal branding hooks (mirror existing templates):
 
 ```html
-<!-- Header: swap static hex for {{.HeaderBg}} -->
-<td style="background-color: {{.HeaderBg}};" ...>
-
-<!-- Instance name -->
-<h1>{{.InstanceName}}</h1>
-
-<!-- Preheader -->
-<div style="display:none;...">{{.Preheader}}</div>
-
-<!-- Support email + instance URL in footer -->
+<div …>{{.Preheader}}</div>
+<td style="background-color: {{.HeaderBg}};" class="darkmode-bg">
+  <h1 class="header-name-pill">{{.InstanceName}}</h1>
+</td>
+<td class="button-td button-td-primary" style="background:{{.ButtonBg}};">
+  <a class="button-a button-a-primary" href="{{.ActionURL}}"
+     style="background:{{.ButtonBg}}; border:1px solid {{.ButtonBg}};">…</a>
+</td>
 {{if .SupportEmail}}<a href="mailto:{{.SupportEmail}}">{{.SupportEmail}}</a>{{end}}
-{{if .InstanceURL}}<a href="{{.InstanceURL}}">{{.InstanceURL}}</a>{{end}}
 ```
 
-### Step 3: Create Plaintext Version (Optional)
+### 3. Plaintext twin
 
 ```bash
-touch server/internal/queue/templates/{name}.txt
+# recommended — all current templates ship .txt
+# path: server/internal/queue/templates/{name}.txt
 ```
 
-If missing, plaintext is auto-generated via `stripHTML()` — readable but ugly. For professional plaintext, write a `.txt` version.
+If `.txt` missing: parse skip is OK; `renderPlaintextBody` falls back to a stripped/fallback dump (prefer real `.txt`).
 
-### Step 4: Register in Go Code
+### 4. Register in Go
 
-In `handler_email.go` `NewSendEmailHandler()`, add the template name to the list:
+`handler_email.go` → `NewSendEmailHandler` name list:
 
 ```go
-for _, name := range []string{"welcome", "room_invite", "password_reset",
-    "password_changed", "verify_email", "generic", "your_new_name"} {
+for _, name := range []string{
+    "welcome", "room_invite", "password_reset",
+    "password_changed", "verify_email", "generic",
+    "your_new_name",
+} {
 ```
 
-### Step 5: Add Config Defaults (Optional)
+### 5. Config / admin (optional)
 
-If the template needs its own subject line or preheader default, add entries to:
+Add `subjectLines` / `preheaderText` keys under `email.templates`. For admin UI overrides, extend `SystemSettings` + `settings_repository` mapping (same pattern as verify/welcome/reset/changed/invite).
 
-```yaml
-# config.yaml
-email:
-  templates:
-    subjectLines:
-      your_new_name: "Subject line for new template"
-    preheaderText:
-      your_new_name: "Preview text for inbox"
+### 6. Enqueue from a handler
+
+```go
+queue.Enqueue(ctx, database.GetDB(), "send_email", queue.SendEmailPayload{
+    To:           user.Email,
+    Subject:      "Fallback subject if config/DB unset",
+    TemplateName: "your_new_name",
+    TemplateData: map[string]any{"Name": user.Name, "ActionURL": url},
+})
 ```
 
-And to the SystemSettings model if admin overrides are desired.
-
-### Step 6: Verify Build
+### 7. Verify
 
 ```bash
-cd server && go build ./...        # embed.FS must compile
-cd server && go test ./internal/queue/...  # existing tests pass
+cd server && go build ./...
+cd server && go test ./internal/queue/ -count=1
 ```
 
-### Step 7: Test Render
-
-With SMTP disabled in config, the handler logs full HTML body as a warning:
-
-```
-email: SMTP not configured, skipping send — body logged
-```
-
-Watch for `{{.VarName}}` left unrendered (shows as `<no value>` or empty) and template syntax errors (logged as warning at startup).
+Parse failures log: `email: failed to parse HTML template, will fall back to plain text`.
 
 ---
 
 ## Testing & Debugging
 
-### Offline (No SMTP)
+### Offline (no SMTP)
 
-Set `email.smtpHost: ""` (default). Handler logs full HTML body as structured field `"body"`. Pipe to a file:
+Empty `email.smtpHost` → handler warns and logs full HTML under field `"body"`:
 
-```bash
-go run . 2>&1 | grep '"body":' | head -1 | sed 's/.*"body":"//' | sed 's/".*//' > test.html
-open test.html  # preview in browser
+```text
+email: SMTP not configured, skipping send — body logged
 ```
 
-### Template Syntax Errors
+### Tests
 
-At startup in `NewSendEmailHandler`, if `template.ParseFS` fails:
+`handler_email_test.go` covers: parse/render all HTML + TXT, branding inject, unknown → generic, welcome without LoginURL, verify URL fallback block, password_changed UserAgent optional, stripHTML, BuildMessage.
 
-```
-email: failed to parse HTML template, will fall back to plain text
-```
+### Syntax pitfalls
 
-Fix the template syntax and rebuild. Common causes:
-- Unclosed `{{range}}` / `{{if}}` / `{{with}}`
-- Mismatched `{{end}}`
-- Go template keyword inside HTML comment (comments aren't stripped before parse)
-- `.` (dot) context changing inside `{{range}}` — use `{{$.VarName}}` to access root scope
-
-### Auto-Generated Plaintext
-
-If no `.txt` file exists, `stripHTML()` removes all tags. Verify it's readable:
-
-```go
-// Readable? If not, add a .txt file
-fmt.Println(renderPlaintextBody(h.plainTmpls, payload))
-```
-
-### Email Client Testing
-
-- **Browser**: Open rendered HTML in Chrome/Safari — closest to webmail (Gmail, Yahoo, Outlook.com)
-- **Litmus / Email on Acid**: Paid services, test across 100+ clients
-- **Manual**: Send to real addresses via SMTP-enabled config → check Gmail, Outlook, Apple Mail
+- Unclosed `{{if}}` / `{{range}}` / `{{with}}`
+- Go actions inside `<!--[if mso]>` comments can break parsing when dynamic
+- Inside `{{range}}`, root scope is `{{$.Var}}`
+- Unknown template name → silent **generic** (or `renderFallback` pre dump) — no hard error
 
 ---
 
 ## Common Pitfalls
 
-### Go Templates Inside MSO Comments
+### Go actions inside MSO comments
 
-**Wrong** — `{{.Var}}` inside MSO conditional comment breaks the Go template parser:
+Avoid dynamic widths in MSO conditionals; use fixed MSO sizes and Go vars in normal HTML/CSS.
 
-```html
-<!--[if mso]>
-<td width="{{.Width}}">  <!-- PARSER ERROR -->
-<![endif]-->
-```
+### `html/template` escaping
 
-**Right** — use MSO for fixed sizing, inline CSS for Go vars:
-
-```html
-<!--[if mso]>
-<td width="680">
-<![endif]-->
-<div style="max-width: {{.MaxWidth}}px;">
-```
-
-### `html/template` Auto-Escaping
-
-Safe: `{{.URL}}` in `<a href="...">` — Go escapes `&`, `"`, etc. correctly.
-Safe: `{{.Color}}` in `style="background: ..."` — Go handles CSS context.
-**Not safe** for raw HTML: `{{.HTMLContent}}` in body — will escape `<`, `>`. Use `template.HTML` type if raw HTML needed (rare for email — keep it clean).
+Safe in `href` and `style` color contexts. Raw HTML in body escapes tags — use `template.HTML` only if intentional.
 
 ### Outlook + max-width
 
-Outlook ignores `max-width`. The MSO wrapper table handles this:
+Keep MSO 680 wrapper around `.email-container`.
 
-```html
-<div style="max-width: 680px; margin: 0 auto;">
-    <!--[if mso]>
-    <table align="center" role="presentation" width="680"><tr><td>
-    <![endif]-->
-    <!-- email content -->
-    <!--[if mso]>
-    </td></tr></table>
-    <![endif]-->
-</div>
-```
+### Outlook + dark mode images
 
-Always keep the MSO wrapper for any fixed-width container.
+Light image wins; accept dual-render risk.
 
-### Outlook + Dark Mode Images
+### Unknown template → generic
 
-Outlook renders all images — both `.display-only-in-light-mode` and `.display-only-in-dark-mode`. The `[if !mso]` guard prevents the dark mode image from appearing in Outlook HTML, but dark mode CSS classes are ignored, so the light image always shows. Accept this behavior.
+Always add name to parse list **and** ship `templates/{name}.html`.
 
-### Template Not Found → Silent Fallback
+### `embed.FS` path
 
-If template name not registered, `renderEmailBody()` falls back to `generic` template. No error is returned. Always:
+Only files under `server/internal/queue/templates/` matching `*.html` / `*.txt` embed. Wrong dir = missing at runtime.
 
-1. Add name to the list in `NewSendEmailHandler`
-2. Verify with `go build ./...`
-3. Check logs for "failed to parse" warnings
+### Generic range filter
 
-### `embed.FS` Path Restriction
+`generic.html` skips branding keys when ranging the map:
 
-Templates must be in `templates/` subdirectory of the queue package. Files outside `server/internal/queue/templates/` won't be embedded. The `//go:embed` directive uses `templates/*.html` — add files only to that directory.
+`Preheader`, `InstanceName`, `SupportEmail`, `InstanceURL`, `HeaderBg`, `ButtonBg`.
 
-### Range Over Map (Generic Template Pattern)
+### VML background images (baseline)
 
-When iterating `{{range $k, $v := .}}`, remember Go template dot changes scope. Access root with `{{$.InstanceName}}`. The generic template filters out branding keys to avoid rendering them as data rows.
+Update both CSS `background-image` and MSO `v:image` `src` together.
 
-### Background Image in Outlook
+### Inline vs class
 
-Cerberus uses VML for bulletproof background images:
+Inline wins unless dark CSS uses `!important`. For colors that must not invert, force them again inside the dark media query.
 
-```html
-<!--[if gte mso 9]>
-<v:image xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false"
-    style="width: 680px; height: 180px;"
-    src="https://example.com/bg.jpg" />
-<v:rect fill="true" stroke="false" style="position: absolute; width: 680px; height: 180px;">
-    <v:fill opacity="0%" color="#222222" />
-<![endif]-->
-```
+---
 
-When customizing, update both the CSS `background-image` URL and the VML `v:image src`. Mismatched paths = broken background in Outlook.
+## SMTP notes (handler)
 
-### Inline Style vs Class Precedence
+| Config | Meaning |
+|--------|---------|
+| `smtpHost` / `smtpPort` | Required to send |
+| `username` / `password` | Optional PLAIN auth |
+| `fromAddress` | Default `noreply@bedrud` if empty |
+| `fromName` | Default `Bedrud` |
+| `tlsSkipVerify` | Skip cert verify |
+| `smtpsMode` | Direct TLS (e.g. 465) |
+| Send timeout | 30s |
 
-In email, inline styles win over `<style>` block classes. Dark mode `!important` overrides inline. For elements that should NOT change in dark mode (e.g., a badge that stays red), apply a class and use `color: #ff0000 !important` in the dark mode block explicitly for that class.
+See also skill `bedrud-jobs` for queue wiring; this skill is template + email handler focused.

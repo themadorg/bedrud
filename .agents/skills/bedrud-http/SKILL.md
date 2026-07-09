@@ -8,252 +8,356 @@ license: Apache License
 
 Go module `bedrud`. `cmd/` + `internal/server/` + `internal/handlers/` + `internal/lkutil/`.
 
+**Path convention:** All API routes live under Fiber group `/api` (Swagger `@BasePath /api`). Tables below use paths relative to `/api` unless noted. Static/upload paths are absolute.
+
+**Critical plural split:** room lifecycle uses singular `/room/...`; recording uses plural `/rooms/:id/...`.
+
 ---
 
 ## Entrypoints
 
 ### `cmd/bedrud/main.go` — Production CLI
 
-| Arg | Calls | Purpose |
-|-----|-------|---------|
-| `run` / `server` / `--run` | `server.Run(configPath)` | Start full app |
-| `--livekit` | `livekit.RunLiveKit(configPath)` | Run LK binary standalone |
-| `install` | `install.DebianInstall(...)` | Systemd install on Debian |
-| `uninstall` | `install.DebianUninstall()` | Remove install |
-| `user promote --email <email>` | `usercli.PromoteUser()` | Add superadmin access |
-| `user demote --email <email>` | `usercli.DemoteUser()` | Remove superadmin access |
-| `user create --email <e> --password <p> --name <n>` | `usercli.CreateUser()` | Create local user |
-| `user delete --email <email>` | `usercli.DeleteUser()` | Delete user |
+Thin wrapper: `cli.Execute(version)` (Cobra under `internal/cli/`). Legacy flags (`--run`, `--livekit`, `--version`) still work via `dispatchLegacy`.
+
+| Command | Calls | Purpose |
+|---------|-------|---------|
+| `run` / `server` | `server.Run(configPath, version)` | Start full app (API + optional embedded LK + SPA) |
+| `livekit` / `--livekit` | `livekit.RunLiveKit(configPath)` | Run LK binary standalone |
+| `install` | `install.LinuxInstall(...)` | Systemd install (Debian/Linux) |
+| `uninstall` | `install.DebianUninstall()` / Linux uninstall | Remove install |
+| `user create/delete/promote/demote/list/info/password/...` | `usercli.*` | Local user management |
+| `room list/info/close/suspend/reactivate/kick` | room CLI helpers | Room ops without HTTP |
+| `config path/show/get/set/validate` | config CLI | Config inspection |
+| `settings`, `invite-token`, `cert`, `db migrate/status` | respective CLIs | Ops tooling |
+| `version` | print version | Version string |
+
+Config path: `--config`, `BEDRUD_CONFIG`, or `CONFIG_PATH`.
 
 ### `cmd/server/main.go` — Dev API server
 
-Air hot-reload target. No CLI subcommands. Inits all subsystems, registers routes, serves Swagger/Scalar + SPA.
-Health: `GET /api/health`. Ready: `GET /api/ready`.
+Air hot-reload target. No Cobra. Inits subsystems, registers routes, serves Swagger/Scalar + SPA.
+
+- Swagger: `GET /api/swagger/*`
+- Scalar: `GET /api/scalar`
+- Health: `GET /api/health` · Ready: `GET /api/ready`
+- Docs disable: `DISABLE_API_DOCS`
+
+Minor route drift vs prod `server.Run` (e.g. `cmd/server` still registers `GET /admin/stats` → `GetAdminStats`; prod bootstrap does not). Prefer `internal/server/server.go` as production source of truth.
 
 ### `ui.go` — Frontend embed
 
-`//go:embed all:frontend` → `UI embed.FS`. Populated by `make build` copying `apps/web/build/*` → `server/frontend/`.
+`//go:embed all:frontend` → `UI embed.FS`. Populated by `make build` (`apps/web/build/*` → `server/frontend/`).
 
 ---
 
 ## `internal/server/server.go` — Bootstrap
 
-`Run(configPath) error` — production bootstrap sequence:
+`Run(configPath, version string) error` — production sequence:
 
-1. Load config
-2. Init LiveKit (internal or external)
+1. Load config + validate JWT/session secrets
+2. Start embedded LiveKit when internal (or log external host)
 3. Init session store
-4. Init DB (`database.Initialize`)
-5. Run migrations
-6. Init scheduler (`scheduler.Initialize(db)`)
-7. Init auth providers
-8. Init all repos
-9. Init cleanup service
-10. Init queue worker
-11. Init authService, challengeStore, authHandler
-12. Init roomHandler
-13. Register Fiber routes
-14. Setup TLS (self-signed / ACME / manual)
-15. Serve embedded SPA frontend
+4. Init DB + migrations
+5. Init repos (`room`, `user`, `recording`, …)
+6. Init scheduler (`recordingRepo` passed; recording store cleanup optional)
+7. Auth providers (`auth.Init`) + load banned users
+8. Fiber app: recover, helmet, CORS (credentials forbid `*`)
+9. LK reverse-proxy at `/livekit` (internal only)
+10. Build upload tracker, LK client, cleanup service
+11. Start queue worker (`user_delete`, `room_delete`, `room_suspend`, `chat_upload_s3`, `send_email`, `dispatch_webhook`; recording job types wired when recording store enabled)
+12. Init handlers (auth, room, users, admin, cert, overview, queue, livekit webhook, recording)
+13. Register `/api` routes + static uploads
+14. Embed SPA (`index.html` for `/`, `shell.html` elsewhere)
+15. TLS: ACME / manual certs / plain HTTP; optional HTTP on `httpPort`
 16. Graceful shutdown on SIGINT/SIGTERM
 
-LK reverse-proxy at `/livekit`. CORS: dynamic origin reflection. SPA fallback: `index.html` for `/`, `shell.html` for non-API routes.
+Health redirects: `/health` → `/api/health`, `/ready` → `/api/ready`. Ready pings DB (503 if down).
 
 ---
 
 ## `internal/handlers/` — HTTP Route Handlers
 
-### `auth.go` — OAuth flows (goth)
+### `auth.go` — OAuth (goth)
 
-`responseWriter` struct: adapter bridging Fiber `Ctx` → `http.ResponseWriter` for goth.
-
-| Fn | Method | Route | Purpose |
-|----|--------|-------|---------|
-| `BeginAuthHandler` | GET | `/auth/{provider}/login` | Start OAuth → redirect to provider |
-| `CallbackHandler` | GET | `/auth/{provider}/callback` | Complete OAuth → upsert user → set JWT cookie → redirect to `/auth/callback?token=...` |
-
-### `auth_handler.go` — Local auth + passkeys
-
-`AuthHandler` struct: `authService`, `config`, `settingsRepo`, `inviteTokenRepo`.
+`responseWriter`: Fiber `Ctx` → `http.ResponseWriter` adapter for gothic.
 
 | Fn | Method | Route | Purpose |
 |----|--------|-------|---------|
-| `Register` | POST | `/auth/register` | Email/pass signup |
-| `Login` | POST | `/auth/login` | Email/pass login |
-| `GuestLogin` | POST | `/auth/guest` | Name-only guest |
-| `RefreshToken` | POST | `/auth/refresh` | Rotate token pair |
-| `GetMe` | GET | `/auth/me` | Return current user |
-| `UpdateProfile` | PUT | `/auth/profile` | Update display name |
-| `ChangePassword` | PUT | `/auth/password` | Validate old, set new |
-| `Logout` | POST | `/auth/logout` | Block refresh token, clear cookies |
-| `PasskeyRegisterBegin` | POST | `/auth/passkey/register/begin` | WebAuthn reg start |
-| `PasskeyRegisterFinish` | POST | `/auth/passkey/register/finish` | WebAuthn reg complete |
-| `PasskeyLoginBegin` | POST | `/auth/passkey/login/begin` | WebAuthn login start |
-| `PasskeyLoginFinish` | POST | `/auth/passkey/login/finish` | WebAuthn login complete |
-| `PasskeySignupBegin` | POST | `/auth/passkey/signup/begin` | Full passkey signup start |
-| `PasskeySignupFinish` | POST | `/auth/passkey/signup/finish` | Full passkey signup complete |
-| `VerifyEmail` | GET | `/auth/verify` | Verify email via token from link |
-| `CheckVerificationStatus` | GET | `/auth/verify/status` | Check email verified |
-| `ResendVerification` | POST | `/auth/verify/resend` | Resend verification email |
+| `BeginAuthHandler` | GET | `/auth/:provider/login` | Start OAuth |
+| `CallbackHandler` | GET | `/auth/:provider/callback` | Complete OAuth → JWT cookies → redirect |
 
-Helpers: `setAuthCookies` (HttpOnly, secure/sameSite/domain from config), `clearAuthCookies`, `getSession`, `getRPID`/`getOrigin`.
-Constructor: `NewAuthHandler(authService, cfg, settingsRepo, inviteTokenRepo, challengeStore, emailCooldown, verifEventRepo)` — 7 deps.
+### `auth_handler.go` — Local auth + passkeys + profile
 
-### `room.go` — Room lifecycle + participant moderation
+`AuthHandler`: `authService`, `config`, `settingsRepo`, `inviteTokenRepo`, `challengeStore`, `emailCooldown`, `verifEventRepo`.
 
-`RoomHandler` struct: `roomRepo`, `userRepo`, `livekitHost`, `apiKey`, `apiSecret`, `livekit.RoomService` client, `uploadTracker`, `cleanupSvc`, `settingsRepo`, `uploadStore`, `uploadMax`, `uploadBackend`, `inlineMaxBytes`, `deletionInFlight sync.Map`.
+`NewAuthHandler(authService, cfg, settingsRepo, inviteTokenRepo, challengeStore, emailCooldown, verifEventRepo)`.
+
+| Fn | Method | Route | Auth / notes | Purpose |
+|----|--------|-------|--------------|---------|
+| `Register` | POST | `/auth/register` | Rate limit | Email/pass signup |
+| `Login` | POST | `/auth/login` | Rate limit | Email/pass login |
+| `GuestLogin` | POST | `/auth/guest-login` | Rate limit | Name-only guest |
+| `RefreshToken` | POST | `/auth/refresh` | Rate limit | Rotate token pair |
+| `Logout` | POST | `/auth/logout` | Protected | Block refresh, clear cookies |
+| `GetMe` | GET | `/auth/me` | Protected + email verified | Current user |
+| `UpdateProfile` | PUT | `/auth/me` | Protected + email verified | Display name / profile fields |
+| `UploadAvatar` | POST | `/auth/me/avatar` | Protected + email verified | Multipart avatar |
+| `DeleteAvatar` | DELETE | `/auth/me/avatar` | Protected + email verified | Remove avatar |
+| `ChangePassword` | PUT | `/auth/password` | Protected + email verified | Old → new password |
+| `VerifyEmail` | POST | `/auth/verify` | Public, body `{token}` | Verify email |
+| `CheckVerificationStatus` | GET | `/auth/verify/status` | Protected | Verification status |
+| `ResendVerification` | POST | `/auth/verify/resend` | Resend rate limit | Resend verification email |
+| `ForgotPassword` | POST | `/auth/forgot-password` | Rate limit | Start reset |
+| `ResetPassword` | POST | `/auth/reset-password` | Rate limit | Complete reset |
+| `PasskeyRegisterBegin` | POST | `/auth/passkey/register/begin` | Protected + verified | WebAuthn reg start |
+| `PasskeyRegisterFinish` | POST | `/auth/passkey/register/finish` | Protected + verified | WebAuthn reg complete |
+| `PasskeyLoginBegin` | POST | `/auth/passkey/login/begin` | Rate limit | WebAuthn login start |
+| `PasskeyLoginFinish` | POST | `/auth/passkey/login/finish` | Rate limit | WebAuthn login complete |
+| `PasskeySignupBegin` | POST | `/auth/passkey/signup/begin` | Rate limit | Passkey signup start |
+| `PasskeySignupFinish` | POST | `/auth/passkey/signup/finish` | Rate limit | Passkey signup complete |
+
+Helpers: `setAuthCookies` / `clearAuthCookies`, `getSession`, `getRPID` / `getOrigin`.
+
+### `room.go` — Room lifecycle + moderation
+
+`RoomHandler`: `roomRepo`, `userRepo`, `recordingRepo`, `webhookRepo`, `livekitHost`, `apiKey`, `apiSecret`, LK `RoomService` client, `uploadStore`, `uploadMax`, `uploadTracker`, `cleanupSvc`, `settingsRepo`, `deletionInFlight`, `uploadBackend`, `inlineMaxBytes`.
+
+`NewRoomHandler(client, lkCfg, chatCfg, roomRepo, userRepo, recordingRepo, settingsRepo, webhookRepo, uploadTracker, cleanupSvc)`.
+
+**Room paths are singular `/room/...` (not `/rooms`).**
 
 | Fn | Method | Route | Purpose |
 |----|--------|-------|---------|
-| `CreateRoom` | POST | `/rooms` | Create in LK + DB |
-| `JoinRoom` | POST | `/rooms/join` | Lookup room, add participant, gen LK token |
-| `GuestJoinRoom` | POST | `/rooms/guest-join` | Unauth guest for public rooms |
-| `ListRooms` | GET | `/rooms` | User's created rooms |
-| `DeleteRoom` | DELETE | `/rooms/:roomId` | 202. Enqueues `room_delete` job |
-| `UpdateSettings` | PATCH | `/rooms/:roomId/settings` | Partial update |
-| `PromoteParticipant` | POST | `/rooms/:roomId/participants/:identity/promote` | Add moderator |
-| `DemoteParticipant` | POST | `/rooms/:roomId/participants/:identity/demote` | Remove moderator |
-| `KickParticipant` | DELETE | `/rooms/:roomId/participants/:identity` | Remove from LK + broadcast |
-| `BanParticipant` | DELETE | `/rooms/:roomId/participants/:identity/ban` | Remove from LK + DB banned |
-| `MuteParticipant` | POST | `/rooms/:roomId/participants/:identity/mute` | Mute all audio tracks |
-| `DisableParticipantVideo` | POST | `/rooms/:roomId/participants/:identity/disable-video` | Mute camera track |
-| `StopScreenShare` | POST | `/rooms/:roomId/participants/:identity/stop-screen-share` | Mute screen-share |
-| `BlockChat` | POST | `/rooms/:roomId/participants/:identity/block-chat` | Set chatBlocked |
-| `DeafenParticipant` | POST | `/rooms/:roomId/participants/:identity/deafen` | Send "deafen" data msg |
-| `UndeafenParticipant` | POST | `/rooms/:roomId/participants/:identity/undeafen` | Send "undeafen" data msg |
-| `AskParticipantAction` | POST | `/rooms/:roomId/participants/:identity/ask/:action` | ask_unmute / ask_camera |
-| `SpotlightParticipant` | POST | `/rooms/:roomId/participants/:identity/spotlight` | Broadcast spotlight |
-| `GetParticipantInfo` | GET | `/rooms/:roomId/participants/:identity` | Identity, name, state, tracks |
-| `UploadChatImage` | POST | `/rooms/:roomId/chat/upload` | Multipart upload |
+| `CreateRoom` | POST | `/room/create` | Create in LK + DB |
+| `JoinRoom` | POST | `/room/join` | Add participant + LK token |
+| `GuestJoinRoom` | POST | `/room/guest-join` | Unauth guest (public rooms) |
+| `RefreshLiveKitToken` | POST | `/room/refresh-token` | Refresh LK JWT |
+| `ListRooms` | GET | `/room/list` | User's rooms |
+| `ListArchivedRooms` | GET | `/room/archived` | Archived rooms + recording counts |
+| `KickParticipant` | POST | `/room/:roomId/kick/:identity` | Remove from LK + broadcast |
+| `MuteParticipant` | POST | `/room/:roomId/mute/:identity` | Mute audio tracks |
+| `BanParticipant` | POST | `/room/:roomId/ban/:identity` | Ban + remove |
+| `DisableParticipantVideo` | POST | `/room/:roomId/video/:identity/off` | Mute camera |
+| `PromoteParticipant` | POST | `/room/:roomId/promote/:identity` | Grant moderator |
+| `DemoteParticipant` | POST | `/room/:roomId/demote/:identity` | Revoke moderator |
+| `BlockChat` | POST | `/room/:roomId/chat/:identity/block` | Set chatBlocked |
+| `DeafenParticipant` | POST | `/room/:roomId/deafen/:identity` | Targeted deafen msg |
+| `UndeafenParticipant` | POST | `/room/:roomId/undeafen/:identity` | Targeted undeafen msg |
+| `AskParticipantAction` | POST | `/room/:roomId/ask/:identity/:action` | `ask_unmute` / `ask_camera` |
+| `SpotlightParticipant` | POST | `/room/:roomId/spotlight/:identity` | Broadcast spotlight |
+| `StopScreenShare` | POST | `/room/:roomId/screenshare/:identity/stop` | Mute screen share |
+| `GetRoomPresence` | GET | `/room/:roomId/presence` | Public-ish presence (API rate limit) |
+| `GetParticipantInfo` | GET | `/room/:roomId/participant/:identity/info` | LK participant + tracks |
+| `GetParticipantProfile` | GET | `/room/:roomId/participant/:identity/profile` | Profile for participant |
+| `BringToStage` | POST | `/room/:roomId/stage/:identity/bring` | **501 stub** |
+| `RemoveFromStage` | POST | `/room/:roomId/stage/:identity/remove` | **501 stub** |
+| `UpdateSettings` | PUT | `/room/:roomId/settings` | Partial room settings |
+| `DeleteRoom` | DELETE | `/room/:roomId` | 202 · enqueue `room_delete` |
+| `UploadChatImage` | POST | `/room/:roomId/chat/upload` | Multipart chat image |
+
+**Admin room ops** (under `/admin`, superadmin):
+
+| Fn | Method | Route | Purpose |
+|----|--------|-------|---------|
 | `AdminListRooms` | GET | `/admin/rooms` | All rooms |
-| `AdminCloseRoom` | DELETE | `/admin/rooms/:roomId` | 202. Enqueues `room_delete` |
-| `AdminSuspendRoom` | POST | `/admin/rooms/:roomId/suspend` | 202. Enqueues `room_suspend` |
-| `AdminUpdateRoom` | PATCH | `/admin/rooms/:roomId` | Update maxParticipants + settings |
+| `ListRoomEvents` | GET | `/admin/rooms/events` | Paginated events |
+| `AdminGenerateToken` | POST | `/admin/rooms/:roomId/token` | **501 stub** |
+| `AdminCloseRoom` | DELETE | `/admin/rooms/:roomId` | 202 · `room_delete` |
+| `AdminSuspendRoom` | POST | `/admin/rooms/:roomId/suspend` | 202 · `room_suspend` |
+| `AdminReactivateRoom` | POST | `/admin/rooms/:roomId/reactivate` | Reactivate suspended room |
+| `AdminUpdateRoom` | PUT | `/admin/rooms/:roomId` | maxParticipants + settings |
 | `AdminGetRoomParticipants` | GET | `/admin/rooms/:roomId/participants` | Live participants |
-| `AdminKickParticipant` | DELETE | `/admin/rooms/:roomId/participants/:identity` | Kick (no creator check) |
+| `AdminKickParticipant` | POST | `/admin/rooms/:roomId/participants/:identity/kick` | Kick (no creator check) |
 | `AdminMuteParticipant` | POST | `/admin/rooms/:roomId/participants/:identity/mute` | Mute audio |
-| `AdminLiveKitStats` | GET | `/admin/livekit/stats` | Aggregate |
-| `BulkSuspendRooms` | POST | `/admin/rooms/bulk/suspend` | Enqueue per-room suspend |
-| `BulkCloseRooms` | POST | `/admin/rooms/bulk/close` | Enqueue per-room delete |
-| `GetAdminStats` | GET | `/admin/stats` | Aggregate KPIs |
-| `ListRoomEvents` | GET | `/admin/rooms/events` | Paginated room events |
-| `AdminGenerateToken` | POST | `/admin/rooms/:roomId/token` | 501 stub |
+| `BulkSuspendRooms` | POST | `/admin/rooms/bulk/suspend` | Bulk suspend |
+| `BulkCloseRooms` | POST | `/admin/rooms/bulk/close` | Bulk close |
 | `GetOnlineCount` | GET | `/admin/online-count` | Active participant count |
-| `BringToStage` | POST | `/rooms/:roomId/participants/:identity/bring-to-stage` | Stub |
-| `RemoveFromStage` | POST | `/rooms/:roomId/participants/:identity/remove-from-stage` | Stub |
+| `AdminLiveKitStats` | GET | `/admin/livekit/stats` | Aggregate LK stats |
+| `GetAdminStats` | GET | `/admin/stats` | KPI stats (wired in `cmd/server`; not in prod `server.go`) |
+
+### `recording_handler.go` — Recording (SHIPPED)
+
+HTTP-only: auth, room lookup, moderator / view ACL. Business logic → `services.RecordingService`.
+
+`RecordingHandler`: `roomRepo`, `recordingService`, `recordingRepo`, `recordingStore`.
+
+`NewRecordingHandler(roomRepo, recordingService, recordingRepo, recStore)`.
+
+DTO: `RecordingDTO` (`id`, `recordingType`, `durationMs`, `fileSize`, `fileUrl`, `status`, `error`, `downloadStatus`, `roomId`, `roomName`, `createdBy`, `createdAt`).
+
+**Recording paths use plural `/rooms/:id/...`.**
+
+| Fn | Method | Route | Auth stack | Purpose |
+|----|--------|-------|------------|---------|
+| `StartRecording` | POST | `/rooms/:id/recording/start` | Protected + verified + **RecordingsEnabled** (+ API rate limit) | Start composite egress · 201 |
+| `StopRecording` | POST | `/rooms/:id/recording/stop` | Protected + verified + **RecordingsEnabled** | Stop active recording |
+| `ListRecordings` | GET | `/rooms/:id/recordings` | Protected + verified + **RecordingsEnabled** | Paginated list (participants / owner / superadmin) |
+| `GetRecording` | GET | `/rooms/:id/recordings/:rid` | Protected + verified + **RecordingsEnabled** | Single recording |
+| `WaitRecordingReady` | GET | `/rooms/:id/recordings/:rid/wait` | Protected + verified + **RecordingsEnabled** | Long-poll ≤15s until egress started/failed |
+| `ClearRoomRecordings` | DELETE | `/rooms/:id/recordings` | Protected + verified | Clear all for room (creator/superadmin) |
+| `ClearSingleRecording` | DELETE | `/rooms/:id/recordings/:recordingId` | Protected + verified | Clear one recording |
+| `AdminListRecordings` | GET | `/admin/recordings` | Superadmin group | Global list + filters |
+| `BulkDeleteRecordings` | POST | `/admin/recordings/bulk/delete` | Superadmin group | 202 · enqueue `recording_delete` (max 500) |
+
+Helpers: `canViewRoomRecordings`, `validateUUID`, `getRoomAdminID`, `recordingToDTO` / `computeDownloadStatus`.
+
+**Bootstrap wiring:** handlers + middleware + swagger are complete. Production `server.Run` / `cmd/server` still have recording store, egress client, handler construct, and route lines present as commented templates next to the live room routes — wire them the same way as integration tests (`handlers_integration_test.go`).
+
+### `middleware/recordings_enabled.go` — `RecordingsEnabled`
+
+`RecordingsEnabled(settingsRepo) fiber.Handler`:
+
+1. Load system settings
+2. If `!settings.RecordingsEnabled` → **403** `"Recordings are disabled on this server"`
+3. Else `c.Next()`
+
+First gate; service layer re-checks (room `RecordingsAllowed`, limits). Apply on room-scoped recording start/stop/list/get/wait. Admin recording routes rely on superadmin group (and service rules).
 
 ### `users.go` — Admin user management
 
-`UsersHandler` struct: `userRepo`, `roomRepo`, `passkeyRepo`, `prefsRepo`, `cleanupSvc`, `verifEventRepo`.
+`UsersHandler`: `userRepo`, `roomRepo`, `passkeyRepo`, `prefsRepo`, `cleanupSvc`, `verifEventRepo`, `deletionInFlight`.
 
 | Fn | Method | Route | Purpose |
 |----|--------|-------|---------|
-| `ListUsers` | GET | `/admin/users` | All users with computed IsAdmin |
-| `ListRecentSignups` | GET | `/admin/users/recent` | Recent signups with filters |
-| `UpdateUserAccesses` | PUT | `/admin/users/:id/accesses` | Replace entire Accesses |
-| `UpdateUserStatus` | PUT | `/admin/users/:id/status` | Set IsActive |
-| `SetUserPassword` | PUT | `/admin/users/:id/password` | Admin-set password |
-| `ForceLogout` | POST | `/admin/users/:id/force-logout` | Revoke all sessions |
-| `AdminVerifyEmail` | POST | `/admin/users/:id/verify` | Force-verify email |
-| `AdminResendVerification` | POST | `/admin/users/:id/verify/resend` | Resend on behalf |
-| `GetUserDetail` | GET | `/admin/users/:id` | User details + rooms |
-| `DeleteUser` | DELETE | `/admin/users/:id` | 202 async 3-phase |
+| `ListUsers` | GET | `/admin/users` | All users + IsAdmin |
+| `ListRecentSignups` | GET | `/admin/users/recent` | Recent signups + filters |
 | `BulkBanUsers` | POST | `/admin/users/bulk/ban` | Bulk deactivate |
 | `BulkPromoteUsers` | POST | `/admin/users/bulk/promote` | Bulk add admin |
-| `BulkDeleteUsers` | POST | `/admin/users/bulk/delete` | 202 enqueue per-user |
+| `BulkDeleteUsers` | POST | `/admin/users/bulk/delete` | 202 · per-user `user_delete` |
+| `UpdateUserStatus` | PUT | `/admin/users/:id/status` | Set IsActive |
+| `UpdateUserAccesses` | PUT | `/admin/users/:id/accesses` | Replace Accesses |
+| `ForceLogout` | POST | `/admin/users/:id/force-logout` | Revoke sessions |
+| `SetUserPassword` | PUT | `/admin/users/:id/password` | Admin-set password |
+| `GetUserDetail` | GET | `/admin/users/:id` | Detail + rooms |
+| `ListUserSessions` | GET | `/admin/users/:id/sessions` | Session list |
+| `AdminVerifyEmail` | POST | `/admin/users/:id/verify` | Force-verify |
+| `AdminResendVerification` | POST | `/admin/users/:id/verify/resend` | Resend on behalf |
+| `DeleteUser` | DELETE | `/admin/users/:id` | 202 · async `user_delete` |
 
-### `admin_handler.go` — System settings + invite tokens
+### `admin_handler.go` — Settings, invites, webhooks
 
-`AdminHandler` struct: `settingsRepo`, `inviteTokenRepo`.
+`AdminHandler`: `settingsRepo`, `inviteTokenRepo`, `webhookRepo`, `recordingRepo`.
 
 | Fn | Method | Route | Purpose |
 |----|--------|-------|---------|
-| `GetSettings` | GET | `/admin/settings` | Full system settings |
-| `GetPublicSettings` | GET | `/settings` | Unauth. reg flags only |
-| `UpdateSettings` | PUT | `/admin/settings` | Replace entire settings |
-| `ListInviteTokens` | GET | `/admin/invite-tokens` | All tokens with `used` bool |
-| `CreateInviteToken` | POST | `/admin/invite-tokens` | Crypto-random hex, email-bind |
-| `DeleteInviteToken` | DELETE | `/admin/invite-tokens/:id` | Delete by ID |
-| `ValidateSettingsConnectivity` | POST | `/admin/settings/validate` | Runtime checks |
+| `GetPublicSettings` | GET | `/auth/settings` | Unauth reg/flags (incl. recordingsEnabled) |
+| `GetSettings` | GET | `/admin/settings` | Full settings (secrets masked) |
+| `UpdateSettings` | PUT | `/admin/settings` | Update settings |
+| `SendTestEmail` | POST | `/admin/settings/send-test-email` | SMTP test |
+| `ValidateSettingsConnectivity` | POST | `/admin/settings/validate` | Runtime connectivity checks |
+| `ListInviteTokens` | GET | `/admin/invite-tokens` | Tokens + `used` |
+| `CreateInviteToken` | POST | `/admin/invite-tokens` | Create token |
+| `DeleteInviteToken` | DELETE | `/admin/invite-tokens/:id` | Delete token |
+| `ListWebhooks` | GET | `/admin/webhooks` | Outbound webhooks |
+| `CreateWebhook` | POST | `/admin/webhooks` | Create |
+| `UpdateWebhook` | PUT | `/admin/webhooks/:id` | Update |
+| `DeleteWebhook` | DELETE | `/admin/webhooks/:id` | Delete |
+| `RotateWebhookSecret` | POST | `/admin/webhooks/:id/rotate-secret` | Rotate secret |
+| `TestWebhook` | POST | `/admin/webhooks/:id/test` | Fire test delivery |
 
 ### `preferences_handler.go`
 
-`PreferencesHandler` struct: `prefsRepo`.
+`PreferencesHandler{prefsRepo}`.
 
 | Fn | Method | Route | Purpose |
 |----|--------|-------|---------|
-| `GetPreferences` | GET | `/api/auth/preferences` | User's preferencesJson blob |
-| `UpdatePreferences` | PUT | `/api/auth/preferences` | Validate JSON + ≤4KB, upsert |
+| `GetPreferences` | GET | `/auth/preferences` | User JSON prefs (`"{}"` default) |
+| `UpdatePreferences` | PUT | `/auth/preferences` | Validate JSON ≤4KB, upsert |
 
 ### `admin_overview.go`
 
-`AdminOverviewHandler` struct: `roomRepo`, `userRepo`, `settingsRepo`, `lkCfg`, `livekit.RoomService` client, `db`, `startTime`, `version`.
+`AdminOverviewHandler`: `roomRepo`, `userRepo`, `settingsRepo`, `lkCfg`, LK client, `db`, `startTime`, `version`.
 
 | Fn | Method | Route | Purpose |
 |----|--------|-------|---------|
-| `GetOverview` | GET | `/api/admin/overview` | Aggregated system stats |
+| `GetOverview` | GET | `/admin/overview` | Aggregated system stats / health / KPIs |
+
+### `admin_queue.go`
+
+`AdminQueueHandler{db}`.
+
+| Fn | Method | Route | Purpose |
+|----|--------|-------|---------|
+| `GetQueueStats` | GET | `/admin/queue` | Pending/active/done/failed + email diagnostics |
 
 ### `cert_handler.go`
 
-`CertHandler` struct: `cfg *config.Config`.
+`CertHandler{cfg}`.
 
 | Fn | Method | Route | Purpose |
 |----|--------|-------|---------|
-| `GetCert` | GET | `/api/cert` | Download server TLS cert PEM |
-| `GetCertInfo` | GET | `/api/admin/cert-info` | Certificate metadata |
-
-> **TODO oncoming feature:** Recording functionality is planned for a future release.
-
-### `recording_handler.go`
-
-`RecordingHandler` struct: `roomRepo`, `recordingService`.
-
-| Fn | Method | Route | Purpose |
-|----|--------|-------|---------|
-| `StartRecording` | POST | `/api/rooms/:id/recording/start` | Auth + moderator check → delegate to RecordingService |
-| `StopRecording` | POST | `/api/rooms/:id/recording/stop` | Auth + moderator check → delegate to RecordingService |
-| `ListRecordings` | GET | `/api/rooms/:id/recordings` | Paginated recording list via service |
-| `GetRecording` | GET | `/api/rooms/:id/recordings/:rid` | Single recording via service |
-
-> **TODO oncoming feature:** Recording functionality is planned for a future release.
-
-### `recordings_enabled.go` (middleware)
-
-`RecordingsEnabled(settingsRepo)` → middleware that checks `SystemSettings.RecordingsEnabled`. Returns 403 if disabled. Applied to all 4 recording routes.
+| `GetCert` | GET | `/cert` | Download TLS cert PEM (full path `/api/cert`) |
+| `GetCertInfo` | GET | `/admin/cert-info` | Cert metadata |
 
 ### `livekit_webhook.go`
 
-`LiveKitWebhookHandler` struct: `lkCfg`, `roomRepo`, `db`.
+`LiveKitWebhookHandler`: `lkCfg`, `roomRepo`, `recordingRepo`, `webhookRepo`, `db`.
 
 | Fn | Method | Route | Purpose |
 |----|--------|-------|---------|
-| `Handle` | POST | `/api/livekit/webhook` | Validate LK JWT + SHA256 checksum. Handles `participant_disconnected`, `room_finished`, `egress_ended` |
+| `Handle` | POST | `/livekit/webhook` | LiveKit JWT + checksum; no app JWT |
 
-### `cooldown.go`
+Events: `participant_left`, `room_finished`, `egress_started`, `egress_ended` (recording status / enqueue process).
 
-`CooldownCache` — in-memory, TTL-based, thread-safe. Used for verification email resend gating.
-`NewCooldownCache(ttl)`, `Allow(key)`, `Remaining(key)`.
+### Supporting files
 
-### `errors.go` — Shared error helpers
+| File | Role |
+|------|------|
+| `cooldown.go` | `CooldownCache` — verification resend TTL gate |
+| `errors.go` | `internalError(err)` — log real, return generic 500 JSON |
+| `room_auth.go` | `isRoomModerator(claims, roomOwnerID, roomID, roomRepo)` |
+| `models.go` | `ErrorResponse`, `AuthResponse`, `UserResponse`, `BulkIDsRequest`, `BulkItemResult`, `BulkResult`, password length constants |
 
-`internalError(err)` — logs real error, returns generic `{"error":"An internal error occurred"}`.
+### Non-API static routes (absolute)
 
-### `room_auth.go`
-
-`isRoomModerator(claims, roomOwnerID, roomID, roomRepo)` — true if superadmin, room creator/admin, or room moderator.
-
-### `models.go` — Shared response DTOs
-
-`ErrorResponse{Error string}`, `AuthResponse{User UserResponse, Token string}`, `UserResponse{ID, Email, Name, Provider, AvatarURL}`.
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | `/uploads/chat/*` | Protected + verified | Disk chat images |
+| GET | `/uploads/avatars/*` | Public | Avatar files |
 
 ---
 
-## `internal/lkutil/lkutil.go` — Shared LiveKit Helpers
+## Route map cheat sheet (prod `server.Run`)
 
-Cross-cutting package used by handlers, services, and user CLI.
+```
+/api/health  /api/ready
+/api/auth/*  (register, login, guest-login, refresh, logout, me, password, verify*, forgot/reset, passkey/*, preferences, settings, :provider/*)
+/api/room/*  (singular — create, join, guest-join, list, archived, :roomId/*)
+/api/rooms/:id/recording/*  + /api/rooms/:id/recordings*   (plural — recording SHIPPED)
+/api/admin/* (users, rooms, settings, invite-tokens, webhooks, overview, queue, cert-info, online-count, livekit/stats, recordings*)
+/api/livekit/webhook
+/api/cert
+/uploads/chat/*  /uploads/avatars/*
+/livekit/*  (reverse proxy when internal LK)
+```
+
+Admin group middleware: `Protected` → `RequireEmailVerified` → `RequireAccess(superadmin)`.
+
+---
+
+## `internal/lkutil/lkutil.go` — Shared LiveKit helpers
+
+Used by handlers, services, user CLI.
 
 | Export | Signature | Purpose |
 |--------|-----------|---------|
-| `NewClient(lkCfg)` | `func(*config.LiveKitConfig) livekit.RoomService` | Create LiveKit RoomService protobuf client. Respects `InternalHost`/`Host`, handles `SkipTLSVerify` |
-| `AuthContext(ctx, apiKey, apiSecret, grants...)` | `func(context.Context, string, string, ...*lkauth.VideoGrant) context.Context` | Inject Bearer token into twirp context |
-| `SendSystemMessage(ctx, client, roomName, event, message)` | `func(context.Context, livekit.RoomService, string, string, string)` | Send typed system data message over LiveKit data channel (topic `"system"`, kind `RELIABLE`) |
+| `NewClient(lkCfg)` | `func(*config.LiveKitConfig) livekit.RoomService` | RoomService protobuf client (`InternalHost`/`Host`, `SkipTLSVerify`) |
+| `NewEgressClient(lkCfg)` | `func(*config.LiveKitConfig) (livekit.Egress, error)` | Egress client for recordings |
+| `AuthContext(ctx, apiKey, apiSecret, grants...)` | `func(...) (context.Context, error)` | Inject Bearer JWT into twirp context |
+| `SendSystemMessage(...)` | system data on topic `"system"`, reliable | Broadcast system event |
+| `SendSystemMessageWithDeletedIdentity(...)` | same + `deletedIdentity` | Room/user delete messaging |
+
+`SystemMessage` JSON: `type`, `event`, `message`, optional `deletedIdentity`.
+
+---
+
+## Stubs (HTTP 501 only)
+
+| Fn | Route | Status |
+|----|-------|--------|
+| `BringToStage` | `POST /room/:roomId/stage/:identity/bring` | 501 |
+| `RemoveFromStage` | `POST /room/:roomId/stage/:identity/remove` | 501 |
+| `AdminGenerateToken` | `POST /admin/rooms/:roomId/token` | 501 |
+
+Do **not** treat recording endpoints as stubs — they are implemented.

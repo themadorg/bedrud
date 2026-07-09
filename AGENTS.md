@@ -45,7 +45,7 @@ bedrud/
 ├── packages/
 │   └── api-types/        Shared TS types (@bedrud/api-types)
 ├── tools/cli/            Deployment CLI (pyinfra + Click)
-├── .agents/skills/       Custom agent skills (bedrud-server, bedrud-frontend, bedrud-api, + bundled)
+├── .agents/skills/       Project skills (dispatch + leaves + umbrellas; see Skill Dispatch Guide)
 ```
 
 **Entrypoints:**
@@ -65,7 +65,7 @@ make dev       # LK + hot-reload server + web (concurrent)
 **Commands:**
 | Command | What |
 |---------|------|
-| `make dev-web` | Frontend only (TanStack Start :3000, proxy /api → :8090) |
+| `make dev-web` | Frontend only (Vite :7070; proxy `/api`→:7071, `/livekit`→:7072 direct) |
 | `make dev-server` | Backend + LK (no reload) |
 | `make dev-server-hot` | Backend + Air hot-reload |
 | `make dev-api` | Backend only (no LK) |
@@ -186,8 +186,8 @@ Astro 6 SSG → `site/` (GitHub Pages). Landing, docs, blog. 10-locale i18n.
 
 Swagger in Go handlers. Gen at build.
 
-- Swagger UI: `http://localhost:8090/api/swagger`
-- Scalar UI: `http://localhost:8090/api/scalar`
+- Swagger UI: `http://localhost:7071/api/swagger` (dev API port; prod uses server `httpPort`)
+- Scalar UI: `http://localhost:7071/api/scalar`
 
 Regen: `make swagger-gen` (needs `swag` CLI).
 
@@ -214,15 +214,49 @@ Regen: `make swagger-gen` (needs `swag` CLI).
 
 ## Skill Dispatch Guide
 
-Load skill by task. Injects full ctx.
+Prefer **leaf** skills for focused work. Use umbrellas only for broad exploration. Router: `bedrud-dispatch`.
 
-| Task | Load Skill | Provides |
+### Router + umbrellas
+
+| Task | Load skill | Provides |
 |------|-----------|----------|
-| Go backend (handler, model, repo, auth, middleware, DB, queue, scheduler) | `bedrud-server` | Every pkg → file → fn/struct/route. Full dep graph. |
-| React/UI (component, route, state, hook, store) | `bedrud-frontend` | Every route → path+purpose. Every component → props+exports. Every lib. Component hierarchy. |
-| API endpoints (add/modify/debug) | `bedrud-api` | Complete endpoint table: method, path, auth, handler, req/res shapes. Auth flow. |
+| Unclear / multi-domain | `bedrud-dispatch` | Keyword → leaf skill map |
+| Broad Go backend | `bedrud-server` | Full backend package map |
+| Broad React frontend | `bedrud-frontend` | Full web app map (ports, routes, stores, meeting) |
+| Broad API reference | `bedrud-api` | Endpoint index (auth/rooms/admin/types) |
 
-**Load:** say skill name or describe task. Auto-dispatches.
+### Backend leaves
+
+| Task keywords | Skill |
+|---------------|--------|
+| model, GORM, migration, repo, SQLite/Postgres | `bedrud-data` |
+| JWT, passkey, OAuth, middleware, rate limit | `bedrud-auth` |
+| handlers, routes, Fiber, bootstrap, entrypoints | `bedrud-http` |
+| queue, scheduler, cleanup, storage, SMTP send, recording jobs | `bedrud-jobs` |
+| Cerberus HTML email templates | `bedrud-email-cerberus` |
+| embedded LiveKit binary, TURN/TLS, node IP | `bedrud-realtime` |
+| install, CLI user/room, certs, utils | `bedrud-ops-cli` |
+
+### Frontend leaves
+
+| Task keywords | Skill |
+|---------------|--------|
+| routes, API client, Vite, ports, Excalidraw aliases | `bedrud-fe-platform` |
+| Zustand stores (10), prefs, profile-sync | `bedrud-fe-state` |
+| meeting, chat, whiteboard, YouTube, stage DC, presence, recording UI | `bedrud-fe-meeting` |
+| admin dashboard, tables, settings tabs, recordings stub | `bedrud-fe-admin` |
+| shadcn, theme, design system, settings panels | `bedrud-fe-ui-foundation` |
+
+### API leaves
+
+| Task keywords | Skill |
+|---------------|--------|
+| auth endpoints, verify, avatar, forgot/reset password | `bedrud-api-auth` |
+| room CRUD/join/moderation, recording room API | `bedrud-api-rooms` |
+| admin users/rooms/queue/settings/webhooks | `bedrud-api-admin` |
+| DTOs, Swagger shapes, source file index | `bedrud-api-types` |
+
+**Load:** say skill name or describe task. Auto-dispatches via `bedrud-dispatch`.
 
 ---
 
@@ -250,9 +284,11 @@ Per-app design docs: `apps/web/DESIGN.md`, `apps/desktop/DESIGN.md`, `apps/site/
 - `server/config.local.yaml` — Dev config template
 - `Makefile` — All build/dev cmds
 - `Dockerfile` — Multi-stage prod build
-- `.agents/skills/bedrud-server/SKILL.md` — Full Go backend map
-- `.agents/skills/bedrud-frontend/SKILL.md` — Full React frontend map
-- `.agents/skills/bedrud-api/SKILL.md` — Complete API endpoint ref
+- `.agents/skills/bedrud-dispatch/SKILL.md` — Skill router (keyword → leaf)
+- `.agents/skills/bedrud-server/SKILL.md` — Full Go backend map (umbrella)
+- `.agents/skills/bedrud-frontend/SKILL.md` — Full React frontend map (umbrella)
+- `.agents/skills/bedrud-api/SKILL.md` — Complete API endpoint ref (umbrella)
+- `.agents/skills/bedrud-*/SKILL.md` — Focused leaves (data, auth, http, jobs, fe-*, api-*, …)
 
 ---
 
