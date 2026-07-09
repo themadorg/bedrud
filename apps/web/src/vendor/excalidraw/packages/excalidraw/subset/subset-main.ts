@@ -3,7 +3,10 @@ import { isServerEnv, promiseTry } from "@excalidraw/common";
 import { WorkerInTheMainChunkError, WorkerUrlNotDefinedError } from "../errors";
 import { WorkerPool } from "../workers";
 
-import type { Commands } from "./subset-shared.chunk";
+// Static: subset-worker.chunk already imports this module, so a dynamic import
+// here cannot move it into a separate async chunk (Rolldown INEFFECTIVE_DYNAMIC_IMPORT).
+// Main thread always needs these symbols for the non-worker fallback path.
+import { Commands, subsetToBase64, toBase64 } from "./subset-shared.chunk";
 
 let shouldUseWorkers = typeof Worker !== "undefined";
 
@@ -22,9 +25,6 @@ export const subsetWoff2GlyphsByCodepoints = async (
   arrayBuffer: ArrayBuffer,
   codePoints: Array<number>,
 ): Promise<string> => {
-  const { Commands, subsetToBase64, toBase64 } =
-    await lazyLoadSharedSubsetChunk();
-
   if (!shouldUseWorkers) {
     return subsetToBase64(arrayBuffer, codePoints);
   }
@@ -71,9 +71,8 @@ export const subsetWoff2GlyphsByCodepoints = async (
   });
 };
 
-// lazy-loaded and cached chunks
+// lazy-loaded and cached worker chunk (entry stays async)
 let subsetWorker: Promise<typeof import("./subset-worker.chunk")> | null = null;
-let subsetShared: Promise<typeof import("./subset-shared.chunk")> | null = null;
 
 const lazyLoadWorkerSubsetChunk = async () => {
   if (!subsetWorker) {
@@ -81,15 +80,6 @@ const lazyLoadWorkerSubsetChunk = async () => {
   }
 
   return subsetWorker;
-};
-
-const lazyLoadSharedSubsetChunk = async () => {
-  if (!subsetShared) {
-    // load dynamically to force create a shared chunk reused between main thread and the worker thread
-    subsetShared = import("./subset-shared.chunk");
-  }
-
-  return subsetShared;
 };
 
 // could be extended with multiple commands in the future

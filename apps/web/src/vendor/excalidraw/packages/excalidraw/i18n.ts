@@ -4,9 +4,18 @@ import type { NestedKeyOf } from "@excalidraw/common/utility-types";
 
 import { useAtomValue, editorJotaiStore, atom } from "./editor-jotai";
 import fallbackLangData from "./locales/en.json";
-import percentages from "./locales/percentages.json";
+// Kept outside locales/ so import.meta.glob("./locales/*.json") does not also
+// create a dynamic edge (Rolldown INEFFECTIVE_DYNAMIC_IMPORT with static import).
+import percentages from "./percentages.json";
 
 const COMPLETION_THRESHOLD = 85;
+
+// Eager static en.json stays the fallback; exclude it from the lazy locale map
+// so en is not both statically and dynamically imported.
+const localeLoaders = import.meta.glob(
+  ["./locales/*.json", "!./locales/en.json"],
+  { import: "default" },
+);
 
 export interface Language {
   code: string;
@@ -96,9 +105,14 @@ export const setLanguage = async (lang: Language) => {
 
   if (lang.code.startsWith(TEST_LANG_CODE)) {
     currentLangData = {};
+  } else if (lang.code === defaultLang.code) {
+    // Already statically imported as fallbackLangData — avoid dual import of en.json.
+    currentLangData = fallbackLangData;
   } else {
+    const key = `./locales/${lang.code}.json`;
+    const loader = localeLoaders[key];
     try {
-      currentLangData = await import(`./locales/${currentLang.code}.json`);
+      currentLangData = loader ? await loader() : fallbackLangData;
     } catch (error: any) {
       console.error(`Failed to load language ${lang.code}:`, error.message);
       currentLangData = fallbackLangData;

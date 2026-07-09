@@ -119,7 +119,13 @@ const config = defineConfig({
           if (
             id.includes('/node_modules/') &&
             !id.includes('/node_modules/@livekit/krisp-noise-filter/') &&
-            !id.includes('/node_modules/@jitsi/rnnoise-wasm/')
+            !id.includes('/node_modules/@jitsi/rnnoise-wasm/') &&
+            // Keep mermaid lazy: dynamic-imported by Excalidraw TTD/paste only.
+            // Forcing it into the shared vendor chunk defeats that split.
+            !id.includes('/node_modules/@excalidraw/mermaid-to-excalidraw/') &&
+            !id.includes('/node_modules/@excalidraw/markdown-to-text/') &&
+            !id.includes('/node_modules/mermaid/') &&
+            !id.includes('/node_modules/@mermaid-js/')
           ) {
             return 'vendor'
           }
