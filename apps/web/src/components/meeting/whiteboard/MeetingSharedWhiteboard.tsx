@@ -5,6 +5,7 @@ import type * as Y from 'yjs'
 import { bindExcalidrawToYDoc } from '@/components/meeting/whiteboard/excalidrawYjsBinding'
 import { WhiteboardMainMenu } from '@/components/meeting/whiteboard/WhiteboardMainMenu'
 import { attachWhiteboardCursorSync } from '@/components/meeting/whiteboard/whiteboardCursorSync'
+import type { ElementLockSnapshot } from '@/components/meeting/whiteboard/whiteboardElementLocks'
 import { handleWhiteboardEscapeKey } from '@/components/meeting/whiteboard/whiteboardKeyboard'
 import { attachWhiteboardRightDragPan } from '@/components/meeting/whiteboard/whiteboardRightDragPan'
 import { releaseWhiteboardCursors } from '@/components/meeting/whiteboard/whiteboardTeardown'
@@ -23,7 +24,7 @@ const Excalidraw = lazy(() =>
 interface MeetingSharedWhiteboardProps {
   ydoc: Y.Doc
   localIdentity: string
-  getLocks: () => ReadonlyMap<string, { identity: string; username: string }>
+  getLocks: () => ElementLockSnapshot
   onApiReady: (api: ExcalidrawImperativeAPI) => void
   onClose?: () => void
   onSyncFlush?: () => void
@@ -135,7 +136,11 @@ export function MeetingSharedWhiteboard({
           handleKeyboardGlobally
           isCollaborating
           onPointerUpdate={onPointerUpdate}
-          excalidrawAPI={(api) => {
+          onExcalidrawAPI={(api: ExcalidrawImperativeAPI | null) => {
+            if (!api) {
+              apiRef.current = null
+              return
+            }
             apiRef.current = api
             onApiReady(api)
             bindingRef.current?.destroy()

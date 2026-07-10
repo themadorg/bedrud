@@ -80,9 +80,14 @@ function throttlePointerSync(
   }
 }
 
-function toCollaboratorSelection(ids?: string[]): Record<string, boolean> | undefined {
+function collaboratorColor(identity: string): { background: string; stroke: string } {
+  const c = avatarColor(identity)
+  return { background: c, stroke: c }
+}
+
+function toCollaboratorSelection(ids?: string[]): Readonly<{ [id: string]: true }> | undefined {
   if (!ids?.length) return undefined
-  return Object.fromEntries(ids.map((id) => [id, true]))
+  return Object.fromEntries(ids.map((id) => [id, true as const]))
 }
 
 export function useWhiteboardPointerSync(apiRef: RefObject<ExcalidrawImperativeAPI | null>, enabled: boolean) {
@@ -150,7 +155,7 @@ export function useWhiteboardPointerSync(apiRef: RefObject<ExcalidrawImperativeA
       socketId: toSocketId(localId),
       isCurrentUser: true,
       username: localName,
-      color: avatarColor(localId),
+      color: collaboratorColor(localId),
     })
 
     for (const participant of room.remoteParticipants.values()) {
@@ -160,7 +165,7 @@ export function useWhiteboardPointerSync(apiRef: RefObject<ExcalidrawImperativeA
         socketId,
         isCurrentUser: false,
         username: participant.name || participant.identity,
-        color: avatarColor(participant.identity),
+        color: collaboratorColor(participant.identity),
       })
     }
 
@@ -235,11 +240,12 @@ export function useWhiteboardPointerSync(apiRef: RefObject<ExcalidrawImperativeA
       const packet = decodeWhiteboardPointerPacket(payload)
       if (!packet || packet.identity === localId) return
 
+      const colorHex = packet.color ?? avatarColor(packet.identity)
       setCollaborator(packet.identity, {
         pointer: toCollaboratorPointer(packet.pointer),
         button: packet.button,
         username: packet.username,
-        color: packet.color ?? avatarColor(packet.identity),
+        color: { background: colorHex, stroke: colorHex },
         selectedElementIds: toCollaboratorSelection(packet.selectedElementIds),
       })
     }

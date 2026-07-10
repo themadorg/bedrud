@@ -28,7 +28,9 @@ function MeetingVideoSettingsPanel() {
   return (
     <VideoSettingsPanel
       tone="meeting"
-      onCameraDeviceChange={(deviceId) => room.switchActiveDevice('videoinput', deviceId).catch(() => {})}
+      onCameraDeviceChange={(deviceId) => {
+        void room.switchActiveDevice('videoinput', deviceId).catch(() => {})
+      }}
     />
   )
 }

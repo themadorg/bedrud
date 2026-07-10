@@ -1,5 +1,13 @@
 {
   "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": [
+    "src/vendor/**/*.test.ts",
+    "src/vendor/**/*.test.tsx",
+    "src/vendor/**/*test.helpers*",
+    "src/vendor/**/test-utils.ts",
+    "src/vendor/**/tests/**",
+    "src/vendor/**/__tests__/**"
+  ],
   "compilerOptions": {
     "ignoreDeprecations": "6.0",
     "target": "ES2022",

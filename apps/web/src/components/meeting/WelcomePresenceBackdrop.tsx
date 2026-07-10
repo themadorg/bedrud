@@ -298,14 +298,15 @@ export function WelcomePresenceBackdrop({ roomId, enabled = true }: { roomId: st
       return
     }
 
-    const container = containerRef.current
-    if (!container || participants.length === 0) return
+    const containerEl = containerRef.current
+    if (!containerEl || participants.length === 0) return
+    const el: HTMLDivElement = containerEl
 
     let raf = 0
 
     function syncParticipants() {
-      const width = container.clientWidth
-      const height = container.clientHeight
+      const width = el.clientWidth
+      const height = el.clientHeight
       if (width === 0 || height === 0) return
 
       const next = participantsRef.current
@@ -375,8 +376,8 @@ export function WelcomePresenceBackdrop({ roomId, enabled = true }: { roomId: st
     }
 
     function tick() {
-      const width = container.clientWidth
-      const height = container.clientHeight
+      const width = el.clientWidth
+      const height = el.clientHeight
       if (width === 0 || height === 0) {
         raf = requestAnimationFrame(tick)
         return
@@ -404,7 +405,7 @@ export function WelcomePresenceBackdrop({ roomId, enabled = true }: { roomId: st
     }
 
     function pointerPos(e: PointerEvent) {
-      const rect = container.getBoundingClientRect()
+      const rect = el.getBoundingClientRect()
       return {
         x: e.clientX - rect.left,
         y: e.clientY - rect.top,
@@ -414,7 +415,7 @@ export function WelcomePresenceBackdrop({ roomId, enabled = true }: { roomId: st
     function onPointerDown(e: PointerEvent) {
       const target = e.target as HTMLElement | null
       const avatar = target?.closest('[data-presence-id]') as HTMLElement | null
-      if (!avatar || !container.contains(avatar)) return
+      if (!avatar || !el.contains(avatar)) return
 
       const identity = avatar.dataset.presenceId
       if (!identity) return
@@ -470,16 +471,16 @@ export function WelcomePresenceBackdrop({ roomId, enabled = true }: { roomId: st
     }
 
     const resizeObserver = new ResizeObserver(() => {
-      const width = container.clientWidth
-      const height = container.clientHeight
+      const width = el.clientWidth
+      const height = el.clientHeight
       for (const body of bodiesRef.current.values()) {
         body.x = clamp(body.x, body.radius, Math.max(body.radius, width - body.radius))
         body.y = clamp(body.y, body.radius, Math.max(body.radius, height - body.radius))
       }
     })
-    resizeObserver.observe(container)
+    resizeObserver.observe(el)
 
-    container.addEventListener('pointerdown', onPointerDown)
+    el.addEventListener('pointerdown', onPointerDown)
     window.addEventListener('pointermove', onPointerMove)
     window.addEventListener('pointerup', onPointerUp)
     window.addEventListener('pointercancel', onPointerUp)
@@ -489,7 +490,7 @@ export function WelcomePresenceBackdrop({ roomId, enabled = true }: { roomId: st
     return () => {
       cancelAnimationFrame(raf)
       resizeObserver.disconnect()
-      container.removeEventListener('pointerdown', onPointerDown)
+      el.removeEventListener('pointerdown', onPointerDown)
       window.removeEventListener('pointermove', onPointerMove)
       window.removeEventListener('pointerup', onPointerUp)
       window.removeEventListener('pointercancel', onPointerUp)

@@ -118,12 +118,13 @@ export function useMeetingConnectionStats(participant: Participant | undefined, 
       return
     }
 
+    const p = participant
     let cancelled = false
 
     async function poll() {
       setLoading(true)
       while (!cancelled) {
-        const partial = await collectMeetingConnectionStats(participant)
+        const partial = await collectMeetingConnectionStats(p)
         if (cancelled) break
 
         setStats((prev) => ({

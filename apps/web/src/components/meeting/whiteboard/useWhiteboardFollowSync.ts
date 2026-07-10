@@ -202,7 +202,10 @@ export function useWhiteboardFollowSync(apiRef: RefObject<ExcalidrawImperativeAP
       if (!api) return
       const appState = api.getAppState()
       const followerSocketId = participant.identity as SocketId
-      const updates: Partial<typeof appState> = {}
+      const updates: {
+        followedBy?: Set<SocketId>
+        userToFollow?: null
+      } = {}
       if (appState.followedBy.has(followerSocketId)) {
         const followedBy = new Set(appState.followedBy)
         followedBy.delete(followerSocketId)
@@ -212,7 +215,8 @@ export function useWhiteboardFollowSync(apiRef: RefObject<ExcalidrawImperativeAP
         updates.userToFollow = null
       }
       if (Object.keys(updates).length > 0) {
-        api.updateScene({ appState: updates })
+        // Excalidraw AppState fields are Readonly; updateScene accepts partial mutable patches at runtime.
+        api.updateScene({ appState: updates as never })
       }
     }
 
