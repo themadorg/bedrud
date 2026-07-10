@@ -155,15 +155,25 @@ func (r *RoomRepository) GetRoom(id string) (*models.Room, error) {
 	return &room, nil
 }
 
-// GetRoomByName retrieves a room by name (case-insensitive)
+// GetRoomByName retrieves a room by name (case-insensitive).
+// Prefers an active room when multiple rows share a name (archived + recreated).
 func (r *RoomRepository) GetRoomByName(name string) (*models.Room, error) {
+	name = strings.ToLower(strings.TrimSpace(name))
 	var room models.Room
-	result := r.db.First(&room, "name = ?", strings.ToLower(strings.TrimSpace(name)))
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+	// Active first so recreate-then-join hits the new room, not the archived row.
+	err := r.db.Where("name = ? AND is_active = ?", name, true).First(&room).Error
+	if err == nil {
+		return &room, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	err = r.db.Where("name = ?", name).Order("created_at DESC").First(&room).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		return nil, result.Error
+		return nil, err
 	}
 	return &room, nil
 }

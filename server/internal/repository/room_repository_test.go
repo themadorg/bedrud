@@ -151,6 +151,39 @@ func TestRoomRepository_GetRoomByName_NotFound(t *testing.T) {
 	}
 }
 
+func TestRoomRepository_GetRoomByName_PrefersActiveOverArchived(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	db.Create(&models.User{ID: testUserIDRoom, Email: "user@ex.com", Name: "Creator", Provider: "local", IsActive: true})
+	old, err := repo.CreateRoom(testUserIDRoom, "reuse-name", false, "standard", 0, &models.RoomSettings{})
+	if err != nil {
+		t.Fatalf("create old: %v", err)
+	}
+	if err := repo.SoftDeleteRoom(old.ID); err != nil {
+		t.Fatalf("archive old: %v", err)
+	}
+	// Name reuse after archive
+	neu, err := repo.CreateRoom(testUserIDRoom, "reuse-name", false, "standard", 0, &models.RoomSettings{})
+	if err != nil {
+		t.Fatalf("create new: %v", err)
+	}
+
+	found, err := repo.GetRoomByName("reuse-name")
+	if err != nil {
+		t.Fatalf("GetRoomByName: %v", err)
+	}
+	if found == nil {
+		t.Fatal("expected room")
+	}
+	if found.ID != neu.ID {
+		t.Fatalf("expected active room %s, got %s (active=%v)", neu.ID, found.ID, found.IsActive)
+	}
+	if !found.IsActive {
+		t.Fatal("expected active room")
+	}
+}
+
 func TestRoomRepository_AddParticipant(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := NewRoomRepository(db)
