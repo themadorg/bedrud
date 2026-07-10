@@ -2,7 +2,11 @@ import { useRoomContext } from '@livekit/components-react'
 import type { RoomConnectOptions } from 'livekit-client'
 import { ConnectionState, RoomEvent } from 'livekit-client'
 import { useEffect } from 'react'
-import { installLiveKitPublisherPromiseFix, resetLiveKitPublisherPromise, waitForRoomPublishReady } from '#/lib/livekit-publish'
+import {
+  installLiveKitPublisherPromiseFix,
+  resetLiveKitPublisherPromise,
+  waitForRoomPublishReady,
+} from '#/lib/livekit-publish'
 import { meetingDebugLog } from '#/lib/meeting-debug-log'
 
 /**

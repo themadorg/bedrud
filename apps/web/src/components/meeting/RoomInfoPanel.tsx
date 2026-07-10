@@ -191,7 +191,11 @@ export function RoomInfoPanel({ open, onOpenChange, roomId }: RoomInfoPanelProps
             onClick={() => void handleCopyDebugLog()}
             className="gap-1.5"
           >
-            {copyingDebug ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
+            {copyingDebug ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <ClipboardCopy className="h-3.5 w-3.5" />
+            )}
             Copy debug log
           </Button>
           <Button

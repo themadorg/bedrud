@@ -708,22 +708,25 @@ export function MeetingProvider({
   const chatChunkBuffersRef = useRef(createChunkBuffer())
   const chatPublishInFlightRef = useRef(false)
 
-  const markChatFailed = useCallback((id: string, err?: unknown) => {
-    setChatMessages((prev) => prev.map((m): ChatMessage => (m.id === id ? { ...m, status: 'failed' } : m)))
-    const message = err instanceof Error ? err.message : err != null ? String(err) : undefined
-    const code = err && typeof err === 'object' && 'code' in err ? (err as { code: unknown }).code : undefined
-    meetingDebugLog('chat.publish_failed', {
-      id,
-      message,
-      code,
-      ...getLiveKitPublishDiagnostics(room),
-      transportDead: isRoomTransportDead(room),
-    })
-    // Do NOT remount here — remount was causing disconnect loops (CLIENT_REQUEST_LEAVE).
-    if (isFatalPublishError(err)) {
-      resetLiveKitPublisherPromise(room)
-    }
-  }, [room])
+  const markChatFailed = useCallback(
+    (id: string, err?: unknown) => {
+      setChatMessages((prev) => prev.map((m): ChatMessage => (m.id === id ? { ...m, status: 'failed' } : m)))
+      const message = err instanceof Error ? err.message : err != null ? String(err) : undefined
+      const code = err && typeof err === 'object' && 'code' in err ? (err as { code: unknown }).code : undefined
+      meetingDebugLog('chat.publish_failed', {
+        id,
+        message,
+        code,
+        ...getLiveKitPublishDiagnostics(room),
+        transportDead: isRoomTransportDead(room),
+      })
+      // Do NOT remount here — remount was causing disconnect loops (CLIENT_REQUEST_LEAVE).
+      if (isFatalPublishError(err)) {
+        resetLiveKitPublisherPromise(room)
+      }
+    },
+    [room],
+  )
 
   const publishChatPackets = useCallback(
     async (id: string, packets: ReturnType<typeof buildChatWirePackets>): Promise<boolean> => {
@@ -791,8 +794,7 @@ export function MeetingProvider({
             markChatFailed(id, err)
             return false
           }
-          const transient =
-            isPublishUnavailableError(err) || (err instanceof Error && err.message === 'not connected')
+          const transient = isPublishUnavailableError(err) || (err instanceof Error && err.message === 'not connected')
           if (transient && attempt < maxAttempts - 1) continue
           markChatFailed(id, err)
           return false

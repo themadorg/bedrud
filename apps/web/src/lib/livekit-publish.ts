@@ -101,11 +101,7 @@ export function isRoomConnected(room: Room): boolean {
 export function isFatalPublishError(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err)
   const code = err && typeof err === 'object' && 'code' in err ? (err as { code: unknown }).code : null
-  return (
-    message.includes('PC manager is closed') ||
-    message.includes('publisher is closed') ||
-    code === 12
-  )
+  return message.includes('PC manager is closed') || message.includes('publisher is closed') || code === 12
 }
 
 type EngineWithPublisherPromise = EngineWithDataChannels & {
@@ -229,9 +225,7 @@ export function isPublishUnavailableError(err: unknown): boolean {
   if (isFatalPublishError(err)) return true
   const message = err instanceof Error ? err.message : String(err)
   return (
-    message.includes('cannot publish') ||
-    message.includes('not connected') ||
-    message.includes('could not establish')
+    message.includes('cannot publish') || message.includes('not connected') || message.includes('could not establish')
   )
 }
 

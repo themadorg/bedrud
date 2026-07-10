@@ -7,9 +7,10 @@
  *
  * We intentionally omit StrictMode so WebRTC sessions stay stable.
  */
+
+import { StartClient } from '@tanstack/react-start/client'
 import { startTransition } from 'react'
 import { hydrateRoot } from 'react-dom/client'
-import { StartClient } from '@tanstack/react-start/client'
 
 startTransition(() => {
   hydrateRoot(document, <StartClient />)

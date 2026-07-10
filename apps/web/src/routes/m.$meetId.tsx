@@ -444,32 +444,35 @@ function MeetingPage() {
     attemptReconnect()
   }, [attemptReconnect])
 
-  const handleDisconnected = useCallback((reason?: DisconnectReason) => {
-    // React unmount / user leave — do nothing (StrictMode used to spam this path).
-    if (reason === DisconnectReason.CLIENT_INITIATED || reason === undefined) {
-      meetingDebugLog('reconnect.ignore', { reason: String(reason) })
-      return
-    }
-
-    meetingDebugLog('reconnect.disconnected', { reason: String(reason) })
-    console.log(`[reconnect] disconnected reason=${reason}`)
-
-    isDisconnectedRef.current = true
-    disconnectedAtRef.current = Date.now()
-    setShowDisconnectedOverlay(true)
-    setOverlayMode('reconnecting')
-    setShowReconnectBanner(true)
-
-    // Soft: refresh token for native SDK reconnect / next connect. No remount.
-    attemptReconnect()
-
-    if (disconnectTimeoutRef.current) clearTimeout(disconnectTimeoutRef.current)
-    disconnectTimeoutRef.current = setTimeout(() => {
-      if (!cancelledRef.current && isDisconnectedRef.current) {
-        setOverlayMode('disconnected')
+  const handleDisconnected = useCallback(
+    (reason?: DisconnectReason) => {
+      // React unmount / user leave — do nothing (StrictMode used to spam this path).
+      if (reason === DisconnectReason.CLIENT_INITIATED || reason === undefined) {
+        meetingDebugLog('reconnect.ignore', { reason: String(reason) })
+        return
       }
-    }, 30_000)
-  }, [attemptReconnect])
+
+      meetingDebugLog('reconnect.disconnected', { reason: String(reason) })
+      console.log(`[reconnect] disconnected reason=${reason}`)
+
+      isDisconnectedRef.current = true
+      disconnectedAtRef.current = Date.now()
+      setShowDisconnectedOverlay(true)
+      setOverlayMode('reconnecting')
+      setShowReconnectBanner(true)
+
+      // Soft: refresh token for native SDK reconnect / next connect. No remount.
+      attemptReconnect()
+
+      if (disconnectTimeoutRef.current) clearTimeout(disconnectTimeoutRef.current)
+      disconnectTimeoutRef.current = setTimeout(() => {
+        if (!cancelledRef.current && isDisconnectedRef.current) {
+          setOverlayMode('disconnected')
+        }
+      }, 30_000)
+    },
+    [attemptReconnect],
+  )
 
   const handleReconnected = useCallback(() => {
     console.log('[reconnect] connected')

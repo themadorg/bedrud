@@ -120,15 +120,7 @@ const config = defineConfig({
   // TanStack Start SSR runner must share the same optimized graph.
   ssr: {
     optimizeDeps: {
-      include: [
-        'react',
-        'react-dom',
-        'react/jsx-runtime',
-        'yjs',
-        'jotai',
-        'jotai-scope',
-        'lib0',
-      ],
+      include: ['react', 'react-dom', 'react/jsx-runtime', 'yjs', 'jotai', 'jotai-scope', 'lib0'],
     },
     // Don't externalize these so SSR doesn't load a second copy vs client.
     noExternal: ['yjs', 'lib0', 'y-protocols', 'jotai', 'jotai-scope'],

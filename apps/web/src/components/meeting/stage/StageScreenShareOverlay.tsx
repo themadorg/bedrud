@@ -41,9 +41,7 @@ export function StageScreenShareOverlay() {
   }
 
   const displayName =
-    trackRef.participant.name ||
-    trackRef.participant.identity ||
-    (stage ? stageOwnerLabel(stage) : 'Presenter')
+    trackRef.participant.name || trackRef.participant.identity || (stage ? stageOwnerLabel(stage) : 'Presenter')
 
   return (
     <div
