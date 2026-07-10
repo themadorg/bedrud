@@ -17,6 +17,9 @@ import (
 // ErrTokenRevoked is returned when a token has been explicitly revoked (e.g. on logout).
 var ErrTokenRevoked = errors.New("token has been revoked")
 
+// ErrTokenPurposeNotAllowed is returned when a purpose-scoped JWT (verify/reset) is used as access.
+var ErrTokenPurposeNotAllowed = errors.New("token purpose not allowed for access")
+
 // tokenHash returns the hex-encoded SHA-256 hash of a token string.
 // Storing hashes instead of full JWTs reduces memory usage in the revocation set.
 func tokenHash(token string) string {
@@ -24,13 +27,23 @@ func tokenHash(token string) string {
 	return hex.EncodeToString(h[:])
 }
 
+// AccessTokenBlockStore persists revoked access-token hashes across restarts.
+// Implemented by repository.UserRepository; set via SetAccessTokenBlockStore at boot.
+type AccessTokenBlockStore interface {
+	BlockAccessToken(rawToken string, expiresAt time.Time) error
+	IsAccessTokenBlocked(rawToken string) (bool, error)
+	CleanupBlockedAccessTokens() error
+}
+
+var accessTokenStore AccessTokenBlockStore
+
+// SetAccessTokenBlockStore wires durable access-token revocation (call after DB init).
+func SetAccessTokenBlockStore(s AccessTokenBlockStore) {
+	accessTokenStore = s
+}
+
 // revokedSet holds revoked access tokens keyed by their SHA-256 hash, with their expiry time.
-//
-// TRADE-OFF: The revocation list is kept in-memory and is lost on server restart.
-// After a restart, revoked tokens remain valid until their natural expiry (up to TokenDuration).
-// This mainly affects tokens explicitly revoked on logout. To close the window:
-//   - Reduce tokenDuration in config.yaml (default 24h)
-//   - Or persist revoked hashes to a DB table (check BlockedRefreshToken model for pattern)
+// Hot cache; durable copy lives in AccessTokenBlockStore when configured.
 type revokedSet struct {
 	mu sync.RWMutex
 	m  map[string]time.Time
@@ -38,7 +51,7 @@ type revokedSet struct {
 
 var revokedTokens = &revokedSet{m: make(map[string]time.Time)}
 
-// RevokeAccessToken marks a JWT as invalid until its natural expiry.
+// RevokeAccessToken marks a JWT as invalid until its natural expiry (memory + durable store).
 func RevokeAccessToken(tokenStr string, cfg *config.Config) {
 	claims, err := parseTokenUnchecked(tokenStr, cfg)
 	if err != nil {
@@ -49,26 +62,42 @@ func RevokeAccessToken(tokenStr string, cfg *config.Config) {
 	revokedTokens.mu.Lock()
 	revokedTokens.m[h] = exp
 	revokedTokens.mu.Unlock()
+	if accessTokenStore != nil {
+		_ = accessTokenStore.BlockAccessToken(tokenStr, exp)
+	}
 }
 
-// PruneRevokedTokens removes expired entries from the revocation set. Call periodically (e.g. hourly).
+// PruneRevokedTokens removes expired entries from the in-memory revocation set.
+// Also cleans durable store when configured. Call periodically (e.g. hourly).
 func PruneRevokedTokens() {
 	now := time.Now()
 	revokedTokens.mu.Lock()
-	defer revokedTokens.mu.Unlock()
 	for h, exp := range revokedTokens.m {
 		if now.After(exp) {
 			delete(revokedTokens.m, h)
 		}
+	}
+	revokedTokens.mu.Unlock()
+	if accessTokenStore != nil {
+		_ = accessTokenStore.CleanupBlockedAccessTokens()
 	}
 }
 
 func isRevoked(tokenStr string) bool {
 	h := tokenHash(tokenStr)
 	revokedTokens.mu.RLock()
-	defer revokedTokens.mu.RUnlock()
 	exp, exists := revokedTokens.m[h]
-	return exists && time.Now().Before(exp)
+	revokedTokens.mu.RUnlock()
+	if exists && time.Now().Before(exp) {
+		return true
+	}
+	if accessTokenStore != nil {
+		blocked, err := accessTokenStore.IsAccessTokenBlocked(tokenStr)
+		if err == nil && blocked {
+			return true
+		}
+	}
+	return false
 }
 
 // bannedUsers holds IDs of deactivated users for fast middleware checks.
@@ -184,6 +213,11 @@ func ValidateToken(tokenString string, cfg *config.Config) (*Claims, error) {
 	claims, err := parseTokenUnchecked(tokenString, cfg)
 	if err != nil {
 		return nil, err
+	}
+
+	// Purpose-scoped JWTs (email_verify, password_reset) must not act as access tokens.
+	if claims.Purpose != "" {
+		return nil, ErrTokenPurposeNotAllowed
 	}
 
 	if isRevoked(tokenString) {

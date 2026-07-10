@@ -27,6 +27,9 @@ func RunMigrations() error {
 	if err := db.AutoMigrate(&models.BlockedRefreshToken{}); err != nil {
 		return err
 	}
+	if err := db.AutoMigrate(&models.BlockedAccessToken{}); err != nil {
+		return err
+	}
 	if err := db.AutoMigrate(&models.Room{}); err != nil {
 		return err
 	}

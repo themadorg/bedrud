@@ -510,8 +510,8 @@ func (h *UsersHandler) SetUserPassword(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Password updated successfully"})
 }
 
-// ForceLogout revokes all sessions for a user by clearing their stored refresh token.
-// The user's access token will remain valid until it naturally expires.
+// ForceLogout revokes all sessions by clearing the stored refresh token and blocking
+// existing access tokens at the shared middleware ban set (process-local).
 // @Summary Force logout a user
 // @Description Revoke all active sessions for a user by clearing their refresh token (superadmin only)
 // @Tags admin
@@ -541,6 +541,7 @@ func (h *UsersHandler) ForceLogout(c *fiber.Ctx) error {
 	if err := h.userRepo.ClearRefreshToken(userID); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to revoke sessions"})
 	}
+	auth.BanUser(userID)
 
 	log.Info().Str("adminID", claims.UserID).Str("targetUserID", userID).Msg("Admin force-logged out user")
 	return c.JSON(fiber.Map{"message": "All sessions revoked"})

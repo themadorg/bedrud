@@ -15,6 +15,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
 	"github.com/rs/zerolog/log"
 )
@@ -229,7 +230,12 @@ func (h *AuthHandler) CallbackHandler(c *fiber.Ctx) error {
 	}
 
 	log.Debug().Str("provider", provider).Msg("Auth completed successfully")
+	return h.finishOAuthLogin(c, gothUser)
+}
 
+// finishOAuthLogin applies registration gates, account lookup, and session issue
+// after gothic.CompleteUserAuth. Extracted so unit tests can drive policy without IdP.
+func (h *AuthHandler) finishOAuthLogin(c *fiber.Ctx, gothUser goth.User) error {
 	// Canonicalize email from OAuth provider
 	gothUser.Email = auth.CanonicalizeEmail(gothUser.Email)
 
@@ -249,7 +255,6 @@ func (h *AuthHandler) CallbackHandler(c *fiber.Ctx) error {
 	if h.settingsRepo != nil {
 		settings, _ := h.settingsRepo.GetSettings()
 		if settings != nil && !settings.RegistrationEnabled {
-			// Check if user already exists — if so, allow login
 			existing, _ := h.authService.GetUserByEmail(gothUser.Email)
 			if existing == nil {
 				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
@@ -259,19 +264,15 @@ func (h *AuthHandler) CallbackHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// Create or update user in database
 	userRepo := repository.NewUserRepository(database.GetDB())
 	var dbUser *models.User
 
-	// Check if user already exists to preserve their accesses and check isActive
 	existingUser, _ := userRepo.GetUserByEmailAndProvider(gothUser.Email, gothUser.Provider)
 
 	if existingUser != nil {
-		// Existing user — check if deactivated
 		if !existingUser.IsActive {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Account is deactivated"})
 		}
-		// Update profile fields only, preserve accesses
 		existingUser.Name = gothUser.Name
 		existingUser.AvatarURL = gothUser.AvatarURL
 		if err := userRepo.UpdateUser(existingUser); err != nil {
@@ -282,7 +283,13 @@ func (h *AuthHandler) CallbackHandler(c *fiber.Ctx) error {
 		}
 		dbUser = existingUser
 	} else {
-		// New user — check invite-only mode before creating account
+		// Do not silently link or create when email already belongs to another provider.
+		if other, _ := h.authService.GetUserByEmail(gothUser.Email); other != nil && other.Provider != gothUser.Provider {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": "An account with this email already exists via a different sign-in method",
+			})
+		}
+
 		if h.settingsRepo != nil {
 			settings, _ := h.settingsRepo.GetSettings()
 			if settings != nil && settings.TokenRegistrationOnly {
@@ -292,7 +299,6 @@ func (h *AuthHandler) CallbackHandler(c *fiber.Ctx) error {
 			}
 		}
 
-		// New user — create with default access
 		dbUser = &models.User{
 			ID:        uuid.New().String(),
 			Email:     gothUser.Email,
@@ -310,7 +316,6 @@ func (h *AuthHandler) CallbackHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// OAuth providers already verify emails — trust their verification
 	if h.config.Auth.RequireEmailVerification && dbUser.EmailVerifiedAt == nil {
 		now := time.Now()
 		dbUser.EmailVerifiedAt = &now
@@ -319,7 +324,6 @@ func (h *AuthHandler) CallbackHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// Generate token pair (access + refresh)
 	accessToken, refreshToken, err := auth.GenerateTokenPair(
 		dbUser.ID,
 		dbUser.Email,
@@ -336,21 +340,16 @@ func (h *AuthHandler) CallbackHandler(c *fiber.Ctx) error {
 		})
 	}
 
-	// Store refresh token in database
 	if err := h.authService.UpdateRefreshToken(dbUser.ID, refreshToken); err != nil {
 		log.Error().Err(err).Msg("Failed to save refresh token for OAuth user")
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
 			Error: "Failed to save refresh token",
 		})
 	}
+	auth.UnbanUser(dbUser.ID)
 
-	// Set both access and refresh token cookies
 	setAuthCookies(c, h.config, accessToken, refreshToken)
 
-	// frontend url debug print
-	log.Debug().Str("frontend url", h.config.Auth.FrontendURL).Msg("frontend url")
-
-	// If frontend URL is provided in config, redirect there without token in URL
 	if h.config.Auth.FrontendURL != "" {
 		frontendURL, err := url.Parse(h.config.Auth.FrontendURL)
 		if err != nil {
@@ -361,11 +360,9 @@ func (h *AuthHandler) CallbackHandler(c *fiber.Ctx) error {
 		}
 
 		frontendURL.Path = "/auth/callback"
-		// Token is delivered via HTTP-only cookie; do not expose it in the URL
 		return c.Redirect(frontendURL.String())
 	}
 
-	// Otherwise return JSON response
 	return c.JSON(AuthResponse{
 		User: UserResponse{
 			ID:        dbUser.ID,

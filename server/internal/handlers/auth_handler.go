@@ -29,6 +29,7 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/markbates/goth/gothic"
 	"github.com/rs/zerolog/log"
+	"gorm.io/gorm"
 )
 
 type AuthHandler struct {
@@ -210,8 +211,15 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 
 	user, err := h.authService.Register(input.Email, input.Password, input.Name)
 	if err != nil {
+		msg := "Registration failed"
+		if err.Error() == "user already exists" {
+			msg = "Registration failed" // controlled; avoid raw internal strings
+		}
+		// Keep stable message for duplicates (same as generic fail) to limit enumeration via distinct copy.
+		// Still return 400 so clients know not to proceed.
+		_ = msg
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
+			"error": "Unable to register with the provided details",
 		})
 	}
 
@@ -914,8 +922,14 @@ func (h *AuthHandler) ResetPassword(c *fiber.Ctx) error {
 		})
 	}
 
-	// Reset password (clears refresh token, revokes sessions)
+	// Reset password (clears refresh token, revokes sessions).
+	// Concurrent loser of UpdatePasswordIfUnchanged gets ErrRecordNotFound → treat as used token.
 	if err := h.authService.ResetPassword(user.ID, input.NewPassword); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid or expired reset token",
+			})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to reset password",
 		})

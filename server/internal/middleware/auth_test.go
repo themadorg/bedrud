@@ -41,6 +41,40 @@ const testBearerPrefix = "Bearer "
 
 // --- Tests using the real Protected() and RequireAccess() functions ---
 
+func TestRequireBearerForMutations_CookieOnlyPOST(t *testing.T) {
+	getTestConfig()
+	app := fiber.New()
+	app.Use(RequireBearerForMutations())
+	app.Post("/mut", func(c *fiber.Ctx) error { return c.SendString("ok") })
+	app.Get("/read", func(c *fiber.Ctx) error { return c.SendString("ok") })
+
+	// POST without Authorization → 401
+	req := httptest.NewRequest(http.MethodPost, "/mut", http.NoBody)
+	req.AddCookie(&http.Cookie{Name: "access_token", Value: "anything"})
+	resp, _ := app.Test(req)
+	defer resp.Body.Close()
+	if resp.StatusCode != fiber.StatusUnauthorized {
+		t.Fatalf("expected 401 for cookie-only POST, got %d", resp.StatusCode)
+	}
+
+	// POST with Bearer → passes middleware
+	req2 := httptest.NewRequest(http.MethodPost, "/mut", http.NoBody)
+	req2.Header.Set("Authorization", "Bearer sometoken")
+	resp2, _ := app.Test(req2)
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 with Bearer, got %d", resp2.StatusCode)
+	}
+
+	// GET without Bearer → passes (safe method)
+	req3 := httptest.NewRequest(http.MethodGet, "/read", http.NoBody)
+	resp3, _ := app.Test(req3)
+	defer resp3.Body.Close()
+	if resp3.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for GET, got %d", resp3.StatusCode)
+	}
+}
+
 func TestProtected_Real_NoAuthHeader(t *testing.T) {
 	getTestConfig() // ensure config is set
 	app := fiber.New()

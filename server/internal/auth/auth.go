@@ -166,9 +166,16 @@ func (s *AuthService) Register(email, password, name string) (*models.User, erro
 // @Failure 401 {object} ErrorResponse
 // @Router /auth/login [post]
 func (s *AuthService) Login(email, password string) (*LoginResponse, error) {
-	user, err := s.GetUserByEmail(email)
+	// Prefer local provider; fall back to passkey accounts that set a password.
+	user, err := s.userRepo.GetUserByEmailAndProvider(email, models.ProviderLocal)
 	if err != nil {
 		return nil, err
+	}
+	if user == nil {
+		user, err = s.userRepo.GetUserByEmailAndProvider(email, models.ProviderPasskey)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Dummy bcrypt hash used to maintain constant-time response when user is nil,
@@ -207,6 +214,7 @@ func (s *AuthService) Login(email, password string) (*LoginResponse, error) {
 	if err := s.userRepo.UpdateRefreshToken(user.ID, refreshToken); err != nil {
 		return nil, errors.New("failed to save refresh token")
 	}
+	UnbanUser(user.ID)
 
 	return &LoginResponse{
 		User: user,
@@ -454,8 +462,8 @@ func (s *AuthService) ResetPassword(userID, newPassword string, accessTokens ...
 		return err
 	}
 
-	// Atomically update password and clear refresh_token (invalidates all sessions)
-	if err := s.userRepo.UpdatePassword(userID, hashed); err != nil {
+	// Concurrent-safe: only one reset wins when PasswordChangedAt still matches.
+	if err := s.userRepo.UpdatePasswordIfUnchanged(userID, hashed, user.PasswordChangedAt); err != nil {
 		return err
 	}
 
@@ -753,6 +761,7 @@ func (s *AuthService) FinishLoginPasskey(challengeStr string, credentialID, clie
 	if err := s.userRepo.UpdateRefreshToken(user.ID, refreshToken); err != nil {
 		return nil, errors.New("failed to save refresh token")
 	}
+	UnbanUser(user.ID)
 
 	return &LoginResponse{
 		User: user,

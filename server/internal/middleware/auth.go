@@ -15,24 +15,25 @@ import (
 
 const bearerPrefix = "bearer "
 
+func extractAccessToken(c *fiber.Ctx) string {
+	token := ""
+	if authHeader := c.Get("Authorization"); authHeader != "" {
+		if strings.HasPrefix(strings.ToLower(authHeader), bearerPrefix) {
+			token = authHeader[7:]
+		} else {
+			token = authHeader
+		}
+	}
+	if token == "" {
+		token = c.Cookies("access_token")
+	}
+	return token
+}
+
 // Protected middleware validates JWT and checks if user is active (not banned).
 func Protected() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		token := ""
-
-		// Prefer Authorization header
-		if authHeader := c.Get("Authorization"); authHeader != "" {
-			if strings.HasPrefix(strings.ToLower(authHeader), bearerPrefix) {
-				token = authHeader[7:]
-			} else {
-				token = authHeader
-			}
-		}
-
-		// Fallback to HTTP-only cookie
-		if token == "" {
-			token = c.Cookies("access_token")
-		}
+		token := extractAccessToken(c)
 
 		if token == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -55,6 +56,26 @@ func Protected() fiber.Handler {
 		}
 
 		// Add claims to context for use in protected routes
+		c.Locals("user", claims)
+		return c.Next()
+	}
+}
+
+// OptionalAuth validates JWT when present and sets Locals("user").
+// Missing/invalid tokens do not fail the request (handler decides).
+func OptionalAuth() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		token := extractAccessToken(c)
+		if token == "" {
+			return c.Next()
+		}
+		claims, err := auth.ValidateToken(token, config.Get())
+		if err != nil {
+			return c.Next()
+		}
+		if auth.IsUserBanned(claims.UserID) {
+			return c.Next()
+		}
 		c.Locals("user", claims)
 		return c.Next()
 	}

@@ -286,6 +286,31 @@ func TestGenerateResetToken_PurposeClaim(t *testing.T) {
 	}
 }
 
+func TestValidateToken_RejectsPurposeTokens(t *testing.T) {
+	cfg := testConfig()
+	verifyTok, err := GenerateVerificationToken(testUserID, testEmail, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ValidateToken(verifyTok, cfg); err == nil {
+		t.Fatal("expected verification token rejected as access")
+	}
+	resetTok, err := GenerateResetToken(testUserID, testEmail, nil, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ValidateToken(resetTok, cfg); err == nil {
+		t.Fatal("expected reset token rejected as access")
+	}
+	// Dedicated validators still accept purpose tokens
+	if _, _, err := ValidateVerificationToken(verifyTok, cfg); err != nil {
+		t.Fatalf("ValidateVerificationToken: %v", err)
+	}
+	if _, _, _, err := ValidateResetToken(resetTok, cfg); err != nil {
+		t.Fatalf("ValidateResetToken: %v", err)
+	}
+}
+
 func TestGenerateResetToken_CustomTTL(t *testing.T) {
 	cfg := testConfig()
 	cfg.Auth.ResetTokenTTLHours = 2

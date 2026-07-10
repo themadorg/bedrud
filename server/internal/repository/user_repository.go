@@ -3,6 +3,7 @@ package repository
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"slices"
 	"strings"
 	"time"
@@ -183,6 +184,45 @@ func (r *UserRepository) CleanupBlockedTokens() error {
 	return result.Error
 }
 
+// BlockAccessToken persists a SHA-256 hash of an access JWT until expiresAt.
+func (r *UserRepository) BlockAccessToken(rawToken string, expiresAt time.Time) error {
+	if rawToken == "" {
+		return nil
+	}
+	h := hashToken(rawToken)
+	var existing models.BlockedAccessToken
+	err := r.db.Where("token = ?", h).First(&existing).Error
+	if err == nil {
+		return nil // already blocked
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	return r.db.Create(&models.BlockedAccessToken{
+		ID:        uuid.New().String(),
+		Token:     h,
+		ExpiresAt: expiresAt,
+	}).Error
+}
+
+// IsAccessTokenBlocked reports whether the raw access token hash is still revoked.
+func (r *UserRepository) IsAccessTokenBlocked(rawToken string) (bool, error) {
+	var count int64
+	err := r.db.Model(&models.BlockedAccessToken{}).
+		Where("token = ? AND expires_at > ?", hashToken(rawToken), time.Now()).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// CleanupBlockedAccessTokens deletes expired access-token revocation rows.
+func (r *UserRepository) CleanupBlockedAccessTokens() error {
+	return r.db.Where("expires_at < ?", time.Now()).
+		Delete(&models.BlockedAccessToken{}).Error
+}
+
 func (r *UserRepository) UpdateUserAccesses(userID string, accesses []string) error {
 	result := r.db.Model(&models.User{}).
 		Where("id = ?", userID).
@@ -266,6 +306,31 @@ func (r *UserRepository) UpdatePassword(userID, hashedPassword string) error {
 	})
 	if result.Error != nil {
 		log.Error().Err(result.Error).Str("userID", userID).Msg("Failed to update password")
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+// UpdatePasswordIfUnchanged is the concurrent-safe reset path: only one caller
+// wins when expectedChangedAt matches the row (nil means still never changed).
+func (r *UserRepository) UpdatePasswordIfUnchanged(userID, hashedPassword string, expectedChangedAt *time.Time) error {
+	now := time.Now()
+	q := r.db.Model(&models.User{}).Where("id = ?", userID)
+	if expectedChangedAt == nil {
+		q = q.Where("password_changed_at IS NULL")
+	} else {
+		q = q.Where("password_changed_at = ?", *expectedChangedAt)
+	}
+	result := q.Updates(map[string]any{
+		"password":            hashedPassword,
+		"refresh_token":       "",
+		"password_changed_at": now,
+		"updated_at":          now,
+	})
+	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {

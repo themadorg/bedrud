@@ -14,3 +14,16 @@ type BlockedRefreshToken struct {
 func (BlockedRefreshToken) TableName() string {
 	return "blocked_refresh_tokens"
 }
+
+// BlockedAccessToken stores SHA-256 hashes of revoked access JWTs until natural expiry.
+// Survives process restart (unlike the in-memory revoke set alone).
+type BlockedAccessToken struct {
+	ID        string    `json:"id" gorm:"primaryKey;type:varchar(36)"`
+	Token     string    `json:"token" gorm:"type:varchar(64);not null;uniqueIndex"` // sha256 hex
+	ExpiresAt time.Time `json:"expiresAt" gorm:"not null;index"`
+	CreatedAt time.Time `json:"createdAt" gorm:"autoCreateTime;not null"`
+}
+
+func (BlockedAccessToken) TableName() string {
+	return "blocked_access_tokens"
+}
