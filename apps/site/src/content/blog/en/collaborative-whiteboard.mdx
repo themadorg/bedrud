@@ -1,0 +1,57 @@
+---
+title: "How Bedrud’s Collaborative Whiteboard Syncs"
+description: "Yjs CRDTs over LiveKit data channels — a shared board without a separate whiteboard server."
+date: "2026-07-10"
+author: "Bedrud Team"
+tags: ["engineering", "whiteboard", "webrtc", "yjs"]
+image: "/blog/collaborative-whiteboard.svg"
+---
+
+Most video stacks bolt on a whiteboard as another SaaS, another WebSocket, another origin to allowlist. Bedrud keeps the board inside the meeting room and reuses the media path you already have: **LiveKit data channels**.
+
+## The product goal
+
+Two (or twenty) people open the same overlay, draw, move shapes, and delete elements. Everyone sees the same scene within about a second. Leaving and rejoining does not strand the UI in a crash loop. Late joiners catch up.
+
+That is the bar we test in our manual guide: multi-user draw, remote select/move/delete, reopen after close, rejoin after leave.
+
+## Stack choice
+
+| Piece | Role |
+|-------|------|
+| Canvas UI | Excalidraw-style tooling (vendored in the web app) |
+| Shared state | **Yjs** CRDT document |
+| Transport | LiveKit **reliable / lossy data channels** |
+| Media A/V | Unchanged WebRTC tracks |
+
+CRDTs let concurrent edits merge without a central operational-transform server. LiveKit already multiplexes data for chat-style payloads; the whiteboard rides that path so self-hosters do not deploy a second realtime service.
+
+## Why not HTTP polling?
+
+Board strokes are high-churn and latency-sensitive. Polling the API would either hammer the Go process or feel sluggish. Data channels:
+
+- Stay in the same participant session as the call
+- Avoid extra CORS and cookie complexity for a side service
+- Fail and recover with the room connection instead of a separate “whiteboard offline” mode
+
+Chat, stage control messages, and board updates can coexist on the DC layer while SFU media stays on RTP.
+
+## Build note for self-hosters
+
+The whiteboard is a **code-split** chunk in the web client. Production builds must complete (`cd apps/web && bun run build`) so the vendor chunk is present when someone opens the board. A 404 on that chunk is a packaging bug, not a LiveKit misconfiguration.
+
+## Experimental toggle
+
+Shared whiteboard can be gated under **Settings → Experimental** so hosts can enable it when they want the control bar entry. Documented for end users in [Collaborative Whiteboard](/en/docs/using/whiteboard).
+
+## What we are not claiming
+
+- Pixel-perfect cursor lock across continents
+- Infinite offline offline-first storage of every board forever
+- Server-side durable board history as a first-class product (today the focus is live session sync)
+
+## Try it
+
+Deploy Bedrud, enable the experimental toggle if required, open a room in two browsers, and draw. If strokes land for both sides, the DC + Yjs path is healthy.
+
+For the full operator and architecture story of the media plane, see [WebRTC Connectivity](/en/docs/architecture/webrtc-connectivity) and [Web Frontend](/en/docs/architecture/web).

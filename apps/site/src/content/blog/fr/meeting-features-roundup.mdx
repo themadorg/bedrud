@@ -1,0 +1,69 @@
+---
+title: "Tour d'horizon des fonctions de réunion : scène, chat, YouTube et push-to-talk"
+description: "Ce que livre la salle de réunion Bedrud moderne — et où lire les guides pratiques."
+date: "2026-07-10"
+author: "Bedrud Team"
+tags: ["product", "meetings", "features"]
+image: "/blog/meeting-features-roundup.svg"
+---
+
+La vidéo auto-hébergée n'est pas seulement « rejoindre et voir des visages ». La coquille de réunion de Bedrud couvre désormais les dispositions de présentation, un chat plus riche, des watch parties optionnelles et le push-to-talk — toujours dans un seul binaire sur votre matériel.
+
+Ce billet est une carte. Les how-tos détaillés vivent sous **Utiliser Bedrud** dans la doc.
+
+## Mode scène
+
+Présentez sans combattre une grille libre pour tous. Les hôtes peuvent démarrer la **scène**, partager l'écran en overlay de scène, garder une bande de participants et terminer la scène pour revenir à la disposition normale. Les arrivants tardifs doivent atterrir dans le bon état de scène.
+
+→ [Mode scène](/fr/docs/using/stage-mode)
+
+## Tableau blanc collaboratif
+
+Dessin partagé avec Yjs sur les data channels LiveKit. Traits multi-utilisateurs, sélection/déplacement/suppression, bascule expérimentale optionnelle.
+
+→ [Tableau blanc collaboratif](/fr/docs/using/whiteboard) · [Billet engineering](/fr/blog/collaborative-whiteboard)
+
+## YouTube Watch
+
+Collez une URL, lisez à peu près en sync, fermez pour tout le monde. Aussi disponible derrière les paramètres expérimentaux lorsqu'elle est verrouillée.
+
+→ [YouTube Watch](/fr/docs/using/youtube-watch)
+
+## Chat : réactions, sondages, pièces jointes
+
+Le texte en salle n'est pas un stub :
+
+- **Réactions** emoji et **sélecteur d'emoji** du compositeur
+- **Sondages** avec mises à jour de vote en direct
+- **Images / fichiers** dans le quota (fragmentés pour les gros payloads)
+- Plafonds de rétention côté client pour borner les longues sessions
+
+→ [Chat en réunion](/fr/docs/using/chat)
+
+## Push-to-talk
+
+Activez le PTT dans les réglages audio, capturez une touche de maintien, n'émettez que pendant le maintien. Désactivez pour rétablir le mute normal. Changement d'appareil en cours d'appel sans reconnexion complète.
+
+→ [Audio et push-to-talk](/fr/docs/using/audio-and-push-to-talk)
+
+## Bases du tableau de bord et du compte
+
+Avant l'appel : inscription, avatar, salles récentes, rejoindre rapide par slug ou URL.
+
+→ [Compte et paramètres](/fr/docs/using/account-and-settings) · [Tableau de bord et salles](/fr/docs/using/dashboard-and-rooms) · [Rejoindre une réunion](/fr/docs/using/joining-a-meeting)
+
+## Modération et disposition
+
+Partage d'écran hors scène, spotlight, infos salle, menus contextuels basés sur le rôle, et UX de repli transport quand le réseau est hostile.
+
+→ [Contrôles de réunion](/fr/docs/using/meeting-controls) · [Rôles utilisateur](/fr/docs/guides/roles)
+
+## Ce qui est encore prévu
+
+Les routes d'**enregistrement** restent un chemin planifié / orienté opérateur — ne traitez pas l'enregistrement egress complet comme universellement prêt en production à chaque release tant que la doc ne le débloque pas. Les guides d'infrastructure, admin, LiveKit et déploiement restent la source de vérité pour les opérateurs.
+
+## Page Fonctionnalités
+
+Les cartes marketing de ces capacités de réunion vivent sur [Fonctionnalités](/fr/features), chacune renvoyant vers la doc ci-dessus.
+
+Livrez un binaire, partagez un lien, animez la réunion — maintenant avec un tableau blanc et une scène quand vous en avez besoin.

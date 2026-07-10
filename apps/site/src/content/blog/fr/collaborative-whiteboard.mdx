@@ -1,0 +1,57 @@
+---
+title: "Comment le tableau blanc collaboratif de Bedrud se synchronise"
+description: "CRDT Yjs sur les data channels LiveKit — un tableau partagé sans serveur de tableau blanc séparé."
+date: "2026-07-10"
+author: "Bedrud Team"
+tags: ["engineering", "whiteboard", "webrtc", "yjs"]
+image: "/blog/collaborative-whiteboard.svg"
+---
+
+La plupart des stacks vidéo greffent un tableau blanc comme un autre SaaS, un autre WebSocket, une autre origine à autoriser. Bedrud garde le tableau dans la salle de réunion et réutilise le chemin média que vous avez déjà : les **data channels LiveKit**.
+
+## L'objectif produit
+
+Deux (ou vingt) personnes ouvrent le même overlay, dessinent, déplacent des formes et suppriment des éléments. Tout le monde voit la même scène en environ une seconde. Quitter et rejoindre ne laisse pas l'UI dans une boucle de crash. Les arrivants tardifs rattrapent le retard.
+
+C'est la barre que nous testons dans le guide manuel : dessin multi-utilisateurs, sélection/déplacement/suppression à distance, réouverture après fermeture, rejoindre après avoir quitté.
+
+## Choix de stack
+
+| Élément | Rôle |
+|---------|------|
+| UI canvas | Outillage de style Excalidraw (vendored dans l'app web) |
+| État partagé | Document CRDT **Yjs** |
+| Transport | **Data channels** LiveKit fiables / lossy |
+| Médias A/V | Pistes WebRTC inchangées |
+
+Les CRDT permettent de fusionner les éditions concurrentes sans serveur central d'operational transform. LiveKit multiplexe déjà des données pour des payloads de type chat ; le tableau blanc emprunte ce chemin pour que les self-hosters n'aient pas à déployer un second service temps réel.
+
+## Pourquoi pas du polling HTTP ?
+
+Les traits du tableau sont à fort churn et sensibles à la latence. Interroger l'API en polling martèlerait le processus Go ou donnerait une sensation de lenteur. Les data channels :
+
+- Restent dans la même session participant que l'appel
+- Évitent la complexité CORS et cookies d'un service annexe
+- Tombent et se rétablissent avec la connexion de salle au lieu d'un mode « tableau blanc hors ligne » séparé
+
+Chat, messages de contrôle de scène et mises à jour du tableau peuvent coexister sur la couche DC tandis que les médias SFU restent sur RTP.
+
+## Note de build pour les self-hosters
+
+Le tableau blanc est un chunk **code-split** du client web. Les builds de production doivent aboutir (`cd apps/web && bun run build`) pour que le chunk vendor soit présent à l'ouverture du tableau. Un 404 sur ce chunk est un bug d'empaquetage, pas une mauvaise config LiveKit.
+
+## Bascule expérimentale
+
+Le tableau blanc partagé peut être derrière **Paramètres → Expérimental** pour que les hôtes activent l'entrée de la barre de contrôle quand ils le souhaitent. Documenté pour les utilisateurs finaux dans [Tableau blanc collaboratif](/fr/docs/using/whiteboard).
+
+## Ce que nous ne prétendons pas
+
+- Un verrouillage de curseur au pixel près entre continents
+- Un stockage offline-first infini de chaque tableau pour toujours
+- Un historique de tableau durable côté serveur comme produit de premier rang (aujourd'hui l'accent est sur la sync de session live)
+
+## Essayez
+
+Déployez Bedrud, activez la bascule expérimentale si besoin, ouvrez une salle dans deux navigateurs et dessinez. Si les traits arrivent des deux côtés, le chemin DC + Yjs est sain.
+
+Pour l'histoire complète opérateur et architecture du plan média, voir [Connectivité WebRTC](/fr/docs/architecture/webrtc-connectivity) et [Frontend web](/fr/docs/architecture/web).

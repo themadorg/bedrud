@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
+  <!-- DESIGN.md: rose + teal, sharp corners, dark meeting chrome, no purple -->
+  <rect width="1200" height="630" fill="#0C0A09"/>
+  <!-- subtle teal/rose grid lines -->
+  <g stroke="#292524" stroke-width="1">
+    <line x1="0" y1="105" x2="1200" y2="105"/>
+    <line x1="0" y1="210" x2="1200" y2="210"/>
+    <line x1="0" y1="315" x2="1200" y2="315"/>
+    <line x1="0" y1="420" x2="1200" y2="420"/>
+    <line x1="0" y1="525" x2="1200" y2="525"/>
+    <line x1="200" y1="0" x2="200" y2="630"/>
+    <line x1="400" y1="0" x2="400" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/>
+    <line x1="800" y1="0" x2="800" y2="630"/>
+    <line x1="1000" y1="0" x2="1000" y2="630"/>
+  </g>
+  <!-- whiteboard panel -->
+  <rect x="140" y="90" width="720" height="450" fill="#1C1917" stroke="#E7E5E4" stroke-width="2"/>
+  <rect x="140" y="90" width="720" height="40" fill="#292524" stroke="#E7E5E4" stroke-width="2"/>
+  <text x="160" y="117" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#FAFAF9" letter-spacing="2">WHITEBOARD</text>
+  <rect x="820" y="100" width="20" height="20" fill="#E11D48"/>
+  <!-- strokes: rose path + teal path -->
+  <path d="M220 220 C 300 180, 380 300, 460 250 S 600 180, 680 240" stroke="#E11D48" stroke-width="4" fill="none"/>
+  <path d="M240 340 C 320 400, 400 300, 500 360 S 640 420, 720 340" stroke="#14B8A6" stroke-width="4" fill="none"/>
+  <rect x="300" y="280" width="120" height="80" fill="none" stroke="#F43F5E" stroke-width="2"/>
+  <circle cx="520" cy="300" r="36" fill="none" stroke="#0D9488" stroke-width="2"/>
+  <!-- cursors A / B -->
+  <g>
+    <polygon points="250,200 250,230 262,220 275,235 282,230 268,216 280,210" fill="#E11D48"/>
+    <rect x="278" y="232" width="28" height="18" fill="#E11D48"/>
+    <text x="286" y="245" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#FAFAF9">A</text>
+  </g>
+  <g>
+    <polygon points="640,360 640,390 652,380 665,395 672,390 658,376 670,370" fill="#14B8A6"/>
+    <rect x="668" y="392" width="28" height="18" fill="#14B8A6"/>
+    <text x="676" y="405" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#1C1917">B</text>
+  </g>
+  <!-- data channel side panel -->
+  <rect x="900" y="140" width="220" height="340" fill="#1C1917" stroke="#57534E" stroke-width="2"/>
+  <text x="920" y="180" font-family="ui-monospace, monospace" font-size="14" font-weight="600" fill="#14B8A6" letter-spacing="1">LIVEKIT DC</text>
+  <line x1="920" y1="200" x2="1100" y2="200" stroke="#292524" stroke-width="2"/>
+  <text x="920" y="240" font-family="ui-monospace, monospace" font-size="13" fill="#A8A29E">Yjs CRDT</text>
+  <text x="920" y="270" font-family="ui-monospace, monospace" font-size="13" fill="#A8A29E">reliable / lossy</text>
+  <text x="920" y="300" font-family="ui-monospace, monospace" font-size="13" fill="#A8A29E">no 2nd server</text>
+  <!-- link lines -->
+  <line x1="860" y1="280" x2="900" y2="280" stroke="#E11D48" stroke-width="2"/>
+  <line x1="860" y1="320" x2="900" y2="320" stroke="#14B8A6" stroke-width="2"/>
+  <rect x="900" y="380" width="180" height="36" fill="#0C0A09" stroke="#E11D48" stroke-width="2"/>
+  <text x="920" y="403" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#FAFAF9">SYNC ~1s</text>
+  <!-- title band -->
+  <rect x="0" y="560" width="1200" height="70" fill="#1C1917"/>
+  <rect x="0" y="560" width="8" height="70" fill="#E11D48"/>
+  <text x="40" y="605" font-family="system-ui, sans-serif" font-size="28" font-weight="700" fill="#FAFAF9">Collaborative Whiteboard</text>
+  <text x="520" y="605" font-family="system-ui, sans-serif" font-size="18" fill="#A8A29E">Yjs · LiveKit data channels · Bedrud</text>
+</svg>

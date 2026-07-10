@@ -1,0 +1,57 @@
+---
+title: "So synchronisiert Bedruds kollaboratives Whiteboard"
+description: "Yjs-CRDTs über LiveKit-Datenkanäle — ein gemeinsames Board ohne separaten Whiteboard-Server."
+date: "2026-07-10"
+author: "Bedrud Team"
+tags: ["engineering", "whiteboard", "webrtc", "yjs"]
+image: "/blog/collaborative-whiteboard.svg"
+---
+
+Die meisten Video-Stacks hängen ein Whiteboard als weiteres SaaS, weiteren WebSocket und weitere Origin an die Allowlist. Bedrud hält das Board im Meeting-Raum und nutzt den Medienpfad, den Sie bereits haben: **LiveKit-Datenkanäle**.
+
+## Das Produktziel
+
+Zwei (oder zwanzig) Personen öffnen dasselbe Overlay, zeichnen, verschieben Formen und löschen Elemente. Alle sehen dieselbe Szene innerhalb von etwa einer Sekunde. Verlassen und erneutes Beitreten lässt die UI nicht in einer Crash-Schleife stecken. Späte Beitretende holen auf.
+
+Das ist die Latte, die wir im manuellen Guide prüfen: Multi-User-Zeichnen, remote auswählen/verschieben/löschen, erneut öffnen nach Schließen, erneut beitreten nach Verlassen.
+
+## Stack-Wahl
+
+| Baustein | Rolle |
+|----------|-------|
+| Canvas-UI | Excalidraw-ähnliche Werkzeuge (vendored in der Web-App) |
+| Geteilter Zustand | **Yjs**-CRDT-Dokument |
+| Transport | LiveKit-**reliable / lossy data channels** |
+| Medien A/V | Unveränderte WebRTC-Tracks |
+
+CRDTs lassen gleichzeitige Edits ohne zentralen Operational-Transform-Server zusammenlaufen. LiveKit multiplexiert ohnehin Daten für chat-ähnliche Payloads; das Whiteboard reitet diesen Pfad, damit Self-Hoster keinen zweiten Realtime-Dienst deployen.
+
+## Warum kein HTTP-Polling?
+
+Board-Striche sind high-churn und latenzsensitiv. Die API zu pollen würde entweder den Go-Prozess hämmern oder träge wirken. Datenkanäle:
+
+- Bleiben in derselben Teilnehmer-Sitzung wie der Anruf
+- Vermeiden extra CORS- und Cookie-Komplexität für einen Nebendienst
+- Fallen und erholen sich mit der Raumverbindung statt eines separaten „Whiteboard offline“-Modus
+
+Chat, Stage-Steuerungsnachrichten und Board-Updates können auf der DC-Schicht koexistieren, während SFU-Medien auf RTP bleiben.
+
+## Build-Hinweis für Self-Hoster
+
+Das Whiteboard ist ein **code-split** Chunk im Web-Client. Produktions-Builds müssen durchlaufen (`cd apps/web && bun run build`), damit der Vendor-Chunk vorhanden ist, wenn jemand das Board öffnet. Ein 404 auf diesem Chunk ist ein Packaging-Bug, keine LiveKit-Fehlkonfiguration.
+
+## Experimenteller Schalter
+
+Das geteilte Whiteboard kann unter **Einstellungen → Experimentell** freigeschaltet werden, damit Hosts den Eintrag in der Steuerungsleiste freigeben, wenn sie ihn wollen. Für Endnutzer dokumentiert unter [Kollaboratives Whiteboard](/de/docs/using/whiteboard).
+
+## Was wir nicht behaupten
+
+- Pixelgenaue Cursor-Sperre über Kontinente hinweg
+- Unendlichen Offline-offline-first-Speicher jedes Boards für immer
+- Serverseitige dauerhafte Board-Historie als First-Class-Produkt (heute steht Live-Session-Sync im Vordergrund)
+
+## Ausprobieren
+
+Deployen Sie Bedrud, aktivieren Sie ggf. den experimentellen Schalter, öffnen Sie einen Raum in zwei Browsern und zeichnen Sie. Wenn Striche auf beiden Seiten ankommen, ist der DC- + Yjs-Pfad gesund.
+
+Die vollständige Operator- und Architekturgeschichte der Medienebene steht unter [WebRTC-Konnektivität](/de/docs/architecture/webrtc-connectivity) und [Web-Frontend](/de/docs/architecture/web).

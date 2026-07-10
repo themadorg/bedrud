@@ -1,0 +1,57 @@
+---
+title: "Cómo se sincroniza la pizarra colaborativa de Bedrud"
+description: "CRDT Yjs sobre data channels de LiveKit — un tablero compartido sin un servidor de pizarra aparte."
+date: "2026-07-10"
+author: "Bedrud Team"
+tags: ["engineering", "whiteboard", "webrtc", "yjs"]
+image: "/blog/collaborative-whiteboard.svg"
+---
+
+La mayoría de los stacks de vídeo enganchan una pizarra como otro SaaS, otro WebSocket y otro origen a permitir. Bedrud mantiene el tablero dentro de la sala de reunión y reutiliza el camino de medios que ya tienes: **data channels de LiveKit**.
+
+## El objetivo de producto
+
+Dos (o veinte) personas abren la misma superposición, dibujan, mueven formas y eliminan elementos. Todos ven la misma escena en alrededor de un segundo. Salir y volver a unirse no deja la UI en un bucle de crash. Quienes llegan tarde se ponen al día.
+
+Esa es la vara que comprobamos en la guía manual: dibujo multiusuario, seleccionar/mover/eliminar en remoto, reabrir tras cerrar, volver a unirse tras salir.
+
+## Elección de stack
+
+| Pieza | Rol |
+|-------|-----|
+| UI del lienzo | Herramientas estilo Excalidraw (vendored en la app web) |
+| Estado compartido | Documento CRDT **Yjs** |
+| Transporte | **Data channels** LiveKit fiables / lossy |
+| Medios A/V | Pistas WebRTC sin cambios |
+
+Los CRDT permiten fusionar ediciones concurrentes sin un servidor central de operational transform. LiveKit ya multiplexa datos para payloads tipo chat; la pizarra usa ese camino para que quien se autoaloja no despliegue un segundo servicio en tiempo real.
+
+## ¿Por qué no polling HTTP?
+
+Los trazos del tablero tienen alto churn y son sensibles a la latencia. Hacer polling a la API o aplastaría el proceso Go o se sentiría lento. Los data channels:
+
+- Permanecen en la misma sesión de participante que la llamada
+- Evitan la complejidad extra de CORS y cookies de un servicio lateral
+- Fallan y se recuperan con la conexión de la sala en lugar de un modo «pizarra offline» aparte
+
+Chat, mensajes de control de escenario y actualizaciones del tablero pueden coexistir en la capa DC mientras los medios SFU siguen en RTP.
+
+## Nota de build para self-hosters
+
+La pizarra es un chunk **code-split** del cliente web. Los builds de producción deben completarse (`cd apps/web && bun run build`) para que el chunk vendor esté presente al abrir el tablero. Un 404 en ese chunk es un bug de empaquetado, no una mala configuración de LiveKit.
+
+## Conmutador experimental
+
+La pizarra compartida puede estar bajo **Ajustes → Experimental** para que los anfitriones activen la entrada de la barra de controles cuando quieran. Documentado para usuarios finales en [Pizarra colaborativa](/es/docs/using/whiteboard).
+
+## Lo que no afirmamos
+
+- Bloqueo de cursor a nivel de píxel entre continentes
+- Almacenamiento offline-first infinito de cada tablero para siempre
+- Historial durable de tablero en el servidor como producto de primera clase (hoy el foco es la sync de sesión en vivo)
+
+## Pruébalo
+
+Despliega Bedrud, activa el conmutador experimental si hace falta, abre una sala en dos navegadores y dibuja. Si los trazos llegan a ambos lados, el camino DC + Yjs está sano.
+
+Para la historia completa de operador y arquitectura del plano de medios, ver [Conectividad WebRTC](/es/docs/architecture/webrtc-connectivity) y [Frontend web](/es/docs/architecture/web).

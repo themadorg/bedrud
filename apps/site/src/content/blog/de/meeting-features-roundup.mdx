@@ -1,0 +1,69 @@
+---
+title: "Meeting-Funktionen im Überblick: Stage, Chat, YouTube und Push-to-Talk"
+description: "Was der moderne Bedrud-Meeting-Raum mitbringt — und wo die How-to-Docs stehen."
+date: "2026-07-10"
+author: "Bedrud Team"
+tags: ["product", "meetings", "features"]
+image: "/blog/meeting-features-roundup.svg"
+---
+
+Selbst gehostetes Video heißt nicht nur „beitreten und Gesichter sehen“. Die Meeting-Shell von Bedrud deckt jetzt Präsentationslayouts, reicheren Chat, optionale Watch-Partys und Push-to-Talk ab — weiterhin in einer Binärdatei auf Ihrer Hardware.
+
+Dieser Beitrag ist eine Karte. Die tiefen How-tos leben unter **Bedrud nutzen** in den Docs.
+
+## Stage-Modus
+
+Präsentieren, ohne gegen ein freies Grid zu kämpfen. Hosts können die **Stage** starten, den Bildschirm als Stage-Overlay teilen, die Teilnehmerleiste behalten und die Stage beenden, um zum normalen Layout zurückzukehren. Späte Beitretende sollten im korrekten Stage-Zustand landen.
+
+→ [Stage-Modus](/de/docs/using/stage-mode)
+
+## Kollaboratives Whiteboard
+
+Gemeinsames Zeichnen mit Yjs über LiveKit-Datenkanäle. Multi-User-Striche, auswählen/verschieben/löschen, optionaler experimenteller Schalter.
+
+→ [Kollaboratives Whiteboard](/de/docs/using/whiteboard) · [Engineering-Beitrag](/de/blog/collaborative-whiteboard)
+
+## YouTube Watch
+
+URL einfügen, ungefähr synchron abspielen, für alle schließen. Auch hinter experimentellen Einstellungen freischaltbar.
+
+→ [YouTube Watch](/de/docs/using/youtube-watch)
+
+## Chat: Reaktionen, Umfragen, Anhänge
+
+Text im Raum ist kein Stub:
+
+- Emoji-**Reaktionen** und Composer-**Emoji-Picker**
+- **Umfragen** mit Live-Abstimmungs-Updates
+- **Bilder / Dateien** im Kontingent (chunked für große Payloads)
+- Clientseitige Aufbewahrungsgrenzen, damit lange Sitzungen begrenzt bleiben
+
+→ [Meeting-Chat](/de/docs/using/chat)
+
+## Push-to-Talk
+
+PTT in den Audio-Einstellungen aktivieren, Hold-Taste erfassen, nur senden solange gehalten. Deaktivieren stellt das normale Mute-Toggle wieder her. Gerätewechsel mitten im Anruf ohne vollständigen Reconnect.
+
+→ [Audio & Push-to-Talk](/de/docs/using/audio-and-push-to-talk)
+
+## Dashboard und Konto-Grundlagen
+
+Vor dem Anruf: registrieren, Avatar, letzte Räume, Schnellbeitritt per Slug oder URL.
+
+→ [Konto & Einstellungen](/de/docs/using/account-and-settings) · [Dashboard & Räume](/de/docs/using/dashboard-and-rooms) · [Einem Meeting beitreten](/de/docs/using/joining-a-meeting)
+
+## Moderation und Layout
+
+Bildschirmfreigabe außerhalb der Stage, Spotlight, Rauminfos, rollenbasierte Kontextmenüs und Transport-Fallback-UX, wenn das Netz feindlich ist.
+
+→ [Meeting-Steuerung](/de/docs/using/meeting-controls) · [Benutzerrollen](/de/docs/guides/roles)
+
+## Was noch geplant ist
+
+**Recording**-Routen bleiben ein geplanter / operator-orientierter Pfad — behandeln Sie vollständiges Egress-Recording nicht als universell produktionsfertig in jedem Release, bis die Docs es freigeben. Infrastruktur, Admin, LiveKit und Deploy-Guides bleiben die Quelle der Wahrheit für Operatoren.
+
+## Features-Seite
+
+Marketing-Karten für diese Meeting-Fähigkeiten stehen unter [Funktionen](/de/features), jeweils mit Link in die Docs oben.
+
+Shippen Sie eine Binärdatei, teilen Sie einen Link, führen Sie das Meeting — jetzt mit Whiteboard und Stage, wenn Sie sie brauchen.

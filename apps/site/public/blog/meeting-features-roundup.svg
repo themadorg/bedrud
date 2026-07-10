@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
+  <!-- DESIGN.md: rose + teal, sharp corners, stage layout -->
+  <rect width="1200" height="630" fill="#0C0A09"/>
+  <!-- stage / presenter tile -->
+  <rect x="80" y="60" width="720" height="400" fill="#1C1917" stroke="#57534E" stroke-width="2"/>
+  <rect x="80" y="60" width="720" height="36" fill="#292524" stroke="#57534E" stroke-width="2"/>
+  <text x="100" y="85" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#14B8A6" letter-spacing="2">STAGE</text>
+  <!-- presenter silhouette blocks -->
+  <rect x="320" y="160" width="240" height="180" fill="#292524" stroke="#E7E5E4" stroke-width="1"/>
+  <circle cx="440" cy="220" r="36" fill="#57534E"/>
+  <rect x="380" y="270" width="120" height="50" fill="#57534E"/>
+  <!-- YOU badge -->
+  <rect x="100" y="110" width="52" height="22" fill="#E11D48"/>
+  <text x="112" y="126" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#FAFAF9">YOU</text>
+  <!-- speaking indicator -->
+  <rect x="760" y="110" width="20" height="12" fill="#16A34A"/>
+  <rect x="760" y="128" width="20" height="12" fill="#16A34A" opacity="0.7"/>
+  <rect x="760" y="146" width="20" height="12" fill="#16A34A" opacity="0.4"/>
+  <!-- participant strip -->
+  <g>
+    <rect x="80" y="480" width="140" height="90" fill="#1C1917" stroke="#E11D48" stroke-width="3"/>
+    <circle cx="150" cy="515" r="18" fill="#57534E"/>
+    <rect x="120" y="540" width="60" height="16" fill="#57534E"/>
+    <rect x="90" y="488" width="36" height="14" fill="#E11D48"/>
+    <text x="96" y="499" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#FAFAF9">YOU</text>
+  </g>
+  <g>
+    <rect x="240" y="480" width="140" height="90" fill="#1C1917" stroke="#292524" stroke-width="2"/>
+    <circle cx="310" cy="515" r="18" fill="#57534E"/>
+    <rect x="280" y="540" width="60" height="16" fill="#57534E"/>
+  </g>
+  <g>
+    <rect x="400" y="480" width="140" height="90" fill="#1C1917" stroke="#292524" stroke-width="2"/>
+    <circle cx="470" cy="515" r="18" fill="#57534E"/>
+    <rect x="440" y="540" width="60" height="16" fill="#57534E"/>
+  </g>
+  <g>
+    <rect x="560" y="480" width="140" height="90" fill="#1C1917" stroke="#14B8A6" stroke-width="2"/>
+    <circle cx="630" cy="515" r="18" fill="#57534E"/>
+    <rect x="600" y="540" width="60" height="16" fill="#57534E"/>
+    <!-- hand raised -->
+    <rect x="650" y="490" width="36" height="20" fill="#14B8A6"/>
+    <text x="656" y="504" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#1C1917">HAND</text>
+  </g>
+  <!-- feature icon column -->
+  <g>
+    <!-- chat -->
+    <rect x="880" y="80" width="240" height="72" fill="#1C1917" stroke="#292524" stroke-width="2"/>
+    <rect x="900" y="98" width="32" height="32" fill="#E11D48"/>
+    <text x="948" y="112" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#FAFAF9">Chat · Polls</text>
+    <text x="948" y="132" font-family="system-ui, sans-serif" font-size="12" fill="#A8A29E">reactions · files</text>
+    <!-- ptt -->
+    <rect x="880" y="172" width="240" height="72" fill="#1C1917" stroke="#292524" stroke-width="2"/>
+    <rect x="900" y="190" width="32" height="32" fill="#14B8A6"/>
+    <text x="948" y="204" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#FAFAF9">Push-to-Talk</text>
+    <text x="948" y="224" font-family="system-ui, sans-serif" font-size="12" fill="#A8A29E">hold key · mute</text>
+    <!-- youtube -->
+    <rect x="880" y="264" width="240" height="72" fill="#1C1917" stroke="#292524" stroke-width="2"/>
+    <rect x="900" y="282" width="32" height="32" fill="#E11D48"/>
+    <polygon points="910,290 910,306 924,298" fill="#FAFAF9"/>
+    <text x="948" y="296" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#FAFAF9">YouTube Watch</text>
+    <text x="948" y="316" font-family="system-ui, sans-serif" font-size="12" fill="#A8A29E">synced playback</text>
+    <!-- whiteboard -->
+    <rect x="880" y="356" width="240" height="72" fill="#1C1917" stroke="#292524" stroke-width="2"/>
+    <rect x="900" y="374" width="32" height="32" fill="#14B8A6"/>
+    <path d="M906 396 L914 380 L926 400" stroke="#1C1917" stroke-width="2" fill="none"/>
+    <text x="948" y="388" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#FAFAF9">Whiteboard</text>
+    <text x="948" y="408" font-family="system-ui, sans-serif" font-size="12" fill="#A8A29E">Yjs · LiveKit DC</text>
+    <!-- single binary badge -->
+    <rect x="880" y="448" width="240" height="48" fill="#0C0A09" stroke="#E11D48" stroke-width="2"/>
+    <text x="910" y="478" font-family="system-ui, sans-serif" font-size="16" font-weight="700" fill="#FAFAF9">ONE BINARY</text>
+  </g>
+  <!-- title band -->
+  <rect x="0" y="580" width="1200" height="50" fill="#1C1917"/>
+  <rect x="0" y="580" width="8" height="50" fill="#14B8A6"/>
+  <text x="40" y="612" font-family="system-ui, sans-serif" font-size="22" font-weight="700" fill="#FAFAF9">Meeting Features Roundup</text>
+  <text x="420" y="612" font-family="system-ui, sans-serif" font-size="16" fill="#A8A29E">Stage · Chat · YouTube · PTT · Bedrud</text>
+</svg>

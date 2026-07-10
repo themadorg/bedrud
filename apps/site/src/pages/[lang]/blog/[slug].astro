@@ -48,6 +48,7 @@ const { Content } = await render(post);
   lang={lang}
   title={`${post.data.title}${t(lang, "blog.titleSuffix")}`}
   description={post.data.description}
+  image={post.data.image}
 >
   <article class="py-12 lg:py-16">
     <div class="mx-auto max-w-3xl px-6">
@@ -59,6 +60,7 @@ const { Content } = await render(post);
         date={String(post.data.date)}
         author={post.data.author ?? t(lang, "blog.defaultAuthor")}
         tags={post.data.tags ?? []}
+        image={post.data.image}
       />
       <div class="prose prose-neutral max-w-none prose-headings:font-semibold prose-a:text-primary prose-a:no-underline hover:prose-a:underline">
         <Content />

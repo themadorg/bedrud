@@ -1,0 +1,57 @@
+---
+title: "Bedrud Ortak Beyaz Tahtası Nasıl Senkronize Olur"
+description: "LiveKit veri kanalları üzerinde Yjs CRDT — ayrı bir beyaz tahta sunucusu olmadan paylaşılan tahta."
+date: "2026-07-10"
+author: "Bedrud Team"
+tags: ["engineering", "whiteboard", "webrtc", "yjs"]
+image: "/blog/collaborative-whiteboard.svg"
+---
+
+Çoğu video yığını beyaz tahtayı başka bir SaaS, başka bir WebSocket, izin listesine eklenecek başka bir origin olarak sonradan takar. Bedrud tahtayı toplantı odasının içinde tutar ve zaten sahip olduğunuz medya yolunu yeniden kullanır: **LiveKit veri kanalları**.
+
+## Ürün hedefi
+
+İki (veya yirmi) kişi aynı katmanı açar, çizer, şekilleri taşır ve öğeleri siler. Herkes yaklaşık bir saniye içinde aynı sahneyi görür. Ayrılıp yeniden katılmak UI'yi çökme döngüsüne bırakmaz. Geç katılanlar yetişir.
+
+Manuel kılavuzumuzda test ettiğimiz çubuk budur: çok kullanıcılı çizim, uzak seç/taşı/sil, kapattıktan sonra yeniden açma, ayrıldıktan sonra yeniden katılma.
+
+## Yığın seçimi
+
+| Parça | Rol |
+|-------|-----|
+| Tuval UI | Excalidraw tarzı araçlar (web uygulamasında vendored) |
+| Paylaşılan durum | **Yjs** CRDT belgesi |
+| Taşıma | LiveKit **reliable / lossy veri kanalları** |
+| Medya A/V | Değişmeyen WebRTC izleri |
+
+CRDT'ler eşzamanlı düzenlemelerin merkezi bir operasyonel dönüşüm sunucusu olmadan birleşmesine izin verir. LiveKit zaten sohbet tarzı yükler için veriyi çoğullar; beyaz tahta o yolu kullanır, böylece kendi barındıranlar ikinci bir gerçek zamanlı hizmet dağıtmaz.
+
+## Neden HTTP yoklaması değil?
+
+Tahta darbeleri yüksek değişim ve gecikmeye duyarlıdır. API'yi yoklamak ya Go sürecini döver ya da hantal hissettirir. Veri kanalları:
+
+- Arama ile aynı katılımcı oturumunda kalır
+- Yan hizmet için ekstra CORS ve çerez karmaşıklığından kaçınır
+- Ayrı bir «beyaz tahta çevrimdışı» modu yerine oda bağlantısıyla birlikte başarısız olur ve toparlanır
+
+Sohbet, sahne kontrol mesajları ve tahta güncellemeleri DC katmanında bir arada yaşayabilir; SFU medyası RTP'de kalır.
+
+## Kendi barındıranlar için derleme notu
+
+Beyaz tahta web istemcisinde **kod bölünmüş** bir parçacıktır. Üretim derlemeleri tamamlanmalıdır (`cd apps/web && bun run build`), böylece biri tahtayı açtığında vendor parçacığı vardır. O parçacıkta 404, LiveKit yanlış yapılandırması değil paketleme hatasıdır.
+
+## Deneysel anahtar
+
+Paylaşılan beyaz tahta **Ayarlar → Deneysel** altında kapılı olabilir; ev sahipleri kontrol çubuğu girişini istediklerinde açabilir. Son kullanıcı belgesi: [Ortak Beyaz Tahta](/tr/docs/using/whiteboard).
+
+## İddia etmediklerimiz
+
+- Kıtalar arası piksel mükemmel imleç kilidi
+- Her tahtanın sonsuza dek çevrimdışı öncelikli depolanması
+- Sunucu tarafı kalıcı tahta geçmişinin birinci sınıf ürün olması (bugün odak canlı oturum senkronu)
+
+## Deneyin
+
+Bedrud'u dağıtın, gerekirse deneysel anahtarı açın, iki tarayıcıda bir oda açın ve çizin. Darbeler her iki tarafa da düşerse DC + Yjs yolu sağlıklıdır.
+
+Medya düzleminin tam operatör ve mimari hikâyesi için [WebRTC Bağlantısı](/tr/docs/architecture/webrtc-connectivity) ve [Web Ön Uç](/tr/docs/architecture/web) bölümlerine bakın.

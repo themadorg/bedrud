@@ -1,0 +1,57 @@
+---
+title: "Как синхронизируется совместная доска Bedrud"
+description: "Yjs CRDT поверх data channels LiveKit — общая доска без отдельного whiteboard-сервера."
+date: "2026-07-10"
+author: "Bedrud Team"
+tags: ["engineering", "whiteboard", "webrtc", "yjs"]
+image: "/blog/collaborative-whiteboard.svg"
+---
+
+Большинство видеостеков прикручивают whiteboard как ещё один SaaS, ещё один WebSocket, ещё один origin в allowlist. Bedrud держит доску внутри комнаты встречи и переиспользует медиа-путь, который у вас уже есть: **LiveKit data channels**.
+
+## Продуктовая цель
+
+Два (или двадцать) человек открывают один оверлей, рисуют, двигают фигуры и удаляют элементы. Все видят одну сцену примерно за секунду. Выход и повторный вход не оставляют UI в цикле крашей. Поздние входы догоняют.
+
+Это планка, которую мы проверяем в ручном гайде: multi-user draw, remote select/move/delete, reopen after close, rejoin after leave.
+
+## Выбор стека
+
+| Часть | Роль |
+|-------|------|
+| Canvas UI | Инструменты в стиле Excalidraw (vendored в web app) |
+| Shared state | CRDT-документ **Yjs** |
+| Transport | **reliable / lossy data channels** LiveKit |
+| Media A/V | WebRTC tracks без изменений |
+
+CRDT позволяют мержить параллельные правки без центрального operational-transform сервера. LiveKit уже мультиплексирует data для chat-подобных payload; доска едет тем же путём, чтобы self-hosters не деплоили второй realtime-сервис.
+
+## Почему не HTTP polling?
+
+Штрихи на доске high-churn и чувствительны к задержке. Polling API либо бьёт по Go-процессу, либо ощущается вялым. Data channels:
+
+- Остаются в той же participant-сессии, что и звонок
+- Не добавляют CORS и cookie-сложность side-сервиса
+- Падают и восстанавливаются вместе с соединением комнаты, а не отдельным режимом «whiteboard offline»
+
+Чат, stage control messages и обновления доски могут сосуществовать на DC-слое, пока SFU-медиа идёт по RTP.
+
+## Заметка по build для self-hosters
+
+Whiteboard — **code-split** chunk в web-клиенте. Production builds должны завершаться (`cd apps/web && bun run build`), чтобы vendor chunk был на месте, когда кто-то открывает доску. 404 на этом chunk — packaging bug, не misconfiguration LiveKit.
+
+## Experimental toggle
+
+Общая доска может быть gated под **Settings → Experimental**, чтобы хосты включали пункт на control bar когда нужно. Для end users задокументировано в [Совместная доска](/ru/docs/using/whiteboard).
+
+## Чего мы не обещаем
+
+- Pixel-perfect lock курсоров между континентами
+- Бесконечное offline-first хранение каждой доски навсегда
+- Server-side durable history доски как first-class product (сегодня фокус — live session sync)
+
+## Попробуйте
+
+Задеплойте Bedrud, включите experimental toggle если нужно, откройте комнату в двух браузерах и рисуйте. Если штрихи доходят с обеих сторон — путь DC + Yjs здоров.
+
+Полная операторская и архитектурная история media plane: [Подключение WebRTC](/ru/docs/architecture/webrtc-connectivity) и [Веб-фронтенд](/ru/docs/architecture/web).

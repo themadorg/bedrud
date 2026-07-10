@@ -1,0 +1,57 @@
+---
+title: "Bedrud 协作白板如何同步"
+description: "LiveKit 数据通道上的 Yjs CRDT — 共享画板，无需单独的白板服务器。"
+date: "2026-07-10"
+author: "Bedrud Team"
+tags: ["engineering", "whiteboard", "webrtc", "yjs"]
+image: "/blog/collaborative-whiteboard.svg"
+---
+
+多数视频栈把白板当成另一个 SaaS、另一条 WebSocket、另一个需要放行的源。Bedrud 把画板留在会议房间内，并复用你已有的媒体路径：**LiveKit 数据通道**。
+
+## 产品目标
+
+两个人（或二十个人）打开同一叠加层，绘制、移动形状、删除元素。大约一秒内所有人看到同一场景。离开再加入不会让 UI 陷入崩溃循环。迟到者能追上进度。
+
+这是我们在手动指南中测试的标准：多用户绘制、远端选择/移动/删除、关闭后重开、离开后重新加入。
+
+## 技术选型
+
+| 组件 | 作用 |
+|------|------|
+| 画布 UI | Excalidraw 风格工具（在 web 应用中 vendored） |
+| 共享状态 | **Yjs** CRDT 文档 |
+| 传输 | LiveKit **reliable / lossy 数据通道** |
+| 媒体 A/V | 不变的 WebRTC 轨道 |
+
+CRDT 让并发编辑在无需中心操作转换服务器的情况下合并。LiveKit 已为聊天类载荷复用数据通道；白板走同一路径，自托管者无需再部署第二套实时服务。
+
+## 为何不用 HTTP 轮询？
+
+画笔笔迹高抖动且对延迟敏感。轮询 API 要么压垮 Go 进程，要么感觉迟钝。数据通道：
+
+- 与通话同一参与者会话
+- 避免旁路服务的额外 CORS 与 cookie 复杂度
+- 随房间连接失败与恢复，而不是单独的「白板离线」模式
+
+聊天、舞台控制消息与画板更新可共存于 DC 层，而 SFU 媒体仍走 RTP。
+
+## 自托管者的构建说明
+
+白板是 web 客户端中的**代码分割**分块。生产构建必须完成（`cd apps/web && bun run build`），以便有人打开画板时 vendor 分块存在。该分块 404 是打包问题，不是 LiveKit 配置错误。
+
+## 实验性开关
+
+共享白板可在 **设置 → 实验性** 下门控，主机可在需要控制栏入口时启用。终端用户文档见 [协作白板](/zh/docs/using/whiteboard)。
+
+## 我们不声称的
+
+- 跨大洲像素级光标锁定
+- 无限离线优先、永久保存每块画板
+- 服务端持久画板历史作为一等产品（今天重点是实时会话同步）
+
+## 试一试
+
+部署 Bedrud，必要时启用实验性开关，用两个浏览器打开房间并绘制。若双方笔迹都能到达，DC + Yjs 路径健康。
+
+媒体平面的完整运维与架构说明见 [WebRTC 连接](/zh/docs/architecture/webrtc-connectivity) 与 [Web 前端](/zh/docs/architecture/web)。

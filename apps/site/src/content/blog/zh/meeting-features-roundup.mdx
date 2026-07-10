@@ -1,0 +1,69 @@
+---
+title: "会议功能汇总：舞台、聊天、YouTube 与一键通讲"
+description: "现代 Bedrud 会议室已交付的能力 — 以及如何找到对应教程文档。"
+date: "2026-07-10"
+author: "Bedrud Team"
+tags: ["product", "meetings", "features"]
+image: "/blog/meeting-features-roundup.svg"
+---
+
+自托管视频不只是「加入并看到脸」。Bedrud 的会议外壳现已覆盖演示布局、更丰富的聊天、可选的一起看，以及一键通讲 — 仍是你硬件上的单个二进制。
+
+本文是一张地图。深入教程在文档中的 **使用 Bedrud** 下。
+
+## 舞台模式
+
+演示时不必与自由混战网格搏斗。主持人可启动**舞台**，以舞台叠加层共享屏幕，保留参与者条，并结束舞台回到普通布局。迟到者应落在正确的舞台状态。
+
+→ [舞台模式](/zh/docs/using/stage-mode)
+
+## 协作白板
+
+Yjs 经 LiveKit 数据通道的共享绘制。多用户笔迹、选择/移动/删除，可选实验性开关。
+
+→ [协作白板](/zh/docs/using/whiteboard) · [工程博文](/zh/blog/collaborative-whiteboard)
+
+## YouTube 一起看
+
+粘贴 URL，大致同步播放，对所有人关闭。在门控时也可在实验性设置后使用。
+
+→ [YouTube 一起看](/zh/docs/using/youtube-watch)
+
+## 聊天：回应、投票、附件
+
+房间内文字不是摆设：
+
+- 表情**回应**与输入框**表情选择器**
+- 带实时投票更新的**投票**
+- 配额内的**图片 / 文件**（大载荷分块）
+- 客户端保留上限，让长会话保持有界
+
+→ [会议内聊天](/zh/docs/using/chat)
+
+## 一键通讲
+
+在音频设置中启用 PTT，捕获按住键，仅在按住时发送。禁用后恢复普通静音切换。通话中切换设备无需完整重连。
+
+→ [音频与一键通讲](/zh/docs/using/audio-and-push-to-talk)
+
+## 仪表板与账户基础
+
+通话前：注册、头像、最近房间、按 slug 或 URL 快速加入。
+
+→ [账户与设置](/zh/docs/using/account-and-settings) · [仪表板与房间](/zh/docs/using/dashboard-and-rooms) · [加入会议](/zh/docs/using/joining-a-meeting)
+
+## 管理与布局
+
+舞台外的屏幕共享、聚光灯、房间信息、基于角色的上下文菜单，以及网络恶劣时的传输回退体验。
+
+→ [会议控制](/zh/docs/using/meeting-controls) · [用户角色](/zh/docs/guides/roles)
+
+## 仍在规划中的
+
+**录制**路由仍是规划中 / 面向运维的路径 — 在文档解除门控前，不要把完整 egress 录制视为每个版本都已生产完备。基础设施、管理、LiveKit 与部署指南仍是运维的权威来源。
+
+## 功能页
+
+这些会议能力的营销卡片在 [功能](/zh/features)，各自链入上述文档。
+
+部署一个二进制，分享一个链接，开会 — 现在需要时还有白板与舞台。

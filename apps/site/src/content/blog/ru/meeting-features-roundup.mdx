@@ -1,0 +1,69 @@
+---
+title: "Обзор функций встречи: сцена, чат, YouTube и push-to-talk"
+description: "Что есть в современной комнате встречи Bedrud — и где читать how-to."
+date: "2026-07-10"
+author: "Bedrud Team"
+tags: ["product", "meetings", "features"]
+image: "/blog/meeting-features-roundup.svg"
+---
+
+Self-hosted видео — это не только «войти и увидеть лица». Оболочка встречи Bedrud теперь покрывает presentation-раскладки, более богатый чат, опциональные watch parties и push-to-talk — по-прежнему в одном бинарнике на вашем железе.
+
+Этот пост — карта. Глубокие how-to живут в разделе **Using Bedrud** документации.
+
+## Режим сцены
+
+Презентуйте, не борясь с сеткой free-for-all. Хосты могут запустить **stage**, шарить экран как stage overlay, держать participant strip и завершить сцену, чтобы вернуться к обычной раскладке. Поздние входы должны попасть в корректное состояние сцены.
+
+→ [Режим сцены](/ru/docs/using/stage-mode)
+
+## Совместная доска
+
+Общее рисование через Yjs поверх LiveKit data channels. Multi-user штрихи, select/move/delete, опциональный experimental toggle.
+
+→ [Совместная доска](/ru/docs/using/whiteboard) · [Engineering post](/ru/blog/collaborative-whiteboard)
+
+## YouTube watch
+
+Вставьте URL, воспроизводите примерно в синхроне, закройте для всех. Также доступно за Experimental settings, когда gated.
+
+→ [YouTube Watch](/ru/docs/using/youtube-watch)
+
+## Чат: реакции, опросы, вложения
+
+Текст в комнате — не stub:
+
+- Emoji **реакции** и **emoji picker** в композере
+- **Опросы** с live-обновлением голосов
+- **Изображения / файлы** в пределах квоты (chunked для больших payload)
+- Client-side retention caps, чтобы длинные сессии оставались bounded
+
+→ [Чат на встрече](/ru/docs/using/chat)
+
+## Push-to-talk
+
+Включите PTT в audio settings, захватите hold-клавишу, передавайте только пока удерживаете. Отключите, чтобы вернуть обычный mute toggle. Смена устройства mid-call без полного reconnect.
+
+→ [Аудио и Push-to-Talk](/ru/docs/using/audio-and-push-to-talk)
+
+## База дашборда и аккаунта
+
+До звонка: регистрация, аватар, недавние комнаты, quick-join по slug или URL.
+
+→ [Аккаунт и настройки](/ru/docs/using/account-and-settings) · [Дашборд и комнаты](/ru/docs/using/dashboard-and-rooms) · [Вход на встречу](/ru/docs/using/joining-a-meeting)
+
+## Модерация и раскладка
+
+Screen share вне stage, spotlight, room info, role-based context menus и transport fallback UX, когда сеть враждебна.
+
+→ [Управление встречей](/ru/docs/using/meeting-controls) · [Роли пользователей](/ru/docs/guides/roles)
+
+## Что ещё в планах
+
+Маршруты **recording** остаются planned/operator-facing — не считайте полный egress recording production-complete на каждом релизе, пока docs его не un-gate. Infrastructure, admin, LiveKit и deploy guides остаются источником истины для операторов.
+
+## Страница возможностей
+
+Маркетинговые карточки этих meeting capabilities на [Features](/ru/features), каждая ведёт в docs выше.
+
+Задеплойте бинарник, поделитесь ссылкой, проведите встречу — теперь с доской и сценой, когда они нужны.
