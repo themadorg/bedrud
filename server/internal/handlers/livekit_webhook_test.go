@@ -340,7 +340,6 @@ func TestLiveKitWebhook_EgressStarted(t *testing.T) {
 }
 
 func TestLiveKitWebhook_EgressEnded(t *testing.T) {
-	t.Skip("TODO oncoming feature")
 	db := testutil.SetupTestDB(t)
 	recordingRepo := repository.NewRecordingRepository(db)
 
@@ -366,6 +365,7 @@ func TestLiveKitWebhook_EgressEnded(t *testing.T) {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 
+	// Handler registered in worker: egress_ended transitions to processing + enqueues job.
 	rec, _ := recordingRepo.GetByEgressID(egressID)
 	if rec.Status != models.RecordingProcessing {
 		t.Fatalf("expected status 'processing', got '%s'", rec.Status)
@@ -373,7 +373,6 @@ func TestLiveKitWebhook_EgressEnded(t *testing.T) {
 }
 
 func TestLiveKitWebhook_EgressFailed(t *testing.T) {
-	t.Skip("TODO oncoming feature")
 	db := testutil.SetupTestDB(t)
 	recordingRepo := repository.NewRecordingRepository(db)
 
@@ -412,7 +411,6 @@ func TestLiveKitWebhook_EgressFailed(t *testing.T) {
 }
 
 func TestLiveKitWebhook_EgressEnded_Duplicate(t *testing.T) {
-	t.Skip("TODO oncoming feature")
 	db := testutil.SetupTestDB(t)
 	recordingRepo := repository.NewRecordingRepository(db)
 
@@ -436,6 +434,17 @@ func TestLiveKitWebhook_EgressEnded_Duplicate(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	// Second delivery should not panic / should leave processing (optimistic lock no-op)
+	req2 := newWebhookRequest(t, whTestAPIKey, whTestAPISecret, event)
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 on duplicate, got %d", resp2.StatusCode)
 	}
 
 	rec, _ := recordingRepo.GetByEgressID(egressID)

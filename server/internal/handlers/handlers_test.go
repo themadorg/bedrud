@@ -61,6 +61,8 @@ func setupUsersTestApp(t *testing.T) (*fiber.App, *repository.UserRepository) {
 
 	app.Get("/admin/users", usersHandler.ListUsers)
 	app.Put("/admin/users/:id/status", usersHandler.UpdateUserStatus)
+	app.Put("/admin/users/:id/accesses", usersHandler.UpdateUserAccesses)
+	app.Delete("/admin/users/:id", usersHandler.DeleteUser)
 	app.Put("/admin/users/:id/password", usersHandler.SetUserPassword)
 	app.Post("/admin/users/:id/verify", usersHandler.AdminVerifyEmail)
 	app.Post("/admin/users/:id/verify/resend", usersHandler.AdminResendVerification)
@@ -918,4 +920,64 @@ func TestListUsers_Pagination(t *testing.T) {
 			t.Fatalf("expected empty users for page beyond total, got %d", len(users))
 		}
 	})
+}
+
+func setupLastSuperadminTestApp(t *testing.T) (*fiber.App, *repository.UserRepository) {
+	t.Helper()
+	config.SetForTest(&config.Config{})
+	db := testutil.SetupTestDB(t)
+	userRepo := repository.NewUserRepository(db)
+	roomRepo := repository.NewRoomRepository(db)
+	passkeyRepo := repository.NewPasskeyRepository(db)
+	prefsRepo := repository.NewUserPreferencesRepository(db)
+	uploadTracker := storage.NewChatUploadTracker(db, t.TempDir(), nil)
+	cleanupSvc := testCleanupSvc(t, roomRepo, uploadTracker)
+	usersHandler := testUsersHandler(userRepo, roomRepo, passkeyRepo, prefsRepo, cleanupSvc)
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user", &auth.Claims{UserID: "actor", Accesses: []string{"superadmin"}})
+		return c.Next()
+	})
+	app.Put("/admin/users/:id/status", usersHandler.UpdateUserStatus)
+	app.Put("/admin/users/:id/accesses", usersHandler.UpdateUserAccesses)
+	app.Delete("/admin/users/:id", usersHandler.DeleteUser)
+	app.Post("/admin/users/bulk/ban", usersHandler.BulkBanUsers)
+	return app, userRepo
+}
+
+func TestUsersHandler_LastSuperadmin_StatusConflict(t *testing.T) {
+	app, userRepo := setupLastSuperadminTestApp(t)
+	_ = userRepo.CreateUser(&models.User{ID: "sole-sa", Email: "sole@ex.com", Name: "Sole", Provider: "local", IsActive: true, Accesses: models.StringArray{"user", string(models.AccessSuperAdmin)}})
+	body, _ := json.Marshal(UserStatusUpdateRequest{Active: false})
+	req := httptest.NewRequest(http.MethodPut, "/admin/users/sole-sa/status", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("want 409, got %d", resp.StatusCode)
+	}
+}
+
+func TestUsersHandler_LastSuperadmin_AccessesConflict(t *testing.T) {
+	app, userRepo := setupLastSuperadminTestApp(t)
+	_ = userRepo.CreateUser(&models.User{ID: "sole-sa2", Email: "sole2@ex.com", Name: "Sole2", Provider: "local", IsActive: true, Accesses: models.StringArray{"user", string(models.AccessSuperAdmin)}})
+	body, _ := json.Marshal(map[string]interface{}{"accesses": []string{"user"}})
+	req := httptest.NewRequest(http.MethodPut, "/admin/users/sole-sa2/accesses", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("want 409, got %d", resp.StatusCode)
+	}
+}
+
+func TestUsersHandler_LastSuperadmin_DeleteConflict(t *testing.T) {
+	app, userRepo := setupLastSuperadminTestApp(t)
+	_ = userRepo.CreateUser(&models.User{ID: "sole-sa3", Email: "sole3@ex.com", Name: "Sole3", Provider: "local", IsActive: true, Accesses: models.StringArray{"user", string(models.AccessSuperAdmin)}})
+	req := httptest.NewRequest(http.MethodDelete, "/admin/users/sole-sa3", http.NoBody)
+	resp, _ := app.Test(req, -1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("want 409, got %d", resp.StatusCode)
+	}
 }

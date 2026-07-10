@@ -148,8 +148,8 @@ func TestGetRoomPresence_PublicEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Authenticated identity list
 	req := httptest.NewRequest(http.MethodGet, "/room/"+room.ID+"/presence", http.NoBody)
-	req.Header.Set("X-Skip-Auth", "1")
 	resp, err := app.Test(req, -1)
 	if err != nil {
 		t.Fatal(err)
@@ -158,6 +158,31 @@ func TestGetRoomPresence_PublicEmpty(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status %d: %s", resp.StatusCode, b)
+	}
+
+	// Unauthenticated identity list denied
+	req2 := httptest.NewRequest(http.MethodGet, "/room/"+room.ID+"/presence", http.NoBody)
+	req2.Header.Set("X-Skip-Auth", "1")
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 unauth identity list, got %d", resp2.StatusCode)
+	}
+
+	// Public countOnly without auth OK
+	req3 := httptest.NewRequest(http.MethodGet, "/room/"+room.ID+"/presence?countOnly=1", http.NoBody)
+	req3.Header.Set("X-Skip-Auth", "1")
+	resp3, err := app.Test(req3, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp3.Body.Close()
+	if resp3.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp3.Body)
+		t.Fatalf("countOnly status %d: %s", resp3.StatusCode, b)
 	}
 }
 

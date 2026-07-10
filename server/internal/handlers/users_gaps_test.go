@@ -8,7 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"bedrud/config"
 	"bedrud/internal/auth"
+	"bedrud/internal/middleware"
 	"bedrud/internal/models"
 	"bedrud/internal/repository"
 	"bedrud/internal/testutil"
@@ -54,6 +56,70 @@ func TestForceLogout_Success(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status %d: %s", resp.StatusCode, b)
+	}
+}
+
+func TestForceLogout_RejectsOldAccessAndRefresh(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	userRepo := repository.NewUserRepository(db)
+	auth.SetAccessTokenBlockStore(userRepo)
+	passkeyRepo := repository.NewPasskeyRepository(db)
+	authSvc := auth.NewAuthService(userRepo, passkeyRepo)
+	cfg := &config.Config{
+		Auth: config.AuthConfig{
+			JWTSecret:     "force-logout-test-secret-key-32b",
+			TokenDuration: 1,
+		},
+	}
+	config.SetForTest(cfg)
+
+	hash, _ := auth.HashPassword("pass12345")
+	target := &models.User{
+		ID: "target-sess", Email: "sess@ex.com", Name: "Sess", Provider: "local",
+		Password: hash, IsActive: true, Accesses: models.StringArray{"user"},
+	}
+	_ = userRepo.CreateUser(target)
+	login, err := authSvc.Login("sess@ex.com", "pass12345")
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldAccess := login.Token.AccessToken
+	oldRefresh := login.Token.RefreshToken
+
+	h := NewUsersHandler(userRepo, repository.NewRoomRepository(db), passkeyRepo, repository.NewUserPreferencesRepository(db), nil, nil)
+	adminClaims := &auth.Claims{UserID: "admin-1", Accesses: []string{"user", "superadmin"}}
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user", adminClaims)
+		return c.Next()
+	})
+	app.Post("/admin/users/:id/force-logout", h.ForceLogout)
+	app.Get("/protected", middleware.Protected(), func(c *fiber.Ctx) error { return c.SendString("ok") })
+
+	flReq := httptest.NewRequest(http.MethodPost, "/admin/users/target-sess/force-logout", http.NoBody)
+	flResp, err := app.Test(flReq, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	flResp.Body.Close()
+	if flResp.StatusCode != http.StatusOK {
+		t.Fatalf("force logout status %d", flResp.StatusCode)
+	}
+
+	protReq := httptest.NewRequest(http.MethodGet, "/protected", http.NoBody)
+	protReq.Header.Set("Authorization", "Bearer "+oldAccess)
+	protResp, err := app.Test(protReq, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer protResp.Body.Close()
+	if protResp.StatusCode != http.StatusForbidden {
+		b, _ := io.ReadAll(protResp.Body)
+		t.Fatalf("old access: want 403, got %d: %s", protResp.StatusCode, b)
+	}
+
+	if _, err := authSvc.ValidateRefreshToken(oldRefresh); err == nil {
+		t.Fatal("old refresh should be rejected after force logout")
 	}
 }
 
