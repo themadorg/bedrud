@@ -27,11 +27,19 @@ Le regroupement des messages et les horodatages doivent rester corrects même en
 
 ## Images et fichiers
 
-- Joignez une image ou un fichier dans les limites de taille du serveur.
-- Les destinataires peuvent ouvrir une **lightbox** pour les images.
-- Les gros payloads utilisent un chemin fragmenté pour ne pas être silencieusement abandonnés.
+- Joignez une image dans les limites de taille et de dimensions du serveur.
+- Le client de réunion **vérifie avant l'envoi** la taille du fichier et les dimensions de l'image à partir des paramètres publics (`chatUploadMaxBytes`, `chatUploadMaxDimension`).
+- Les fichiers trop volumineux ou aux dimensions excessives sont rejetés avec un message clair (client d'abord ; le serveur fait autorité — `413` / `400` sur `POST /api/room/:roomId/chat/upload`).
+- Les destinataires peuvent ouvrir les images dans une **lightbox**.
 
-Les opérateurs configurent les quotas d'upload et le stockage sous `chat` dans la [Configuration](/fr/docs/getting-started/configuration) (`maxUploadBytesPerUser`, réglages disque/S3).
+**Valeurs par défaut :** 10 MiB par fichier, dimension max 8192×8192 (si non défini).
+
+Les opérateurs configurent les limites via :
+
+- `chat.uploads.maxBytes` / `chat.uploads.maxDimension` dans la [Configuration](/fr/docs/getting-started/configuration)
+- Onglet admin **Chat Uploads** (`chatUploadMaxBytes`, `chatUploadMaxDimension`) dans le [tableau de bord admin](/fr/docs/guides/admin-dashboard)
+- Quotas de stockage par utilisateur / globaux sous `chat` (`maxUploadBytesPerUser`, backends disque/S3)
+
 
 ## Rétention (côté client)
 

@@ -27,11 +27,19 @@ order: 7
 
 ## Изображения и файлы
 
-- Прикрепите изображение или файл в пределах лимитов сервера.
-- Получатели могут открыть **lightbox** для изображений.
-- Большие payload идут chunked-путём, чтобы контент не отбрасывался молча.
+- Прикрепите изображение в пределах серверных лимитов размера и размеров в пикселях.
+- Клиент встречи **заранее проверяет** размер файла и габариты изображения по публичным настройкам (`chatUploadMaxBytes`, `chatUploadMaxDimension`).
+- Слишком большие файлы или габариты отклоняются с понятной ошибкой (сначала клиент; сервер остаётся источником истины — `413` / `400` на `POST /api/room/:roomId/chat/upload`).
+- Получатели могут открыть изображения в **lightbox**.
 
-Операторы настраивают квоты загрузки и storage под `chat` в [Конфигурации](/ru/docs/getting-started/configuration) (`maxUploadBytesPerUser`, disk/S3 upload settings).
+**По умолчанию:** 10 MiB на файл, макс. 8192×8192 (если не задано).
+
+Операторы задают лимиты через:
+
+- `chat.uploads.maxBytes` / `chat.uploads.maxDimension` в [конфигурации](/ru/docs/getting-started/configuration)
+- вкладку админа **Chat Uploads** (`chatUploadMaxBytes`, `chatUploadMaxDimension`) в [админ-панели](/ru/docs/guides/admin-dashboard)
+- квоты хранилища на пользователя / глобальные в `chat` (`maxUploadBytesPerUser`, бэкенды disk/S3)
+
 
 ## Retention (client-side)
 

@@ -223,14 +223,17 @@ Controls storage limits for chat image uploads:
 - **Max Upload Bytes Per User:** Per-user storage quota across all rooms (default: 524288000 = 500 MB, 0 = unlimited). Superadmins bypass this limit.
 - **Global Disk Threshold:** Total storage ceiling across all users. When exceeded, all uploads are rejected until an admin frees space (default: 0 = unlimited). This limit applies to everyone, including superadmins.
 
-### Chat Uploads Tab
+### تب Chat Uploads
 
-Configure how chat image uploads are stored:
+نحوهٔ ذخیرهٔ آپلود تصاویر چت را پیکربندی می‌کند:
 
-- **Backend:** `disk` (local filesystem), `s3` (S3-compatible storage), or `inline` (base64 embedded)
-- **Max Upload Bytes:** Maximum file size per upload
-- **Inline Max:** Maximum size for inline/base64 uploads
-- **Disk Directory:** Local directory for `disk` backend uploads
+- **Backend:** `disk` (فایل‌سیستم محلی)، `s3` (ذخیره‌سازی سازگار با S3) یا `inline` (base64 توکار)
+- **Max Upload Bytes** (`chatUploadMaxBytes`): حداکثر اندازهٔ هر آپلود (پیش‌فرض ۱۰ MiB اگر تنظیم نشود). توسط API آپلود اعمال می‌شود و برای پیش‌بررسی در اختیار کلاینت جلسه قرار می‌گیرد.
+- **Max Image Dimension** (`chatUploadMaxDimension`): حداکثر عرض یا ارتفاع به پیکسل (پیش‌فرض ۸۱۹۲ اگر تنظیم نشود / ۰). تصاویر بزرگ‌تر پس از decode با HTTP 400 رد می‌شوند.
+- **Inline Max:** حداکثر اندازه برای آپلودهای inline/base64
+- **Disk Directory:** پوشهٔ محلی برای بک‌اند `disk`
+
+پشتیبان YAML: `chat.uploads.maxBytes`، `chat.uploads.maxDimension` در [پیکربندی](/fa/docs/getting-started/configuration).
 
 **S3 Configuration (when backend is `s3`):**
 - Endpoint, Bucket, Region

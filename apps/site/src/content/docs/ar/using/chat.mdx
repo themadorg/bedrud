@@ -27,11 +27,19 @@ order: 7
 
 ## الصور والملفات
 
-- أرفق صورة أو ملفًا ضمن حدود حجم الخادم.
-- يمكن للمستلمين فتح **lightbox** للصور.
-- تستخدم الحمولات الكبيرة مسارًا مجزّأً حتى لا تُسقط المحتوى بصمت.
+- أرفق صورة ضمن حدود الحجم والأبعاد على الخادم.
+- يُجري عميل الاجتماع **فحصًا مسبقًا** لحجم الملف وأبعاد الصورة قبل الرفع باستخدام الإعدادات العامة (`chatUploadMaxBytes`، `chatUploadMaxDimension`).
+- تُرفض الملفات الكبيرة جدًا أو الأبعاد الزائدة برسالة خطأ واضحة (العميل أولًا؛ الخادم يبقى المرجع — `413` / `400` على `POST /api/room/:roomId/chat/upload`).
+- يمكن للمستلمين فتح الصور في **lightbox**.
 
-يضبط المشغّلون حصص الرفع والتخزين تحت `chat` في [الإعداد](/ar/docs/getting-started/configuration) (`maxUploadBytesPerUser`، إعدادات الرفع على القرص/S3).
+**الافتراضيات:** 10 MiB لكل ملف، وأقصى أبعاد 8192×8192 (عند عدم التعيين).
+
+يضبط المشغّلون الحدود عبر:
+
+- `chat.uploads.maxBytes` / `chat.uploads.maxDimension` في [الإعدادات](/ar/docs/getting-started/configuration)
+- تبويب **Chat Uploads** للمسؤول (`chatUploadMaxBytes`، `chatUploadMaxDimension`) في [لوحة الإدارة](/ar/docs/guides/admin-dashboard)
+- حصص التخزين لكل مستخدم / عامة تحت `chat` (`maxUploadBytesPerUser`، خلفيات disk/S3)
+
 
 ## الاحتفاظ (من جانب العميل)
 

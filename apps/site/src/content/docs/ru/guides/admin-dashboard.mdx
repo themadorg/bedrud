@@ -223,14 +223,17 @@ Controls storage limits for chat image uploads:
 - **Max Upload Bytes Per User:** Per-user storage quota across all rooms (default: 524288000 = 500 MB, 0 = unlimited). Superadmins bypass this limit.
 - **Global Disk Threshold:** Total storage ceiling across all users. When exceeded, all uploads are rejected until an admin frees space (default: 0 = unlimited). This limit applies to everyone, including superadmins.
 
-### Chat Uploads Tab
+### Вкладка Chat Uploads
 
-Configure how chat image uploads are stored:
+Настраивает хранение загрузок изображений чата:
 
-- **Backend:** `disk` (local filesystem), `s3` (S3-compatible storage), or `inline` (base64 embedded)
-- **Max Upload Bytes:** Maximum file size per upload
-- **Inline Max:** Maximum size for inline/base64 uploads
-- **Disk Directory:** Local directory for `disk` backend uploads
+- **Backend:** `disk` (локальная ФС), `s3` (S3-совместимое хранилище) или `inline` (встроенный base64)
+- **Max Upload Bytes** (`chatUploadMaxBytes`): Максимальный размер файла на загрузку (по умолчанию 10 MiB, если не задано). Применяется API загрузки и отдаётся клиенту встречи для предварительных проверок.
+- **Max Image Dimension** (`chatUploadMaxDimension`): Максимальная ширина или высота в пикселях (по умолчанию 8192, если не задано / 0). Более крупные декодированные изображения отклоняются с HTTP 400.
+- **Inline Max:** Максимальный размер для inline/base64-загрузок
+- **Disk Directory:** Локальный каталог для бэкенда `disk`
+
+YAML-запасные значения: `chat.uploads.maxBytes`, `chat.uploads.maxDimension` в [конфигурации](/ru/docs/getting-started/configuration).
 
 **S3 Configuration (when backend is `s3`):**
 - Endpoint, Bucket, Region

@@ -27,11 +27,19 @@ order: 7
 
 ## 图片与文件
 
-- 在服务器大小限制内附加图片或文件。
-- 接收方可对图片打开**灯箱**。
-- 大载荷走分块路径，内容不会被静默丢弃。
+- 在服务器的大小与尺寸限制内附加图片。
+- 会议客户端会在上传前根据公开设置（`chatUploadMaxBytes`、`chatUploadMaxDimension`）**预检**文件大小和图片尺寸。
+- 超大文件或超限尺寸会被明确报错拒绝（先客户端；服务端仍为准 — `POST /api/room/:roomId/chat/upload` 返回 `413` / `400`）。
+- 接收方可在 **lightbox** 中打开图片。
 
-运维人员在 [配置](/zh/docs/getting-started/configuration) 的 `chat` 下配置上传配额与存储（`maxUploadBytesPerUser`、磁盘/S3 上传设置）。
+**默认值：** 每个文件 10 MiB，最大尺寸 8192×8192（未设置时）。
+
+运营者可通过以下方式设置限制：
+
+- [配置](/zh/docs/getting-started/configuration) 中的 `chat.uploads.maxBytes` / `chat.uploads.maxDimension`
+- [管理后台](/zh/docs/guides/admin-dashboard) 的 **Chat Uploads** 选项卡（`chatUploadMaxBytes`、`chatUploadMaxDimension`）
+- `chat` 下的每用户 / 全局存储配额（`maxUploadBytesPerUser`、disk/S3 后端）
+
 
 ## 保留策略（客户端）
 

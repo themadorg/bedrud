@@ -158,6 +158,7 @@ chat:
   uploads:
     backend: "disk"                      # disk | s3 | inline
     maxBytes: 10485760                   # Hard per-file limit (default 10 MB). Server HTTP body limit is aligned to this value.
+    maxDimension: 8192                   # Max image width/height in pixels (default 8192). 0 = use default.
     inlineMaxBytes: 512000               # Below this → data URI (0 = disable)
     diskDir: "./data/uploads/chat"
     # s3:
@@ -251,13 +252,16 @@ Advisory client-side retention (LiveKit does not persist data-channel messages s
 
 `chat.uploads` controls image storage:
 
-| Field | Meaning |
-|-------|---------|
-| `backend` | `disk` (default), `s3`, or `inline` |
-| `maxBytes` | Hard per-file limit (default 10 MB) |
-| `inlineMaxBytes` | Smaller images returned as data URIs |
-| `diskDir` | Path for disk backend |
-| `s3.*` | S3-compatible credentials and public base URL |
+| Alan | Anlam |
+|------|-------|
+| `backend` | `disk` (varsayılan), `s3` veya `inline` |
+| `maxBytes` | Dosya başına sert limit (varsayılan 10 MB). Çalışma anında admin `chatUploadMaxBytes` ile geçersiz kılınabilir. |
+| `maxDimension` | Maks. genişlik/yükseklik piksel (varsayılan 8192). Admin `chatUploadMaxDimension` ile geçersiz kılınabilir. |
+| `inlineMaxBytes` | Daha küçük görseller data URI olarak döner |
+| `diskDir` | Disk arka ucu yolu |
+| `s3.*` | S3 uyumlu kimlik bilgileri ve genel taban URL |
+
+Toplantı arayüzü ve `GET /api/auth/settings`, istemcinin yüklemeden önce doğrulaması için etkin `chatUploadMaxBytes` ve `chatUploadMaxDimension` değerlerini sunar. Yükleme API'si aynı limitleri uygular (`413` aşırı büyük, `400` boyut aşımı).
 
 #### Recordings
 

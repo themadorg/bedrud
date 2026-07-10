@@ -27,11 +27,19 @@ Nachrichtengruppierung und Zeitstempel sollten auch bei Burst-Sends korrekt auss
 
 ## Bilder und Dateien
 
-- Hängen Sie ein Bild oder eine Datei innerhalb der Server-Größenlimits an.
-- Empfänger können für Bilder eine **Lightbox** öffnen.
-- Große Payloads nutzen einen chunked Pfad, damit Inhalte nicht still verworfen werden.
+- Hängen Sie ein Bild innerhalb der serverseitigen Größen- und Dimensionsgrenzen an.
+- Der Meeting-Client **prüft vor dem Upload** Dateigröße und Bildmaße anhand der öffentlichen Einstellungen (`chatUploadMaxBytes`, `chatUploadMaxDimension`).
+- Zu große Dateien oder Dimensionen werden mit einer klaren Fehlermeldung abgelehnt (zuerst Client; Server bleibt maßgeblich — `413` / `400` bei `POST /api/room/:roomId/chat/upload`).
+- Empfänger können Bilder in einer **Lightbox** öffnen.
 
-Operatoren konfigurieren Upload-Kontingente und Speicher unter `chat` in der [Konfiguration](/de/docs/getting-started/configuration) (`maxUploadBytesPerUser`, Disk-/S3-Upload-Einstellungen).
+**Standardwerte:** 10 MiB pro Datei, max. Dimension 8192×8192 (wenn nicht gesetzt).
+
+Betreiber setzen Limits über:
+
+- `chat.uploads.maxBytes` / `chat.uploads.maxDimension` in der [Konfiguration](/de/docs/getting-started/configuration)
+- Admin-Tab **Chat Uploads** (`chatUploadMaxBytes`, `chatUploadMaxDimension`) im [Admin-Dashboard](/de/docs/guides/admin-dashboard)
+- Speicher-Quotas pro Nutzer / global unter `chat` (`maxUploadBytesPerUser`, Disk/S3-Backends)
+
 
 ## Aufbewahrung (clientseitig)
 

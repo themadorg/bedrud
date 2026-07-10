@@ -223,14 +223,17 @@ Controls storage limits for chat image uploads:
 - **Max Upload Bytes Per User:** Per-user storage quota across all rooms (default: 524288000 = 500 MB, 0 = unlimited). Superadmins bypass this limit.
 - **Global Disk Threshold:** Total storage ceiling across all users. When exceeded, all uploads are rejected until an admin frees space (default: 0 = unlimited). This limit applies to everyone, including superadmins.
 
-### Chat Uploads Tab
+### Chat Uploads 选项卡
 
-Configure how chat image uploads are stored:
+配置聊天图片上传的存储方式：
 
-- **Backend:** `disk` (local filesystem), `s3` (S3-compatible storage), or `inline` (base64 embedded)
-- **Max Upload Bytes:** Maximum file size per upload
-- **Inline Max:** Maximum size for inline/base64 uploads
-- **Disk Directory:** Local directory for `disk` backend uploads
+- **Backend：** `disk`（本地文件系统）、`s3`（S3 兼容存储）或 `inline`（base64 内嵌）
+- **Max Upload Bytes**（`chatUploadMaxBytes`）：每次上传的最大文件大小（未设置时默认 10 MiB）。由上传 API 强制执行，并向会议客户端公开以供预检。
+- **Max Image Dimension**（`chatUploadMaxDimension`）：最大宽或高（像素；未设置 / 0 时默认 8192）。解码后更大的图片以 HTTP 400 拒绝。
+- **Inline Max：** inline/base64 上传的最大大小
+- **Disk Directory：** `disk` 后端的本地目录
+
+YAML 回退：`chat.uploads.maxBytes`、`chat.uploads.maxDimension`，见[配置](/zh/docs/getting-started/configuration)。
 
 **S3 Configuration (when backend is `s3`):**
 - Endpoint, Bucket, Region

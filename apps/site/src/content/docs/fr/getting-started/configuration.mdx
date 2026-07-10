@@ -158,6 +158,7 @@ chat:
   uploads:
     backend: "disk"                      # disk | s3 | inline
     maxBytes: 10485760                   # Hard per-file limit (default 10 MB). Server HTTP body limit is aligned to this value.
+    maxDimension: 8192                   # Max image width/height in pixels (default 8192). 0 = use default.
     inlineMaxBytes: 512000               # Below this → data URI (0 = disable)
     diskDir: "./data/uploads/chat"
     # s3:
@@ -251,13 +252,16 @@ Advisory client-side retention (LiveKit does not persist data-channel messages s
 
 `chat.uploads` controls image storage:
 
-| Field | Meaning |
-|-------|---------|
-| `backend` | `disk` (default), `s3`, or `inline` |
-| `maxBytes` | Hard per-file limit (default 10 MB) |
-| `inlineMaxBytes` | Smaller images returned as data URIs |
-| `diskDir` | Path for disk backend |
-| `s3.*` | S3-compatible credentials and public base URL |
+| Champ | Signification |
+|-------|---------------|
+| `backend` | `disk` (défaut), `s3` ou `inline` |
+| `maxBytes` | Limite dure par fichier (défaut 10 MB). Surchargeable à l'exécution via l'admin `chatUploadMaxBytes`. |
+| `maxDimension` | Largeur/hauteur max en pixels (défaut 8192). Surchargeable via l'admin `chatUploadMaxDimension`. |
+| `inlineMaxBytes` | Images plus petites renvoyées en data URI |
+| `diskDir` | Chemin du backend disque |
+| `s3.*` | Identifiants S3-compatibles et URL de base publique |
+
+L'UI de réunion et `GET /api/auth/settings` exposent les valeurs effectives `chatUploadMaxBytes` et `chatUploadMaxDimension` pour la pré-validation côté client. L'API d'upload applique les mêmes limites (`413` trop volumineux, `400` dimensions excessives).
 
 #### Recordings
 

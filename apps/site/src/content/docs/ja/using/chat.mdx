@@ -27,11 +27,19 @@ order: 7
 
 ## 画像とファイル
 
-- サーバーのサイズ制限内で画像またはファイルを添付します。
-- 受信者は画像の**ライトボックス**を開けます。
-- 大きなペイロードはチャンク経路を使い、内容が黙って落とされません。
+- サーバーのサイズ・寸法制限内で画像を添付します。
+- 会議クライアントは公開設定（`chatUploadMaxBytes`、`chatUploadMaxDimension`）を使い、アップロード前にファイルサイズと画像寸法を**事前チェック**します。
+- 大きすぎるファイルや寸法超過は明確なエラーで拒否されます（まずクライアント。権威はサーバー — `POST /api/room/:roomId/chat/upload` で `413` / `400`）。
+- 受信者は **lightbox** で画像を開けます。
 
-運用者は [設定](/ja/docs/getting-started/configuration) の `chat` でアップロード枠とストレージを構成します（`maxUploadBytesPerUser`、ディスク/S3 アップロード設定）。
+**デフォルト:** 1 ファイルあたり 10 MiB、最大寸法 8192×8192（未設定時）。
+
+運用者は次で制限を設定します:
+
+- [設定](/ja/docs/getting-started/configuration) の `chat.uploads.maxBytes` / `chat.uploads.maxDimension`
+- [管理ダッシュボード](/ja/docs/guides/admin-dashboard) の **Chat Uploads** タブ（`chatUploadMaxBytes`、`chatUploadMaxDimension`）
+- `chat` 配下のユーザー単位 / 全体ストレージ枠（`maxUploadBytesPerUser`、disk/S3 バックエンド）
+
 
 ## 保持（クライアント側）
 

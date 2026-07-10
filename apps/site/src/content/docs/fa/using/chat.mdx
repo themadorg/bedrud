@@ -27,11 +27,19 @@ order: 7
 
 ## تصاویر و فایل‌ها
 
-- تصویر یا فایل را در محدوده حجم سرور پیوست کنید.
-- گیرندگان می‌توانند برای تصاویر **lightbox** باز کنند.
-- payloadهای بزرگ مسیر تکه‌تکه دارند تا محتوا بی‌صدا drop نشود.
+- تصویری در محدودهٔ اندازه و ابعاد سرور پیوست کنید.
+- کلاینت جلسه قبل از آپلود، اندازهٔ فایل و ابعاد تصویر را با تنظیمات عمومی (`chatUploadMaxBytes`، `chatUploadMaxDimension`) **پیش‌بررسی** می‌کند.
+- فایل‌های بیش‌ازحد بزرگ یا ابعاد بیش‌ازحد با خطای واضح رد می‌شوند (ابتدا کلاینت؛ مرجع نهایی سرور است — `413` / `400` روی `POST /api/room/:roomId/chat/upload`).
+- گیرندگان می‌توانند تصاویر را در **lightbox** باز کنند.
 
-اپراتورها سهمیه آپلود و ذخیره‌سازی را زیر `chat` در [پیکربندی](/fa/docs/getting-started/configuration) تنظیم می‌کنند (`maxUploadBytesPerUser`، تنظیمات آپلود دیسک/S3).
+**پیش‌فرض‌ها:** ۱۰ MiB برای هر فایل، حداکثر ابعاد ۸۱۹۲×۸۱۹۲ (در صورت تنظیم‌نشدن).
+
+اپراتورها محدودیت‌ها را از این مسیرها تنظیم می‌کنند:
+
+- `chat.uploads.maxBytes` / `chat.uploads.maxDimension` در [پیکربندی](/fa/docs/getting-started/configuration)
+- زبانهٔ **Chat Uploads** ادمین (`chatUploadMaxBytes`، `chatUploadMaxDimension`) در [داشبورد ادمین](/fa/docs/guides/admin-dashboard)
+- سهمیه‌های ذخیره‌سازی per-user / سراسری زیر `chat` (`maxUploadBytesPerUser`، بک‌اند disk/S3)
+
 
 ## نگه‌داری (سمت کلاینت)
 

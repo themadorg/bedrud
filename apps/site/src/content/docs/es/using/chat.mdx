@@ -27,11 +27,19 @@ La agrupación de mensajes y las marcas de tiempo deben verse correctas incluso 
 
 ## Imágenes y archivos
 
-- Adjunta una imagen o un archivo dentro de los límites de tamaño del servidor.
-- Los destinatarios pueden abrir una **lightbox** para las imágenes.
-- Las cargas grandes usan un camino fragmentado para que el contenido no se descarte en silencio.
+- Adjunte una imagen dentro de los límites de tamaño y dimensiones del servidor.
+- El cliente de la reunión **comprueba antes de subir** el tamaño del archivo y las dimensiones de la imagen usando los ajustes públicos (`chatUploadMaxBytes`, `chatUploadMaxDimension`).
+- Los archivos demasiado grandes o con dimensiones excesivas se rechazan con un error claro (primero el cliente; el servidor sigue siendo la autoridad — `413` / `400` en `POST /api/room/:roomId/chat/upload`).
+- Los destinatarios pueden abrir las imágenes en una **lightbox**.
 
-Los operadores configuran cuotas de subida y almacenamiento bajo `chat` en la [Configuración](/es/docs/getting-started/configuration) (`maxUploadBytesPerUser`, ajustes de disco/S3).
+**Valores predeterminados:** 10 MiB por archivo, dimensión máxima 8192×8192 (si no se define).
+
+Los operadores configuran los límites mediante:
+
+- `chat.uploads.maxBytes` / `chat.uploads.maxDimension` en la [Configuración](/es/docs/getting-started/configuration)
+- Pestaña de admin **Chat Uploads** (`chatUploadMaxBytes`, `chatUploadMaxDimension`) en el [panel de administración](/es/docs/guides/admin-dashboard)
+- Cuotas de almacenamiento por usuario / globales bajo `chat` (`maxUploadBytesPerUser`, backends disco/S3)
+
 
 ## Retención (lado cliente)
 

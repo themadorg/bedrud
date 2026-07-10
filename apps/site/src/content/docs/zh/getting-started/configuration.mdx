@@ -158,6 +158,7 @@ chat:
   uploads:
     backend: "disk"                      # disk | s3 | inline
     maxBytes: 10485760                   # Hard per-file limit (default 10 MB). Server HTTP body limit is aligned to this value.
+    maxDimension: 8192                   # Max image width/height in pixels (default 8192). 0 = use default.
     inlineMaxBytes: 512000               # Below this → data URI (0 = disable)
     diskDir: "./data/uploads/chat"
     # s3:
@@ -251,13 +252,16 @@ Advisory client-side retention (LiveKit does not persist data-channel messages s
 
 `chat.uploads` controls image storage:
 
-| Field | Meaning |
-|-------|---------|
-| `backend` | `disk` (default), `s3`, or `inline` |
-| `maxBytes` | Hard per-file limit (default 10 MB) |
-| `inlineMaxBytes` | Smaller images returned as data URIs |
-| `diskDir` | Path for disk backend |
-| `s3.*` | S3-compatible credentials and public base URL |
+| 字段 | 含义 |
+|------|------|
+| `backend` | `disk`（默认）、`s3` 或 `inline` |
+| `maxBytes` | 单文件硬限制（默认 10 MB）。运行时可通过管理项 `chatUploadMaxBytes` 覆盖。 |
+| `maxDimension` | 最大宽/高像素（默认 8192）。可通过管理项 `chatUploadMaxDimension` 覆盖。 |
+| `inlineMaxBytes` | 更小的图片以 data URI 返回 |
+| `diskDir` | disk 后端路径 |
+| `s3.*` | S3 兼容凭证与公开基础 URL |
+
+会议 UI 与 `GET /api/auth/settings` 会暴露有效的 `chatUploadMaxBytes` 与 `chatUploadMaxDimension`，供客户端上传前预检。上传 API 仍强制相同限制（超大 `413`，超尺寸 `400`）。
 
 #### Recordings
 

@@ -27,11 +27,18 @@ Message grouping and timestamps should look correct even on burst sends.
 
 ## Images and files
 
-- Attach an image or file within server size limits.
+- Attach an image within server size and dimension limits.
+- The meeting client **pre-checks** file size and image dimensions before upload using limits from public settings (`chatUploadMaxBytes`, `chatUploadMaxDimension`).
+- Oversize files or oversized dimensions are rejected with a clear error (client first; server is still authoritative — `413` / `400` on `POST /api/room/:roomId/chat/upload`).
 - Recipients can open a **lightbox** for images.
-- Large payloads use a chunked path so content is not silently dropped.
 
-Operators configure upload quotas and storage under `chat` in [Configuration](/en/docs/getting-started/configuration) (`maxUploadBytesPerUser`, disk/S3 upload settings).
+**Defaults:** 10 MiB per file, 8192×8192 max dimension (when unset).
+
+Operators set limits via:
+
+- `chat.uploads.maxBytes` / `chat.uploads.maxDimension` in [Configuration](/en/docs/getting-started/configuration)
+- Admin **Chat Uploads** tab (`chatUploadMaxBytes`, `chatUploadMaxDimension`) in the [Admin Dashboard](/en/docs/guides/admin-dashboard)
+- Per-user / global storage quotas under `chat` (`maxUploadBytesPerUser`, disk/S3 backends)
 
 ## Retention (client-side)
 

@@ -228,9 +228,12 @@ Controls storage limits for chat image uploads:
 Configure how chat image uploads are stored:
 
 - **Backend:** `disk` (local filesystem), `s3` (S3-compatible storage), or `inline` (base64 embedded)
-- **Max Upload Bytes:** Maximum file size per upload
+- **Max Upload Bytes** (`chatUploadMaxBytes`): Maximum file size per upload (default 10 MiB when unset). Applied by the upload API and exposed to the meeting client for pre-checks.
+- **Max Image Dimension** (`chatUploadMaxDimension`): Maximum width or height in pixels (default 8192 when unset / 0). Images that decode larger are rejected with HTTP 400.
 - **Inline Max:** Maximum size for inline/base64 uploads
 - **Disk Directory:** Local directory for `disk` backend uploads
+
+YAML fallbacks: `chat.uploads.maxBytes`, `chat.uploads.maxDimension` in [Configuration](/en/docs/getting-started/configuration).
 
 **S3 Configuration (when backend is `s3`):**
 - Endpoint, Bucket, Region
