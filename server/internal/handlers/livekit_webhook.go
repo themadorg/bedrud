@@ -310,19 +310,15 @@ func (h *LiveKitWebhookHandler) handleEgressEnded(ctx context.Context, event *li
 		return
 	}
 
-	// Determine file size
 	var fileSize int64
 	if len(event.EgressInfo.FileResults) > 0 {
 		fileSize = event.EgressInfo.FileResults[0].Size
 	}
-
-	// Determine duration from file results (nanos → ms)
 	var durationMs int64
 	if len(event.EgressInfo.FileResults) > 0 {
 		durationMs = event.EgressInfo.FileResults[0].Duration / 1e6
 	}
 
-	// Enqueue processing
 	var startedAt string
 	if rec.StartedAt != nil {
 		startedAt = rec.StartedAt.Format(time.RFC3339)

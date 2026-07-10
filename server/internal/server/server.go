@@ -163,11 +163,12 @@ func Run(configPath, version string) error {
 	}
 	defer database.Close()
 	if err := database.RunMigrations(); err != nil {
-		log.Error().Err(err).Msg("Failed to run database migrations")
+		return fmt.Errorf("database migrations failed: %w", err)
 	}
 	roomRepo := repository.NewRoomRepository(database.GetDB())
 	userRepo := repository.NewUserRepository(database.GetDB())
 	recordingRepo := repository.NewRecordingRepository(database.GetDB())
+	auth.SetAccessTokenBlockStore(userRepo)
 	// TODO oncoming feature: recordingStore, scheduler recording cleanup
 	// recordingStore := storage.NewRecordingStore(&cfg.Recording, &cfg.Chat.Uploads.S3)
 	scheduler.Initialize(database.GetDB(), roomRepo, userRepo, recordingRepo, &cfg.LiveKit, &cfg.Server, nil, nil)
@@ -180,20 +181,27 @@ func Run(configPath, version string) error {
 		auth.LoadBannedUsersFromDB(inactiveUsers)
 	}
 
+	if cfg.Server.BehindProxy && len(cfg.Server.TrustedProxies) == 0 {
+		return fmt.Errorf("behindProxy=true requires explicit server.trustedProxies (refusing 0.0.0.0/0 default)")
+	}
+
+	bodyLimit := int(cfg.Chat.Uploads.MaxBytes)
+	if bodyLimit <= 0 {
+		bodyLimit = 10 * 1024 * 1024 // match chat upload default 10 MiB
+	}
+	const avatarMax = 2 * 1024 * 1024
+	if bodyLimit < avatarMax {
+		bodyLimit = avatarMax
+	}
 	fiberCfg := fiber.Config{
 		AppName:   "Bedrud API",
-		BodyLimit: 2 * 1024 * 1024,
+		BodyLimit: bodyLimit,
 	}
 	// Enable trusted-proxy mode when: explicit trustedProxies list is set,
-	// OR behindProxy=true (CDN / nginx in front), OR DisableTLS with a domain.
+	// OR behindProxy=true (CDN / nginx in front) with an explicit list.
 	if len(cfg.Server.TrustedProxies) > 0 || cfg.Server.BehindProxy {
 		fiberCfg.EnableTrustedProxyCheck = true
-		if len(cfg.Server.TrustedProxies) > 0 {
-			fiberCfg.TrustedProxies = cfg.Server.TrustedProxies
-		} else {
-			// Trust all proxies when behindProxy=true and no explicit list.
-			fiberCfg.TrustedProxies = []string{"0.0.0.0/0"}
-		}
+		fiberCfg.TrustedProxies = cfg.Server.TrustedProxies
 		if cfg.Server.ProxyHeader != "" {
 			fiberCfg.ProxyHeader = cfg.Server.ProxyHeader
 		} else {
@@ -299,11 +307,10 @@ func Run(configPath, version string) error {
 		s3Deleter = storage.NewS3Deleter(&cfg.Chat.Uploads.S3)
 	}
 	uploadStore := storage.NewChatUploadStore(&cfg.Chat.Uploads)
-	// TODO oncoming feature: recordingStore
-	// recordingStore = storage.NewRecordingStore(&cfg.Recording, &cfg.Chat.Uploads.S3)
+	recordingStore := storage.NewRecordingStore(&cfg.Recording, &cfg.Chat.Uploads.S3)
 	uploadTracker := storage.NewChatUploadTracker(database.GetDB(), uploadDir, s3Deleter)
 	lkClient := lkutil.NewClient(&cfg.LiveKit)
-	// TODO oncoming feature: egress client, recording service, recording handler
+	// TODO oncoming feature: egress client, recording service, recording HTTP routes
 	// egressClient, err := lkutil.NewEgressClient(&cfg.LiveKit)
 	// if err != nil {
 	// 	log.Warn().Err(err).Msg("Failed to create LiveKit egress client — recording disabled")
@@ -313,17 +320,26 @@ func Run(configPath, version string) error {
 	cleanupSvc := services.NewRoomCleanupService(roomRepo, nil, lkClient, nil, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, uploadTracker)
 
 	// Queue worker — runs async jobs for deletion, uploads, etc.
+	queueConcurrency := cfg.Queue.Concurrency
+	if queueConcurrency <= 0 {
+		queueConcurrency = 1
+	}
+	if (cfg.Database.Type == database.DBTypeSQLite || cfg.Database.Type == "sqlite") && queueConcurrency > 1 {
+		log.Warn().Int("configured", queueConcurrency).Msg("SQLite queue concurrency forced to 1 (single-writer claim)")
+		queueConcurrency = 1
+	}
 	queueWorker := queue.NewWorker(database.GetDB(), map[string]queue.Handler{
-		"user_delete":      queue.NewUserDeleteHandler(cleanupSvc, userRepo, passkeyRepo, prefsRepo, roomRepo),
-		"room_delete":      queue.NewRoomDeleteHandler(cleanupSvc, roomRepo),
-		"room_suspend":     queue.NewRoomSuspendHandler(cleanupSvc, roomRepo),
-		"chat_upload_s3":   queue.NewChatUploadS3Handler(uploadStore, uploadTracker),
-		"send_email":       queue.NewSendEmailHandler(&cfg.Email),
-		"dispatch_webhook": queue.NewDispatchWebhookHandler(),
-		// TODO oncoming feature: process_recording, recording_delete queue handlers
+		"user_delete":        queue.NewUserDeleteHandler(cleanupSvc, userRepo, passkeyRepo, prefsRepo, roomRepo),
+		"room_delete":        queue.NewRoomDeleteHandler(cleanupSvc, roomRepo),
+		"room_suspend":       queue.NewRoomSuspendHandler(cleanupSvc, roomRepo),
+		"chat_upload_s3":     queue.NewChatUploadS3Handler(uploadStore, uploadTracker),
+		"send_email":         queue.NewSendEmailHandler(&cfg.Email),
+		"dispatch_webhook":   queue.NewDispatchWebhookHandler(),
+		"process_recording":  queue.NewProcessRecordingHandler(recordingRepo, webhookRepo, cfg.LiveKit.Host, cfg.LiveKit.InternalHost, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, recordingStore),
+		"recording_delete":   queue.NewRecordingDeleteHandler(recordingRepo),
 	}, queue.WorkerOptions{
 		Interval:    time.Duration(cfg.Queue.PollInterval.Int64()) * time.Millisecond,
-		Concurrency: cfg.Queue.Concurrency,
+		Concurrency: queueConcurrency,
 	})
 	queueWorker.Start(context.Background())
 	defer queueWorker.Stop()
@@ -339,18 +355,22 @@ func Run(configPath, version string) error {
 	verifEventRepo := repository.NewVerificationEventRepository(database.GetDB())
 	challengeStore := auth.NewChallengeStore(cfg.Auth.PasskeyChallengeTTL)
 	authHandler := handlers.NewAuthHandler(authService, cfg, settingsRepo, inviteTokenRepo, challengeStore, emailCooldown, verifEventRepo)
-	roomHandler := handlers.NewRoomHandler(lkClient, &cfg.LiveKit, &cfg.Chat, roomRepo, userRepo, recordingRepo, settingsRepo, webhookRepo, uploadTracker, cleanupSvc)
+	roomHandler := handlers.NewRoomHandlerWithSecrets(
+		lkClient, &cfg.LiveKit, &cfg.Chat, roomRepo, userRepo, recordingRepo, settingsRepo, webhookRepo, uploadTracker, cleanupSvc,
+		cfg.Auth.SessionSecret,
+		cfg.Server.EnableTLS && !cfg.Server.DisableTLS || cfg.Server.BehindProxy,
+	)
 
 	api.Post("/auth/register", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.Register)
 	api.Post("/auth/login", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.Login)
 	api.Post("/auth/guest-login", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.GuestLogin)
 	api.Post("/auth/refresh", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.RefreshToken)
-	api.Post("/auth/logout", middleware.Protected(), authHandler.Logout)
+	api.Post("/auth/logout", middleware.Protected(), middleware.RequireBearerForMutations(), authHandler.Logout)
 	api.Get("/auth/me", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.GetMe)
-	api.Put("/auth/me", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.UpdateProfile)
-	api.Post("/auth/me/avatar", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.UploadAvatar)
-	api.Delete("/auth/me/avatar", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.DeleteAvatar)
-	api.Put("/auth/password", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.ChangePassword)
+	api.Put("/auth/me", middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.UpdateProfile)
+	api.Post("/auth/me/avatar", middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.UploadAvatar)
+	api.Delete("/auth/me/avatar", middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.DeleteAvatar)
+	api.Put("/auth/password", middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.ChangePassword)
 	api.Post("/auth/verify", authHandler.VerifyEmail)
 	api.Get("/auth/verify/status", middleware.Protected(), authHandler.CheckVerificationStatus)
 	api.Post("/auth/verify/resend", middleware.ResendRateLimiter(cfg.RateLimit), authHandler.ResendVerification)
@@ -361,42 +381,47 @@ func Run(configPath, version string) error {
 
 	preferencesHandler := handlers.NewPreferencesHandler(prefsRepo)
 	api.Get("/auth/preferences", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), preferencesHandler.GetPreferences)
-	api.Put("/auth/preferences", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), preferencesHandler.UpdatePreferences)
+	api.Put("/auth/preferences", middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo), preferencesHandler.UpdatePreferences)
 
 	// Passkey routes
-	api.Post("/auth/passkey/register/begin", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.PasskeyRegisterBegin)
-	api.Post("/auth/passkey/register/finish", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.PasskeyRegisterFinish)
+	api.Post("/auth/passkey/register/begin", middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.PasskeyRegisterBegin)
+	api.Post("/auth/passkey/register/finish", middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.PasskeyRegisterFinish)
 	api.Post("/auth/passkey/login/begin", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.PasskeyLoginBegin)
 	api.Post("/auth/passkey/login/finish", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.PasskeyLoginFinish)
 	api.Post("/auth/passkey/signup/begin", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.PasskeySignupBegin)
 	api.Post("/auth/passkey/signup/finish", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.PasskeySignupFinish)
 
-	api.Post("/room/create", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.CreateRoom)
-	api.Post("/room/join", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.JoinRoom)
+	// requireAuthMut = JWT + Bearer required for state-changing routes (CSRF defense)
+	requireAuth := []fiber.Handler{middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo)}
+	requireAuthMut := []fiber.Handler{middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo)}
+
+	api.Post("/room/create", append(requireAuthMut, middleware.APIRateLimiter(cfg.RateLimit), roomHandler.CreateRoom)...)
+	api.Post("/room/join", append(requireAuthMut, roomHandler.JoinRoom)...)
 	api.Post("/room/guest-join", middleware.GuestRateLimiter(cfg.RateLimit), roomHandler.GuestJoinRoom)
-	api.Post("/room/refresh-token", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.RefreshLiveKitToken)
-	api.Get("/room/list", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.ListRooms)
-	api.Get("/room/archived", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.ListArchivedRooms)
-	api.Post("/room/:roomId/kick/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.KickParticipant)
-	api.Post("/room/:roomId/mute/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.MuteParticipant)
-	api.Post("/room/:roomId/ban/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.BanParticipant)
-	api.Post("/room/:roomId/video/:identity/off", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.DisableParticipantVideo)
-	api.Post("/room/:roomId/promote/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.PromoteParticipant)
-	api.Post("/room/:roomId/demote/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.DemoteParticipant)
-	api.Post("/room/:roomId/chat/:identity/block", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.BlockChat)
-	api.Post("/room/:roomId/deafen/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.DeafenParticipant)
-	api.Post("/room/:roomId/undeafen/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.UndeafenParticipant)
-	api.Post("/room/:roomId/ask/:identity/:action", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.AskParticipantAction)
-	api.Post("/room/:roomId/spotlight/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.SpotlightParticipant)
-	api.Post("/room/:roomId/screenshare/:identity/stop", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.StopScreenShare)
-	api.Get("/room/:roomId/presence", middleware.APIRateLimiter(cfg.RateLimit), roomHandler.GetRoomPresence)
-	api.Get("/room/:roomId/participant/:identity/info", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.GetParticipantInfo)
-	api.Get("/room/:roomId/participant/:identity/profile", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.GetParticipantProfile)
-	api.Post("/room/:roomId/stage/:identity/bring", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.BringToStage)
-	api.Post("/room/:roomId/stage/:identity/remove", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.RemoveFromStage)
-	api.Put("/room/:roomId/settings", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.UpdateSettings)
-	api.Delete("/room/:roomId", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.DeleteRoom)
-	api.Post("/room/:roomId/chat/upload", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.UploadChatImage)
+	api.Post("/room/refresh-token", append(requireAuthMut, middleware.APIRateLimiter(cfg.RateLimit), roomHandler.RefreshLiveKitToken)...)
+	api.Get("/room/list", append(requireAuth, roomHandler.ListRooms)...)
+	api.Get("/room/archived", append(requireAuth, roomHandler.ListArchivedRooms)...)
+	api.Post("/room/:roomId/kick/:identity", append(requireAuthMut, roomHandler.KickParticipant)...)
+	api.Post("/room/:roomId/mute/:identity", append(requireAuthMut, roomHandler.MuteParticipant)...)
+	api.Post("/room/:roomId/ban/:identity", append(requireAuthMut, roomHandler.BanParticipant)...)
+	api.Post("/room/:roomId/video/:identity/off", append(requireAuthMut, roomHandler.DisableParticipantVideo)...)
+	api.Post("/room/:roomId/promote/:identity", append(requireAuthMut, roomHandler.PromoteParticipant)...)
+	api.Post("/room/:roomId/demote/:identity", append(requireAuthMut, roomHandler.DemoteParticipant)...)
+	api.Post("/room/:roomId/chat/:identity/block", append(requireAuthMut, roomHandler.BlockChat)...)
+	api.Post("/room/:roomId/deafen/:identity", append(requireAuthMut, roomHandler.DeafenParticipant)...)
+	api.Post("/room/:roomId/undeafen/:identity", append(requireAuthMut, roomHandler.UndeafenParticipant)...)
+	api.Post("/room/:roomId/ask/:identity/:action", append(requireAuthMut, roomHandler.AskParticipantAction)...)
+	api.Post("/room/:roomId/spotlight/:identity", append(requireAuthMut, roomHandler.SpotlightParticipant)...)
+	api.Post("/room/:roomId/screenshare/:identity/stop", append(requireAuthMut, roomHandler.StopScreenShare)...)
+	api.Get("/room/:roomId/presence", middleware.OptionalAuth(), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.GetRoomPresence)
+	api.Get("/room/:roomId/participant/:identity/info", append(requireAuth, roomHandler.GetParticipantInfo)...)
+	api.Get("/room/:roomId/participant/:identity/profile", append(requireAuth, roomHandler.GetParticipantProfile)...)
+	api.Post("/room/:roomId/stage/:identity/bring", append(requireAuthMut, roomHandler.BringToStage)...)
+	api.Post("/room/:roomId/stage/:identity/remove", append(requireAuthMut, roomHandler.RemoveFromStage)...)
+	api.Put("/room/:roomId/settings", append(requireAuthMut, roomHandler.UpdateSettings)...)
+	api.Delete("/room/:roomId", append(requireAuthMut, roomHandler.DeleteRoom)...)
+	api.Post("/room/:roomId/chat/upload", append(requireAuthMut, middleware.APIRateLimiter(cfg.RateLimit), roomHandler.UploadChatImage)...)
+
 
 	// TODO oncoming feature: recording routes
 	// api.Post("/rooms/:id/recording/start", ...)
@@ -449,7 +474,7 @@ func Run(configPath, version string) error {
 	certHandler := handlers.NewCertHandler(cfg)
 	overviewHandler := handlers.NewAdminOverviewHandler(roomRepo, userRepo, settingsRepo, &cfg.LiveKit, lkClient, database.GetDB(), time.Now(), version)
 	adminGroup := api.Group("/admin",
-		middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo),
+		middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo),
 		middleware.RequireAccess(models.AccessSuperAdmin),
 	)
 	adminGroup.Get("/users", usersHandler.ListUsers)

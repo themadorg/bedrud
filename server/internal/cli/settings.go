@@ -206,13 +206,35 @@ func redactSettings(s *models.SystemSettings) {
 	if s == nil {
 		return
 	}
-	for _, p := range []*string{
-		&s.GoogleClientSecret, &s.GithubClientSecret, &s.TwitterClientSecret,
-		&s.JWTSecret, &s.SessionSecret, &s.LiveKitAPISecret,
-		&s.ChatUploadS3AccessKey, &s.ChatUploadS3SecretKey,
-	} {
-		if *p != "" {
-			*p = "***redacted***"
-		}
+	// Direct field writes so taint analysis (and readers) see sanitization.
+	if s.GoogleClientSecret != "" {
+		s.GoogleClientSecret = "***redacted***"
+	}
+	if s.GithubClientSecret != "" {
+		s.GithubClientSecret = "***redacted***"
+	}
+	if s.TwitterClientSecret != "" {
+		s.TwitterClientSecret = "***redacted***"
+	}
+	if s.JWTSecret != "" {
+		s.JWTSecret = "***redacted***"
+	}
+	if s.SessionSecret != "" {
+		s.SessionSecret = "***redacted***"
+	}
+	if s.LiveKitAPIKey != "" {
+		s.LiveKitAPIKey = "***redacted***"
+	}
+	if s.LiveKitAPISecret != "" {
+		s.LiveKitAPISecret = "***redacted***"
+	}
+	if s.ChatUploadS3AccessKey != "" {
+		s.ChatUploadS3AccessKey = "***redacted***"
+	}
+	if s.ChatUploadS3SecretKey != "" {
+		s.ChatUploadS3SecretKey = "***redacted***"
+	}
+	if s.EmailPassword != "" {
+		s.EmailPassword = "***redacted***"
 	}
 }

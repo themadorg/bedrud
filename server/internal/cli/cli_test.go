@@ -10,6 +10,7 @@ import (
 	"bedrud/config"
 	"bedrud/internal/clioutput"
 	"bedrud/internal/database"
+	"bedrud/internal/models"
 )
 
 func TestVersionJSON(t *testing.T) {
@@ -222,4 +223,33 @@ livekit:
 		t.Fatal(err)
 	}
 	return cfgPath
+}
+
+func TestRedactSettings(t *testing.T) {
+	s := &models.SystemSettings{
+		GoogleClientSecret:  "g",
+		GithubClientSecret:  "h",
+		TwitterClientSecret: "t",
+		JWTSecret:           "j",
+		SessionSecret:       "s",
+		LiveKitAPIKey:       "k",
+		LiveKitAPISecret:    "lk",
+		ChatUploadS3AccessKey: "ak",
+		ChatUploadS3SecretKey: "sk",
+		EmailPassword:       "pw",
+		ServerHost:          "keep-me",
+	}
+	redactSettings(s)
+	for _, got := range []string{
+		s.GoogleClientSecret, s.GithubClientSecret, s.TwitterClientSecret,
+		s.JWTSecret, s.SessionSecret, s.LiveKitAPIKey, s.LiveKitAPISecret,
+		s.ChatUploadS3AccessKey, s.ChatUploadS3SecretKey, s.EmailPassword,
+	} {
+		if got != "***redacted***" {
+			t.Fatalf("secret not redacted: %q", got)
+		}
+	}
+	if s.ServerHost != "keep-me" {
+		t.Fatalf("non-secret mutated: %q", s.ServerHost)
+	}
 }
