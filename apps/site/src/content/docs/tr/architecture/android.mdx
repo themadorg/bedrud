@@ -122,6 +122,20 @@ The instance switcher appears as a `ModalBottomSheet` triggered from the Dashboa
 
 ## Features
 
+### Ürün yüzeyi (kullanıcıların aldığı)
+
+| Alan | Davranış |
+|------|----------|
+| Auth | Giriş / kayıt (desteklendiği yerde passkey'ler) |
+| Dashboard | Oda listesi; katıldıktan sonra **son odalar** |
+| Deep links | Yapıştırılan / açılan oda URL'leri doğru odaya çözülür |
+| Meeting | Katıl, sessize al, ayrıl; kullanılabilir kontrol chrome'u |
+| Stage / share | Cihaz izin verdiğinde sahne katmanı ve ekran paylaşımı yolu |
+| Telecom | Kendi yönettiği arama bağlantısı; bağlantı kesince toplantı temiz biter |
+| RTL | `fa` / `ar` yerel ayarları ve Shabnam — chrome kesilmemeli |
+
+Paylaşılan ürün kavramları (web'de sahne, sohbet, beyaz tahta) [Bedrud'u Kullanma](/tr/docs/using/joining-a-meeting) altında belgelenir. Web ile özellik eşliği sürüme göre değişebilir.
+
 ### Deep Linking
 
 The app handles URLs matching:
@@ -129,7 +143,7 @@ The app handles URLs matching:
 - `https://bedrud.com/m/*` - Direct room join
 - `https://bedrud.com/c/*` - Room join by code
 
-Configured via intent filters in `AndroidManifest.xml`.
+Configured via intent filters in `AndroidManifest.xml`. Room URL parsing (`BedrudURLParser` and related) should open the correct room from a paste or external link.
 
 ### Call Management
 

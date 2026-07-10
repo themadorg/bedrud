@@ -1,0 +1,59 @@
+---
+title: Rejoindre une réunion
+description: Écran pré-join, connexion, micro et caméra, quitter, et salles à accès restreint
+order: 3
+---
+
+Comment entrer dans une salle Bedrud depuis l'application web : aperçu pré-join, connexion, contrôles média de base et portes d'accès.
+
+## Pré-join (coquille d'accueil)
+
+Avant la connexion média, vous voyez en général :
+
+- **Nom** d'affichage
+- Aperçu **micro** et **caméra**
+- **Sélecteurs d'appareils** pour micro, caméra et haut-parleur (si disponibles)
+
+Réglez-les avant de rejoindre pour que la première connexion utilise les bons appareils.
+
+## Rejoindre et se connecter
+
+1. Cliquez sur **Rejoindre** (ou équivalent).
+2. Vous devriez voir une courte coquille de chargement, puis l'UI de réunion **connectée** — pas un spinner infini.
+3. Les autres participants apparaissent en tuiles ou avatars une fois qu'ils ont rejoint.
+
+Si la connexion échoue, vérifiez les permissions du navigateur, le réseau et l'accessibilité des ports LiveKit/WebRTC du serveur. Opérateurs : voir [Connectivité WebRTC](/fr/docs/architecture/webrtc-connectivity).
+
+## Contrôles de base
+
+| Action | Comportement attendu |
+|--------|----------------------|
+| Couper / rétablir le micro | Les autres cessent / recommencent à vous entendre |
+| Caméra on / off | Votre tuile vidéo se met à jour pour les autres |
+| Quitter la salle | Déconnexion propre ; les autres ne gardent pas un participant zombie indéfiniment |
+| Rejoindre à nouveau | Rejoindre la même salle après avoir quitté fonctionne |
+
+## Plusieurs participants
+
+Utilisez deux navigateurs (ou normal + privé) pour confirmer :
+
+- Les deux côtés voient les tuiles de l'autre
+- Les états micro et caméra sont visibles à distance
+
+## Salles à accès restreint
+
+Les salles peuvent exiger un **mot de passe**, une approbation ou d'autres contrôles selon les réglages. Complétez le **dialogue d'accès à la salle** s'il s'affiche, puis poursuivez vers le pré-join / rejoindre.
+
+L'accès invité (sans compte) peut être autorisé sur certaines instances — partagez un lien et les invités entrent avec un nom d'affichage uniquement.
+
+## Une fois dans la salle
+
+- [Mode scène](/fr/docs/using/stage-mode)
+- [Chat](/fr/docs/using/chat)
+- [Contrôles de réunion](/fr/docs/using/meeting-controls) — partage d'écran, spotlight, modération
+- [Audio et push-to-talk](/fr/docs/using/audio-and-push-to-talk)
+
+## Voir aussi
+
+- [Tableau de bord et salles](/fr/docs/using/dashboard-and-rooms)
+- [Compte et paramètres](/fr/docs/using/account-and-settings)

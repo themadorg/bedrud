@@ -1,0 +1,35 @@
+---
+title: YouTube Watch
+description: Share a YouTube video in the room with roughly synchronized playback
+order: 6
+---
+
+YouTube Watch lets one participant share a video so everyone in the room watches together.
+
+## Enable the feature
+
+YouTube watch party can be gated behind **Settings → Experimental → YouTube watch party**. Enable it before you expect the share control to appear.
+
+## Share a video
+
+1. Open the **share** / YouTube dialog from meeting controls.
+2. Paste a **valid YouTube URL**.
+3. The watch **overlay** should play for you and for other participants in the room.
+
+## Playback sync
+
+Play, pause, and seek (as implemented) should **roughly stay in sync** for remote viewers. Exact frame-level lock is not guaranteed on poor networks; small drift can appear.
+
+## Errors and close
+
+| Situation | Expected |
+|-----------|----------|
+| Invalid URL | Clear error; no blank hang |
+| Close watch | Overlay gone for both sides |
+| Toggle with stage / whiteboard | Should not permanently break those modes |
+
+## Related
+
+- [Stage Mode](/en/docs/using/stage-mode)
+- [Whiteboard](/en/docs/using/whiteboard)
+- [Joining a Meeting](/en/docs/using/joining-a-meeting)

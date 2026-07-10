@@ -1,0 +1,59 @@
+---
+title: Unirse a una reunión
+description: Pantalla de pre-unión, conectar, silenciar y cámara, salir y salas con acceso restringido
+order: 3
+---
+
+Cómo entrar en una sala de Bedrud desde la app web: vista previa de pre-unión, conexión, controles básicos de medios y puertas de acceso.
+
+## Pre-unión (shell de bienvenida)
+
+Antes de conectar los medios sueles ver:
+
+- **Nombre** de visualización
+- Vista previa de **micrófono** y **cámara**
+- **Selectores de dispositivo** para micrófono, cámara y altavoz (si están disponibles)
+
+Configúralos antes de unirte para que la primera conexión use los dispositivos correctos.
+
+## Unirse y conectar
+
+1. Haz clic en **Unirse** (o equivalente).
+2. Deberías ver un shell de carga breve y luego la UI de reunión **conectada** — no un spinner infinito.
+3. Los demás participantes aparecen como tarjetas o avatares una vez se han unido.
+
+Si la conexión falla, comprueba permisos del navegador, red y que los puertos LiveKit/WebRTC del servidor sean alcanzables. Operadores: ver [Conectividad WebRTC](/es/docs/architecture/webrtc-connectivity).
+
+## Controles básicos
+
+| Acción | Comportamiento esperado |
+|--------|-------------------------|
+| Silenciar / activar micrófono | Los demás dejan / vuelven a oírte |
+| Cámara on / off | Tu tarjeta de vídeo se actualiza para los demás |
+| Salir de la sala | Te desconectas limpiamente; los demás no deberían conservar un participante zombi para siempre |
+| Volver a unirse | Unirse de nuevo a la misma sala funciona tras salir |
+
+## Varios participantes
+
+Usa dos navegadores (o normal + privado) para confirmar:
+
+- Ambos lados ven las tarjetas del otro
+- El estado de silencio y cámara es visible en remoto
+
+## Salas con acceso restringido
+
+Las salas pueden exigir una **contraseña**, aprobación u otras comprobaciones según la configuración. Completa el **diálogo de acceso a la sala** si aparece y continúa a pre-unión / unirse.
+
+El acceso de invitado (sin cuenta) puede estar permitido en algunas instancias: comparte un enlace y los invitados entran solo con un nombre de visualización.
+
+## Una vez dentro
+
+- [Modo escenario](/es/docs/using/stage-mode)
+- [Chat](/es/docs/using/chat)
+- [Controles de reunión](/es/docs/using/meeting-controls) — compartir pantalla, spotlight, moderación
+- [Audio y push-to-talk](/es/docs/using/audio-and-push-to-talk)
+
+## Relacionado
+
+- [Panel y salas](/es/docs/using/dashboard-and-rooms)
+- [Cuenta y ajustes](/es/docs/using/account-and-settings)

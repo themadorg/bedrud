@@ -1,0 +1,45 @@
+---
+title: Tableau blanc collaboratif
+description: Tableau de dessin partagé synchronisé en temps réel via les data channels LiveKit
+order: 5
+---
+
+Bedrud inclut un tableau blanc collaboratif pour que tout le monde dans la salle puisse dessiner, sélectionner et modifier la même scène.
+
+## Activer la fonction
+
+Le tableau blanc peut être derrière **Paramètres → Expérimental → Tableau blanc partagé**. Activez-le, puis ouvrez le contrôle tableau blanc dans la réunion. Une acceptation peut être demandée avant chaque session.
+
+## Ouvrir le tableau
+
+1. Rejoignez une réunion (deux navigateurs recommandés pour un vrai test).
+2. Ouvrez l'overlay **tableau blanc** depuis les contrôles de réunion.
+3. Dessinez sur le tableau de l'utilisateur A — l'utilisateur B devrait voir les traits en environ **une seconde**.
+4. Dessinez sur B — A devrait voir les mêmes mises à jour.
+
+## Éditer ensemble
+
+| Action | Attente à distance |
+|--------|--------------------|
+| Dessiner des traits | Apparaît rapidement chez les autres |
+| Sélectionner / déplacer / supprimer | La scène distante se met à jour |
+| Curseurs distants / suivi | Ne doit pas figer l'UI |
+
+## Fermer, rouvrir, rejoindre
+
+- **Fermez** l'overlay et rouvrez — la scène partagée reste en général (sauf démontage intentionnel).
+- **Quittez** la salle en cours de session — pas de boucle de mort console ; rejoindre doit être stable.
+- Les arrivants tardifs reçoivent l'état partagé actuel via le même chemin de sync.
+
+## Fonctionnement (bref)
+
+Le tableau blanc repose sur un canevas collaboratif (outillage de style Excalidraw) avec un état CRDT **Yjs** synchronisé sur les **data channels LiveKit**. Les médias (audio/vidéo) restent sur les pistes WebRTC ; les mises à jour du tableau empruntent les chemins data fiables/lossy, sans serveur de tableau blanc séparé.
+
+Self-hosters : assurez-vous que les builds de production incluent le chunk vendor du tableau blanc (`bun run build` pour l'app web) afin que l'ouverture du tableau ne renvoie pas 404 sur les assets statiques.
+
+## Voir aussi
+
+- [Mode scène](/fr/docs/using/stage-mode)
+- [YouTube Watch](/fr/docs/using/youtube-watch)
+- [Contrôles de réunion](/fr/docs/using/meeting-controls)
+- Blog : [Comment le tableau blanc collaboratif de Bedrud se synchronise](/fr/blog/collaborative-whiteboard)

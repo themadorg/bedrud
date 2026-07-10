@@ -1,0 +1,53 @@
+---
+title: In-Meeting Chat
+description: Text messages, emoji reactions, polls, and image attachments
+order: 7
+---
+
+In-room chat is a side panel for text, reactions, polls, and images without leaving the call.
+
+## Open and send
+
+1. Open the **chat** panel from the meeting controls.
+2. Send a text message — other participants receive it.
+3. Opening or closing the panel must **not** kill camera or microphone tracks.
+
+Message grouping and timestamps should look correct even on burst sends.
+
+## Emoji
+
+- **Reaction** on a message — both sides update reaction counts.
+- **Emoji picker** in the composer inserts emoji into the draft text.
+
+## Polls
+
+1. Create a **poll** from chat.
+2. Everyone sees the poll bubble.
+3. Participants **vote**; results update (results modal if the UI provides one).
+
+## Images and files
+
+- Attach an image or file within server size limits.
+- Recipients can open a **lightbox** for images.
+- Large payloads use a chunked path so content is not silently dropped.
+
+Operators configure upload quotas and storage under `chat` in [Configuration](/en/docs/getting-started/configuration) (`maxUploadBytesPerUser`, disk/S3 upload settings).
+
+## Retention (client-side)
+
+LiveKit does not persist data-channel chat on the server the way a chat product would. Bedrud applies **client-side** retention hints:
+
+| Setting | Default (typical) | Meaning |
+|---------|-------------------|---------|
+| `chat.maxMessageCount` | 10000 | Cap messages kept in memory / session storage |
+| `chat.messageTTLHours` | 2160 (90 days) | Age-based trim |
+
+Env overrides: `CHAT_MAX_MESSAGE_COUNT`, `CHAT_MESSAGE_TTL_HOURS`.
+
+After a **reload mid-room**, history follows that product policy (session restore or clean start) without crashing.
+
+## Related
+
+- [Meeting Controls](/en/docs/using/meeting-controls)
+- [Joining a Meeting](/en/docs/using/joining-a-meeting)
+- [API Handlers](/en/docs/backend/api-handlers) — `POST /room/:roomId/chat/upload`

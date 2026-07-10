@@ -1,0 +1,53 @@
+---
+title: Meeting-Chat
+description: Textnachrichten, Emoji-Reaktionen, Umfragen und Bildanhänge
+order: 7
+---
+
+Der Raum-Chat ist ein Seitenpanel für Text, Reaktionen, Umfragen und Bilder — ohne den Anruf zu verlassen.
+
+## Öffnen und senden
+
+1. Öffnen Sie das **Chat**-Panel über die Meeting-Steuerung.
+2. Senden Sie eine Textnachricht — andere Teilnehmende empfangen sie.
+3. Öffnen oder Schließen des Panels darf **Kamera- oder Mikrofon-Tracks nicht abbrechen**.
+
+Nachrichtengruppierung und Zeitstempel sollten auch bei Burst-Sends korrekt aussehen.
+
+## Emoji
+
+- **Reaktion** auf eine Nachricht — beide Seiten aktualisieren Reaktionszähler.
+- **Emoji-Picker** im Composer fügt Emoji in den Entwurf ein.
+
+## Umfragen
+
+1. Erstellen Sie eine **Umfrage** aus dem Chat.
+2. Alle sehen die Umfrage-Bubble.
+3. Teilnehmende **stimmen ab**; Ergebnisse aktualisieren sich (Ergebnis-Modal, falls die UI eines bietet).
+
+## Bilder und Dateien
+
+- Hängen Sie ein Bild oder eine Datei innerhalb der Server-Größenlimits an.
+- Empfänger können für Bilder eine **Lightbox** öffnen.
+- Große Payloads nutzen einen chunked Pfad, damit Inhalte nicht still verworfen werden.
+
+Operatoren konfigurieren Upload-Kontingente und Speicher unter `chat` in der [Konfiguration](/de/docs/getting-started/configuration) (`maxUploadBytesPerUser`, Disk-/S3-Upload-Einstellungen).
+
+## Aufbewahrung (clientseitig)
+
+LiveKit speichert Data-Channel-Chat serverseitig nicht wie ein Chat-Produkt. Bedrud wendet **clientseitige** Aufbewahrungshinweise an:
+
+| Einstellung | Standard (typisch) | Bedeutung |
+|-------------|--------------------|-----------|
+| `chat.maxMessageCount` | 10000 | Obergrenze für Nachrichten in Speicher / Session Storage |
+| `chat.messageTTLHours` | 2160 (90 Tage) | Altersbasiertes Trimmen |
+
+Env-Overrides: `CHAT_MAX_MESSAGE_COUNT`, `CHAT_MESSAGE_TTL_HOURS`.
+
+Nach einem **Reload mitten im Raum** folgt der Verlauf dieser Produktpolitik (Session-Wiederherstellung oder sauberer Start) — ohne Crash.
+
+## Verwandt
+
+- [Meeting-Steuerung](/de/docs/using/meeting-controls)
+- [Einem Meeting beitreten](/de/docs/using/joining-a-meeting)
+- [API-Handler](/de/docs/backend/api-handlers) — `POST /room/:roomId/chat/upload`

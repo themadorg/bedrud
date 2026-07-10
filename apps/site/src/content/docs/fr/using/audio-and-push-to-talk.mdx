@@ -1,0 +1,44 @@
+---
+title: Audio et push-to-talk
+description: Sélection d'appareils, touche de maintien push-to-talk et contrôles audio en appel
+order: 8
+---
+
+Configurez micros et haut-parleurs, puis utilisez éventuellement le push-to-talk (PTT) pour n'émettre que pendant le maintien d'une touche.
+
+## Sélection d'appareils
+
+Dans **Paramètres → Audio** (et au pré-join) :
+
+- Les listes micro et haut-parleur se peuplent lorsque le navigateur accorde les permissions.
+- Changer d'appareil **en cours d'appel** doit fonctionner sans reconnexion complète à la salle.
+
+Les caméras sont sous **Paramètres → Vidéo**. Voir [Compte et paramètres](/fr/docs/using/account-and-settings).
+
+## Activer le push-to-talk
+
+1. Ouvrez **Paramètres → Audio**.
+2. Activez le **push-to-talk**.
+3. Capturez une **touche de maintien** avec le contrôle de capture.
+4. Enregistrez si l'UI l'exige explicitement — les préférences doivent persister au rechargement.
+
+## En réunion
+
+| Étape | Attendu |
+|-------|---------|
+| Maintenir la touche PTT | Le micro **émet** ; les autres vous entendent |
+| Relâcher la touche | Le micro est **coupé** ; les autres cessent de vous entendre |
+| Indicateurs | Les contrôles locaux et les tuiles distantes peuvent afficher l'état PTT s'il est implémenté |
+| Désactiver le PTT | Le bascule mute normal revient |
+
+Ne laissez pas le PTT actif avec un micro resté ouvert alors que vous voulez rester silencieux — désactivez le PTT ou coupez explicitement le micro.
+
+## Deafen / casque
+
+Si votre build expose le **deafen** ou des contrôles casque, ils ne doivent pas bloquer l'audio distant pour les autres. Le deafen est un état d'écoute local, pas un mute distant d'autrui (sauf combiné à des actions de modération).
+
+## Voir aussi
+
+- [Compte et paramètres](/fr/docs/using/account-and-settings)
+- [Contrôles de réunion](/fr/docs/using/meeting-controls)
+- [Rejoindre une réunion](/fr/docs/using/joining-a-meeting)

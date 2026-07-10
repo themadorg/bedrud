@@ -1,0 +1,59 @@
+---
+title: Einem Meeting beitreten
+description: Pre-Join-Bildschirm, Verbinden, Stummschalten und Kamera, Verlassen und zugangsbeschränkte Räume
+order: 3
+---
+
+So betreten Sie einen Bedrud-Raum über die Web-App: Pre-Join-Vorschau, Verbindung, grundlegende Mediensteuerung und Zugangsschranken.
+
+## Pre-Join (Willkommens-Shell)
+
+Bevor Medien verbunden werden, sehen Sie typischerweise:
+
+- Anzeige-**Name**
+- **Mikrofon**- und **Kamera**-Vorschau
+- **Geräteauswahl** für Mikrofon, Kamera und Lautsprecher (falls verfügbar)
+
+Stellen Sie diese vor dem Beitritt ein, damit die erste Verbindung die richtigen Geräte nutzt.
+
+## Beitreten und verbinden
+
+1. Klicken Sie auf **Beitreten** (oder Entsprechendes).
+2. Sie sollten eine kurze Lade-Shell sehen, dann die **verbundene** Meeting-UI — keinen endlosen Spinner.
+3. Andere Teilnehmer erscheinen als Kacheln oder Avatare, sobald sie beigetreten sind.
+
+Schlägt die Verbindung fehl, prüfen Sie Browser-Berechtigungen, Netzwerk und ob die LiveKit-/WebRTC-Ports des Servers erreichbar sind. Operatoren: siehe [WebRTC-Konnektivität](/de/docs/architecture/webrtc-connectivity).
+
+## Grundlegende Steuerung
+
+| Aktion | Erwartetes Verhalten |
+|--------|----------------------|
+| Mikro stumm / laut | Andere hören Sie nicht mehr / wieder |
+| Kamera an / aus | Ihre Videokachel aktualisiert sich für andere |
+| Raum verlassen | Saubere Trennung; andere behalten keinen Zombie-Teilnehmer auf Dauer |
+| Erneut beitreten | Nach dem Verlassen funktioniert der erneute Beitritt |
+
+## Mehrere Teilnehmer
+
+Nutzen Sie zwei Browser (oder normal + privat), um zu prüfen:
+
+- Beide Seiten sehen die Kacheln der anderen
+- Stumm- und Kamerastatus ist remote sichtbar
+
+## Zugangsbeschränkte Räume
+
+Räume können ein **Passwort**, Freigabe oder andere Zugangsprüfungen verlangen — je nach Raumeinstellungen. Schließen Sie den **Raumzugangs-Dialog** ab, wenn er erscheint, und fahren Sie mit Pre-Join / Beitreten fort.
+
+Gastbeitritt (ohne Konto) kann auf manchen Instanzen erlaubt sein — teilen Sie einen Link, und Gäste treten nur mit Anzeigenamen bei.
+
+## Sobald Sie drin sind
+
+- [Stage-Modus](/de/docs/using/stage-mode)
+- [Chat](/de/docs/using/chat)
+- [Meeting-Steuerung](/de/docs/using/meeting-controls) — Bildschirmfreigabe, Spotlight, Moderation
+- [Audio & Push-to-Talk](/de/docs/using/audio-and-push-to-talk)
+
+## Verwandt
+
+- [Dashboard & Räume](/de/docs/using/dashboard-and-rooms)
+- [Konto & Einstellungen](/de/docs/using/account-and-settings)

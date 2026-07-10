@@ -1,0 +1,45 @@
+---
+title: Collaborative Whiteboard
+description: Shared drawing board synced in real time over LiveKit data channels
+order: 5
+---
+
+Bedrud includes a collaborative whiteboard so everyone in the room can draw, select, and edit the same scene.
+
+## Enable the feature
+
+Whiteboard can be gated behind **Settings → Experimental → Shared whiteboard**. Turn it on, then open the whiteboard control in the meeting. You may be asked to accept before each session.
+
+## Open the board
+
+1. Join a meeting (two browsers recommended for a real test).
+2. Open the **whiteboard** overlay from the meeting controls.
+3. Draw on user A’s board — user B should see strokes within about **one second**.
+4. Draw on B — A should see the same updates.
+
+## Editing together
+
+| Action | Remote expectation |
+|--------|--------------------|
+| Draw strokes | Appears for others quickly |
+| Select / move / delete | Remote scene updates |
+| Remote cursors / follow | Should not freeze the UI |
+
+## Close, reopen, rejoin
+
+- **Close** the overlay and reopen — the shared scene typically remains (unless intentionally torn down).
+- **Leave** the room mid-session — no console death loop; rejoin should be stable.
+- Late joiners receive the current shared state through the same sync path.
+
+## How it works (short)
+
+The whiteboard is built on a collaborative canvas (Excalidraw-style tooling) with **Yjs** CRDT state synchronized over **LiveKit data channels**. Media (audio/video) stays on WebRTC tracks; board updates ride the reliable/lossy data paths so collaboration does not depend on a separate whiteboard server.
+
+Self-hosters: ensure production builds include the whiteboard vendor chunk (`bun run build` for the web app) so opening the board does not 404 static assets.
+
+## Related
+
+- [Stage Mode](/en/docs/using/stage-mode)
+- [YouTube Watch](/en/docs/using/youtube-watch)
+- [Meeting Controls](/en/docs/using/meeting-controls)
+- Blog: [How Bedrud’s collaborative whiteboard syncs](/en/blog/collaborative-whiteboard)

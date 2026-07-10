@@ -1,0 +1,59 @@
+---
+title: Toplantı Kontrolleri
+description: Ekran paylaşımı, spotlight, moderasyon, oda bilgisi ve taşıma yedek yolu
+order: 9
+---
+
+Bir odaya bağlandıktan sonra kullanılabilir kontroller: paylaşım, düzen odağı, moderasyon ve kurtarma yolları.
+
+## Ekran paylaşımı (normal düzen)
+
+1. Kontrol çubuğundan **ekran paylaşımını** başlatın (mutlaka sahne modunda olması gerekmez).
+2. Diğer katılımcılar paylaşılan ekranınızı kutucuk veya odaklı görünüm olarak görür.
+3. **Paylaşımı durdur** — paylaşım kutucuğu herkes için temizlenir.
+
+Sahneye özel paylaşım katmanı [Sahne Modu](/tr/docs/using/stage-mode) içinde ele alınır.
+
+## Spotlight ve düzen
+
+Üç veya daha fazla kutucukla **spotlight / odak** düzeni hâlâ çalışmalıdır: bir katılımcıyı sabitleyin veya odaklayın; birincil alanı alsın, diğerleri erişilebilir kalsın.
+
+## Katılımcı bağlam menüsü
+
+**Rolünüze** bağlı olarak (oda oluşturucu, moderatör, süper yönetici):
+
+- Sessize alma, atma, videoyu kapatma, ekran paylaşımını durdurma, yükseltme/düşürme ve benzeri
+- Yetkisiz eylemler temizce başarısız olur (kısmi ayrıcalıklı durum yok)
+
+Hiyerarşi ve kimin moderasyon yapabileceği için [Kullanıcı Rolleri](/tr/docs/guides/roles) bölümüne bakın.
+
+## Oda bilgisi
+
+Oda bilgisi paneli şunları gösterir:
+
+- Oda **adı** ve **slug** / id
+- Yaklaşık **katılımcı sayısı**
+- UI'nin sunduğu diğer meta veriler
+
+## Taşıma yedek yolu
+
+Kötü ağlarda (tarayıcı kısıtlaması, engelli UDP) WebRTC TURN/TCP/TLS'ye düşebilir. UI tasarlandığında **yedek yolu göstermeli** ve odayı **sert çökertmemelidir**.
+
+Operatörler: [WebRTC Bağlantısı](/tr/docs/architecture/webrtc-connectivity) ve [TURN Sunucusu](/tr/docs/architecture/turn-server).
+
+## Yenileme ve yeniden katılma
+
+Toplantı ortasında tam tarayıcı **yenilemesi**, katılım yoluna yeniden girmelidir (gerekirse jeton yenileme) ve sonsuza dek zombi oturum bırakmamalıdır.
+
+## Güvenli bağlam ve izinler
+
+`getUserMedia` güvenli bağlam gerektirir (HTTPS veya localhost). İzin afişleri yalnızca tarayıcı kamera/mikrofon erişimini engellediğinde görünmelidir.
+
+## İlgili
+
+- [Toplantıya Katılma](/tr/docs/using/joining-a-meeting)
+- [Sohbet](/tr/docs/using/chat)
+- [Sahne Modu](/tr/docs/using/stage-mode)
+- [Beyaz Tahta](/tr/docs/using/whiteboard)
+- [YouTube İzleme](/tr/docs/using/youtube-watch)
+- [Ses ve Bas-Konuş](/tr/docs/using/audio-and-push-to-talk)

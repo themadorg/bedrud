@@ -1,0 +1,59 @@
+---
+title: 会议控制
+description: 屏幕共享、聚光灯、管理、房间信息与传输回退
+order: 9
+---
+
+连接到房间后可用的控制：共享、布局聚焦、管理与恢复路径。
+
+## 屏幕共享（普通布局）
+
+1. 从控制栏开始**屏幕共享**（不必在舞台模式）。
+2. 其他参与者以画面或聚焦视图看到你的共享屏幕。
+3. **停止共享**——共享画面对所有人清除。
+
+舞台专用共享叠加层见 [舞台模式](/zh/docs/using/stage-mode)。
+
+## 聚光灯与布局
+
+有三个及以上画面时，**聚光灯 / 聚焦**布局仍应可用：固定或聚焦某参与者占据主区域，其他人仍可访问。
+
+## 参与者上下文菜单
+
+取决于你的**角色**（房间创建者、版主、超级管理员）：
+
+- 静音、踢出、禁用视频、停止屏幕共享、提升/降级等类似操作
+- 未授权操作干净失败（无部分特权状态）
+
+层级与谁可管理见 [用户角色](/zh/docs/guides/roles)。
+
+## 房间信息
+
+房间信息面板显示：
+
+- 房间**名称**与 **slug** / id
+- 大致**参与者数量**
+- UI 暴露的其他元数据
+
+## 传输回退
+
+在糟糕网络（浏览器限流、UDP 被拦）上，WebRTC 可能回退到 TURN/TCP/TLS。UI 在设计时应**展示回退**，且**不得硬崩溃**房间。
+
+运维人员：[WebRTC 连接](/zh/docs/architecture/webrtc-connectivity) 与 [TURN 服务器](/zh/docs/architecture/turn-server)。
+
+## 刷新与重新加入
+
+会议中途完整浏览器**刷新**应重新进入加入路径（如需则刷新令牌），不会永久留下僵尸会话。
+
+## 安全上下文与权限
+
+`getUserMedia` 需要安全上下文（HTTPS 或 localhost）。仅在浏览器阻止摄像头/麦克风访问时显示权限横幅。
+
+## 相关
+
+- [加入会议](/zh/docs/using/joining-a-meeting)
+- [聊天](/zh/docs/using/chat)
+- [舞台模式](/zh/docs/using/stage-mode)
+- [白板](/zh/docs/using/whiteboard)
+- [YouTube 一起看](/zh/docs/using/youtube-watch)
+- [音频与一键通讲](/zh/docs/using/audio-and-push-to-talk)

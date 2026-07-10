@@ -1,0 +1,59 @@
+---
+title: Joining a Meeting
+description: Pre-join screen, connect, mute and camera, leave, and gated room access
+order: 3
+---
+
+How to enter a Bedrud room from the web app: pre-join preview, connect, basic media controls, and access gates.
+
+## Pre-join (welcome shell)
+
+Before media connects you typically see:
+
+- Display **name**
+- **Microphone** and **camera** preview
+- **Device selectors** for mic, camera, and speaker (when available)
+
+Set these before joining so the first connection uses the right devices.
+
+## Join and connect
+
+1. Click **Join** (or equivalent).
+2. You should see a short loading shell, then the **connected** meeting UI — not an infinite spinner.
+3. Other participants appear as tiles or avatars once they have joined.
+
+If connection fails, check browser permissions, network, and that the server’s LiveKit/WebRTC ports are reachable. Operators: see [WebRTC Connectivity](/en/docs/architecture/webrtc-connectivity).
+
+## Basic controls
+
+| Action | Expected behavior |
+|--------|-------------------|
+| Mute / unmute mic | Other participants stop/start hearing you |
+| Camera on / off | Your video tile updates for others |
+| Leave room | You disconnect cleanly; others should not keep a zombie participant forever |
+| Rejoin | Joining the same room again works after leave |
+
+## Multiple participants
+
+Use two browsers (or normal + private) to confirm:
+
+- Both sides see each other’s tiles
+- Mute and camera state is visible remotely
+
+## Gated rooms
+
+Rooms may require a **password**, wait for approval, or other access checks depending on room settings. Complete the **room access dialog** when shown, then proceed to pre-join / join.
+
+Guest join (no account) may be allowed on some instances — share a link and guests enter with a display name only.
+
+## After you are in
+
+- [Stage Mode](/en/docs/using/stage-mode)
+- [Chat](/en/docs/using/chat)
+- [Meeting Controls](/en/docs/using/meeting-controls) — screen share, spotlight, moderation
+- [Audio & Push-to-Talk](/en/docs/using/audio-and-push-to-talk)
+
+## Related
+
+- [Dashboard & Rooms](/en/docs/using/dashboard-and-rooms)
+- [Account & Settings](/en/docs/using/account-and-settings)

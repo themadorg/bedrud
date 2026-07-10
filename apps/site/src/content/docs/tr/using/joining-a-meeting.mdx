@@ -1,0 +1,59 @@
+---
+title: Toplantıya Katılma
+description: Ön katılım ekranı, bağlanma, sessize alma ve kamera, ayrılma ve kapılı oda erişimi
+order: 3
+---
+
+Web uygulamasından bir Bedrud odasına nasıl girilir: ön katılım önizlemesi, bağlantı, temel medya kontrolleri ve erişim kapıları.
+
+## Ön katılım (karşılama kabuğu)
+
+Medya bağlanmadan önce genelde şunları görürsünüz:
+
+- Görünen **ad**
+- **Mikrofon** ve **kamera** önizlemesi
+- Mikrofon, kamera ve hoparlör için **cihaz seçicileri** (varsa)
+
+İlk bağlantının doğru cihazları kullanması için katılmadan önce bunları ayarlayın.
+
+## Katılma ve bağlanma
+
+1. **Katıl** (veya eşdeğeri) tıklayın.
+2. Kısa bir yükleme kabuğu, ardından **bağlı** toplantı arayüzü görmelisiniz — sonsuz bir dönen gösterge değil.
+3. Diğer katılımcılar katıldıktan sonra kutucuk veya avatar olarak görünür.
+
+Bağlantı başarısız olursa tarayıcı izinlerini, ağı ve sunucunun LiveKit/WebRTC portlarının erişilebilirliğini kontrol edin. Operatörler: [WebRTC Bağlantısı](/tr/docs/architecture/webrtc-connectivity).
+
+## Temel kontroller
+
+| Eylem | Beklenen davranış |
+|-------|-------------------|
+| Mikrofonu sessize al / aç | Diğer katılımcılar sizi duymayı bırakır/başlar |
+| Kamera açık / kapalı | Video kutucuğunuz diğerleri için güncellenir |
+| Odadan ayrıl | Temizce bağlantıyı kesin; diğerleri sonsuza dek zombi katılımcı tutmamalı |
+| Yeniden katıl | Ayrıldıktan sonra aynı odaya katılmak çalışır |
+
+## Birden fazla katılımcı
+
+İki tarayıcı (veya normal + gizli) ile doğrulayın:
+
+- Her iki taraf da birbirinin kutucuklarını görür
+- Sessize alma ve kamera durumu uzaktan görünür
+
+## Kapılı odalar
+
+Odalar oda ayarlarına bağlı olarak **şifre**, onay bekleme veya diğer erişim kontrolleri gerektirebilir. Gösterildiğinde **oda erişim iletişim kutusunu** tamamlayın, ardından ön katılım / katılıma geçin.
+
+Bazı örneklerde misafir katılımı (hesap yok) açık olabilir — bir bağlantı paylaşın; misafirler yalnızca görünen adla girer.
+
+## İçerideyken
+
+- [Sahne Modu](/tr/docs/using/stage-mode)
+- [Sohbet](/tr/docs/using/chat)
+- [Toplantı Kontrolleri](/tr/docs/using/meeting-controls) — ekran paylaşımı, spotlight, moderasyon
+- [Ses ve Bas-Konuş](/tr/docs/using/audio-and-push-to-talk)
+
+## İlgili
+
+- [Pano ve Odalar](/tr/docs/using/dashboard-and-rooms)
+- [Hesap ve Ayarlar](/tr/docs/using/account-and-settings)

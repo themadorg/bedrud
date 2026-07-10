@@ -1,0 +1,59 @@
+---
+title: Управление встречей
+description: Демонстрация экрана, spotlight, модерация, информация о комнате и transport fallback
+order: 9
+---
+
+Контролы, доступные после подключения к комнате: шаринг, фокус раскладки, модерация и пути восстановления.
+
+## Демонстрация экрана (обычная раскладка)
+
+1. Запустите **screen share** с панели контролов (не обязательно в stage mode).
+2. Другие участники видят ваш экран как плитку или focused view.
+3. **Stop share** — share-плитка очищается у всех.
+
+Stage-specific share overlay описан в [Режиме сцены](/ru/docs/using/stage-mode).
+
+## Spotlight и раскладка
+
+При трёх и более плитках **spotlight / focus** должен работать: закрепите или сфокусируйте участника, чтобы он занял основное пространство, а остальные оставались доступны.
+
+## Контекстное меню участника
+
+В зависимости от вашей **роли** (создатель комнаты, модератор, superadmin):
+
+- Mute, kick, disable video, stop screen share, promote/demote и похожие действия
+- Неавторизованные действия падают чисто (без частичного privileged state)
+
+Иерархия и кто может модерировать: [Роли пользователей](/ru/docs/guides/roles).
+
+## Информация о комнате
+
+Панель room info показывает:
+
+- **Имя** комнаты и **slug** / id
+- Примерное **число участников**
+- Другие метаданные, которые отдаёт UI
+
+## Transport fallback
+
+На плохих сетях (throttle браузера, заблокированный UDP) WebRTC может уйти в TURN/TCP/TLS. UI должен **показывать fallback**, когда это заложено в дизайн, и **не должен hard-crash** комнату.
+
+Операторам: [Подключение WebRTC](/ru/docs/architecture/webrtc-connectivity) и [TURN-сервер](/ru/docs/architecture/turn-server).
+
+## Перезагрузка и rejoin
+
+Полная **перезагрузка** браузера mid-meeting должна снова войти в join path (token refresh при необходимости) без вечного zombie-session.
+
+## Secure context и разрешения
+
+`getUserMedia` нужен secure context (HTTPS или localhost). Баннеры разрешений должны появляться только когда браузер блокирует доступ к камере/микрофону.
+
+## См. также
+
+- [Вход на встречу](/ru/docs/using/joining-a-meeting)
+- [Чат](/ru/docs/using/chat)
+- [Режим сцены](/ru/docs/using/stage-mode)
+- [Whiteboard](/ru/docs/using/whiteboard)
+- [YouTube Watch](/ru/docs/using/youtube-watch)
+- [Аудио и Push-to-Talk](/ru/docs/using/audio-and-push-to-talk)

@@ -122,6 +122,20 @@ The instance switcher appears as a `ModalBottomSheet` triggered from the Dashboa
 
 ## Features
 
+### 产品表面（用户能得到什么）
+
+| 区域 | 行为 |
+|------|------|
+| Auth | 登录 / 注册（以及支持处的通行密钥） |
+| Dashboard | 房间列表；加入后的**最近房间** |
+| Deep links | 粘贴 / 打开的房间 URL 解析到正确房间 |
+| Meeting | 加入、静音、离开；可用的控制栏 |
+| Stage / share | 设备允许时的舞台叠加层与屏幕共享路径 |
+| Telecom | 自管理通话连接；断开干净结束会议 |
+| RTL | `fa` / `ar` 语言与 Shabnam — 外壳不应裁切 |
+
+共享产品概念（web 上的舞台、聊天、白板）见 [使用 Bedrud](/zh/docs/using/joining-a-meeting)。与 web 的功能对等可能因版本而异。
+
 ### Deep Linking
 
 The app handles URLs matching:
@@ -129,7 +143,7 @@ The app handles URLs matching:
 - `https://bedrud.com/m/*` - Direct room join
 - `https://bedrud.com/c/*` - Room join by code
 
-Configured via intent filters in `AndroidManifest.xml`.
+Configured via intent filters in `AndroidManifest.xml`. Room URL parsing (`BedrudURLParser` and related) should open the correct room from a paste or external link.
 
 ### Call Management
 

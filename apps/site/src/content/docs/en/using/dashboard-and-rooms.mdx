@@ -1,0 +1,48 @@
+---
+title: Dashboard & Rooms
+description: Create rooms, quick-join by slug or URL, and manage recent rooms
+order: 2
+---
+
+After you log in, the dashboard is home base for creating rooms, joining them, and returning to rooms you used recently.
+
+## Create a room
+
+1. From the dashboard, create a new room (name and any room options your host exposes).
+2. The room appears in your list.
+3. Open the room to enter the pre-join / meeting flow.
+
+Room cards support join and delete actions. Layout density may vary by UI version, but join and delete remain available.
+
+## Quick-join
+
+Paste a **room slug** or a **full meeting URL** into quick-join. Bedrud resolves the room and takes you to the correct join path.
+
+Shareable links typically look like:
+
+```
+https://your-host/m/<room-id-or-slug>
+```
+
+## Recent rooms
+
+After you **join** a room, it is added to **Recent rooms**.
+
+- The list **survives a full page reload**.
+- **Remove** a recent entry — it stays gone after reload.
+- Use a recent card to re-open that room quickly.
+
+Recent rooms are a convenience list on the client; they do not replace the server-side room list you own or can access.
+
+## Landing page
+
+When you open the instance root:
+
+- **Logged out** — marketing / sign-in path (no broken API proxy)
+- **Logged in** — dashboard entry
+
+## Related
+
+- [Joining a Meeting](/en/docs/using/joining-a-meeting)
+- [Account & Settings](/en/docs/using/account-and-settings)
+- [Admin Dashboard](/en/docs/guides/admin-dashboard) — operators managing all rooms

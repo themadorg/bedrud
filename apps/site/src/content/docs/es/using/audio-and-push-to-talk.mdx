@@ -1,0 +1,44 @@
+---
+title: Audio y push-to-talk
+description: Selección de dispositivos, tecla de mantener push-to-talk y controles de audio en llamada
+order: 8
+---
+
+Configura micrófonos y altavoces y, opcionalmente, usa push-to-talk (PTT) para transmitir solo mientras mantienes una tecla.
+
+## Selección de dispositivos
+
+En **Ajustes → Audio** (y en pre-unión):
+
+- Las listas de micrófono y altavoz deberían rellenarse cuando el navegador concede permisos.
+- Cambiar dispositivos **a mitad de llamada** debería funcionar sin reconectar la sala por completo.
+
+Las cámaras de vídeo están en **Ajustes → Vídeo**. Ver [Cuenta y ajustes](/es/docs/using/account-and-settings).
+
+## Activar push-to-talk
+
+1. Abre **Ajustes → Audio**.
+2. Activa **push-to-talk**.
+3. Captura una **tecla de mantener** con el control de captura de tecla.
+4. Guarda si la UI exige un guardado explícito: las preferencias deberían persistir entre recargas.
+
+## En una reunión
+
+| Paso | Esperado |
+|------|----------|
+| Mantener la tecla PTT | El micrófono **transmite**; los demás te oyen |
+| Soltar la tecla | El micrófono queda **silenciado**; dejan de oírte |
+| Indicadores | Los controles locales y las tarjetas remotas pueden mostrar el estado PTT si está implementado |
+| Desactivar PTT | Vuelve el mute normal |
+
+No dejes el PTT activo con un micrófono abierto cuando quieras estar en silencio: desactiva el PTT o silencia de forma explícita.
+
+## Deafen / auriculares
+
+Si tu build expone **deafen** o controles de auriculares, no deben dejar el audio remoto bloqueado para los demás. Deafen es estado de escucha local, no silenciar a otros en remoto (salvo en combinación con acciones de moderación).
+
+## Relacionado
+
+- [Cuenta y ajustes](/es/docs/using/account-and-settings)
+- [Controles de reunión](/es/docs/using/meeting-controls)
+- [Unirse a una reunión](/es/docs/using/joining-a-meeting)

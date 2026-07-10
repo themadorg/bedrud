@@ -56,6 +56,68 @@ export const sections: SidebarSection[] = [
     ],
   },
   {
+    title: "Using Bedrud",
+    titleKey: "using",
+    items: [
+      {
+        slug: "using/account-and-settings",
+        title: "Account & Settings",
+        description:
+          "Register, log in, manage profile, avatar, and preferences",
+        order: 7,
+      },
+      {
+        slug: "using/dashboard-and-rooms",
+        title: "Dashboard & Rooms",
+        description: "Create rooms, quick-join, and recent rooms",
+        order: 8,
+      },
+      {
+        slug: "using/joining-a-meeting",
+        title: "Joining a Meeting",
+        description: "Pre-join, connect, mute, camera, leave, gated rooms",
+        order: 9,
+      },
+      {
+        slug: "using/stage-mode",
+        title: "Stage Mode",
+        description: "Presenter layout, stage screen share, late joiners",
+        order: 10,
+      },
+      {
+        slug: "using/whiteboard",
+        title: "Collaborative Whiteboard",
+        description: "Shared drawing board synced over LiveKit data channels",
+        order: 11,
+      },
+      {
+        slug: "using/youtube-watch",
+        title: "YouTube Watch",
+        description: "Synchronized YouTube watch party in the room",
+        order: 12,
+      },
+      {
+        slug: "using/chat",
+        title: "In-Meeting Chat",
+        description: "Text, reactions, polls, and image attachments",
+        order: 13,
+      },
+      {
+        slug: "using/audio-and-push-to-talk",
+        title: "Audio & Push-to-Talk",
+        description: "Devices, hold-to-talk, and in-call audio controls",
+        order: 14,
+      },
+      {
+        slug: "using/meeting-controls",
+        title: "Meeting Controls",
+        description:
+          "Screen share, spotlight, moderation, and transport fallback",
+        order: 15,
+      },
+    ],
+  },
+  {
     title: "Architecture",
     titleKey: "architecture",
     items: [

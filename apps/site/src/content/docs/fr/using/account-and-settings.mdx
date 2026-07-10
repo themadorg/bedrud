@@ -1,0 +1,70 @@
+---
+title: Compte et paramètres
+description: S'inscrire, se connecter, gérer le profil, l'avatar et les préférences de réunion
+order: 1
+---
+
+Créez un compte, conservez votre session et configurez le profil et les préférences média avant de rejoindre un appel.
+
+## S'inscrire et se connecter
+
+1. Ouvrez votre instance Bedrud dans le navigateur.
+2. **Inscrivez-vous** avec e-mail et mot de passe (et tout jeton d'invitation exigé par votre hôte).
+3. Si la vérification e-mail est activée, terminez l'étape de vérification lorsque l'interface vous y invite.
+4. **Connectez-vous** avec des identifiants valides. Un mauvais mot de passe affiche une erreur claire et ne crée pas de session.
+5. **Déconnectez-vous** depuis le menu compte. Les routes protégées (tableau de bord, paramètres, admin) redirigent vers l'authentification.
+
+Les sessions survivent à un **rechargement complet** de la page tant que le jeton d'accès reste valide.
+
+### Autres options de connexion
+
+Selon la configuration de l'instance, vous pouvez aussi voir :
+
+- **OAuth** (Google, GitHub, Twitter ou OIDC personnalisé)
+- **Passkeys** (WebAuthn) après en avoir enregistré un dans les paramètres de sécurité
+- **Accès invité** pour les salles qui l'autorisent — aucun compte requis (voir [Rejoindre une réunion](/fr/docs/using/joining-a-meeting))
+
+Mot de passe oublié ? Utilisez **Mot de passe oublié** sur la page de connexion, puis suivez le lien de réinitialisation (SMTP doit être configuré sur le serveur).
+
+Pour le détail opérateur (JWT, passkeys, limites de débit), voir [Authentification](/fr/docs/backend/authentication).
+
+## Profil
+
+Ouvrez **Paramètres → Profil** depuis le tableau de bord.
+
+- Modifiez le **nom** / les champs d'affichage et enregistrez — les valeurs se rechargent correctement après un rafraîchissement.
+- Les changements apparaissent sur le tableau de bord, les tuiles de réunion et les listes de participants.
+
+## Avatar
+
+Toujours sous **Paramètres → Profil** :
+
+| Règle | Détail |
+|-------|--------|
+| Formats | JPEG, PNG, WebP |
+| Taille max | Moins de **2 MB** |
+| Trop grand / mauvais MIME | Rejeté avec une erreur (pas de crash) |
+| Nouvel envoi | Remplace le fichier précédent |
+
+Après l'envoi, l'aperçu se met à jour immédiatement. Vérifiez le nouvel avatar après un rafraîchissement sur le tableau de bord et en réunion.
+
+## Panneaux de paramètres
+
+Ouvrez chaque panneau depuis la route des paramètres du tableau de bord :
+
+| Panneau | Rôle |
+|---------|------|
+| **Profil** | Nom et identité d'affichage |
+| **Audio** | Listes micro / haut-parleur ; activation **push-to-talk** + capture de la touche de maintien ; persiste au rechargement |
+| **Vidéo** | Sélection de la caméra ; persiste au rechargement |
+| **Sécurité** | Changement de mot de passe et inscription de passkey |
+| **Apparence** | Thème et bascules d'interface associées (si affichées) |
+| **Expérimental** | Fonctions optionnelles comme le **tableau blanc partagé** et la **watch party YouTube** |
+
+Les préférences sont stockées pour votre compte (et peuvent se synchroniser dans l'interface de réunion à la connexion). Voir [Audio et push-to-talk](/fr/docs/using/audio-and-push-to-talk) pour le comportement PTT en appel.
+
+## Voir aussi
+
+- [Tableau de bord et salles](/fr/docs/using/dashboard-and-rooms)
+- [Rôles utilisateur](/fr/docs/guides/roles)
+- [Configuration](/fr/docs/getting-started/configuration) — auth, SMTP, domaine pour les passkeys

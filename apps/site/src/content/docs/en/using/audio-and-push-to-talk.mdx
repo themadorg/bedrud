@@ -1,0 +1,44 @@
+---
+title: Audio & Push-to-Talk
+description: Device selection, push-to-talk hold key, and in-call audio controls
+order: 8
+---
+
+Configure microphones and speakers, then optionally use push-to-talk (PTT) so you only transmit while holding a key.
+
+## Device selection
+
+In **Settings → Audio** (and on pre-join):
+
+- Mic and speaker lists should populate when the browser grants permissions.
+- Switching devices **mid-call** should work without a full room reconnect.
+
+Video cameras are under **Settings → Video**. See [Account & Settings](/en/docs/using/account-and-settings).
+
+## Enable push-to-talk
+
+1. Open **Settings → Audio**.
+2. Enable **push-to-talk**.
+3. Capture a **hold key** with the key capture control.
+4. Save if the UI requires an explicit save — preferences should persist across reload.
+
+## In a meeting
+
+| Step | Expected |
+|------|----------|
+| Hold the PTT key | Mic **transmits**; others hear you |
+| Release the key | Mic **muted**; others stop hearing you |
+| Indicators | Local controls and remote tiles may show PTT state when implemented |
+| Disable PTT | Normal mute toggle behavior returns |
+
+Do not leave PTT enabled with a stuck open mic after you mean to be silent — if that happens, disable PTT or mute explicitly.
+
+## Deafen / headphones
+
+If your build exposes **deafen** or headphone controls, they must not leave remote audio stuck for others. Deafen is local listen state, not remote mute of other people (unless combined with moderation actions).
+
+## Related
+
+- [Account & Settings](/en/docs/using/account-and-settings)
+- [Meeting Controls](/en/docs/using/meeting-controls)
+- [Joining a Meeting](/en/docs/using/joining-a-meeting)

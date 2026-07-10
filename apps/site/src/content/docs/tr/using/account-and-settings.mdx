@@ -1,0 +1,70 @@
+---
+title: Hesap ve Ayarlar
+description: Kaydolun, oturum açın, profilinizi, avatarınızı ve toplantı tercihlerinizi yönetin
+order: 1
+---
+
+Bir hesap oluşturun, oturumunuzu koruyun ve bir aramaya katılmadan önce profil ile medya tercihlerini yapılandırın.
+
+## Kaydolma ve oturum açma
+
+1. Tarayıcıda Bedrud örneğinizi açın.
+2. E-posta ve şifreyle **kaydolun** (ve ana makinenizin gerektirdiği davet jetonu varsa onu da girin).
+3. E-posta doğrulama açıksa, arayüz sorduğunda doğrulamayı tamamlayın.
+4. Geçerli kimlik bilgileriyle **oturum açın**. Yanlış şifre net bir hata gösterir ve oturum oluşturmaz.
+5. Hesap menüsünden **oturumu kapatın**. Korumalı rotalar (pano, ayarlar, yönetim) kimlik doğrulamaya yönlendirir.
+
+Erişim jetonu geçerli kaldığı sürece oturumlar tam sayfa **yenilemesinden** sonra da devam eder.
+
+### Diğer oturum açma seçenekleri
+
+Örneğin yapılandırmasına bağlı olarak şunları da görebilirsiniz:
+
+- **OAuth** (Google, GitHub, Twitter veya özel OIDC)
+- **Passkey'ler** (WebAuthn) — Güvenlik ayarlarında bir tane kaydettikten sonra
+- **Misafir katılımı** — izin veren odalarda hesap gerekmez (bkz. [Toplantıya Katılma](/tr/docs/using/joining-a-meeting))
+
+Şifrenizi mi unuttunuz? Giriş sayfasında **Şifremi unuttum** kullanın, ardından sıfırlama bağlantısını izleyin (sunucuda SMTP yapılandırılmış olmalıdır).
+
+Operatör ayrıntıları (JWT, passkey'ler, hız sınırları) için [Kimlik Doğrulama](/tr/docs/backend/authentication) bölümüne bakın.
+
+## Profil
+
+Panodan **Ayarlar → Profil**'i açın.
+
+- **Ad** / görünen alanları düzenleyip kaydedin — yenilemeden sonra değerler doğru yüklenir.
+- Değişiklikler panoda, toplantı kutucuklarında ve katılımcı listelerinde görünür.
+
+## Avatar
+
+Hâlâ **Ayarlar → Profil** altında:
+
+| Kural | Ayrıntı |
+|-------|---------|
+| Biçimler | JPEG, PNG, WebP |
+| Boyut sınırı | **2 MB** altında |
+| Aşırı büyük / hatalı MIME | Hata ile reddedilir (çökme yok) |
+| Yeniden yükleme | Önceki dosyanın yerini alır |
+
+Yüklemeden sonra önizleme hemen güncellenir. Yenilemeden sonra panoda ve toplantıda yeni avatarı doğrulayın.
+
+## Ayar panelleri
+
+Pano ayar rotasından her paneli açın:
+
+| Panel | Ne yapar |
+|-------|----------|
+| **Profil** | Ad ve görünen kimlik |
+| **Ses** | Mikrofon / hoparlör listeleri; **bas-konuş** etkinleştirme + basılı tutma tuşu yakalama; yenileme sonrası kaydedilir |
+| **Video** | Kamera cihaz seçimi; yenileme sonrası kalır |
+| **Güvenlik** | Şifre değişimi ve passkey kaydı yüzeyleri |
+| **Görünüm** | Tema ve ilgili UI anahtarları (gösterildiğinde) |
+| **Deneysel** | **paylaşılan beyaz tahta** ve **YouTube izleme partisi** gibi isteğe bağlı özellikler |
+
+Tercihler hesabınıza kaydedilir (ve katıldığında toplantı kabuğuna senkronize olabilir). Arama içi PTT davranışı için [Ses ve Bas-Konuş](/tr/docs/using/audio-and-push-to-talk) bölümüne bakın.
+
+## İlgili
+
+- [Pano ve Odalar](/tr/docs/using/dashboard-and-rooms)
+- [Kullanıcı Rolleri](/tr/docs/guides/roles)
+- [Yapılandırma](/tr/docs/getting-started/configuration) — kimlik doğrulama, SMTP, passkey alan adı

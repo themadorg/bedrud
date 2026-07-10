@@ -1,0 +1,59 @@
+---
+title: Meeting Controls
+description: Screen share, spotlight, moderation, room info, and transport fallback
+order: 9
+---
+
+Controls available once you are connected to a room: sharing, layout focus, moderation, and recovery paths.
+
+## Screen share (normal layout)
+
+1. Start **screen share** from the controls bar (not necessarily in stage mode).
+2. Other participants see your shared screen as a tile or focused view.
+3. **Stop share** — the share tile clears for everyone.
+
+Stage-specific share overlay is covered in [Stage Mode](/en/docs/using/stage-mode).
+
+## Spotlight and layout
+
+With three or more tiles, **spotlight / focus** layout should still work: pin or focus a participant so they take primary space while others remain available.
+
+## Participant context menu
+
+Depending on your **role** (room creator, moderator, superadmin):
+
+- Mute, kick, disable video, stop screen share, promote/demote, and similar actions
+- Unauthorized actions fail cleanly (no partial privileged state)
+
+See [User Roles](/en/docs/guides/roles) for the hierarchy and who can moderate.
+
+## Room info
+
+The room info panel shows:
+
+- Room **name** and **slug** / id
+- Approximate **participant count**
+- Other metadata the UI exposes
+
+## Transport fallback
+
+On bad networks (browser throttle, blocked UDP), WebRTC may fall back to TURN/TCP/TLS. The UI should **surface fallback** when designed to do so and **must not hard-crash** the room.
+
+Operators: [WebRTC Connectivity](/en/docs/architecture/webrtc-connectivity) and [TURN Server](/en/docs/architecture/turn-server).
+
+## Refresh and rejoin
+
+A full browser **refresh** mid-meeting should re-enter the join path (token refresh if required) without stranding a zombie session forever.
+
+## Secure context and permissions
+
+`getUserMedia` needs a secure context (HTTPS or localhost). Permission banners should appear only when the browser blocks camera/mic access.
+
+## Related
+
+- [Joining a Meeting](/en/docs/using/joining-a-meeting)
+- [Chat](/en/docs/using/chat)
+- [Stage Mode](/en/docs/using/stage-mode)
+- [Whiteboard](/en/docs/using/whiteboard)
+- [YouTube Watch](/en/docs/using/youtube-watch)
+- [Audio & Push-to-Talk](/en/docs/using/audio-and-push-to-talk)

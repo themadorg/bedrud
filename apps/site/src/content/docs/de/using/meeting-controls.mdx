@@ -1,0 +1,59 @@
+---
+title: Meeting-Steuerung
+description: Bildschirmfreigabe, Spotlight, Moderation, Rauminfos und Transport-Fallback
+order: 9
+---
+
+Steuerungen, sobald Sie mit einem Raum verbunden sind: Teilen, Layout-Fokus, Moderation und Recovery-Pfade.
+
+## Bildschirmfreigabe (normales Layout)
+
+1. Starten Sie **Bildschirmfreigabe** über die Steuerungsleiste (nicht zwingend im Stage-Modus).
+2. Andere Teilnehmende sehen Ihren geteilten Bildschirm als Kachel oder fokussierte Ansicht.
+3. **Freigabe beenden** — die Share-Kachel verschwindet für alle.
+
+Stage-spezifisches Share-Overlay ist in [Stage-Modus](/de/docs/using/stage-mode) beschrieben.
+
+## Spotlight und Layout
+
+Bei drei oder mehr Kacheln sollte **Spotlight- / Fokus**-Layout weiter funktionieren: pinnen oder fokussieren Sie eine Person, damit sie den Hauptplatz einnimmt, während andere verfügbar bleiben.
+
+## Teilnehmer-Kontextmenü
+
+Je nach Ihrer **Rolle** (Raumersteller, Moderator, Superadmin):
+
+- Stummschalten, kicken, Video deaktivieren, Bildschirmfreigabe stoppen, befördern/degradieren und ähnliche Aktionen
+- Unerlaubte Aktionen scheitern sauber (kein teilweise privilegierter Zustand)
+
+Die Hierarchie und wer moderieren darf, steht unter [Benutzerrollen](/de/docs/guides/roles).
+
+## Rauminfos
+
+Das Rauminfo-Panel zeigt:
+
+- Raum-**Name** und **Slug** / ID
+- Ungefähre **Teilnehmerzahl**
+- Weitere Metadaten, die die UI freigibt
+
+## Transport-Fallback
+
+Bei schlechten Netzen (Browser-Throttle, blockiertes UDP) kann WebRTC auf TURN/TCP/TLS zurückfallen. Die UI sollte den **Fallback anzeigen**, wenn so designed, und den Raum **nicht hard-crashen**.
+
+Operatoren: [WebRTC-Konnektivität](/de/docs/architecture/webrtc-connectivity) und [TURN-Server](/de/docs/architecture/turn-server).
+
+## Reload und erneuter Beitritt
+
+Ein vollständiger Browser-**Reload** mitten im Meeting sollte den Join-Pfad erneut betreten (Token-Refresh falls nötig), ohne eine Zombie-Sitzung dauerhaft hängen zu lassen.
+
+## Secure Context und Berechtigungen
+
+`getUserMedia` braucht einen Secure Context (HTTPS oder localhost). Berechtigungs-Banner sollten nur erscheinen, wenn der Browser Kamera/Mikrofon blockiert.
+
+## Verwandt
+
+- [Einem Meeting beitreten](/de/docs/using/joining-a-meeting)
+- [Chat](/de/docs/using/chat)
+- [Stage-Modus](/de/docs/using/stage-mode)
+- [Whiteboard](/de/docs/using/whiteboard)
+- [YouTube Watch](/de/docs/using/youtube-watch)
+- [Audio & Push-to-Talk](/de/docs/using/audio-and-push-to-talk)

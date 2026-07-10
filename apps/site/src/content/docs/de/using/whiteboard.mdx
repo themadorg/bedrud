@@ -1,0 +1,45 @@
+---
+title: Kollaboratives Whiteboard
+description: Gemeinsames Zeichenbrett, in Echtzeit über LiveKit-Datenkanäle synchronisiert
+order: 5
+---
+
+Bedrud enthält ein kollaboratives Whiteboard, damit alle im Raum dieselbe Szene zeichnen, auswählen und bearbeiten können.
+
+## Funktion aktivieren
+
+Das Whiteboard kann hinter **Einstellungen → Experimentell → Geteiltes Whiteboard** freigeschaltet sein. Schalten Sie es ein und öffnen Sie dann die Whiteboard-Steuerung im Meeting. Vor jeder Sitzung kann eine Bestätigung nötig sein.
+
+## Board öffnen
+
+1. Treten Sie einem Meeting bei (zwei Browser eignen sich für einen echten Test).
+2. Öffnen Sie das **Whiteboard**-Overlay über die Meeting-Steuerung.
+3. Zeichnen Sie auf dem Board von Nutzer A — Nutzer B sollte Striche innerhalb von etwa **einer Sekunde** sehen.
+4. Zeichnen Sie auf B — A sollte dieselben Updates sehen.
+
+## Gemeinsam bearbeiten
+
+| Aktion | Erwartung remote |
+|--------|------------------|
+| Striche zeichnen | Erscheint bei anderen schnell |
+| Auswählen / verschieben / löschen | Remote-Szene aktualisiert sich |
+| Remote-Cursor / Folgen | UI sollte nicht einfrieren |
+
+## Schließen, erneut öffnen, erneut beitreten
+
+- Overlay **schließen** und wieder öffnen — die geteilte Szene bleibt typischerweise erhalten (sofern nicht absichtlich abgebaut).
+- Raum mitten in der Sitzung **verlassen** — keine Console-Death-Loop; erneuter Beitritt sollte stabil sein.
+- Späte Beitretende erhalten den aktuellen gemeinsamen Zustand über denselben Sync-Pfad.
+
+## So funktioniert es (kurz)
+
+Das Whiteboard basiert auf einer kollaborativen Canvas (Excalidraw-ähnliche Werkzeuge) mit **Yjs**-CRDT-Zustand, synchronisiert über **LiveKit-Datenkanäle**. Medien (Audio/Video) bleiben auf WebRTC-Tracks; Board-Updates laufen über reliable/lossy Data-Pfade — die Zusammenarbeit braucht keinen separaten Whiteboard-Server.
+
+Self-Hoster: Stellen Sie sicher, dass Produktions-Builds den Whiteboard-Vendor-Chunk enthalten (`bun run build` für die Web-App), damit das Öffnen des Boards keine statischen Assets mit 404 scheitern lässt.
+
+## Verwandt
+
+- [Stage-Modus](/de/docs/using/stage-mode)
+- [YouTube Watch](/de/docs/using/youtube-watch)
+- [Meeting-Steuerung](/de/docs/using/meeting-controls)
+- Blog: [So synchronisiert Bedruds kollaboratives Whiteboard](/de/blog/collaborative-whiteboard)

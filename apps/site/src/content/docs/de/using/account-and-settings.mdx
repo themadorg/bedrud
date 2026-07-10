@@ -1,0 +1,70 @@
+---
+title: Konto & Einstellungen
+description: Registrieren, anmelden, Profil, Avatar und Meeting-Präferenzen verwalten
+order: 1
+---
+
+Erstellen Sie ein Konto, behalten Sie Ihre Sitzung und konfigurieren Sie Profil- und Medienpräferenzen, bevor Sie einem Anruf beitreten.
+
+## Registrieren und anmelden
+
+1. Öffnen Sie Ihre Bedrud-Instanz im Browser.
+2. **Registrieren** Sie sich mit E-Mail und Passwort (und ggf. dem Einladungs-Token, den Ihr Host verlangt).
+3. Wenn E-Mail-Verifizierung aktiv ist, schließen Sie den Bestätigungsschritt ab, sobald die Oberfläche Sie dazu auffordert.
+4. **Melden Sie sich** mit gültigen Zugangsdaten an. Ein falsches Passwort zeigt einen klaren Fehler und erzeugt keine Sitzung.
+5. **Melden Sie sich** über das Kontomenü ab. Geschützte Routen (Dashboard, Einstellungen, Admin) leiten zur Anmeldung um.
+
+Sitzungen überleben einen vollständigen **Seiten-Reload**, solange das Access-Token gültig bleibt.
+
+### Weitere Anmeldeoptionen
+
+Je nach Konfiguration der Instanz können Sie außerdem sehen:
+
+- **OAuth** (Google, GitHub, Twitter oder benutzerdefiniertes OIDC)
+- **Passkeys** (WebAuthn), nachdem Sie einen unter Sicherheitseinstellungen eingerichtet haben
+- **Gastbeitritt** für Räume, die ihn erlauben — kein Konto nötig (siehe [Einem Meeting beitreten](/de/docs/using/joining-a-meeting))
+
+Passwort vergessen? Nutzen Sie **Passwort vergessen** auf der Anmeldeseite und folgen Sie dem Reset-Link (SMTP muss auf dem Server konfiguriert sein).
+
+Operator-Details (JWT, Passkeys, Rate Limits) finden Sie unter [Authentifizierung](/de/docs/backend/authentication).
+
+## Profil
+
+Öffnen Sie **Einstellungen → Profil** vom Dashboard aus.
+
+- Bearbeiten Sie **Name** / Anzeigefelder und speichern — die Werte laden nach einem Reload korrekt.
+- Änderungen erscheinen im Dashboard, auf Meeting-Kacheln und in Teilnehmerlisten.
+
+## Avatar
+
+Ebenfalls unter **Einstellungen → Profil**:
+
+| Regel | Detail |
+|------|--------|
+| Formate | JPEG, PNG, WebP |
+| Größenlimit | Unter **2 MB** |
+| Zu groß / falscher MIME | Mit Fehler abgelehnt (kein Crash) |
+| Erneut hochladen | Ersetzt die vorherige Datei |
+
+Nach dem Upload aktualisiert sich die Vorschau sofort. Prüfen Sie den neuen Avatar nach einem Reload im Dashboard und im Meeting.
+
+## Einstellungspanels
+
+Öffnen Sie jedes Panel über die Dashboard-Einstellungsroute:
+
+| Panel | Funktion |
+|-------|----------|
+| **Profil** | Name und Anzeigeidentität |
+| **Audio** | Mikrofon- / Lautsprecherlisten; **Push-to-Talk** aktivieren + Hold-Taste erfassen; speichert über Reload hinweg |
+| **Video** | Kameragerät wählen; bleibt über Reload hinweg erhalten |
+| **Sicherheit** | Passwortänderung und Passkey-Einrichtung |
+| **Erscheinungsbild** | Theme und verwandte UI-Schalter (falls angezeigt) |
+| **Experimentell** | Optionale Funktionen wie **geteiltes Whiteboard** und **YouTube-Watch-Party** |
+
+Präferenzen werden für Ihr Konto gespeichert (und können beim Beitreten in die Meeting-Oberfläche synchronisiert werden). Zum Verhalten von PTT im Anruf siehe [Audio & Push-to-Talk](/de/docs/using/audio-and-push-to-talk).
+
+## Verwandt
+
+- [Dashboard & Räume](/de/docs/using/dashboard-and-rooms)
+- [Benutzerrollen](/de/docs/guides/roles)
+- [Konfiguration](/de/docs/getting-started/configuration) — Auth, SMTP, Domain für Passkeys

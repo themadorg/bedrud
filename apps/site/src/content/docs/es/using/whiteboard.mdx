@@ -1,0 +1,45 @@
+---
+title: Pizarra colaborativa
+description: Tablero de dibujo compartido sincronizado en tiempo real por data channels de LiveKit
+order: 5
+---
+
+Bedrud incluye una pizarra colaborativa para que todos en la sala dibujen, seleccionen y editen la misma escena.
+
+## Activar la función
+
+La pizarra puede estar detrás de **Ajustes → Experimental → Pizarra compartida**. Actívala y abre el control de pizarra en la reunión. Puede pedirse aceptación antes de cada sesión.
+
+## Abrir el tablero
+
+1. Únete a una reunión (se recomiendan dos navegadores para una prueba real).
+2. Abre la superposición de **pizarra** desde los controles de la reunión.
+3. Dibuja en el tablero del usuario A: el usuario B debería ver los trazos en alrededor de **un segundo**.
+4. Dibuja en B: A debería ver las mismas actualizaciones.
+
+## Editar juntos
+
+| Acción | Expectativa remota |
+|--------|--------------------|
+| Dibujar trazos | Aparece rápido para los demás |
+| Seleccionar / mover / eliminar | La escena remota se actualiza |
+| Cursores remotos / seguir | No debe congelar la UI |
+
+## Cerrar, reabrir, volver a unirse
+
+- **Cierra** la superposición y reabre: la escena compartida suele permanecer (salvo desmontaje intencionado).
+- **Sal** de la sala a mitad de sesión: sin bucle de muerte en consola; volver a unirse debe ser estable.
+- Quienes se unen tarde reciben el estado compartido actual por el mismo camino de sincronización.
+
+## Cómo funciona (breve)
+
+La pizarra se basa en un lienzo colaborativo (herramientas estilo Excalidraw) con estado CRDT **Yjs** sincronizado por **data channels de LiveKit**. Los medios (audio/vídeo) siguen en pistas WebRTC; las actualizaciones del tablero van por los caminos de datos fiables/lossy, sin un servidor de pizarra aparte.
+
+Self-hosters: asegúrate de que los builds de producción incluyan el chunk vendor de la pizarra (`bun run build` de la app web) para que abrir el tablero no devuelva 404 en assets estáticos.
+
+## Relacionado
+
+- [Modo escenario](/es/docs/using/stage-mode)
+- [YouTube Watch](/es/docs/using/youtube-watch)
+- [Controles de reunión](/es/docs/using/meeting-controls)
+- Blog: [Cómo se sincroniza la pizarra colaborativa de Bedrud](/es/blog/collaborative-whiteboard)

@@ -1,0 +1,53 @@
+---
+title: Chat en réunion
+description: Messages texte, réactions emoji, sondages et pièces jointes image
+order: 7
+---
+
+Le chat en salle est un panneau latéral pour le texte, les réactions, les sondages et les images sans quitter l'appel.
+
+## Ouvrir et envoyer
+
+1. Ouvrez le panneau **chat** depuis les contrôles de réunion.
+2. Envoyez un message texte — les autres participants le reçoivent.
+3. Ouvrir ou fermer le panneau ne doit **pas** couper les pistes caméra ou micro.
+
+Le regroupement des messages et les horodatages doivent rester corrects même en envoi en rafale.
+
+## Emoji
+
+- **Réaction** sur un message — les deux côtés mettent à jour les compteurs de réactions.
+- Le **sélecteur d'emoji** du compositeur insère des emoji dans le brouillon.
+
+## Sondages
+
+1. Créez un **sondage** depuis le chat.
+2. Tout le monde voit la bulle de sondage.
+3. Les participants **votent** ; les résultats se mettent à jour (modale de résultats si l'UI en fournit une).
+
+## Images et fichiers
+
+- Joignez une image ou un fichier dans les limites de taille du serveur.
+- Les destinataires peuvent ouvrir une **lightbox** pour les images.
+- Les gros payloads utilisent un chemin fragmenté pour ne pas être silencieusement abandonnés.
+
+Les opérateurs configurent les quotas d'upload et le stockage sous `chat` dans la [Configuration](/fr/docs/getting-started/configuration) (`maxUploadBytesPerUser`, réglages disque/S3).
+
+## Rétention (côté client)
+
+LiveKit ne persiste pas le chat des data channels côté serveur comme un produit de messagerie. Bedrud applique des indices de rétention **côté client** :
+
+| Réglage | Défaut (typique) | Signification |
+|---------|------------------|---------------|
+| `chat.maxMessageCount` | 10000 | Plafond de messages en mémoire / session storage |
+| `chat.messageTTLHours` | 2160 (90 jours) | Trim basé sur l'âge |
+
+Overrides d'env : `CHAT_MAX_MESSAGE_COUNT`, `CHAT_MESSAGE_TTL_HOURS`.
+
+Après un **rechargement en pleine salle**, l'historique suit cette politique produit (restauration de session ou départ propre) sans planter.
+
+## Voir aussi
+
+- [Contrôles de réunion](/fr/docs/using/meeting-controls)
+- [Rejoindre une réunion](/fr/docs/using/joining-a-meeting)
+- [Gestionnaires d'API](/fr/docs/backend/api-handlers) — `POST /room/:roomId/chat/upload`

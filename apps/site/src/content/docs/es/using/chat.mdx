@@ -1,0 +1,53 @@
+---
+title: Chat en reunión
+description: Mensajes de texto, reacciones emoji, encuestas y adjuntos de imagen
+order: 7
+---
+
+El chat en sala es un panel lateral para texto, reacciones, encuestas e imágenes sin salir de la llamada.
+
+## Abrir y enviar
+
+1. Abre el panel de **chat** desde los controles de la reunión.
+2. Envía un mensaje de texto: los demás participantes lo reciben.
+3. Abrir o cerrar el panel **no** debe cortar las pistas de cámara o micrófono.
+
+La agrupación de mensajes y las marcas de tiempo deben verse correctas incluso con envíos en ráfaga.
+
+## Emoji
+
+- **Reacción** en un mensaje: ambos lados actualizan los contadores de reacciones.
+- El **selector de emoji** del compositor inserta emoji en el borrador.
+
+## Encuestas
+
+1. Crea una **encuesta** desde el chat.
+2. Todos ven la burbuja de encuesta.
+3. Los participantes **votan**; los resultados se actualizan (modal de resultados si la UI lo ofrece).
+
+## Imágenes y archivos
+
+- Adjunta una imagen o un archivo dentro de los límites de tamaño del servidor.
+- Los destinatarios pueden abrir una **lightbox** para las imágenes.
+- Las cargas grandes usan un camino fragmentado para que el contenido no se descarte en silencio.
+
+Los operadores configuran cuotas de subida y almacenamiento bajo `chat` en la [Configuración](/es/docs/getting-started/configuration) (`maxUploadBytesPerUser`, ajustes de disco/S3).
+
+## Retención (lado cliente)
+
+LiveKit no persiste el chat de data channel en el servidor como un producto de mensajería. Bedrud aplica pistas de retención **en el cliente**:
+
+| Ajuste | Valor por defecto (típico) | Significado |
+|--------|----------------------------|-------------|
+| `chat.maxMessageCount` | 10000 | Tope de mensajes en memoria / session storage |
+| `chat.messageTTLHours` | 2160 (90 días) | Recorte por antigüedad |
+
+Overrides de entorno: `CHAT_MAX_MESSAGE_COUNT`, `CHAT_MESSAGE_TTL_HOURS`.
+
+Tras una **recarga a mitad de sala**, el historial sigue esa política de producto (restauración de sesión o inicio limpio) sin fallar.
+
+## Relacionado
+
+- [Controles de reunión](/es/docs/using/meeting-controls)
+- [Unirse a una reunión](/es/docs/using/joining-a-meeting)
+- [Handlers de API](/es/docs/backend/api-handlers) — `POST /room/:roomId/chat/upload`

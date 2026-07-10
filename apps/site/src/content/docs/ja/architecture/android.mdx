@@ -122,6 +122,20 @@ The instance switcher appears as a `ModalBottomSheet` triggered from the Dashboa
 
 ## Features
 
+### プロダクト表面（ユーザーが得られるもの）
+
+| 領域 | 動作 |
+|------|------|
+| Auth | ログイン / 登録（対応箇所ではパスキー） |
+| Dashboard | ルーム一覧；参加後の**最近のルーム** |
+| Deep links | 貼り付け / 開いたルーム URL が正しいルームへ解決 |
+| Meeting | 参加、ミュート、退出；使えるコントロール chrome |
+| Stage / share | デバイスが許す場合のステージオーバーレイと画面共有パス |
+| Telecom | 自己管理の通話接続；切断で会議をきれいに終了 |
+| RTL | `fa` / `ar` ロケールと Shabnam — chrome が切れないこと |
+
+共有プロダクト概念（Web のステージ、チャット、ホワイトボード）は [Bedrud の使い方](/ja/docs/using/joining-a-meeting) に記載。Web との機能パリティはリリースにより異なる場合があります。
+
 ### Deep Linking
 
 The app handles URLs matching:
@@ -129,7 +143,7 @@ The app handles URLs matching:
 - `https://bedrud.com/m/*` - Direct room join
 - `https://bedrud.com/c/*` - Room join by code
 
-Configured via intent filters in `AndroidManifest.xml`.
+Configured via intent filters in `AndroidManifest.xml`. Room URL parsing (`BedrudURLParser` and related) should open the correct room from a paste or external link.
 
 ### Call Management
 

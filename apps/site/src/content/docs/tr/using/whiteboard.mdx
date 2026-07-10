@@ -1,0 +1,45 @@
+---
+title: Ortak Beyaz Tahta
+description: LiveKit veri kanalları üzerinden gerçek zamanlı senkron paylaşılan çizim tahtası
+order: 5
+---
+
+Bedrud, odadaki herkesin aynı sahneyi çizmesine, seçmesine ve düzenlemesine olanak tanıyan ortak bir beyaz tahta içerir.
+
+## Özelliği etkinleştirme
+
+Beyaz tahta **Ayarlar → Deneysel → Paylaşılan beyaz tahta** arkasında kapılı olabilir. Açın, ardından toplantıda beyaz tahta kontrolünü açın. Her oturumdan önce kabul etmeniz istenebilir.
+
+## Tahtayı açma
+
+1. Bir toplantıya katılın (gerçek test için iki tarayıcı önerilir).
+2. Toplantı kontrollerinden **beyaz tahta** katmanını açın.
+3. A kullanıcısının tahtasına çizin — B kullanıcısı darbeleri yaklaşık **bir saniye** içinde görmelidir.
+4. B'de çizin — A aynı güncellemeleri görmelidir.
+
+## Birlikte düzenleme
+
+| Eylem | Uzak beklenti |
+|-------|---------------|
+| Darbe çizme | Diğerlerinde hızla görünür |
+| Seç / taşı / sil | Uzak sahne güncellenir |
+| Uzak imleçler / takip | UI'yi dondurmamalı |
+
+## Kapatma, yeniden açma, yeniden katılma
+
+- Katmanı **kapatıp** yeniden açın — paylaşılan sahne genelde kalır (bilerek yıkılmadıkça).
+- Oturum ortasında odadan **ayrılın** — konsol ölüm döngüsü yok; yeniden katılma kararlı olmalı.
+- Geç katılanlar mevcut paylaşılan durumu aynı senkron yolu üzerinden alır.
+
+## Nasıl çalışır (kısa)
+
+Beyaz tahta, ortak bir tuval (Excalidraw tarzı araçlar) üzerine kuruludur; **Yjs** CRDT durumu **LiveKit veri kanalları** üzerinden senkronize edilir. Medya (ses/video) WebRTC izlerinde kalır; tahta güncellemeleri reliable/lossy veri yollarını kullanır, böylece işbirliği ayrı bir beyaz tahta sunucusuna bağlı değildir.
+
+Kendi barındıranlar: üretim derlemelerinin beyaz tahta vendor parçacığını içerdiğinden emin olun (web uygulaması için `bun run build`), böylece tahta açılırken statik varlıklar 404 vermez.
+
+## İlgili
+
+- [Sahne Modu](/tr/docs/using/stage-mode)
+- [YouTube İzleme](/tr/docs/using/youtube-watch)
+- [Toplantı Kontrolleri](/tr/docs/using/meeting-controls)
+- Blog: [Bedrud ortak beyaz tahtası nasıl senkronize olur](/tr/blog/collaborative-whiteboard)

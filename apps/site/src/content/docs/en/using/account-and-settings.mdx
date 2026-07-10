@@ -1,0 +1,70 @@
+---
+title: Account & Settings
+description: Register, log in, manage your profile, avatar, and meeting preferences
+order: 1
+---
+
+Create an account, keep your session, and configure profile and media preferences before you join a call.
+
+## Register and log in
+
+1. Open your Bedrud instance in the browser.
+2. **Register** with email and password (and any invite token your host requires).
+3. If email verification is enabled, complete the verify step when the UI prompts you.
+4. **Log in** with valid credentials. Wrong password shows a clear error and does not create a session.
+5. **Log out** from the account menu. Protected routes (dashboard, settings, admin) redirect to auth.
+
+Sessions survive a full page **refresh** while the access token remains valid.
+
+### Other sign-in options
+
+Depending on how the instance is configured, you may also see:
+
+- **OAuth** (Google, GitHub, Twitter, or custom OIDC)
+- **Passkeys** (WebAuthn) after you enroll one under Security settings
+- **Guest join** for rooms that allow it — no account required (see [Joining a Meeting](/en/docs/using/joining-a-meeting))
+
+Forgot your password? Use **Forgot password** on the login page, then follow the reset link (SMTP must be configured on the server).
+
+For operator detail (JWT, passkeys, rate limits), see [Authentication](/en/docs/backend/authentication).
+
+## Profile
+
+Open **Settings → Profile** from the dashboard.
+
+- Edit **name** / display fields and save — values reload correctly after a refresh.
+- Changes appear on the dashboard, meeting tiles, and participant lists.
+
+## Avatar
+
+Still under **Settings → Profile**:
+
+| Rule | Detail |
+|------|--------|
+| Formats | JPEG, PNG, WebP |
+| Size limit | Under **2 MB** |
+| Oversize / bad MIME | Rejected with an error (no crash) |
+| Re-upload | Replaces the previous file |
+
+After upload, the preview updates immediately. Confirm the new avatar after a refresh on the dashboard and in a meeting.
+
+## Settings panels
+
+Open each panel from the dashboard settings route:
+
+| Panel | What it does |
+|-------|----------------|
+| **Profile** | Name and display identity |
+| **Audio** | Microphone / speaker lists; **push-to-talk** enable + hold-key capture; saves across reload |
+| **Video** | Camera device selection; persists across reload |
+| **Security** | Password change and passkey enrollment surfaces |
+| **Appearance** | Theme and related UI toggles (when shown) |
+| **Experimental** | Optional features such as **shared whiteboard** and **YouTube watch party** |
+
+Preferences are stored for your account (and may sync into the meeting shell when you join). See [Audio & Push-to-Talk](/en/docs/using/audio-and-push-to-talk) for in-call PTT behavior.
+
+## Related
+
+- [Dashboard & Rooms](/en/docs/using/dashboard-and-rooms)
+- [User Roles](/en/docs/guides/roles)
+- [Configuration](/en/docs/getting-started/configuration) — auth, SMTP, domain for passkeys

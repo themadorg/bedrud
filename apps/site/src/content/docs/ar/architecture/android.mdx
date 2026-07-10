@@ -122,6 +122,20 @@ The instance switcher appears as a `ModalBottomSheet` triggered from the Dashboa
 
 ## Features
 
+### Product surface (what users get)
+
+| Area | Behavior |
+|------|----------|
+| Auth | Login / register (and passkeys where supported) |
+| Dashboard | Room list; **recent rooms** after a join |
+| Deep links | Pasted / opened room URLs resolve to the correct room |
+| Meeting | Join, mute, leave; usable controls chrome |
+| Stage / share | Stage overlay and screen-share path when the device allows |
+| Telecom | Self-managed call connection; disconnect ends the meeting cleanly |
+| RTL | `fa` / `ar` locales with Shabnam — chrome should not clip |
+
+Shared product concepts (stage, chat, whiteboard on web) are documented under [Using Bedrud](/ar/docs/using/joining-a-meeting). Feature parity with web may differ by release.
+
 ### Deep Linking
 
 The app handles URLs matching:
@@ -129,7 +143,7 @@ The app handles URLs matching:
 - `https://bedrud.com/m/*` - Direct room join
 - `https://bedrud.com/c/*` - Room join by code
 
-Configured via intent filters in `AndroidManifest.xml`.
+Configured via intent filters in `AndroidManifest.xml`. Room URL parsing (`BedrudURLParser` and related) should open the correct room from a paste or external link.
 
 ### Call Management
 

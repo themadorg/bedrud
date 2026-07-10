@@ -1,0 +1,59 @@
+---
+title: Contrôles de réunion
+description: Partage d'écran, spotlight, modération, infos salle et repli transport
+order: 9
+---
+
+Contrôles disponibles une fois connecté à une salle : partage, focus de disposition, modération et chemins de récupération.
+
+## Partage d'écran (disposition normale)
+
+1. Démarrez le **partage d'écran** depuis la barre de contrôles (pas forcément en mode scène).
+2. Les autres participants voient votre écran partagé en tuile ou vue focalisée.
+3. **Arrêter le partage** — la tuile de partage disparaît pour tout le monde.
+
+L'overlay de partage spécifique à la scène est couvert dans [Mode scène](/fr/docs/using/stage-mode).
+
+## Spotlight et disposition
+
+Avec trois tuiles ou plus, la disposition **spotlight / focus** doit encore fonctionner : épingler ou focaliser un participant pour qu'il occupe l'espace principal tandis que les autres restent disponibles.
+
+## Menu contextuel participant
+
+Selon votre **rôle** (créateur de salle, modérateur, superadmin) :
+
+- Couper le micro, expulser, désactiver la vidéo, arrêter le partage d'écran, promouvoir/rétrograder, et actions similaires
+- Les actions non autorisées échouent proprement (pas d'état partiellement privilégié)
+
+Voir [Rôles utilisateur](/fr/docs/guides/roles) pour la hiérarchie et qui peut modérer.
+
+## Infos salle
+
+Le panneau d'infos salle affiche :
+
+- **Nom** de la salle et **slug** / id
+- **Nombre approximatif de participants**
+- Les autres métadonnées exposées par l'UI
+
+## Repli de transport
+
+Sur de mauvais réseaux (limitation navigateur, UDP bloqué), WebRTC peut basculer vers TURN/TCP/TLS. L'UI doit **afficher le repli** lorsqu'elle est conçue pour le faire et **ne doit pas planter durement** la salle.
+
+Opérateurs : [Connectivité WebRTC](/fr/docs/architecture/webrtc-connectivity) et [Serveur TURN](/fr/docs/architecture/turn-server).
+
+## Rechargement et rejoindre
+
+Un **rechargement** complet du navigateur en pleine réunion doit reprendre le chemin de jointure (rafraîchissement de jeton si besoin) sans laisser une session zombie indéfiniment.
+
+## Contexte sécurisé et permissions
+
+`getUserMedia` nécessite un contexte sécurisé (HTTPS ou localhost). Les bannières de permission ne doivent apparaître que lorsque le navigateur bloque l'accès caméra/micro.
+
+## Voir aussi
+
+- [Rejoindre une réunion](/fr/docs/using/joining-a-meeting)
+- [Chat](/fr/docs/using/chat)
+- [Mode scène](/fr/docs/using/stage-mode)
+- [Tableau blanc](/fr/docs/using/whiteboard)
+- [YouTube Watch](/fr/docs/using/youtube-watch)
+- [Audio et push-to-talk](/fr/docs/using/audio-and-push-to-talk)

@@ -1,0 +1,70 @@
+---
+title: Cuenta y ajustes
+description: Registrarse, iniciar sesión, gestionar perfil, avatar y preferencias de reunión
+order: 1
+---
+
+Crea una cuenta, mantén tu sesión y configura el perfil y las preferencias de medios antes de unirte a una llamada.
+
+## Registrarse e iniciar sesión
+
+1. Abre tu instancia de Bedrud en el navegador.
+2. **Regístrate** con correo y contraseña (y cualquier token de invitación que exija tu anfitrión).
+3. Si la verificación por correo está activada, completa el paso de verificación cuando la UI te lo pida.
+4. **Inicia sesión** con credenciales válidas. Una contraseña incorrecta muestra un error claro y no crea sesión.
+5. **Cierra sesión** desde el menú de cuenta. Las rutas protegidas (panel, ajustes, admin) redirigen a la autenticación.
+
+Las sesiones sobreviven a una **recarga completa** de la página mientras el token de acceso siga siendo válido.
+
+### Otras opciones de acceso
+
+Según la configuración de la instancia, también puedes ver:
+
+- **OAuth** (Google, GitHub, Twitter u OIDC personalizado)
+- **Passkeys** (WebAuthn) tras registrar uno en Ajustes de seguridad
+- **Acceso de invitado** en salas que lo permitan — sin cuenta (ver [Unirse a una reunión](/es/docs/using/joining-a-meeting))
+
+¿Olvidaste la contraseña? Usa **Olvidé mi contraseña** en la página de acceso y sigue el enlace de restablecimiento (SMTP debe estar configurado en el servidor).
+
+Para detalle de operador (JWT, passkeys, límites de tasa), ver [Autenticación](/es/docs/backend/authentication).
+
+## Perfil
+
+Abre **Ajustes → Perfil** desde el panel.
+
+- Edita el **nombre** / campos de visualización y guarda — los valores se recargan correctamente tras refrescar.
+- Los cambios aparecen en el panel, las tarjetas de reunión y las listas de participantes.
+
+## Avatar
+
+También en **Ajustes → Perfil**:
+
+| Regla | Detalle |
+|-------|---------|
+| Formatos | JPEG, PNG, WebP |
+| Límite de tamaño | Menos de **2 MB** |
+| Demasiado grande / MIME incorrecto | Rechazado con error (sin crash) |
+| Volver a subir | Sustituye el archivo anterior |
+
+Tras la subida, la vista previa se actualiza al instante. Confirma el nuevo avatar tras refrescar en el panel y en una reunión.
+
+## Paneles de ajustes
+
+Abre cada panel desde la ruta de ajustes del panel:
+
+| Panel | Qué hace |
+|-------|----------|
+| **Perfil** | Nombre e identidad de visualización |
+| **Audio** | Listas de micrófono / altavoz; activar **push-to-talk** + captura de tecla de mantener; se guarda entre recargas |
+| **Vídeo** | Selección de cámara; persiste entre recargas |
+| **Seguridad** | Cambio de contraseña e inscripción de passkey |
+| **Apariencia** | Tema y conmutadores de UI relacionados (si se muestran) |
+| **Experimental** | Funciones opcionales como **pizarra compartida** y **watch party de YouTube** |
+
+Las preferencias se guardan en tu cuenta (y pueden sincronizarse en la interfaz de reunión al unirte). Ver [Audio y push-to-talk](/es/docs/using/audio-and-push-to-talk) para el comportamiento de PTT en llamada.
+
+## Relacionado
+
+- [Panel y salas](/es/docs/using/dashboard-and-rooms)
+- [Roles de usuario](/es/docs/guides/roles)
+- [Configuración](/es/docs/getting-started/configuration) — auth, SMTP, dominio para passkeys

@@ -1,0 +1,59 @@
+---
+title: Controles de reunión
+description: Compartir pantalla, spotlight, moderación, info de sala y fallback de transporte
+order: 9
+---
+
+Controles disponibles una vez conectado a una sala: compartir, foco de diseño, moderación y caminos de recuperación.
+
+## Compartir pantalla (diseño normal)
+
+1. Inicia **compartir pantalla** desde la barra de controles (no necesariamente en modo escenario).
+2. Los demás participantes ven tu pantalla compartida como tarjeta o vista enfocada.
+3. **Dejar de compartir** — la tarjeta de compartir se limpia para todos.
+
+La superposición de compartir específica del escenario se cubre en [Modo escenario](/es/docs/using/stage-mode).
+
+## Spotlight y diseño
+
+Con tres o más tarjetas, el diseño **spotlight / foco** debe seguir funcionando: fija o enfoca a un participante para que ocupe el espacio principal mientras los demás siguen disponibles.
+
+## Menú contextual del participante
+
+Según tu **rol** (creador de la sala, moderador, superadmin):
+
+- Silenciar, expulsar, desactivar vídeo, detener compartir pantalla, promover/degradar y acciones similares
+- Las acciones no autorizadas fallan de forma limpia (sin estado parcialmente privilegiado)
+
+Ver [Roles de usuario](/es/docs/guides/roles) para la jerarquía y quién puede moderar.
+
+## Info de la sala
+
+El panel de info de la sala muestra:
+
+- **Nombre** de la sala y **slug** / id
+- **Número aproximado de participantes**
+- Otros metadatos que exponga la UI
+
+## Fallback de transporte
+
+En redes malas (limitación del navegador, UDP bloqueado), WebRTC puede caer a TURN/TCP/TLS. La UI debería **mostrar el fallback** cuando esté diseñada para ello y **no debe hard-crashear** la sala.
+
+Operadores: [Conectividad WebRTC](/es/docs/architecture/webrtc-connectivity) y [Servidor TURN](/es/docs/architecture/turn-server).
+
+## Recarga y volver a unirse
+
+Una **recarga** completa del navegador a mitad de reunión debería reentrar en el camino de unión (refresh de token si hace falta) sin dejar una sesión zombi para siempre.
+
+## Contexto seguro y permisos
+
+`getUserMedia` necesita un contexto seguro (HTTPS o localhost). Los banners de permisos solo deberían aparecer cuando el navegador bloquea el acceso a cámara/micrófono.
+
+## Relacionado
+
+- [Unirse a una reunión](/es/docs/using/joining-a-meeting)
+- [Chat](/es/docs/using/chat)
+- [Modo escenario](/es/docs/using/stage-mode)
+- [Pizarra](/es/docs/using/whiteboard)
+- [YouTube Watch](/es/docs/using/youtube-watch)
+- [Audio y push-to-talk](/es/docs/using/audio-and-push-to-talk)

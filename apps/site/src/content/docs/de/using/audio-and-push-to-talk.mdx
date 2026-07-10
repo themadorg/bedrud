@@ -1,0 +1,44 @@
+---
+title: Audio und Push-to-Talk
+description: Geräteauswahl, Push-to-Talk-Haltetaste und Audio-Steuerung im Anruf
+order: 8
+---
+
+Konfigurieren Sie Mikrofone und Lautsprecher und nutzen Sie optional Push-to-Talk (PTT), sodass Sie nur senden, solange Sie eine Taste halten.
+
+## Geräteauswahl
+
+Unter **Einstellungen → Audio** (und im Pre-Join):
+
+- Mikrofon- und Lautsprecherlisten sollten sich füllen, sobald der Browser Berechtigungen erteilt.
+- Geräte **mitten im Anruf** wechseln sollte ohne vollständigen Raum-Reconnect funktionieren.
+
+Videokameras finden Sie unter **Einstellungen → Video**. Siehe [Konto & Einstellungen](/de/docs/using/account-and-settings).
+
+## Push-to-Talk aktivieren
+
+1. Öffnen Sie **Einstellungen → Audio**.
+2. Aktivieren Sie **Push-to-Talk**.
+3. Erfassen Sie eine **Hold-Taste** mit der Tastenerfassung.
+4. Speichern Sie, falls die UI ein explizites Speichern verlangt — Präferenzen sollten über Reload hinweg bleiben.
+
+## Im Meeting
+
+| Schritt | Erwartung |
+|---------|-----------|
+| PTT-Taste halten | Mikro **sendet**; andere hören Sie |
+| Taste loslassen | Mikro **stumm**; andere hören Sie nicht mehr |
+| Anzeigen | Lokale Steuerung und Remote-Kacheln können PTT-Status zeigen, wenn implementiert |
+| PTT deaktivieren | Normales Mute-Toggle-Verhalten kehrt zurück |
+
+Lassen Sie PTT nicht mit dauerhaft offenem Mikro an, wenn Sie still sein wollen — deaktivieren Sie PTT oder stummschalten Sie explizit.
+
+## Deafen / Kopfhörer
+
+Wenn Ihr Build **Deafen** oder Kopfhörer-Steuerung anbietet, dürfen sie Remote-Audio bei anderen nicht blockieren. Deafen ist lokaler Hörstatus, nicht Remote-Mute anderer Personen (es sei denn in Kombination mit Moderationsaktionen).
+
+## Verwandt
+
+- [Konto & Einstellungen](/de/docs/using/account-and-settings)
+- [Meeting-Steuerung](/de/docs/using/meeting-controls)
+- [Einem Meeting beitreten](/de/docs/using/joining-a-meeting)

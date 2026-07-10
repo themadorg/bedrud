@@ -1,0 +1,53 @@
+---
+title: Toplantı İçi Sohbet
+description: Metin mesajları, emoji tepkileri, anketler ve görsel ekleri
+order: 7
+---
+
+Oda içi sohbet; aramadan ayrılmadan metin, tepkiler, anketler ve görseller için bir yan paneldir.
+
+## Açma ve gönderme
+
+1. Toplantı kontrollerinden **sohbet** panelini açın.
+2. Metin mesajı gönderin — diğer katılımcılar alır.
+3. Paneli açmak veya kapatmak kamera veya mikrofon izlerini **öldürmemelidir**.
+
+Patlama halinde gönderimlerde bile mesaj gruplama ve zaman damgaları doğru görünmelidir.
+
+## Emoji
+
+- Bir mesaja **tepki** — her iki tarafta tepki sayıları güncellenir.
+- Bestecideki **emoji seçici** taslak metne emoji ekler.
+
+## Anketler
+
+1. Sohbetten bir **anket** oluşturun.
+2. Herkes anket balonunu görür.
+3. Katılımcılar **oy verir**; sonuçlar güncellenir (UI sonuç modalı sunuyorsa).
+
+## Görseller ve dosyalar
+
+- Sunucu boyut sınırları içinde görsel veya dosya ekleyin.
+- Alıcılar görseller için bir **lightbox** açabilir.
+- Büyük yükler parçalı yol kullanır; içerik sessizce düşürülmez.
+
+Operatörler [Yapılandırma](/tr/docs/getting-started/configuration) altında `chat` ile yükleme kotalarını ve depolamayı ayarlar (`maxUploadBytesPerUser`, disk/S3 yükleme ayarları).
+
+## Saklama (istemci tarafı)
+
+LiveKit, sohbet ürünü gibi sunucuda veri kanalı sohbetini kalıcı tutmaz. Bedrud **istemci tarafı** saklama ipuçları uygular:
+
+| Ayar | Varsayılan (tipik) | Anlam |
+|------|--------------------|-------|
+| `chat.maxMessageCount` | 10000 | Bellek / session storage'da tutulan mesaj tavanı |
+| `chat.messageTTLHours` | 2160 (90 gün) | Yaşa göre budama |
+
+Ortam değişkenleri: `CHAT_MAX_MESSAGE_COUNT`, `CHAT_MESSAGE_TTL_HOURS`.
+
+Oda ortasında **yenilemeden** sonra geçmiş, ürün politikasına göre (oturum geri yükleme veya temiz başlangıç) ilerler ve çökmez.
+
+## İlgili
+
+- [Toplantı Kontrolleri](/tr/docs/using/meeting-controls)
+- [Toplantıya Katılma](/tr/docs/using/joining-a-meeting)
+- [API İşleyicileri](/tr/docs/backend/api-handlers) — `POST /room/:roomId/chat/upload`
