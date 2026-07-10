@@ -461,6 +461,10 @@ function MeetingPage() {
             setArchivedRoom({ name: ar.name, mode: ar.mode, settings: ar.settings })
             return
           }
+          if (!data.id) {
+            setJoinError('Invalid join response')
+            return
+          }
           addRecent(meetId)
           setJoinData(data)
         })
@@ -561,7 +565,17 @@ function MeetingPage() {
                     api
                       .post<JoinResponse>('/api/room/join', { roomName: room.name })
                       .then((data) => {
-                        if (!cancelledRef.current) setJoinData(data)
+                        if (cancelledRef.current) return
+                        if ((data as unknown as ArchivedOwnedResponse).status === 'archived_owned') {
+                          const ar = data as unknown as ArchivedOwnedResponse
+                          setArchivedRoom({ name: ar.name, mode: ar.mode, settings: ar.settings })
+                          return
+                        }
+                        if (!data.id) {
+                          setJoinError('Invalid join response')
+                          return
+                        }
+                        setJoinData(data)
                       })
                       .catch((err: Error) => {
                         if (!cancelledRef.current) setJoinError(err.message)
@@ -616,7 +630,8 @@ function MeetingPage() {
     }
   }
 
-  const skipWelcome = !welcomeSessionRef.current.showWelcome
+  // Guard: joinData without id (e.g. archived_owned mis-set as join) must not crash render.
+  const skipWelcome = !welcomeSessionRef.current?.showWelcome
   if (!skipWelcome && welcomeChoices === null) {
     return (
       <MeetingWelcomeScreen
