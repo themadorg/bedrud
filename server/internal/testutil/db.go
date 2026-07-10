@@ -34,6 +34,7 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		&models.SystemSettings{},
 		&models.InviteToken{},
 		&models.UserPreferences{},
+		&models.VerificationEvent{},
 		&models.ChatUpload{},
 		&models.Job{},
 		&models.Webhook{},

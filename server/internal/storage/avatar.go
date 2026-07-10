@@ -20,10 +20,19 @@ const (
 	defaultAvatarDir = "./data/uploads/avatars"
 )
 
+var avatarDir = defaultAvatarDir
+
 func AvatarMaxBytes() int64 { return avatarMaxBytes }
 
 func AvatarDir() string {
-	return defaultAvatarDir
+	return avatarDir
+}
+
+// SetAvatarDirForTest overrides the avatar directory; restore() reverts it.
+func SetAvatarDirForTest(dir string) (restore func()) {
+	prev := avatarDir
+	avatarDir = dir
+	return func() { avatarDir = prev }
 }
 
 func SaveUserAvatar(userID string, data []byte) (string, error) {
