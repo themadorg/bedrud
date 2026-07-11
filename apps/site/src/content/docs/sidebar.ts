@@ -97,23 +97,29 @@ export const sections: SidebarSection[] = [
         order: 12,
       },
       {
+        slug: "using/webxdc",
+        title: "WebXDC mini-apps (experimental)",
+        description: "Sandboxed .xdc apps in meetings — enable and use",
+        order: 13,
+      },
+      {
         slug: "using/chat",
         title: "In-Meeting Chat",
         description: "Text, reactions, polls, and image attachments",
-        order: 13,
+        order: 14,
       },
       {
         slug: "using/audio-and-push-to-talk",
         title: "Audio & Push-to-Talk",
         description: "Devices, hold-to-talk, and in-call audio controls",
-        order: 14,
+        order: 15,
       },
       {
         slug: "using/meeting-controls",
         title: "Meeting Controls",
         description:
           "Screen share, spotlight, moderation, and transport fallback",
-        order: 15,
+        order: 16,
       },
     ],
   },

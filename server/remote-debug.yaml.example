@@ -50,6 +50,17 @@ provision:
   livekitRTCEnd: 7099
   enableACME: true
   # acmeEmail: you@example.com   # or set REMOTE_DEBUG_ACME_EMAIL in server/.env
+  #
+  # WebXDC (webxdc-<id>.{publicHost}):
+  #   DNS: *.publicHost → this server (same A/AAAA as publicHost).
+  #   Traefik: make dev-remote / traefik sync adds HostRegexp → local API.
+  #   TLS: apex ACME (HTTP-01) does NOT cover subdomains. Install a wildcard
+  #   cert on the server and point these paths (or env vars):
+  #     webxdcWildcardCert: /etc/bedrud-debug/certs/wildcard.crt
+  #     webxdcWildcardKey:  /etc/bedrud-debug/certs/wildcard.key
+  #   Env: REMOTE_DEBUG_WEBXDC_WILDCARD_CERT / REMOTE_DEBUG_WEBXDC_WILDCARD_KEY
+  #   How to get one: LE DNS-01 (certbot/acme.sh + DNS API), or Cloudflare Origin
+  #   Certificate for *.publicHost + publicHost.
 
 # Legacy tunnel modes (not recommended):
 #

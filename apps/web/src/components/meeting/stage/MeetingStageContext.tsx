@@ -23,14 +23,22 @@ import {
 
 type YoutubeStageMeta = {
   videoId: string
-  playing: boolean
-  currentTime: number
+  playing?: boolean
+  currentTime?: number
 }
+
+export type WebxdcStageMeta = {
+  instanceId: string
+  packageId: string
+  name: string
+}
+
+type StageClaimMeta = YoutubeStageMeta | WebxdcStageMeta
 
 interface MeetingStageContextValue {
   stage: MeetingStage | null
   isOwner: boolean
-  claimStage: (kind: StageKind, meta?: YoutubeStageMeta) => string | null
+  claimStage: (kind: StageKind, meta?: StageClaimMeta) => string | null
   clearStage: () => void
   updateYoutubeStage: (playing: boolean, currentTime: number) => void
   youtubeSyncNonce: number
@@ -38,22 +46,47 @@ interface MeetingStageContextValue {
 
 const MeetingStageContext = createContext<MeetingStageContextValue | null>(null)
 
+export function useOptionalMeetingStage(): MeetingStageContextValue | null {
+  return useContext(MeetingStageContext)
+}
+
 export function useMeetingStage(): MeetingStageContextValue {
   const ctx = useContext(MeetingStageContext)
   if (!ctx) throw new Error('useMeetingStage must be used inside MeetingStageProvider')
   return ctx
 }
 
-function buildStage(kind: StageKind, ownerIdentity: string, ownerName: string, meta?: YoutubeStageMeta): MeetingStage {
+function isYoutubeMeta(meta?: StageClaimMeta): meta is YoutubeStageMeta {
+  return !!meta && 'videoId' in meta
+}
+
+function isWebxdcMeta(meta?: StageClaimMeta): meta is WebxdcStageMeta {
+  return !!meta && 'instanceId' in meta
+}
+
+function buildStage(kind: StageKind, ownerIdentity: string, ownerName: string, meta?: StageClaimMeta): MeetingStage {
   const updatedAt = Date.now()
   if (kind === 'youtube') {
+    const yt = isYoutubeMeta(meta) ? meta : undefined
     return {
       kind: 'youtube',
       ownerIdentity,
       ownerName,
-      videoId: meta?.videoId ?? '',
-      playing: meta?.playing ?? false,
-      currentTime: meta?.currentTime ?? 0,
+      videoId: yt?.videoId ?? '',
+      playing: yt?.playing ?? false,
+      currentTime: yt?.currentTime ?? 0,
+      updatedAt,
+    }
+  }
+  if (kind === 'webxdc') {
+    const wx = isWebxdcMeta(meta) ? meta : undefined
+    return {
+      kind: 'webxdc',
+      ownerIdentity,
+      ownerName,
+      instanceId: wx?.instanceId ?? '',
+      packageId: wx?.packageId ?? '',
+      name: wx?.name ?? 'WebXDC',
       updatedAt,
     }
   }
@@ -191,7 +224,7 @@ export function MeetingStageProvider({ children }: { children: ReactNode }) {
   }, [publish, room.localParticipant.identity, stopLocalScreenShare])
 
   const claimStage = useCallback(
-    (kind: StageKind, meta?: YoutubeStageMeta): string | null => {
+    (kind: StageKind, meta?: StageClaimMeta): string | null => {
       const ownerIdentity = room.localParticipant.identity
       const ownerName = room.localParticipant.name || ownerIdentity
       const active = stageRef.current
@@ -200,8 +233,12 @@ export function MeetingStageProvider({ children }: { children: ReactNode }) {
         return `${stageOwnerLabel(active)} is already on stage`
       }
 
-      if (kind === 'youtube' && !meta?.videoId) {
+      if (kind === 'youtube' && (!isYoutubeMeta(meta) || !meta.videoId)) {
         return 'Enter a valid YouTube URL or video ID'
+      }
+
+      if (kind === 'webxdc' && (!isWebxdcMeta(meta) || !meta.instanceId)) {
+        return 'WebXDC instance is missing'
       }
 
       if (active?.kind !== kind) {

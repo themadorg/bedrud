@@ -196,6 +196,10 @@ const config = defineConfig({
     proxy: {
       '/api': `http://localhost:${DEV_PORT_API}`,
       '/uploads': `http://localhost:${DEV_PORT_API}`,
+      // Local WebXDC path mode (make dev): packages at /__webxdc/{id}/ on the API.
+      // Iframes still use http://localhost:7071 directly (publicBaseURL); this helps
+      // same-origin tooling if needed.
+      '/__webxdc': `http://localhost:${DEV_PORT_API}`,
       // Proxy signaling directly to LiveKit (strip /livekit prefix).
       // Do NOT chain through the Go API — double WS proxy breaks /rtc/v1/validate.
       '/livekit': {

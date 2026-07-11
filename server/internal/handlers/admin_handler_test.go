@@ -786,6 +786,38 @@ func TestApplySettingsFields_NewValueReplacesMasked(t *testing.T) {
 	}
 }
 
+func TestApplySettingsFields_WebxdcGallery(t *testing.T) {
+	existing := defaultSettings()
+	raw := map[string]json.RawMessage{
+		"webxdcGalleryEnabled":             json.RawMessage(`true`),
+		"webxdcGalleryRemoteCatalogUrl":    json.RawMessage(`"https://mirror.example.com/catalog.json"`),
+		"webxdcGallerySource":              json.RawMessage(`"both"`),
+		"webxdcGalleryAllowRemoteDownload": json.RawMessage(`true`),
+	}
+	if err := applySettingsFields(&existing, raw); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !existing.WebxdcGalleryEnabled {
+		t.Fatal("expected gallery enabled")
+	}
+	if existing.WebxdcGalleryRemoteCatalogURL != "https://mirror.example.com/catalog.json" {
+		t.Fatalf("catalog URL: got %q", existing.WebxdcGalleryRemoteCatalogURL)
+	}
+	if existing.WebxdcGallerySource != "both" {
+		t.Fatalf("source: got %q", existing.WebxdcGallerySource)
+	}
+	if !existing.WebxdcGalleryAllowRemoteDownload {
+		t.Fatal("expected allow remote download")
+	}
+
+	bad := map[string]json.RawMessage{
+		"webxdcGallerySource": json.RawMessage(`"invalid"`),
+	}
+	if err := applySettingsFields(&existing, bad); err == nil {
+		t.Fatal("expected error for invalid source")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // ValidateSettingsConnectivity endpoint tests
 // ---------------------------------------------------------------------------

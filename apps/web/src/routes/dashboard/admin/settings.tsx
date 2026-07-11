@@ -15,6 +15,7 @@ import {
   ServerTab,
   type SystemSettings,
   validateLocalSettings,
+  WebxdcTab,
 } from '#/components/admin/settings'
 import { WebhookSection } from '#/components/admin/settings/webhook-section'
 import { api } from '#/lib/api'
@@ -47,6 +48,7 @@ const TABS = [
   { id: 'chat', label: 'Chat' },
   // TODO oncoming feature
   // { id: 'recordings', label: 'Recordings' },
+  { id: 'webxdc', label: 'WebXDC' },
   { id: 'logging', label: 'Logging' },
   { id: 'webhooks', label: 'Webhooks' },
 ] as const
@@ -130,6 +132,17 @@ const TAB_FIELDS: Record<TabId, (keyof SystemSettings)[]> = {
     'chatMessageTTLHours',
     'maxUploadBytesPerUser',
     'globalDiskThresholdBytes',
+  ],
+  webxdc: [
+    'webxdcGalleryEnabled',
+    'webxdcGalleryRemoteCatalogUrl',
+    'webxdcGallerySource',
+    'webxdcGalleryAllowRemoteDownload',
+    'webxdcGalleryInstanceCatalogEnabled',
+    'webxdcMaxArchiveMB',
+    'webxdcMaxUncompressedMB',
+    'webxdcMaxSingleFileMB',
+    'webxdcMaxEntries',
   ],
   logging: ['logLevel'],
   webhooks: [],
@@ -389,6 +402,14 @@ function AdminSettingsPage() {
                 clearFieldError={clearFieldError}
               />
             </TabsContent> */}
+            <TabsContent value="webxdc">
+              <WebxdcTab
+                settings={current}
+                setSettings={handleTabChange}
+                errors={localErrors}
+                clearFieldError={clearFieldError}
+              />
+            </TabsContent>
             <TabsContent value="logging">
               <LoggingTab settings={current} setSettings={handleTabChange} />
             </TabsContent>

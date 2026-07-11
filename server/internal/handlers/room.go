@@ -629,12 +629,76 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 		}
 	}
 
-	return c.JSON(fiber.Map{
+	out := fiber.Map{
 		"id": room.ID, "name": room.Name, "token": token, "adminId": adminId,
 		"isPublic":          room.IsPublic,
 		settingLiveKitHost:  h.clientLiveKitHost(c),
 		"activeRecordingId": activeRecordingID,
-	})
+	}
+	// Issue Bedrud JWT for the stable guest identity so guests can call room APIs
+	// (WebXDC ticket mint, status updates, …). LiveKit token alone is not enough.
+	if access, refresh, err := h.ensureGuestAPIAuth(guestID, req.GuestName); err != nil {
+		log.Warn().Err(err).Str("guestID", guestID).Msg("guest-join: failed to issue API tokens (LiveKit join still ok)")
+	} else if access != "" {
+		out["accessToken"] = access
+		out["refreshToken"] = refresh
+		out["tokens"] = fiber.Map{
+			"accessToken":  access,
+			"refreshToken": refresh,
+		}
+	}
+	return c.JSON(out)
+}
+
+// ensureGuestAPIAuth creates/updates a guest user row and returns JWT access+refresh.
+// UserID matches LiveKit identity (guest-*) so room participant checks align.
+func (h *RoomHandler) ensureGuestAPIAuth(guestID, displayName string) (accessToken, refreshToken string, err error) {
+	if h.userRepo == nil || guestID == "" {
+		return "", "", errors.New("guest API auth unavailable")
+	}
+	cfg := config.GetSafe()
+	if cfg == nil || cfg.Auth.JWTSecret == "" {
+		return "", "", errors.New("auth not configured")
+	}
+	displayName = strings.TrimSpace(displayName)
+	if displayName == "" {
+		displayName = "Guest"
+	}
+	user, gerr := h.userRepo.GetUserByID(guestID)
+	if gerr != nil || user == nil {
+		user = &models.User{
+			ID:        guestID,
+			Email:     guestID + "@bedrud.guest",
+			Name:      displayName,
+			Provider:  "guest",
+			Accesses:  models.StringArray{"guest"},
+			IsActive:  true,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+		if cerr := h.userRepo.CreateUser(user); cerr != nil {
+			// Race: another join created the same id — re-fetch.
+			user, gerr = h.userRepo.GetUserByID(guestID)
+			if gerr != nil || user == nil {
+				return "", "", cerr
+			}
+		}
+	} else if displayName != "" && user.Name != displayName {
+		user.Name = displayName
+		_ = h.userRepo.UpdateUser(user)
+	}
+
+	accessToken, refreshToken, err = auth.GenerateTokenPair(
+		user.ID, user.Email, user.Name, user.Provider, user.Accesses, cfg, nil,
+	)
+	if err != nil {
+		return "", "", err
+	}
+	if err := h.userRepo.UpdateRefreshToken(user.ID, refreshToken); err != nil {
+		log.Warn().Err(err).Str("guestID", guestID).Msg("guest-join: failed to store refresh token")
+		// Access token is still usable until expiry.
+	}
+	return accessToken, refreshToken, nil
 }
 
 // RefreshLiveKitToken generates a new LiveKit token for an existing room session.
@@ -2610,10 +2674,18 @@ func (h *RoomHandler) UploadChatImage(c *fiber.Ctx) error {
 
 	// Always store sync so the client gets a usable {url,mime,...} attachment.
 	// Async S3 queue returned 202 {status:upload_queued} with no url — FE can't send image.
-	attachment, err := h.uploadStore.Store(roomID, claims.UserID, data)
-	if err != nil {
-		log.Warn().Err(err).Str("roomId", roomID).Msg("Chat image upload failed")
-		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+	// asFile=1: allow generic file attachments (WebXDC sendToChat). Default remains image-only.
+	asFile := c.FormValue("asFile") == "1" || c.FormValue("as_file") == "1"
+	var attachment *storage.ChatAttachment
+	var errStore error
+	if asFile {
+		attachment, errStore = h.uploadStore.StoreNamed(roomID, claims.UserID, data, file.Filename)
+	} else {
+		attachment, errStore = h.uploadStore.Store(roomID, claims.UserID, data)
+	}
+	if errStore != nil {
+		log.Warn().Err(errStore).Str("roomId", roomID).Msg("Chat upload failed")
+		return c.Status(400).JSON(fiber.Map{"error": errStore.Error()})
 	}
 
 	if h.uploadTracker != nil {

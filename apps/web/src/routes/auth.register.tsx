@@ -241,7 +241,8 @@ function RegisterPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      {/* method=post: never serialize password into the URL if JS fails to intercept */}
+      <form method="post" action="#" onSubmit={handleSubmit} className="space-y-4" noValidate>
         {/* Name */}
         <div className="space-y-1.5">
           <Label htmlFor="reg-name">Full name</Label>

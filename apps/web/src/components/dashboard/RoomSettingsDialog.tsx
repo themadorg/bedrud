@@ -92,7 +92,7 @@ export function RoomSettingsDialog({ room, open, onOpenChange, onSave }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="gap-0 overflow-hidden border p-0 max-w-[calc(100vw-2rem)] sm:max-w-sm">
+      <DialogContent className="gap-0 overflow-hidden border p-0 max-w-[calc(var(--app-width,100svw)-2rem)] sm:max-w-sm">
         <DialogTitle className="sr-only">Room Settings</DialogTitle>
         <DialogDescription className="sr-only">Configure room visibility, capacity, and features</DialogDescription>
         <form onSubmit={handleSubmit}>

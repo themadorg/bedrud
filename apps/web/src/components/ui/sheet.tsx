@@ -19,7 +19,10 @@ const SheetOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      'fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+      // Visual viewport (not layout 100vh/100vw) — iOS Safari toolbar-safe
+      'fixed z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+      'top-[var(--app-offset-top,0px)] left-[var(--app-offset-left,0px)]',
+      'h-[var(--app-height,100svh)] w-[var(--app-width,100svw)]',
       className,
     )}
     {...props}
@@ -33,12 +36,13 @@ const sheetVariants = cva(
   {
     variants: {
       side: {
-        top: 'inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top',
+        top: 'left-[var(--app-offset-left,0px)] top-[var(--app-offset-top,0px)] w-[var(--app-width,100svw)] border-b pt-[env(safe-area-inset-top,0px)] data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top',
         bottom:
-          'inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
-        left: 'inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm',
+          // Align to visual viewport bottom (Safari bar + home indicator).
+          'left-[var(--app-offset-left,0px)] top-[calc(var(--app-offset-top,0px)+var(--app-height,100svh))] w-[var(--app-width,100svw)] -translate-y-full border-t pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
+        left: 'left-[var(--app-offset-left,0px)] top-[var(--app-offset-top,0px)] h-[var(--app-height,100svh)] w-[min(75%,var(--app-width,100svw))] max-w-sm border-r pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left',
         right:
-          'inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm',
+          'left-[calc(var(--app-offset-left,0px)+var(--app-width,100svw))] top-[var(--app-offset-top,0px)] h-[var(--app-height,100svh)] w-[min(75%,var(--app-width,100svw))] max-w-sm -translate-x-full border-l pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
       },
     },
     defaultVariants: {
@@ -57,7 +61,14 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
       <SheetOverlay />
       <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
         {children}
-        <SheetPrimitive.Close className="absolute right-4 top-4 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+        <SheetPrimitive.Close
+          className={cn(
+            'absolute z-10 flex h-11 w-11 items-center justify-center opacity-70 ring-offset-background transition-opacity',
+            'hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+            'disabled:pointer-events-none data-[state=open]:bg-secondary',
+            'top-[max(0.5rem,env(safe-area-inset-top,0px))] end-[max(0.5rem,env(safe-area-inset-right,0px))]',
+          )}
+        >
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </SheetPrimitive.Close>
@@ -73,7 +84,14 @@ const SheetHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
 SheetHeader.displayName = 'SheetHeader'
 
 const SheetFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)} {...props} />
+  <div
+    className={cn(
+      'flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2',
+      'pb-[env(safe-area-inset-bottom,0px)] sm:pb-0',
+      className,
+    )}
+    {...props}
+  />
 )
 SheetFooter.displayName = 'SheetFooter'
 

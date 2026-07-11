@@ -141,7 +141,7 @@ function GuestPage() {
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form method="post" action="#" onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="guest-name">Display name</Label>
           <Input

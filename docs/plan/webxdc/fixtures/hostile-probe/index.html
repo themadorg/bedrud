@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hostile probe (manual security fixture)</title>
+    <script src="webxdc.js"></script>
+  </head>
+  <body>
+    <h1>Hostile probe</h1>
+    <p>
+      Manual fixture for DevTools checklist (docs/plan/webxdc/06). All network /
+      parent probes should fail under a correct Bedrud host.
+    </p>
+    <pre id="log"></pre>
+    <script>
+      function log(line) {
+        document.getElementById('log').textContent += line + '\n'
+      }
+
+      // Network probes — must fail
+      fetch('https://example.com/')
+        .then(function () {
+          log('FAIL: fetch to example.com succeeded')
+        })
+        .catch(function (e) {
+          log('OK: fetch blocked: ' + e)
+        })
+
+      try {
+        new WebSocket('wss://example.com/')
+        log('CHECK: WebSocket constructed (may still fail to connect)')
+      } catch (e) {
+        log('OK: WebSocket threw: ' + e)
+      }
+
+      // Parent breakout — must fail when origin-isolated
+      try {
+        var d = parent.document
+        log('FAIL: parent.document accessible: ' + d)
+      } catch (e) {
+        log('OK: parent.document blocked: ' + e)
+      }
+
+      // WebRTC residual check
+      try {
+        var pc = new RTCPeerConnection()
+        log('WARN: RTCPeerConnection constructed — verify no external ICE')
+        pc.close()
+      } catch (e) {
+        log('OK: RTCPeerConnection blocked: ' + e)
+      }
+
+      // Host API still required for legitimate collab
+      if (window.webxdc && window.webxdc.sendUpdate) {
+        log('OK: window.webxdc present (host bridge)')
+      } else {
+        log('FAIL: window.webxdc missing')
+      }
+    </script>
+  </body>
+</html>

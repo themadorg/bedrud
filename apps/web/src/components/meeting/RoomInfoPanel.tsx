@@ -1,14 +1,21 @@
 import { useConnectionState, useParticipants, useRoomContext } from '@livekit/components-react'
 import { ConnectionState } from 'livekit-client'
-import { ClipboardCopy, Loader2 } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useState } from 'react'
-import { toast } from 'sonner'
+import { useEffect, useState } from 'react'
 import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
+import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
 import { useRoomPublishReady } from '#/lib/livekit-publish'
 import { liveKitTransportModeLabel, useLiveKitTransportMode } from '#/lib/livekit-transport-type'
-import { copyMeetingDebugLog } from '#/lib/meeting-debug-log'
-import { Button } from '@/components/ui/button'
+import { meetingPanelScopeClass, settingsDialogScrollClass } from '#/components/settings/settingsPanelTone'
+import { MeetingElevatedLeftDock } from '@/components/meeting/MeetingElevatedLeftDock'
+import {
+  formatMeetingClock,
+  formatMeetingElapsed,
+  getMeetingJoinedAtMs,
+  noteMeetingConnected,
+} from '@/components/meeting/meetingSessionTime'
+import { WebxdcPanel } from '@/components/meeting/webxdc/WebxdcPanel'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import {
@@ -18,13 +25,39 @@ import {
   useMeetingConnectionStats,
 } from './meetingConnectionStats'
 
+/** Elapsed meeting duration + local clock (ticks every second while mounted). */
+function useRoomInfoClock() {
+  const connectionState = useConnectionState()
+  const isConnected = connectionState === ConnectionState.Connected
+  const [elapsed, setElapsed] = useState('00:00')
+  const [clock, setClock] = useState(() => formatMeetingClock(new Date()))
+
+  useEffect(() => {
+    if (isConnected) noteMeetingConnected()
+  }, [isConnected])
+
+  useEffect(() => {
+    const tick = () => {
+      setClock(formatMeetingClock(new Date()))
+      const joined = getMeetingJoinedAtMs()
+      if (joined != null) {
+        setElapsed(formatMeetingElapsed(Date.now() - joined))
+      } else {
+        setElapsed('00:00')
+      }
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [isConnected])
+
+  return { elapsed, clock }
+}
+
 interface RoomInfoContentProps {
   roomId: string
   /** When false, pause stats polling (e.g. panel not visible). */
   active?: boolean
-  /** Hide the “Close” control when embedded in another sheet. */
-  hideClose?: boolean
-  onClose?: () => void
 }
 
 function InfoRow({ label, children }: { label: string; children: ReactNode }) {
@@ -44,8 +77,84 @@ function connectionStateLabel(state: ConnectionState) {
   return state
 }
 
-/** Room connection details body — used by dialog and mobile More sub-page. */
-export function RoomInfoContent({ roomId, active = true, hideClose = false, onClose }: RoomInfoContentProps) {
+/** Matches SettingsListNav header (title + close) + session elapsed / clock. */
+function RoomInfoSheetHeader({ onClose }: { onClose: () => void }) {
+  const { elapsed, clock } = useRoomInfoClock()
+
+  return (
+    <>
+      <header className="flex shrink-0 items-center gap-1 border-b border-[var(--meet-border)] pt-[env(safe-area-inset-top,0px)]">
+        <div className="flex h-12 w-full items-center px-1">
+          <span className="flex-1 px-3 text-[17px] font-semibold text-[var(--meet-fg-strong)]">Room info</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-11 w-11 shrink-0 items-center justify-center border-none bg-transparent text-[var(--meet-fg-muted)]"
+            aria-label="Close room info"
+          >
+            <X size={20} />
+          </button>
+        </div>
+      </header>
+      <div className="flex shrink-0 items-end justify-between gap-4 border-b border-[var(--meet-border)] px-4 py-3.5">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--meet-fg-muted)]">In meeting</p>
+          <p
+            className="mt-1 text-4xl font-bold leading-none tabular-nums tracking-tight text-[var(--meet-fg-strong)]"
+            aria-label={`Meeting duration ${elapsed}`}
+          >
+            {elapsed}
+          </p>
+        </div>
+        <div className="shrink-0 self-end pb-0.5 text-end">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--meet-fg-muted)]">Local time</p>
+          <p
+            className="mt-1 text-[13px] tabular-nums text-[var(--meet-fg-muted)]"
+            aria-label={`Current time ${clock}`}
+          >
+            {clock}
+          </p>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/** Desktop dialog header with the same elapsed / clock strip. */
+function RoomInfoDesktopHeader() {
+  const { elapsed, clock } = useRoomInfoClock()
+
+  return (
+    <DialogHeader className="shrink-0 space-y-0 border-b border-[var(--meet-border)] px-4 py-3">
+      <div className="flex items-start justify-between gap-3 pe-8">
+        <div className="min-w-0">
+          <DialogTitle className="text-[15px] font-semibold text-[var(--meet-fg)]">Room info</DialogTitle>
+          <DialogDescription className="sr-only">Connection details for this meeting.</DialogDescription>
+        </div>
+      </div>
+      <div className="mt-3 flex items-end justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--meet-fg-muted)]">In meeting</p>
+          <p
+            className="mt-1 text-4xl font-bold leading-none tabular-nums tracking-tight text-[var(--meet-fg-strong)]"
+            aria-label={`Meeting duration ${elapsed}`}
+          >
+            {elapsed}
+          </p>
+        </div>
+        <div className="shrink-0 self-end pb-0.5 text-end">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--meet-fg-muted)]">Local time</p>
+          <p className="mt-1 text-[13px] tabular-nums text-[var(--meet-fg-muted)]" aria-label={`Current time ${clock}`}>
+            {clock}
+          </p>
+        </div>
+      </div>
+    </DialogHeader>
+  )
+}
+
+/** Room connection details body — used by dialog, elevated sheet, and mobile More. */
+export function RoomInfoContent({ roomId, active = true }: RoomInfoContentProps) {
   const room = useRoomContext()
   const participants = useParticipants()
   const connectionState = useConnectionState()
@@ -54,33 +163,12 @@ export function RoomInfoContent({ roomId, active = true, hideClose = false, onCl
   const { stats, loading } = useMeetingConnectionStats(room.localParticipant, active)
   const transportMode = useLiveKitTransportMode(room, connected)
   const chatReady = useRoomPublishReady(room, connected)
-  const [copyingDebug, setCopyingDebug] = useState(false)
-
-  const handleCopyDebugLog = async () => {
-    setCopyingDebug(true)
-    try {
-      await copyMeetingDebugLog(room)
-      toast.success('Debug log copied', {
-        description: 'Also printed in the browser console as [bedrud-meet]. Paste it here.',
-      })
-    } catch (err) {
-      toast.error('Could not copy debug log', {
-        description: err instanceof Error ? err.message : 'Check the console for the full dump.',
-      })
-    } finally {
-      setCopyingDebug(false)
-    }
-  }
+  const webxdcUserEnabled = useExperimentalPreferencesStore((s) => s.webxdcEnabled)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--meet-fg-muted)]">Room ID</p>
-          <p className="mt-0.5 break-all font-mono text-sm text-[var(--meet-fg-strong)]">{roomId}</p>
-        </div>
-
-        <div className="rounded-lg border border-[var(--meet-border)] bg-[var(--meet-surface-muted)] p-3">
+    <div className={cn('flex min-h-0 flex-1 flex-col', meetingPanelScopeClass)}>
+      <div className={cn('min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4', settingsDialogScrollClass)}>
+        <div className="rounded-xl border border-[var(--meet-border)] bg-[var(--meet-surface-muted)] p-3.5">
           <p className="mb-2.5 text-[10px] font-medium uppercase tracking-wider text-[var(--meet-fg-muted)]">
             Connection
           </p>
@@ -165,34 +253,21 @@ export function RoomInfoContent({ roomId, active = true, hideClose = false, onCl
             )}
           </div>
         </div>
-      </div>
 
-      <div
-        className={cn(
-          'flex shrink-0 flex-wrap items-center gap-2 border-t border-[var(--meet-border)] px-4 py-3',
-          hideClose ? 'justify-start' : 'justify-between',
-        )}
-      >
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={copyingDebug}
-          onClick={() => void handleCopyDebugLog()}
-          className="gap-1.5"
-        >
-          {copyingDebug ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
-          Copy debug log
-        </Button>
-        {!hideClose && onClose && (
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onClose}
-            className="text-[var(--meet-fg-muted)] hover:bg-[var(--meet-control-hover)] hover:text-[var(--meet-fg)]"
-          >
-            Close
-          </Button>
+        {webxdcUserEnabled ? (
+          <div className="overflow-hidden rounded-xl border border-[var(--meet-border)] bg-[var(--meet-surface-muted)]">
+            <WebxdcPanel
+              roomId={roomId}
+              selfName={room.localParticipant.name || room.localParticipant.identity}
+              userId={room.localParticipant.identity}
+            />
+          </div>
+        ) : (
+          <div className="rounded-xl border border-[var(--meet-border)] bg-[var(--meet-surface-muted)] px-3.5 py-3 text-[11px] text-[var(--meet-fg-muted)]">
+            WebXDC mini-apps: enable under{' '}
+            <span className="font-medium text-[var(--meet-fg-strong)]">Settings → Experimental</span>
+            . Server must also have webxdc configured (domain + baseDomain).
+          </div>
         )}
       </div>
     </div>
@@ -203,19 +278,54 @@ interface RoomInfoPanelProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   roomId: string
+  /**
+   * When true (WebXDC expand rail): left dock like settings —
+   * does not collapse the mini-app; clears the left rail.
+   */
+  elevated?: boolean
 }
 
-export function RoomInfoPanel({ open, onOpenChange, roomId }: RoomInfoPanelProps) {
+export function RoomInfoPanel({ open, onOpenChange, roomId, elevated = false }: RoomInfoPanelProps) {
+  const close = () => onOpenChange(false)
+
+  const sheetBody = (
+    <>
+      <RoomInfoSheetHeader onClose={close} />
+      <RoomInfoContent roomId={roomId} active={open} />
+    </>
+  )
+
+  // Elevated: shared left dock (same shell/size as chat + settings).
+  if (elevated) {
+    if (!open) return null
+    return (
+      <MeetingElevatedLeftDock label="Room info" marker="info">
+        {sheetBody}
+      </MeetingElevatedLeftDock>
+    )
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="meet-dialog max-w-[min(92vw,360px)] gap-0 p-0 shadow-2xl">
-        <DialogHeader className="border-b border-[var(--meet-border)] px-4 py-3">
-          <DialogTitle className="text-[15px] font-semibold text-[var(--meet-fg)]">Room info</DialogTitle>
-          <DialogDescription className="text-[var(--meet-fg-muted)]">
-            Connection details for this meeting.
-          </DialogDescription>
-        </DialogHeader>
-        <RoomInfoContent roomId={roomId} active={open} onClose={() => onOpenChange(false)} />
+      <DialogContent
+        className={cn(
+          'meet-dialog flex flex-col gap-0 overflow-hidden p-0 shadow-2xl',
+          // Desktop: compact card (settings uses larger for tabs)
+          'sm:max-h-[min(90vh,720px)] sm:w-[min(360px,calc(var(--app-width,100svw)-2rem))] sm:max-w-[min(360px,calc(var(--app-width,100svw)-2rem))]',
+          // Mobile full-screen — same shell as settings
+          'max-sm:fixed max-sm:left-[var(--app-offset-left,0px)] max-sm:top-[var(--app-offset-top,0px)] max-sm:h-[var(--app-height,100svh)] max-sm:max-h-[var(--app-height,100svh)] max-sm:w-[var(--app-width,100svw)] max-sm:max-w-[var(--app-width,100svw)] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0',
+          // Hide default Dialog X on mobile (we render nav chrome ourselves).
+          'max-sm:[&>button.absolute]:hidden',
+        )}
+      >
+        {/* Mobile: settings-style sheet chrome */}
+        <div className="flex min-h-0 flex-1 flex-col sm:hidden">{sheetBody}</div>
+
+        {/* Desktop: title header + body */}
+        <div className="hidden min-h-0 flex-1 flex-col sm:flex">
+          <RoomInfoDesktopHeader />
+          <RoomInfoContent roomId={roomId} active={open} />
+        </div>
       </DialogContent>
     </Dialog>
   )

@@ -308,6 +308,12 @@ func (h *AdminHandler) GetPublicSettings(c *fiber.Ctx) error {
 	if maxDim <= 0 {
 		maxDim = defaultChatUploadMaxDimension
 	}
+	webxdcEnabled := false
+	webxdcBase := ""
+	if cfg := config.GetSafe(); cfg != nil && cfg.Webxdc.Active(cfg.Server.Domain) {
+		webxdcEnabled = true
+		webxdcBase = cfg.Webxdc.BaseDomain
+	}
 	return c.JSON(fiber.Map{
 		"serverName":               s.ServerName,
 		"registrationEnabled":      s.RegistrationEnabled,
@@ -321,6 +327,11 @@ func (h *AdminHandler) GetPublicSettings(c *fiber.Ctx) error {
 		"chatUploadMaxBytes":       maxBytes,
 		"chatUploadMaxDimension":   maxDim,
 		"recordingsEnabled":        s.RecordingsEnabled,
+		"webxdc": fiber.Map{
+			"enabled":      webxdcEnabled,
+			"experimental": true,
+			"baseDomain":   webxdcBase,
+		},
 	})
 }
 
@@ -440,7 +451,8 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 			"emailSubjectReset", "emailSubjectChanged", "emailSubjectInvite",
 			"emailPreheaderVerify", "emailPreheaderWelcome",
 			"emailPreheaderReset", "emailPreheaderChanged", "emailPreheaderInvite",
-			"emailSmtpHost", "emailUsername", "emailFromAddress", "emailFromName":
+			"emailSmtpHost", "emailUsername", "emailFromAddress", "emailFromName",
+			"webxdcGalleryRemoteCatalogUrl", "webxdcGallerySource":
 			var s string
 			if err := json.Unmarshal(val, &s); err != nil {
 				return fmt.Errorf("%s: expected a string, got %s", key, describeJSONType(val))
@@ -536,6 +548,16 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 				existing.EmailFromAddress = s
 			case "emailFromName":
 				existing.EmailFromName = s
+			case "webxdcGalleryRemoteCatalogUrl":
+				existing.WebxdcGalleryRemoteCatalogURL = strings.TrimSpace(s)
+			case "webxdcGallerySource":
+				s = strings.TrimSpace(s)
+				switch s {
+				case "", "local", "remote", "both", "semi-remote":
+					existing.WebxdcGallerySource = s
+				default:
+					return fmt.Errorf("webxdcGallerySource: must be local, semi-remote, remote, or both")
+				}
 			}
 
 		// Bool fields
@@ -543,6 +565,7 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 			"serverEnableTls", "serverUseAcme", "behindProxy",
 			"livekitExternal", "corsAllowCredentials", "guestLoginEnabled",
 			"recordingsEnabled",
+			"webxdcGalleryEnabled", "webxdcGalleryAllowRemoteDownload", "webxdcGalleryInstanceCatalogEnabled",
 			"emailTlsSkipVerify", "emailSmtpsMode":
 			var b bool
 			if err := json.Unmarshal(val, &b); err != nil {
@@ -569,6 +592,12 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 				existing.GuestLoginEnabled = b
 			case "recordingsEnabled":
 				existing.RecordingsEnabled = b
+			case "webxdcGalleryEnabled":
+				existing.WebxdcGalleryEnabled = b
+			case "webxdcGalleryAllowRemoteDownload":
+				existing.WebxdcGalleryAllowRemoteDownload = b
+			case "webxdcGalleryInstanceCatalogEnabled":
+				existing.WebxdcGalleryInstanceCatalogEnabled = b
 			case "emailTlsSkipVerify":
 				existing.EmailTLSSkipVerify = b
 			case "emailSmtpsMode":
@@ -581,7 +610,8 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 			"chatMaxMessageCount", "chatMessageTTLHours",
 			"chatUploadMaxDimension",
 			"recordingMaxDurationMins", "recordingMaxFileSizeMB",
-			"emailSmtpPort":
+			"emailSmtpPort",
+			"webxdcMaxArchiveMB", "webxdcMaxUncompressedMB", "webxdcMaxSingleFileMB", "webxdcMaxEntries":
 			var i int
 			if err := json.Unmarshal(val, &i); err != nil {
 				return fmt.Errorf("%s: expected an integer, got %s", key, describeJSONType(val))
@@ -607,6 +637,26 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 				existing.RecordingMaxFileSizeMB = i
 			case "emailSmtpPort":
 				existing.EmailSMTPPort = i
+			case "webxdcMaxArchiveMB":
+				if i < 0 || i > 512 {
+					return fmt.Errorf("webxdcMaxArchiveMB: must be 0–512 (0 = config default)")
+				}
+				existing.WebxdcMaxArchiveMB = i
+			case "webxdcMaxUncompressedMB":
+				if i < 0 || i > 1024 {
+					return fmt.Errorf("webxdcMaxUncompressedMB: must be 0–1024 (0 = config default)")
+				}
+				existing.WebxdcMaxUncompressedMB = i
+			case "webxdcMaxSingleFileMB":
+				if i < 0 || i > 256 {
+					return fmt.Errorf("webxdcMaxSingleFileMB: must be 0–256 (0 = config default)")
+				}
+				existing.WebxdcMaxSingleFileMB = i
+			case "webxdcMaxEntries":
+				if i < 0 || i > 10000 {
+					return fmt.Errorf("webxdcMaxEntries: must be 0–10000 (0 = config default)")
+				}
+				existing.WebxdcMaxEntries = i
 			}
 
 		// Int64 fields

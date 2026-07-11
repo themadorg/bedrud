@@ -19,6 +19,8 @@ const (
 	envACMEEmail            = "REMOTE_DEBUG_ACME_EMAIL"
 	envTunnelToken          = "REMOTE_DEBUG_TUNNEL_TOKEN"
 	envTunnelTLSFingerprint = "REMOTE_DEBUG_TUNNEL_TLS_FINGERPRINT"
+	envWebxdcWildcardCert   = "REMOTE_DEBUG_WEBXDC_WILDCARD_CERT"
+	envWebxdcWildcardKey    = "REMOTE_DEBUG_WEBXDC_WILDCARD_KEY"
 )
 
 // EnvPath returns server/.env under repo root.
@@ -69,7 +71,10 @@ func loadSSHFromEnv(repo string, cfg *Config) error {
 
 func loadProvisionFromEnv(repo string, cfg *Config) error {
 	vals := map[string]string{}
-	for _, key := range []string{envWGEndpoint, envLiveKitAPISecret, envACMEEmail, envTunnelToken, envTunnelTLSFingerprint} {
+	for _, key := range []string{
+		envWGEndpoint, envLiveKitAPISecret, envACMEEmail, envTunnelToken, envTunnelTLSFingerprint,
+		envWebxdcWildcardCert, envWebxdcWildcardKey,
+	} {
 		if v := strings.TrimSpace(os.Getenv(key)); v != "" {
 			vals[key] = v
 		}
@@ -97,6 +102,13 @@ func loadProvisionFromEnv(repo string, cfg *Config) error {
 	}
 	if fp := vals[envTunnelTLSFingerprint]; fp != "" {
 		cfg.Tunnel.DevTunnel.TLSFingerprint = fp
+	}
+	// Wildcard cert paths fill empty YAML only (YAML can pin remote paths).
+	if cert := vals[envWebxdcWildcardCert]; cert != "" && cfg.Provision.WebxdcWildcardCert == "" {
+		cfg.Provision.WebxdcWildcardCert = cert
+	}
+	if key := vals[envWebxdcWildcardKey]; key != "" && cfg.Provision.WebxdcWildcardKey == "" {
+		cfg.Provision.WebxdcWildcardKey = key
 	}
 	return nil
 }

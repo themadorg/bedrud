@@ -18,6 +18,7 @@ import {
   MonitorOff,
   MonitorUp,
   MoreVertical,
+  Package,
   PenLine,
   PhoneOff,
   Settings,
@@ -38,11 +39,19 @@ import { readMeetingDeviceId, writeMeetingDeviceId } from '#/lib/meeting-device-
 import { cn } from '#/lib/utils'
 import { DeviceSelector } from '@/components/meeting/DeviceSelector'
 import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
+import {
+  isWebxdcExpandSource,
+  MEETING_CLOSE_ELEVATED_CHROME,
+  MEETING_CLOSE_SETTINGS,
+  MEETING_OPEN_SETTINGS,
+  publishMeetingChromeState,
+} from '@/components/meeting/meetingChromeEvents'
 import { meetControlsDockClass, useMeetingUILayout } from '@/components/meeting/MeetingUILayoutContext'
 import { RoomInfoContent } from '@/components/meeting/RoomInfoPanel'
 import { useMeetingStage } from '@/components/meeting/stage/MeetingStageContext'
 import { stageOwnerLabel } from '@/components/meeting/stage/stageWire'
 import { waitForScreenSharePublication } from '@/components/meeting/stage/waitForScreenShare'
+import { WebxdcAppsDialog } from '@/components/meeting/webxdc/WebxdcAppsDialog'
 import { useWhiteboardWatch } from '@/components/meeting/whiteboard/whiteboard-watch-context'
 import { useYoutubeWatch } from '@/components/meeting/youtube/youtube-watch-context'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -171,7 +180,7 @@ function CtrlBtn({
 const dividerCn = 'w-px h-7 bg-[var(--meet-border)] mx-0.5 shrink-0 max-sm:hidden'
 
 const meetMenuCn =
-  'meet-dialog min-w-60 max-w-[calc(100vw-24px)] rounded-xl border border-[var(--meet-border-subtle)] !bg-[var(--meet-bg-panel)] !text-[var(--meet-fg)] shadow-[var(--meet-shadow)] backdrop-blur-xl'
+  'meet-dialog min-w-60 max-w-[calc(var(--app-width,100svw)-24px)] rounded-xl border border-[var(--meet-border-subtle)] !bg-[var(--meet-bg-panel)] !text-[var(--meet-fg)] shadow-[var(--meet-shadow)] backdrop-blur-xl'
 
 const meetMenuItemCn =
   'rounded-md gap-2 text-xs !text-[var(--meet-control-fg)] focus:!bg-[var(--meet-control-hover)] focus:!text-[var(--meet-fg)] data-[highlighted]:!bg-[var(--meet-control-hover)] data-[highlighted]:!text-[var(--meet-fg)]'
@@ -280,8 +289,10 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
   const layout = useMeetingUILayout()
   const { stage, isOwner, claimStage, clearStage } = useMeetingStage()
   const isWhiteboardHost = stage?.kind === 'whiteboard' && isOwner
+  const isWebxdcOnStage = stage?.kind === 'webxdc'
   const whiteboardEnabled = useExperimentalPreferencesStore((s) => s.whiteboardEnabled)
   const youtubeEnabled = useExperimentalPreferencesStore((s) => s.youtubeEnabled)
+  const webxdcEnabled = useExperimentalPreferencesStore((s) => s.webxdcEnabled)
   const { requestStartWhiteboard } = useWhiteboardWatch()
   const { isHost: isYoutubeHost, openShareDialog, stopShare: stopYoutubeShare } = useYoutubeWatch()
   const {
@@ -291,7 +302,13 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
     isScreenShareEnabled,
   } = useLocalParticipant()
   const stageTakenByOther = Boolean(stage && !isOwner)
-  const { isSelfDeafened, toggleSelfDeafen } = useMeetingRoomContext()
+  const { isSelfDeafened, toggleSelfDeafen, roomId, getParticipantDisplayName } = useMeetingRoomContext()
+  const [webxdcAppsOpen, setWebxdcAppsOpen] = useState(false)
+  const selfName =
+    getParticipantDisplayName(localParticipant) ||
+    localParticipant.name ||
+    localParticipant.identity ||
+    'You'
 
   const tokens = useAuthStore((s) => s.tokens)
   const canShare = Boolean(tokens) && Boolean(navigator.mediaDevices?.getDisplayMedia)
@@ -322,6 +339,7 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
   const linkCopiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsElevated, setSettingsElevated] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [audioOpen, setAudioOpen] = useState(false)
   /** Mobile More drill-down: null = root list. */
@@ -336,6 +354,41 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
       }
     }
   }, [])
+
+  // WebXDC left rail / other chrome can open settings without prop drilling.
+  useEffect(() => {
+    const onSettings = (e: Event) => {
+      const fromWx = isWebxdcExpandSource((e as CustomEvent).detail)
+      // Toggle: second click on left-rail settings while elevated → close.
+      if (fromWx && settingsOpen && settingsElevated) {
+        setSettingsOpen(false)
+        setSettingsElevated(false)
+        publishMeetingChromeState(null)
+        return
+      }
+      setSettingsElevated(fromWx)
+      setSettingsOpen(true)
+      if (fromWx) publishMeetingChromeState('settings')
+    }
+    const onClose = () => {
+      setSettingsOpen(false)
+      setSettingsElevated(false)
+    }
+    const onCloseElevated = () => {
+      if (!settingsElevated) return
+      setSettingsOpen(false)
+      setSettingsElevated(false)
+      publishMeetingChromeState(null)
+    }
+    window.addEventListener(MEETING_OPEN_SETTINGS, onSettings)
+    window.addEventListener(MEETING_CLOSE_SETTINGS, onClose)
+    window.addEventListener(MEETING_CLOSE_ELEVATED_CHROME, onCloseElevated)
+    return () => {
+      window.removeEventListener(MEETING_OPEN_SETTINGS, onSettings)
+      window.removeEventListener(MEETING_CLOSE_SETTINGS, onClose)
+      window.removeEventListener(MEETING_CLOSE_ELEVATED_CHROME, onCloseElevated)
+    }
+  }, [settingsOpen, settingsElevated])
 
   const copyRoomLink = useCallback(() => {
     void navigator.clipboard
@@ -488,6 +541,17 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
       }
     }
 
+    if (webxdcEnabled) {
+      rows.push({ kind: 'separator', id: 'sep-webxdc' })
+      rows.push({
+        kind: 'action',
+        id: 'webxdc-apps',
+        label: isWebxdcOnStage ? 'Gallery (on stage)' : 'App gallery',
+        icon: <Package size={18} className="shrink-0 text-amber-400" />,
+        onSelect: () => setWebxdcAppsOpen(true),
+      })
+    }
+
     return rows
   }, [
     isMobile,
@@ -497,6 +561,8 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
     toggleFullscreen,
     whiteboardEnabled,
     youtubeEnabled,
+    webxdcEnabled,
+    isWebxdcOnStage,
     stage,
     isWhiteboardHost,
     isYoutubeHost,
@@ -537,12 +603,13 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
       <div
         id="meet-controls"
         className={cn(
-          'absolute -translate-x-1/2 z-30 flex items-center bg-[var(--meet-chrome)] backdrop-blur-xl border border-[var(--meet-border-subtle)] whitespace-nowrap shadow-[var(--meet-shadow),var(--meet-shadow-inset)] transition-[left] duration-200',
+          // meet-controls-bar: border-radius needs !important (global * { border-radius: 0 })
+          'meet-controls-bar absolute -translate-x-1/2 z-30 flex items-center bg-[var(--meet-chrome)] backdrop-blur-xl border border-[var(--meet-border-subtle)] whitespace-nowrap shadow-[var(--meet-shadow),var(--meet-shadow-inset)] transition-[left] duration-200',
           meetControlsDockClass(layout),
           isMobile
-            ? 'bottom-[calc(12px+env(safe-area-inset-bottom))] gap-[2px] rounded-2xl p-1.5'
-            : 'bottom-5 gap-[3px] rounded-[18px] p-2',
-          'max-w-[calc(100vw-16px)]',
+            ? 'bottom-[calc(12px+env(safe-area-inset-bottom))] gap-[2px] p-1.5'
+            : 'bottom-5 gap-[3px] p-2',
+          'max-w-[calc(var(--app-width,100svw)-16px)]',
         )}
       >
         {/* ── Left: Video + Screen Share ── */}
@@ -596,6 +663,17 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
           {isScreenShareEnabled ? <MonitorOff size={iconSizeSm} /> : <MonitorUp size={iconSizeSm} />}
         </CtrlBtn>
 
+        {webxdcEnabled ? (
+          <CtrlBtn
+            tip={isWebxdcOnStage ? 'App gallery (on stage)' : 'App gallery'}
+            active={isWebxdcOnStage}
+            isMobile={isMobile}
+            onClick={() => setWebxdcAppsOpen(true)}
+          >
+            <Package size={iconSize} />
+          </CtrlBtn>
+        ) : null}
+
         {/* TODO oncoming feature — recording button removed */}
 
         {!isMobile && <div className={dividerCn} />}
@@ -607,8 +685,9 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
               type="button"
               onClick={onLeave}
               className={cn(
-                'flex items-center gap-2 shrink-0 border-none cursor-pointer text-[var(--meet-btn-leave-fg)] text-[13px] font-semibold transition-[background,box-shadow] duration-150',
-                isMobile ? 'h-[38px] rounded-[10px] px-3 mx-0.5' : 'h-11 rounded-xl px-[18px] mx-0.5',
+                // meet-btn-leave: border-radius needs !important (global * { border-radius: 0 })
+                'meet-btn-leave flex items-center gap-2 shrink-0 border-none cursor-pointer text-[var(--meet-btn-leave-fg)] text-[13px] font-semibold transition-[background,box-shadow] duration-150',
+                isMobile ? 'h-[38px] px-3 mx-0.5' : 'h-11 px-[18px] mx-0.5',
                 'bg-[var(--meet-btn-leave-bg)] shadow-[0_2px_12px_color-mix(in_oklab,var(--meet-btn-leave-bg)_45%,transparent)] hover:bg-[var(--meet-btn-leave-hover)]',
               )}
               aria-label="Leave meeting"
@@ -839,11 +918,12 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
         <DialogContent
           className={cn(
             'meet-dialog flex flex-col gap-0 overflow-hidden p-0 shadow-2xl',
-            'fixed inset-0 left-0 top-0 h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0',
+            // Visual viewport full-screen (iOS Safari toolbar-safe)
+            'fixed left-[var(--app-offset-left,0px)] top-[var(--app-offset-top,0px)] h-[var(--app-height,100svh)] max-h-[var(--app-height,100svh)] w-[var(--app-width,100svw)] max-w-[var(--app-width,100svw)] translate-x-0 translate-y-0 rounded-none border-0',
             '[&>button.absolute]:hidden',
           )}
         >
-          <header className="flex shrink-0 items-center border-b border-[var(--meet-border)] pt-[env(safe-area-inset-top)]">
+          <header className="flex shrink-0 items-center border-b border-[var(--meet-border)] pt-[env(safe-area-inset-top,0px)]">
             <div className="flex h-12 w-full items-center px-1">
               <DialogTitle className="flex-1 px-3 text-[17px] font-semibold text-[var(--meet-fg-strong)]">
                 Audio
@@ -851,7 +931,7 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
               <button
                 type="button"
                 onClick={() => setAudioOpen(false)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center border-none bg-transparent text-[var(--meet-fg-muted)]"
+                className="flex h-11 w-11 shrink-0 items-center justify-center border-none bg-transparent text-[var(--meet-fg-muted)]"
                 aria-label="Close"
               >
                 <X size={20} />
@@ -859,7 +939,7 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
             </div>
           </header>
 
-          <div className="meet-scroll min-h-0 flex-1 space-y-4 overflow-y-auto p-3 pb-[calc(16px+env(safe-area-inset-bottom))]">
+          <div className="meet-scroll min-h-0 flex-1 space-y-4 overflow-y-auto p-3 pb-[max(1rem,calc(16px+env(safe-area-inset-bottom,0px)))]">
             {mics.devices.length > 0 && (
               <section>
                 <h3 className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--meet-fg-muted)]">
@@ -978,12 +1058,12 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
         <DialogContent
           className={cn(
             'meet-dialog flex flex-col gap-0 overflow-hidden p-0 shadow-2xl',
-            // Always full-viewport when this dialog is open (only opened on mobile).
-            'fixed inset-0 left-0 top-0 h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0',
+            // Visual viewport full-screen (iOS Safari toolbar-safe)
+            'fixed left-[var(--app-offset-left,0px)] top-[var(--app-offset-top,0px)] h-[var(--app-height,100svh)] max-h-[var(--app-height,100svh)] w-[var(--app-width,100svw)] max-w-[var(--app-width,100svw)] translate-x-0 translate-y-0 rounded-none border-0',
             '[&>button.absolute]:hidden',
           )}
         >
-          <header className="flex shrink-0 items-center border-b border-[var(--meet-border)] pt-[env(safe-area-inset-top)]">
+          <header className="flex shrink-0 items-center border-b border-[var(--meet-border)] pt-[env(safe-area-inset-top,0px)]">
             <div className="flex h-12 w-full items-center px-1">
               {morePage ? (
                 <button
@@ -992,7 +1072,7 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
                     setMoreNavDir('back')
                     setMorePage(null)
                   }}
-                  className="flex h-10 min-w-0 flex-1 items-center gap-0.5 border-none bg-transparent px-1 text-[var(--meet-accent)]"
+                  className="flex h-11 min-w-0 flex-1 items-center gap-0.5 border-none bg-transparent px-1 text-[var(--meet-accent)]"
                   aria-label="Back to more"
                 >
                   <ChevronLeft size={22} className="shrink-0" />
@@ -1006,7 +1086,7 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
               <button
                 type="button"
                 onClick={() => setMoreOpen(false)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center border-none bg-transparent text-[var(--meet-fg-muted)]"
+                className="flex h-11 w-11 shrink-0 items-center justify-center border-none bg-transparent text-[var(--meet-fg-muted)]"
                 aria-label="Close"
               >
                 <X size={20} />
@@ -1023,7 +1103,7 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
             </div>
           )}
 
-          <div className="relative min-h-0 flex-1 overflow-hidden pb-[env(safe-area-inset-bottom)]">
+          <div className="relative min-h-0 flex-1 overflow-hidden pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
             <div
               key={morePage ?? 'root'}
               className={cn('absolute inset-0 flex flex-col overflow-hidden', morePageAnim)}
@@ -1076,7 +1156,7 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
                 </nav>
               ) : morePage === 'info' && moreExtras?.roomId ? (
                 <div className="meet-scroll flex min-h-0 flex-1 flex-col overflow-y-auto">
-                  <RoomInfoContent roomId={moreExtras.roomId} active={moreOpen && morePage === 'info'} hideClose />
+                  <RoomInfoContent roomId={moreExtras.roomId} active={moreOpen && morePage === 'info'} />
                 </div>
               ) : null}
             </div>
@@ -1084,7 +1164,27 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
         </DialogContent>
       </Dialog>
 
-      <BedrudSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <BedrudSettingsDialog
+        open={settingsOpen}
+        onOpenChange={(open) => {
+          setSettingsOpen(open)
+          if (!open) {
+            setSettingsElevated(false)
+            publishMeetingChromeState(null)
+          }
+        }}
+        elevated={settingsElevated}
+      />
+
+      {webxdcEnabled ? (
+        <WebxdcAppsDialog
+          open={webxdcAppsOpen}
+          onOpenChange={setWebxdcAppsOpen}
+          roomId={roomId}
+          selfName={selfName}
+          userId={localParticipant.identity}
+        />
+      ) : null}
     </TooltipProvider>
   )
 }

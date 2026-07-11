@@ -22,6 +22,10 @@ type InstallConfig struct {
 	LKDomain            string
 	LKIP                string
 	CertAlgorithm       string
+	// Experimental WebXDC (requires Domain)
+	EnableWebxdc     bool
+	WebxdcBaseDomain string
+	WebxdcDNSAck     bool
 }
 
 // SetDefaults populates empty fields with their default values.

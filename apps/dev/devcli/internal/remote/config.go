@@ -90,6 +90,12 @@ type ProvisionConfig struct {
 	LiveKitRTCEnd            int    `yaml:"livekitRTCEnd"`
 	EnableACME               *bool  `yaml:"enableACME"`
 	ACMEmail                 string `yaml:"acmeEmail"`
+	// WebxdcWildcardCert/Key are remote paths to a TLS cert covering
+	// *.publicHost (e.g. LE DNS-01 or Cloudflare Origin). Required for
+	// browser-trusted WebXDC hosts; HTTP-01 ACME cannot issue wildcards.
+	// Env: REMOTE_DEBUG_WEBXDC_WILDCARD_CERT / REMOTE_DEBUG_WEBXDC_WILDCARD_KEY
+	WebxdcWildcardCert string `yaml:"webxdcWildcardCert"`
+	WebxdcWildcardKey  string `yaml:"webxdcWildcardKey"`
 	// WGEndpoint is loaded from server/.env (not YAML).
 	WGEndpoint string
 }

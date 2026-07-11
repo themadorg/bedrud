@@ -1,11 +1,12 @@
 import { useRoomContext } from '@livekit/components-react'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, FileText } from 'lucide-react'
 import { type ReactNode, Suspense } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import { textDirectionFor } from '#/lib/text-direction'
 import { cn } from '@/lib/utils'
+import type { ChatAttachment } from '../MeetingContext'
 import { ChatMessageContextMenu } from './ChatMessageContextMenu'
 import { ChatPollBubble } from './ChatPollBubble'
 import { ChatReactionList } from './ChatReactionList'
@@ -17,12 +18,57 @@ import { absoluteTime, avatarColor, avatarInitials, relativeTime } from './chatG
 
 function isSafeUrl(url: string): boolean {
   if (url.startsWith('data:image/')) return true
+  if (url.startsWith('data:')) return true // inline file attachments (small uploads)
   try {
     const parsed = new URL(url, window.location.origin)
     return parsed.protocol === 'https:' || parsed.protocol === 'http:'
   } catch {
     return false
   }
+}
+
+function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function FileAttachmentCard({
+  att,
+  isLocal,
+}: {
+  att: Extract<ChatAttachment, { kind: 'file' }>
+  isLocal: boolean
+}) {
+  if (!isSafeUrl(att.url)) return null
+  const sizeLabel = formatFileSize(att.size)
+  return (
+    <a
+      href={att.url}
+      download={att.name}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        'my-0.5 flex max-w-full items-center gap-2.5 rounded-lg border px-3 py-2 no-underline transition-colors',
+        isLocal
+          ? 'border-white/20 bg-white/10 text-white hover:bg-white/15'
+          : 'border-white/[0.12] bg-black/20 text-white/90 hover:bg-black/30',
+      )}
+      aria-label={`Download file ${att.name}`}
+    >
+      <span className="bg-primary/20 text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-md">
+        <FileText className="h-4 w-4" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium leading-tight">{att.name}</span>
+        <span className="text-[11px] opacity-70">
+          {sizeLabel || att.mime || 'File'}
+          {sizeLabel && att.mime ? ` · ${att.mime}` : ''}
+        </span>
+      </span>
+    </a>
+  )
 }
 
 function ChatMarkdown({ content, isLocal }: { content: string; isLocal: boolean }) {
@@ -172,7 +218,10 @@ export function ChatMessageCluster({ cluster, currentIdentity, onImageOpen, onVo
               }
             >
               {msg.attachments.map((att, ai) => {
-                if (att.kind !== 'image' && !att.mime.startsWith('image/')) return null
+                if (att.kind === 'file') {
+                  return <FileAttachmentCard key={ai} att={att} isLocal={isSelf} />
+                }
+                // kind === 'image'
                 if (!isSafeUrl(att.url)) return null
                 return (
                   <button

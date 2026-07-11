@@ -35,13 +35,13 @@ export function useMeetingUILayout() {
  */
 export function meetRightInsetClass({ chatDocked, participantsDocked }: MeetingUILayoutState) {
   if (chatDocked && participantsDocked) {
-    return 'right-0 sm:right-[min(calc(320px+288px),100vw)]'
+    return 'right-0 sm:right-[min(calc(320px+288px),var(--app-width,100svw))]'
   }
   if (chatDocked) {
-    return 'right-0 sm:right-[min(320px,100vw)]'
+    return 'right-0 sm:right-[min(320px,var(--app-width,100svw))]'
   }
   if (participantsDocked) {
-    return 'right-0 sm:right-[min(288px,100vw)]'
+    return 'right-0 sm:right-[min(288px,var(--app-width,100svw))]'
   }
   return 'right-0'
 }
@@ -86,5 +86,5 @@ export function meetControlsDockClass({ chatDocked, participantsDocked }: Meetin
 }
 
 export function participantsDockOffset(chatDocked: boolean) {
-  return chatDocked ? 'min(320px, 100vw)' : undefined
+  return chatDocked ? 'min(320px, var(--app-width, 100svw))' : undefined
 }

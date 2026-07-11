@@ -39,6 +39,7 @@ import (
 	"bedrud/internal/services"
 	"bedrud/internal/storage"
 	"bedrud/internal/utils"
+	wxhost "bedrud/internal/webxdc"
 
 	_ "bedrud/docs"
 
@@ -346,6 +347,12 @@ func run() error {
 	// recordingService := services.NewRecordingService(settingsRepo, recordingRepo, roomRepo, egressClient, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret)
 	// recordingHandler := handlers.NewRecordingHandler(roomRepo, recordingService, recordingRepo, recordingStore)
 	cleanupSvc := services.NewRoomCleanupService(roomRepo, nil, lkClient, nil, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, uploadTracker)
+	webxdcRepo := repository.NewWebxdcRepository(database.GetDB())
+	if cfg.Webxdc.Active(cfg.Server.Domain) {
+		cleanupSvc.SetWebxdcCleanup(webxdcRepo, cfg.Webxdc.StorageDir)
+		log.Info().Str("baseDomain", cfg.Webxdc.BaseDomain).Msg("WebXDC experimental subsystem enabled")
+	}
+	webxdcHandler := handlers.NewWebxdcHandler(cfg, webxdcRepo, roomRepo).WithSettings(settingsRepo)
 	roomHandler := handlers.NewRoomHandler(lkClient, &cfg.LiveKit, &cfg.Chat, roomRepo, userRepo, recordingRepo, settingsRepo, webhookRepo, uploadTracker, cleanupSvc)
 
 	// Room routes
@@ -376,6 +383,21 @@ func run() error {
 	api.Put("/room/:roomId/settings", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.UpdateSettings)
 	api.Delete("/room/:roomId", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.DeleteRoom)
 	api.Post("/room/:roomId/chat/upload", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.UploadChatImage)
+
+	// Experimental WebXDC
+	if cfg.Webxdc.Active(cfg.Server.Domain) {
+		api.Get("/webxdc/gallery", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), webxdcHandler.ListGallery)
+		api.Get("/webxdc/packages/:id/icon", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), webxdcHandler.GetPackageIcon)
+		api.Post("/rooms/:roomId/webxdc/gallery/import", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.APIRateLimiter(cfg.RateLimit), webxdcHandler.ImportGalleryApp)
+		api.Post("/rooms/:roomId/webxdc/packages", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.APIRateLimiter(cfg.RateLimit), webxdcHandler.UploadPackage)
+		api.Get("/rooms/:roomId/webxdc/packages", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), webxdcHandler.ListPackages)
+		api.Post("/rooms/:roomId/webxdc/instances", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.APIRateLimiter(cfg.RateLimit), webxdcHandler.CreateInstance)
+		api.Get("/rooms/:roomId/webxdc/instances", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), webxdcHandler.ListInstances)
+		api.Post("/rooms/:roomId/webxdc/instances/:instanceId/ticket", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), webxdcHandler.MintTicket)
+		api.Post("/rooms/:roomId/webxdc/instances/:instanceId/close", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), webxdcHandler.CloseInstance)
+		api.Post("/rooms/:roomId/webxdc/instances/:instanceId/updates", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.APIRateLimiter(cfg.RateLimit), webxdcHandler.PostUpdate)
+		api.Get("/rooms/:roomId/webxdc/instances/:instanceId/updates", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), webxdcHandler.ListUpdates)
+	}
 
 	// TODO oncoming feature: recording routes
 	// api.Post("/rooms/:id/recording/start", ...)
@@ -484,8 +506,17 @@ func run() error {
 	adminGroup.Post("/rooms/:roomId/participants/:identity/kick", roomHandler.AdminKickParticipant)
 	adminGroup.Post("/rooms/:roomId/participants/:identity/mute", roomHandler.AdminMuteParticipant)
 	api.Get("/auth/settings", adminHandler.GetPublicSettings)
+	api.Get("/webxdc/config", webxdcHandler.PublicConfig)
 	api.Get("/cert", certHandler.GetCert)
 	adminGroup.Get("/settings", adminHandler.GetSettings)
+	// Instance WebXDC catalog (admin-managed packages for meeting gallery)
+	if cfg.Webxdc.Active(cfg.Server.Domain) {
+		adminGroup.Get("/webxdc/catalog", webxdcHandler.AdminListInstanceCatalog)
+		adminGroup.Post("/webxdc/catalog", middleware.APIRateLimiter(cfg.RateLimit), webxdcHandler.AdminUploadInstanceCatalog)
+		adminGroup.Get("/webxdc/catalog/:id/icon", webxdcHandler.AdminGetInstanceCatalogIcon)
+		adminGroup.Put("/webxdc/catalog/:id", webxdcHandler.AdminUpdateInstanceCatalog)
+		adminGroup.Delete("/webxdc/catalog/:id", webxdcHandler.AdminDeleteInstanceCatalog)
+	}
 	adminGroup.Put("/settings", adminHandler.UpdateSettings)
 	adminGroup.Post("/settings/validate", adminHandler.ValidateSettingsConnectivity)
 	adminGroup.Get("/invite-tokens", adminHandler.ListInviteTokens)
@@ -512,6 +543,27 @@ func run() error {
 	// ------------------------------
 	// Serve static files
 	app.Static("/static", "./static")
+
+	// Experimental WebXDC asset host
+	if cfg.Webxdc.Active(cfg.Server.Domain) {
+		if cfg.Webxdc.UsePathMode() {
+			log.Info().
+				Str("publicBaseURL", cfg.Webxdc.PublicBaseURL).
+				Msg("WebXDC path mode: packages at {publicBaseURL}/__webxdc/{id}/")
+			app.All(wxhost.PathModePrefix+"/:instanceId", webxdcHandler.ServeHostPath)
+			app.All(wxhost.PathModePrefix+"/:instanceId/*", webxdcHandler.ServeHostPath)
+		}
+		log.Info().
+			Str("baseDomain", cfg.Webxdc.BaseDomain).
+			Str("publicPort", cfg.Webxdc.PublicPort).
+			Msg("WebXDC subdomain hosts: webxdc-<id>.{baseDomain}")
+		app.Use(func(c *fiber.Ctx) error {
+			if _, ok := wxhost.ParseInstanceHost(c.Hostname(), cfg.Webxdc.BaseDomain); ok {
+				return webxdcHandler.ServeHost(c)
+			}
+			return c.Next()
+		})
+	}
 
 	// ------------------------------
 	// Serve frontend application using embedded files

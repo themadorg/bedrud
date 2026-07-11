@@ -42,6 +42,22 @@ sudo bedrud --json install --no-tls
 | `--lk-ip` | LiveKit node IP behind CDN |
 | `--cert-algorithm` | `ed25519`, `ecdsa256`, `rsa2048`, `rsa4096` |
 | `--json` | Result as JSON envelope |
+| `--webxdc` | **(planned)** Enable **experimental** WebXDC; writes `webxdc.enabled: true` |
+| `--no-webxdc` | **(planned)** Leave WebXDC disabled (default) |
+| `--webxdc-base-domain` | **(planned)** e.g. `wx.example.com` → hosts `webxdc-<id>.wx.example.com` |
+| `--webxdc-dns-ack` | **(planned)** Non-interactive: admin acknowledges DNS `*.{baseDomain}` → this server/proxy |
+
+**Domain required:** WebXDC is only offered if install has a **domain name** (`--domain` / interactive domain). **IP-only installs cannot enable WebXDC** (prompt skipped; `--webxdc` without domain errors).
+
+When a domain is set, interactive install will ask **Enable experimental WebXDC?** and, if yes:
+
+1. Ask for **base domain** (default `wx.<server.domain>`).
+2. **Require the admin to acknowledge** that they must add DNS:  
+   `*.<baseDomain>` (e.g. `*.wx.example.com`) **pointing to the same IP/target as the main Bedrud domain** (this machine or reverse proxy).
+3. Ensure TLS covers `*.{baseDomain}` (self-signed SAN, ACME DNS-01, or proxy cert) — main-site-only cert is not enough.
+4. Print a prominent post-install summary with the exact `*.…` record to create.
+
+Design: [WebXDC config & installer](../../plan/webxdc/10-config-and-installer.md).
 
 ---
 

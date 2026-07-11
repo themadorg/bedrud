@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bedrud WebXDC demo echo</title>
+    <!-- Host provides webxdc.js — do not ship it in the .xdc for production hosts -->
+    <script src="webxdc.js"></script>
+  </head>
+  <body>
+    <h1>Echo demo</h1>
+    <input id="input" type="text" placeholder="Type a message" />
+    <button type="button" id="send">Send</button>
+    <p id="output"></p>
+    <script>
+      document.getElementById('send').onclick = function () {
+        var msg = document.getElementById('input').value
+        window.webxdc.sendUpdate({ payload: msg }, '')
+      }
+      window.webxdc.setUpdateListener(function (update) {
+        document.getElementById('output').innerHTML +=
+          String(update.payload) + ' <small>#' + update.serial + '</small><br>'
+      }, 0)
+    </script>
+  </body>
+</html>

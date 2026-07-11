@@ -114,3 +114,21 @@ email:
   fromName: "Bedrud"   # Env: EMAIL_FROM_NAME
   tlsSkipVerify: false # Skip TLS cert validation for self-signed SMTP. Env: EMAIL_TLS_SKIP_VERIFY
   smtpsMode: false     # Direct TLS (SMTPS, port 465). Env: EMAIL_SMTPS_MODE
+
+# Experimental WebXDC mini-apps
+# Local make dev — subdomain hosts (recommended; browsers resolve *.localhost → 127.0.0.1):
+# webxdc:
+#   enabled: true
+#   baseDomain: "localhost"
+#   devPathMode: false
+#   publicPort: "7071"   # API port in iframe URL: http://webxdc-{id}.localhost:7071/
+#   uploadPolicy: owner_mod
+#   storageDir: "./data/webxdc"
+# Local path mode (no subdomains):
+#   devPathMode: true
+#   publicBaseURL: "http://localhost:7071"
+# Production (DNS *.{baseDomain} + TLS):
+# webxdc:
+#   enabled: true
+#   baseDomain: "wx.example.com"
+#   uploadPolicy: owner_mod

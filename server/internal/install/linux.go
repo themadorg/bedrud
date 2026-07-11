@@ -64,6 +64,11 @@ type installConfigYAML struct {
 		AllowedOrigins   string `yaml:"allowedOrigins"`
 		AllowCredentials bool   `yaml:"allowCredentials"`
 	} `yaml:"cors"`
+	Webxdc struct {
+		Enabled      bool   `yaml:"enabled"`
+		BaseDomain   string `yaml:"baseDomain,omitempty"`
+		UploadPolicy string `yaml:"uploadPolicy,omitempty"`
+	} `yaml:"webxdc"`
 }
 
 func LinuxInstall(cfg *InstallConfig) error {
@@ -249,6 +254,14 @@ func LinuxInstall(cfg *InstallConfig) error {
 
 	configYAML.CORS.AllowedOrigins = corsOrigins
 	configYAML.CORS.AllowCredentials = corsCredentials
+
+	if cfg.EnableWebxdc && cfg.Domain != "" && cfg.WebxdcBaseDomain != "" && cfg.WebxdcDNSAck {
+		configYAML.Webxdc.Enabled = true
+		configYAML.Webxdc.BaseDomain = cfg.WebxdcBaseDomain
+		configYAML.Webxdc.UploadPolicy = "owner_mod"
+	} else {
+		configYAML.Webxdc.Enabled = false
+	}
 
 	configData, err := yaml.Marshal(&configYAML)
 	if err != nil {
@@ -441,6 +454,14 @@ WantedBy=multi-user.target
 	if cfg.Domain != "" {
 		fmt.Println("  Domain URL: ", fmt.Sprintf("%s://%s", protocol, cfg.Domain))
 	}
+	if cfg.EnableWebxdc && configYAML.Webxdc.Enabled {
+		fmt.Println("  WebXDC:          enabled (experimental)")
+		fmt.Println("  WebXDC base:     ", cfg.WebxdcBaseDomain)
+		fmt.Println("  WebXDC DNS:      *."+cfg.WebxdcBaseDomain, "→ MUST point to this server / reverse proxy")
+		fmt.Println("  WebXDC TLS:      cert MUST cover *." + cfg.WebxdcBaseDomain)
+	} else {
+		fmt.Println("  WebXDC:          disabled")
+	}
 	fmt.Println("  LiveKit Host:", livekitPublicHost)
 	if !isExternalLK {
 		displayNodeIP := lkNodeIP
@@ -502,6 +523,51 @@ func promptConfig(r io.Reader, w io.Writer, cfg *InstallConfig) {
 		_, _ = fmt.Fscanln(r, &secure)
 		if secure == "" || secure == "y" || secure == "Y" {
 			cfg.EnableTLS = true
+		}
+	}
+
+	// Experimental WebXDC — domain required (not IP-only)
+	if cfg.Domain == "" {
+		fmt.Fprintln(w, "  WebXDC: skipped (requires a domain name; not available on IP-only installs)")
+		cfg.EnableWebxdc = false
+	} else if !cfg.EnableWebxdc {
+		fmt.Fprintf(w, "➜ Enable experimental WebXDC mini-apps in meetings? [y/N]:\n")
+		fmt.Fprintf(w, "  (Requires DNS *.<baseDomain> → this server/proxy, and a wildcard TLS cert)\n  ")
+		var yn string
+		_, _ = fmt.Fscanln(r, &yn)
+		if yn == "y" || yn == "Y" || yn == "yes" {
+			cfg.EnableWebxdc = true
+		}
+	}
+	if cfg.EnableWebxdc && cfg.Domain != "" {
+		if cfg.WebxdcBaseDomain == "" {
+			cfg.WebxdcBaseDomain = "wx." + cfg.Domain
+			fmt.Fprintf(w, "➜ WebXDC base domain [%s]: ", cfg.WebxdcBaseDomain)
+			var bd string
+			_, _ = fmt.Fscanln(r, &bd)
+			if strings.TrimSpace(bd) != "" {
+				cfg.WebxdcBaseDomain = strings.TrimSpace(bd)
+			}
+		}
+		fmt.Fprintln(w, "")
+		fmt.Fprintln(w, "╔══════════════════════════════════════════════════════════════════╗")
+		fmt.Fprintln(w, "║  WebXDC — REQUIRED DNS (do this now)                             ║")
+		fmt.Fprintln(w, "╠══════════════════════════════════════════════════════════════════╣")
+		fmt.Fprintf(w, "║  Add wildcard DNS:  *.%s\n", cfg.WebxdcBaseDomain)
+		fmt.Fprintln(w, "║  → same IP / target as your main Bedrud domain                   ║")
+		fmt.Fprintf(w, "║  TLS must cover:    *.%s\n", cfg.WebxdcBaseDomain)
+		fmt.Fprintln(w, "║  Without this, mini-apps will not load.                          ║")
+		fmt.Fprintln(w, "╚══════════════════════════════════════════════════════════════════╝")
+		if !cfg.WebxdcDNSAck {
+			fmt.Fprintf(w, "➜ Confirm: I will (or already did) point *.%s at this server/proxy [y/N]: ", cfg.WebxdcBaseDomain)
+			var ack string
+			_, _ = fmt.Fscanln(r, &ack)
+			if ack != "y" && ack != "Y" && ack != "yes" {
+				fmt.Fprintln(w, "  WebXDC left disabled (DNS not acknowledged).")
+				cfg.EnableWebxdc = false
+			} else {
+				cfg.WebxdcDNSAck = true
+			}
 		}
 	}
 }

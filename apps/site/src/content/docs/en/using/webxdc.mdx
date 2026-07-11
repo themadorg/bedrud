@@ -1,0 +1,71 @@
+---
+title: WebXDC mini-apps (experimental)
+description: Sandboxed collaborative mini-apps in meetings — enable, upload, and run .xdc packages
+order: 13
+---
+
+WebXDC packages (`.xdc`) are small collaborative web apps that run **inside a meeting**, sandboxed with **no internet access**. They talk only through the host `window.webxdc` API. Bedrud’s support is **experimental**.
+
+## Prerequisites (server)
+
+WebXDC cannot run on IP-only installs. The operator must:
+
+1. Set a real **`server.domain`**
+2. Enable in config:
+
+```yaml
+webxdc:
+  enabled: true
+  baseDomain: "wx.example.com"   # instances: webxdc-<id>.wx.example.com
+```
+
+3. DNS: **`*.wx.example.com`** (or your `baseDomain`) must point to the **same IP** as the main Bedrud site  
+4. TLS must cover **`*.{baseDomain}`** (not only the main hostname)
+
+Installer prompts for this when a domain is set. See self-host configuration for details.
+
+## Enable in the web app (user)
+
+1. Open **Settings → Experimental**
+2. Turn on **WebXDC mini-apps**
+3. If the switch is disabled, the **server** has not enabled WebXDC (or domain is missing)
+
+Both server config and this toggle are required.
+
+## App gallery (admin)
+
+Optional curated catalog. Configure under **Admin → Settings → WebXDC**:
+
+- **Enable app gallery**
+- **Catalog source** — local, remote, or both
+- **Remote catalog URL** — HTTPS catalog JSON or mirror base URL (overrides `webxdc.gallery.remoteCatalogURL` in config)
+- **Allow remote download** — server may fetch `.xdc` packages listed in the catalog (outbound from the server only)
+
+Gallery is separate from room upload and is off by default.
+
+## Use in a meeting
+
+1. Join a meeting  
+2. Open **Room info**  
+3. Under **Apps (experimental)**:
+   - **Upload** a `.xdc` file (room owner/moderator by default)
+   - **Start** a package  
+4. The mini-app runs in a sandboxed iframe on `webxdc-<id>.{baseDomain}`  
+
+Label: **Untrusted mini-app · experimental**
+
+## Meeting end cleanup
+
+Room-scoped packages, instances, and status logs are **temporary**. When the room is cleaned up / deleted, WebXDC data for that room is removed. Global gallery apps (if enabled later) are separate.
+
+## Security (short)
+
+- Mini-apps have no network (`connect-src 'none'`, sandbox, separate origin)
+- Host provides `webxdc.js` (never trust a copy inside the ZIP)
+- Status updates go through Bedrud (serial log + optional LiveKit fan-out)
+
+## Related
+
+- [Configuration](/en/docs/getting-started/configuration)
+- [CLI installer](/en/docs/getting-started/cli-installer)
+- [Account & settings](/en/docs/using/account-and-settings)

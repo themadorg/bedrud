@@ -4,6 +4,8 @@ package services
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"bedrud/internal/lkutil"
 	"bedrud/internal/models"
@@ -18,6 +20,8 @@ import (
 type RoomCleanupService struct {
 	roomRepo      *repository.RoomRepository
 	recordingRepo *repository.RecordingRepository
+	webxdcRepo    *repository.WebxdcRepository
+	webxdcDir     string
 	lkClient      livekit.RoomService
 	egressClient  livekit.Egress
 	apiKey        string
@@ -42,6 +46,12 @@ func NewRoomCleanupService(
 		apiSecret:     apiSecret,
 		uploadTracker: uploadTracker,
 	}
+}
+
+// SetWebxdcCleanup wires experimental WebXDC room cascade (optional).
+func (s *RoomCleanupService) SetWebxdcCleanup(repo *repository.WebxdcRepository, storageDir string) {
+	s.webxdcRepo = repo
+	s.webxdcDir = storageDir
 }
 
 func (s *RoomCleanupService) lkAuthContext(ctx context.Context) context.Context {
@@ -90,10 +100,33 @@ func (s *RoomCleanupService) CascadeDeleteRoom(ctx context.Context, room *models
 		}
 	}
 
+	if s.webxdcRepo != nil {
+		if err := s.cleanupWebxdc(room.ID); err != nil {
+			log.Warn().Err(err).Str("roomID", room.ID).Msg("failed to clean up webxdc data")
+		}
+	}
+
 	if err := s.roomRepo.HardDeleteRoom(room.ID); err != nil {
 		return fmt.Errorf("failed to hard-delete room from DB: %w", err)
 	}
 
+	return nil
+}
+
+func (s *RoomCleanupService) cleanupWebxdc(roomID string) error {
+	keys, err := s.webxdcRepo.DeleteAllForRoom(roomID)
+	if err != nil {
+		return err
+	}
+	for _, key := range keys {
+		if key == "" || s.webxdcDir == "" {
+			continue
+		}
+		path := filepath.Join(s.webxdcDir, key)
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			log.Warn().Err(err).Str("path", path).Msg("webxdc blob remove")
+		}
+	}
 	return nil
 }
 

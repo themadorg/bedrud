@@ -149,7 +149,7 @@ export function ChatImageLightbox({ url, onClose }: Props) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex flex-col bg-black/90"
+      className="app-fixed-viewport z-[100] flex flex-col bg-black/90"
       role="dialog"
       aria-modal="true"
       aria-label="Image preview"
@@ -160,12 +160,12 @@ export function ChatImageLightbox({ url, onClose }: Props) {
         if (e.key === 'Escape') onClose()
       }}
     >
-      <div className="absolute top-[calc(12px+env(safe-area-inset-top))] right-[calc(12px+env(safe-area-inset-right))] z-20 flex items-center gap-2">
+      <div className="absolute top-[max(12px,calc(12px+env(safe-area-inset-top,0px)))] end-[max(12px,calc(12px+env(safe-area-inset-right,0px)))] z-20 flex items-center gap-2">
         <button
           type="button"
           onClick={() => void downloadImage()}
           disabled={downloading}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/50 text-white/90 backdrop-blur-sm transition-colors hover:bg-black/70 hover:text-white disabled:opacity-50"
+          className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/15 bg-black/50 text-white/90 backdrop-blur-sm transition-colors hover:bg-black/70 hover:text-white disabled:opacity-50"
           aria-label="Download image"
         >
           <Download size={18} />
@@ -173,7 +173,7 @@ export function ChatImageLightbox({ url, onClose }: Props) {
         <button
           type="button"
           onClick={onClose}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/50 text-white/90 backdrop-blur-sm transition-colors hover:bg-black/70 hover:text-white"
+          className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/15 bg-black/50 text-white/90 backdrop-blur-sm transition-colors hover:bg-black/70 hover:text-white"
           aria-label="Close image preview"
         >
           <X size={20} />
@@ -205,12 +205,12 @@ export function ChatImageLightbox({ url, onClose }: Props) {
           src={url}
           alt="Chat attachment"
           draggable={false}
-          className="max-h-[85vh] max-w-[92vw] select-none object-contain"
+          className="max-h-[calc(var(--app-height,100svh)*0.85)] max-w-[calc(var(--app-width,100svw)*0.92)] select-none object-contain"
           style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
         />
       </div>
 
-      <div className="absolute bottom-[calc(16px+env(safe-area-inset-bottom))] left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-white/15 bg-black/50 p-1 backdrop-blur-sm">
+      <div className="absolute bottom-[max(16px,calc(16px+env(safe-area-inset-bottom,0px)))] left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-white/15 bg-black/50 p-1 backdrop-blur-sm">
         <button
           type="button"
           onClick={zoomOut}

@@ -22,6 +22,34 @@ cp server/config.local.yaml.example server/config.yaml
 
 ## Config Sections
 
+### `webxdc` (planned, **experimental**)
+
+Mini-apps in meetings. **Experimental and opt-in; default off.** APIs/config may change. Full design: [WebXDC plan — config & installer](../plan/webxdc/10-config-and-installer.md).
+
+| Field | Default | Env | Description |
+|-------|---------|-----|-------------|
+| `enabled` | `false` | `WEBXDC_ENABLED` | Master switch for experimental WebXDC |
+| `baseDomain` | — | `WEBXDC_BASE_DOMAIN` | Parent domain for instances: `webxdc-<id>.{baseDomain}` (requires DNS `*.{baseDomain}` + TLS) |
+| `uploadPolicy` | `owner_mod` | `WEBXDC_UPLOAD_POLICY` | Who may upload `.xdc` packages |
+| `gallery.enabled` | `false` | `WEBXDC_GALLERY_ENABLED` | Optional app gallery (also Admin → Settings → WebXDC) |
+| `gallery.remoteCatalogURL` | — | `WEBXDC_GALLERY_REMOTE_URL` | Catalog JSON/base URL; **admin-overridable** in System Settings |
+| `gallery.source` | `local` | — | `local` \| `remote` \| `both` |
+| `gallery.allowRemoteDownload` | `false` | — | Server may download `.xdc` from catalog URLs |
+
+**Requires a domain:** `webxdc.enabled: true` is invalid without `server.domain` (hostname). **IP-only installs cannot use WebXDC.**
+
+**Admin UI:** Gallery flags and the **remote catalog URL** are also stored in System Settings (`Admin → Settings → WebXDC`) and override empty config defaults after save.
+
+When enabled, operators **must**:
+
+1. Run with a real **`server.domain`** (not IP-only).
+2. Add DNS **`*.{baseDomain}`** (e.g. `*.wx.example.com`) pointing to the **same IP/target as the main Bedrud domain** (server or reverse proxy).
+3. Use TLS that covers **`*.{baseDomain}`** (not only the main hostname) — ACME DNS-01, proxy wildcard cert, or self-signed SAN.
+
+Installer only offers WebXDC when a domain was entered; it **explicitly instructs** the admin about the `*.` DNS record and wildcard cert. See [plan 10](../plan/webxdc/10-config-and-installer.md).
+
+API / tickets: [plan 11](../plan/webxdc/11-api-schema-and-tickets.md). Proxy sketches: [plan 12](../plan/webxdc/12-ui-rbac-lifecycle-ops.md).
+
 ### `server`
 
 HTTP listener, TLS, proxy, and capacity limits.

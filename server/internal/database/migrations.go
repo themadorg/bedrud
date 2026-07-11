@@ -122,6 +122,16 @@ func RunMigrations() error {
 		return err
 	}
 	// TODO oncoming feature
+	if err := db.AutoMigrate(&models.WebxdcPackage{}); err != nil {
+		return err
+	}
+	if err := db.AutoMigrate(&models.WebxdcInstance{}); err != nil {
+		return err
+	}
+	if err := db.AutoMigrate(&models.WebxdcStatusUpdate{}); err != nil {
+		return err
+	}
+
 	if err := db.AutoMigrate(&models.Recording{}); err != nil {
 		return err
 	}

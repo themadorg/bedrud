@@ -122,6 +122,52 @@ func mergeFromConfig(s *models.SystemSettings, cfg *config.Config) {
 		s.BehindProxy = cfg.Server.BehindProxy
 	}
 
+	// WebXDC gallery (DB non-empty/non-false wins; config fills defaults)
+	if s.WebxdcGalleryRemoteCatalogURL == "" && cfg.Webxdc.Gallery.RemoteCatalogURL != "" {
+		s.WebxdcGalleryRemoteCatalogURL = cfg.Webxdc.Gallery.RemoteCatalogURL
+	}
+	if s.WebxdcGallerySource == "" {
+		if cfg.Webxdc.Gallery.Source != "" {
+			s.WebxdcGallerySource = cfg.Webxdc.Gallery.Source
+		} else {
+			s.WebxdcGallerySource = "local"
+		}
+	}
+	// Note: booleans — if admin never saved gallery flags, seed from config when config enables gallery
+	if !s.WebxdcGalleryEnabled && cfg.Webxdc.Gallery.Enabled {
+		s.WebxdcGalleryEnabled = true
+	}
+	if !s.WebxdcGalleryAllowRemoteDownload && cfg.Webxdc.Gallery.AllowRemoteDownload {
+		s.WebxdcGalleryAllowRemoteDownload = true
+	}
+	// Size limits: 0 in DB means "use config.yaml". Surface config as MiB for the admin UI.
+	const mib = int64(1 << 20)
+	if s.WebxdcMaxArchiveMB <= 0 && cfg.Webxdc.MaxArchiveBytes > 0 {
+		s.WebxdcMaxArchiveMB = int(cfg.Webxdc.MaxArchiveBytes / mib)
+		if s.WebxdcMaxArchiveMB <= 0 {
+			s.WebxdcMaxArchiveMB = 10
+		}
+	}
+	if s.WebxdcMaxUncompressedMB <= 0 && cfg.Webxdc.MaxUncompressedTotal > 0 {
+		s.WebxdcMaxUncompressedMB = int(cfg.Webxdc.MaxUncompressedTotal / mib)
+		if s.WebxdcMaxUncompressedMB <= 0 {
+			s.WebxdcMaxUncompressedMB = 30
+		}
+	}
+	if s.WebxdcMaxSingleFileMB <= 0 && cfg.Webxdc.MaxSingleFileBytes > 0 {
+		s.WebxdcMaxSingleFileMB = int(cfg.Webxdc.MaxSingleFileBytes / mib)
+		if s.WebxdcMaxSingleFileMB <= 0 {
+			s.WebxdcMaxSingleFileMB = 5
+		}
+	}
+	if s.WebxdcMaxEntries <= 0 {
+		if cfg.Webxdc.MaxEntries > 0 {
+			s.WebxdcMaxEntries = cfg.Webxdc.MaxEntries
+		} else {
+			s.WebxdcMaxEntries = 500
+		}
+	}
+
 	// LiveKit
 	if s.LiveKitHost == "" {
 		s.LiveKitHost = cfg.LiveKit.Host

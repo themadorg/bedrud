@@ -1,6 +1,6 @@
 export const STAGE_DATA_TOPIC = 'stage'
 
-export type StageKind = 'youtube' | 'whiteboard' | 'screenshare'
+export type StageKind = 'youtube' | 'whiteboard' | 'screenshare' | 'webxdc'
 
 export type MeetingStage =
   | {
@@ -22,6 +22,15 @@ export type MeetingStage =
       kind: 'screenshare'
       ownerIdentity: string
       ownerName: string
+      updatedAt: number
+    }
+  | {
+      kind: 'webxdc'
+      ownerIdentity: string
+      ownerName: string
+      instanceId: string
+      packageId: string
+      name: string
       updatedAt: number
     }
 
@@ -83,6 +92,10 @@ export function parseMeetingStage(raw: unknown): MeetingStage | null {
       if (typeof stage.videoId !== 'string' || typeof stage.playing !== 'boolean') return null
       if (typeof stage.currentTime !== 'number') return null
       return stage as MeetingStage
+    case 'webxdc':
+      if (typeof stage.instanceId !== 'string' || typeof stage.packageId !== 'string') return null
+      if (typeof stage.name !== 'string' || !stage.instanceId) return null
+      return stage as MeetingStage
     case 'whiteboard':
     case 'screenshare':
       return stage as MeetingStage
@@ -99,7 +112,21 @@ export function stageSessionKey(stage: MeetingStage): string {
   if (stage.kind === 'youtube') {
     return `youtube:${stage.ownerIdentity}:${stage.videoId}:${stage.updatedAt}`
   }
+  if (stage.kind === 'webxdc') {
+    return `webxdc:${stage.instanceId}:${stage.updatedAt}`
+  }
   return `${stage.kind}:${stage.ownerIdentity}:${stage.updatedAt}`
+}
+
+/** Stable key for one share session (ignores playhead / rebroadcast updatedAt). */
+export function stageShareKey(stage: MeetingStage): string {
+  if (stage.kind === 'youtube') {
+    return `youtube:${stage.ownerIdentity}:${stage.videoId}`
+  }
+  if (stage.kind === 'webxdc') {
+    return `webxdc:${stage.instanceId}`
+  }
+  return `${stage.kind}:${stage.ownerIdentity}`
 }
 
 export function stageDescription(stage: MeetingStage): string {
@@ -111,5 +138,7 @@ export function stageDescription(stage: MeetingStage): string {
       return `${who} opened the shared whiteboard`
     case 'screenshare':
       return `${who} is presenting their screen on stage`
+    case 'webxdc':
+      return `${who} shared a mini-app on stage (${stage.name || 'WebXDC'})`
   }
 }

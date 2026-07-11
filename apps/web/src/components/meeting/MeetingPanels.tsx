@@ -15,11 +15,18 @@ interface MeetingPanelsProps {
   navigate: () => void
   chatOpen: boolean
   setChatOpen: (open: boolean | ((prev: boolean) => boolean)) => void
+  /** Remount elevated ChatPanel when opening from expanded WebXDC. */
+  chatSurfaceKey?: number
+  /** Reset chat dock to right when opened from meeting chrome (not WebXDC rail). */
+  onChatOpenFromToggle?: () => void
   chatStuck: boolean
   setChatStuck: (stuck: boolean) => void
+  chatSide?: 'left' | 'right'
+  chatElevated?: boolean
   videoSidebarOpen: boolean
   onToggleVideoSidebar: () => void
   infoOpen: boolean
+  infoElevated?: boolean
   onCloseInfo: () => void
   onToggleInfo: () => void
   participantsOpen: boolean
@@ -31,11 +38,16 @@ export function MeetingPanels({
   navigate,
   chatOpen,
   setChatOpen,
+  chatSurfaceKey = 0,
+  onChatOpenFromToggle,
   chatStuck,
   setChatStuck,
+  chatSide = 'right',
+  chatElevated = false,
   videoSidebarOpen,
   onToggleVideoSidebar,
   infoOpen,
+  infoElevated = false,
   onCloseInfo,
   onToggleInfo,
   participantsOpen,
@@ -53,7 +65,9 @@ export function MeetingPanels({
   const toggleChat = () => {
     setChatOpen((open) => {
       if (open && chatStuck) return true
-      return !open
+      const next = !open
+      if (next) onChatOpenFromToggle?.()
+      return next
     })
     onCloseParticipants()
     onCloseInfo()
@@ -104,6 +118,7 @@ export function MeetingPanels({
       )}
       {chatOpen && (
         <ChatPanel
+          key={chatElevated ? `chat-elevated-${chatSurfaceKey}` : 'chat-default'}
           onClose={closeChat}
           roomId={roomId}
           currentIdentity={currentIdentity}
@@ -115,9 +130,16 @@ export function MeetingPanels({
           reactToMessage={reactToMessage}
           stuck={chatStuck}
           onStuckChange={setChatStuck}
+          side={chatSide}
+          elevated={chatElevated}
         />
       )}
-      <RoomInfoPanel open={infoOpen} onOpenChange={(open) => !open && onCloseInfo()} roomId={roomId} />
+      <RoomInfoPanel
+        open={infoOpen}
+        onOpenChange={(open) => !open && onCloseInfo()}
+        roomId={roomId}
+        elevated={infoElevated}
+      />
       <ChatToastNotifier chatOpen={chatOpen} />
       <MeetingControls
         onNavigate={navigate}

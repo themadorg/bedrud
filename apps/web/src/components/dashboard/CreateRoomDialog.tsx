@@ -118,7 +118,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="gap-0 overflow-hidden border p-0 max-w-[calc(100vw-2rem)] sm:max-w-md">
+      <DialogContent className="gap-0 overflow-hidden border p-0 max-w-[calc(var(--app-width,100svw)-2rem)] sm:max-w-md">
         <DialogTitle className="sr-only">Create Room</DialogTitle>
         <DialogDescription className="sr-only">Configure and create a new room</DialogDescription>
         <form onSubmit={handleSubmit}>

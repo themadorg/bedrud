@@ -29,12 +29,12 @@ export function ChatPollResultsModal({ poll, open, onOpenChange, currentIdentity
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="meet-dialog max-h-[min(85vh,520px)] max-w-[min(92vw,380px)] gap-0 overflow-hidden p-0 shadow-2xl">
+      <DialogContent className="meet-dialog max-h-[min(calc(var(--app-height,100svh)*0.85),520px)] max-w-[min(380px,calc(var(--app-width,100svw)-2rem))] gap-0 overflow-hidden p-0 shadow-2xl">
         <DialogHeader className="border-b border-white/[0.08] px-4 py-3">
           <DialogTitle className="text-[15px] font-semibold text-white/90">Poll results</DialogTitle>
         </DialogHeader>
 
-        <div className="meet-scroll flex max-h-[min(60vh,400px)] flex-col gap-3 overflow-y-auto px-4 py-4">
+        <div className="meet-scroll flex max-h-[min(calc(var(--app-height,100svh)*0.6),400px)] flex-col gap-3 overflow-y-auto px-4 py-4">
           <p className="m-0 text-[14px] font-semibold leading-snug text-white/95">{poll.question}</p>
 
           <div className="flex flex-col gap-2.5">

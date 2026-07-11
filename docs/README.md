@@ -24,6 +24,15 @@ Documentation for the Bedrud monorepo. Use this index to find what you need.
 
 ---
 
+## Plans (in progress)
+
+| Document | Description |
+|----------|-------------|
+| [WebXDC plan](./plan/webxdc/README.md) | **Experimental** mini-apps: [config](./plan/webxdc/10-config-and-installer.md), [API](./plan/webxdc/11-api-schema-and-tickets.md), [UI/ops](./plan/webxdc/12-ui-rbac-lifecycle-ops.md), [gallery](./plan/webxdc/13-app-gallery.md) |
+| [Context clones](./../context/README.md) | Local refs: webxdc website + deltachat-desktop |
+
+---
+
 ## Server (Go backend)
 
 | Document | Description |
