@@ -49,12 +49,14 @@ jobs:
             exit 0
           fi
 
-          if git diff --name-only "$BASE" "$HEAD" | grep -E '^(apps/site/|server/|\.github/workflows/(ci|deploy-site)\.yml)' >/dev/null; then
+          # Landing/docs deploy when public site, repo docs/, or server (swagger) change.
+          # Product trees (apps/web, android, desktop) do not force a site deploy.
+          if git diff --name-only "$BASE" "$HEAD" | grep -E '^(apps/site/|docs/|server/|\.github/workflows/(ci|deploy-site)\.yml)' >/dev/null; then
             echo "site=true" >> "$GITHUB_OUTPUT"
-            echo "Relevant site/server paths changed — deploy site"
+            echo "Relevant site/docs/server paths changed — deploy site"
           else
             echo "site=false" >> "$GITHUB_OUTPUT"
-            echo "No apps/site or server changes — skip site deploy"
+            echo "No apps/site, docs/, or server changes — skip site deploy"
           fi
 
   build:

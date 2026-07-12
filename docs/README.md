@@ -20,7 +20,7 @@ Documentation for the Bedrud monorepo. Use this index to find what you need.
 | [Debugging](./developer/debugging.md) | Contributors | Common issues and fixes |
 | [Whiteboard Yjs sync](./developer/whiteboard-yjs.md) | Contributors | Excalidraw + Yjs over LiveKit in meeting rooms |
 | [Whiteboard multiplayer](./developer/whiteboard-multiplayer.md) | Contributors | Shared canvas, cursors, follow, element locks |
-| [CI/CD](./developer/ci.md) | Contributors | What runs in GitHub Actions |
+| [CI/CD pipelines](./developer/ci.md) | Contributors | Workflows, path filters, job deps, steps |
 
 ---
 

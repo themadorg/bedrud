@@ -77,6 +77,10 @@ jobs:
       android: ${{ steps.filter.outputs.android }}
       desktop: ${{ steps.filter.outputs.desktop }}
       docker: ${{ steps.filter.outputs.docker }}
+      server: ${{ steps.filter.outputs.server }}
+      web: ${{ steps.filter.outputs.web }}
+      # True if any product artifact job should run (not docs/-only).
+      product: ${{ steps.filter.outputs.product }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -116,11 +120,27 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - '.github/workflows/dev-nightly.yml'
+            server:
+              - 'server/**'
+              - '.github/workflows/dev-nightly.yml'
+            web:
+              - 'apps/web/**'
+              - '.github/workflows/dev-nightly.yml'
             # Docker image = Go server binary with *embedded meeting web UI* (apps/web).
-            # Does NOT include landing/docs (apps/site) — that is a separate GitHub Pages deploy.
+            # Does NOT include landing/docs (apps/site) or root docs/.
             docker:
               - 'server/**'
               - 'apps/web/**'
+              - 'Dockerfile'
+              - '.github/workflows/dev-nightly.yml'
+            # Any product release artifact (exclude pure docs/site-only pushes)
+            product:
+              - 'server/**'
+              - 'apps/web/**'
+              - 'apps/android/**'
+              - 'apps/desktop/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
               - 'Dockerfile'
               - '.github/workflows/dev-nightly.yml'
 
@@ -128,7 +148,8 @@ jobs:
   server-binary:
     name: Server – ${{ matrix.goos }}/${{ matrix.goarch }}
     runs-on: ubuntu-latest
-    needs: prepare
+    needs: [prepare, changes]
+    if: needs.changes.outputs.server == 'true' || needs.changes.outputs.docker == 'true'
     strategy:
       matrix:
         include:
@@ -636,7 +657,8 @@ jobs:
   web:
     name: Web Bundle
     runs-on: ubuntu-latest
-    needs: prepare
+    needs: [prepare, changes]
+    if: needs.changes.outputs.web == 'true'
     defaults:
       run:
         working-directory: apps/web
@@ -665,18 +687,27 @@ jobs:
     name: Publish ${{ needs.prepare.outputs.title }}
     runs-on: ubuntu-latest
     needs: [prepare, changes, server-binary, docker-debian, docker-distroless, android, desktop, web]
-    # Skipped native jobs must not block publish when their trees did not change.
+    # Docs-only / site-only pushes: product=false → skip release entirely.
+    # Skipped optional jobs must not block publish when their trees did not change.
     if: |
       always() &&
       !cancelled() &&
       needs.prepare.result == 'success' &&
       needs.changes.result == 'success' &&
-      needs.server-binary.result == 'success' &&
-      needs.web.result == 'success' &&
+      needs.changes.outputs.product == 'true' &&
+      (needs.server-binary.result == 'success' || needs.server-binary.result == 'skipped') &&
+      (needs.web.result == 'success' || needs.web.result == 'skipped') &&
       (needs.docker-debian.result == 'success' || needs.docker-debian.result == 'skipped') &&
       (needs.docker-distroless.result == 'success' || needs.docker-distroless.result == 'skipped') &&
       (needs.android.result == 'success' || needs.android.result == 'skipped') &&
-      (needs.desktop.result == 'success' || needs.desktop.result == 'skipped')
+      (needs.desktop.result == 'success' || needs.desktop.result == 'skipped') &&
+      (
+        needs.server-binary.result == 'success' ||
+        needs.web.result == 'success' ||
+        needs.android.result == 'success' ||
+        needs.desktop.result == 'success' ||
+        needs.docker-debian.result == 'success'
+      )
     steps:
       - uses: actions/checkout@v6
         with:
