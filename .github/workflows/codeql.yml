@@ -32,7 +32,7 @@ jobs:
           # Re-add once CodeQL ships support for it.
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
