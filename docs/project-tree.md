@@ -267,7 +267,6 @@ Do not edit manually; produced by `make build-site`.
 │   ├── ci.yml                       # Main CI (server, web, site, mobile, desktop)
 │   ├── release.yml                  # Release builds on version tags
 │   ├── deploy-site.yml              # GitHub Pages deploy
-│   ├── deploy-server.yml            # Server deployment
 │   ├── codeql.yml                   # Security scanning
 │   └── …                            # apt-repo, dnf-repo, pr-beta, dev-nightly
 ├── ISSUE_TEMPLATE/                  # Bug, feature, security, etc.
