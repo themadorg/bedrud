@@ -35,7 +35,7 @@ jobs:
     needs: check-secrets
     if: needs.check-secrets.outputs.has_gpg == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: packages
           fetch-depth: 0
