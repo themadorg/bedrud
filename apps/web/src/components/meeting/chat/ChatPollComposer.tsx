@@ -105,7 +105,7 @@ export function ChatPollComposer({ open, onOpenChange, onCreate, disabled }: Pro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="meet-dialog max-w-[min(92vw,360px)] gap-0 p-0 shadow-2xl">
+      <DialogContent className="meet-dialog max-w-[min(360px,calc(var(--app-width,100svw)-2rem))] gap-0 p-0 shadow-2xl">
         <DialogHeader className="border-b border-white/[0.08] px-4 py-3">
           <DialogTitle className="text-[15px] font-semibold text-white/90">Create poll</DialogTitle>
         </DialogHeader>

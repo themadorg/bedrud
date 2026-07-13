@@ -63,6 +63,25 @@ export interface SystemSettings {
   // TODO oncoming feature
   recordingMaxFileSizeMB: number
 
+  // Experimental WebXDC gallery (admin-configurable; requires webxdc.enabled + domain in config.yaml)
+  webxdcGalleryEnabled: boolean
+  /** Remote catalog JSON/base URL (e.g. store API or self-hosted mirror). */
+  webxdcGalleryRemoteCatalogUrl: string
+  /** local | remote | both | semi-remote */
+  webxdcGallerySource: string
+  /** If true, server may download .xdc from catalog entry URLs. */
+  webxdcGalleryAllowRemoteDownload: boolean
+  /** Admin-uploaded instance catalog packages (in addition to remote/semi-remote). */
+  webxdcGalleryInstanceCatalogEnabled: boolean
+  /** Max .xdc archive size in MiB (default 10). */
+  webxdcMaxArchiveMB: number
+  /** Max total uncompressed zip size in MiB (default 30). */
+  webxdcMaxUncompressedMB: number
+  /** Max single file inside .xdc in MiB (default 5) — usual "entry too large" limit. */
+  webxdcMaxSingleFileMB: number
+  /** Max files inside a .xdc package (default 500). */
+  webxdcMaxEntries: number
+
   /** Instance allows RNNoise WASM (off by default; not downloaded until enabled + selected). */
   rnnoiseEnabled: boolean
   /** Instance allows users to select Krisp (off by default; requires operator licensing). */

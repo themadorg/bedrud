@@ -501,6 +501,10 @@ func TestGuestJoinRoom_Success(t *testing.T) {
 		Name:     "Guest",
 		Accesses: []string{"user"},
 	}
+	// JWT secret required so guest-join can issue API tokens for WebXDC / room APIs.
+	config.SetForTest(&config.Config{
+		Auth: config.AuthConfig{JWTSecret: "guest-join-test-secret-key-32bytes!", TokenDuration: 1},
+	})
 	app, roomRepo := setupJoinTestApp(t, claims)
 
 	room, err := roomRepo.CreateRoom("owner", "guest-room", true, "standard", 0, &models.RoomSettings{})
@@ -525,6 +529,20 @@ func TestGuestJoinRoom_Success(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(respBody))
+	}
+	var payload map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["token"] == nil || payload["token"] == "" {
+		t.Fatal("expected LiveKit token")
+	}
+	// API tokens required for minting WebXDC capability tickets as guest.
+	if at, _ := payload["accessToken"].(string); at == "" {
+		t.Fatalf("expected accessToken for guest API auth, got %#v", payload)
+	}
+	if tokens, _ := payload["tokens"].(map[string]interface{}); tokens == nil || tokens["accessToken"] == "" {
+		t.Fatalf("expected tokens.accessToken, got %#v", payload["tokens"])
 	}
 }
 

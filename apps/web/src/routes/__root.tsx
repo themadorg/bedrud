@@ -5,6 +5,7 @@ import { IntlProvider } from 'react-intl'
 import { Toaster } from 'sonner'
 import { useAuthStore } from '#/lib/auth.store'
 import { applyTheme, useThemeStore } from '#/lib/theme.store'
+import { installVisualViewportCssVars } from '#/lib/visual-viewport'
 import enMessages from '#/locales/en.json'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import appCss from '../styles.css?url'
@@ -20,6 +21,34 @@ const themeScript = `
       (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     if (dark) document.documentElement.classList.add('dark');
   } catch(e) {}
+})();
+`
+
+// iOS Safari: layout 100vh is taller than the visible area when the toolbar is
+// shown. Publish visualViewport height/offset before paint so fixed modals fit.
+const viewportScript = `
+(function(){
+  function u(){
+    try {
+      var vv = window.visualViewport;
+      var h = vv ? vv.height : window.innerHeight;
+      var w = vv ? vv.width : window.innerWidth;
+      var t = vv ? vv.offsetTop : 0;
+      var l = vv ? vv.offsetLeft : 0;
+      var r = document.documentElement;
+      r.style.setProperty('--app-height', h + 'px');
+      r.style.setProperty('--app-width', w + 'px');
+      r.style.setProperty('--app-offset-top', t + 'px');
+      r.style.setProperty('--app-offset-left', l + 'px');
+    } catch(e) {}
+  }
+  u();
+  if (window.visualViewport) {
+    visualViewport.addEventListener('resize', u);
+    visualViewport.addEventListener('scroll', u);
+  }
+  window.addEventListener('resize', u);
+  window.addEventListener('orientationchange', u);
 })();
 `
 
@@ -42,7 +71,7 @@ export const Route = createRootRoute({
       { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
       { rel: 'manifest', href: '/manifest.json' },
     ],
-    scripts: [{ children: themeScript }],
+    scripts: [{ children: themeScript }, { children: viewportScript }],
   }),
   shellComponent: RootDocument,
 })
@@ -62,6 +91,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
+
+  // Keep --app-height / --app-offset-top in sync (iOS Safari toolbar).
+  useEffect(() => installVisualViewportCssVars(), [])
 
   // Restore session via HTTP-only cookie refresh.
   // Runs in the background — does NOT block initial render.

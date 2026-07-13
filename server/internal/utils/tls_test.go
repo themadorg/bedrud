@@ -729,9 +729,9 @@ func TestDetectCertAlgorithm_Ed25519(t *testing.T) {
 		t.Fatalf("generation failed: %v", err)
 	}
 
-	algo, err := detectCertAlgorithm(certFile)
+	algo, err := DetectCertAlgorithm(certFile)
 	if err != nil {
-		t.Fatalf("detectCertAlgorithm failed: %v", err)
+		t.Fatalf("DetectCertAlgorithm failed: %v", err)
 	}
 	if algo != KeyEd25519 {
 		t.Fatalf("expected KeyEd25519, got %s", algo)
@@ -747,9 +747,9 @@ func TestDetectCertAlgorithm_ECDSA256(t *testing.T) {
 		t.Fatalf("generation failed: %v", err)
 	}
 
-	algo, err := detectCertAlgorithm(certFile)
+	algo, err := DetectCertAlgorithm(certFile)
 	if err != nil {
-		t.Fatalf("detectCertAlgorithm failed: %v", err)
+		t.Fatalf("DetectCertAlgorithm failed: %v", err)
 	}
 	if algo != KeyECDSA256 {
 		t.Fatalf("expected KeyECDSA256, got %s", algo)
@@ -765,9 +765,9 @@ func TestDetectCertAlgorithm_RSA2048(t *testing.T) {
 		t.Fatalf("generation failed: %v", err)
 	}
 
-	algo, err := detectCertAlgorithm(certFile)
+	algo, err := DetectCertAlgorithm(certFile)
 	if err != nil {
-		t.Fatalf("detectCertAlgorithm failed: %v", err)
+		t.Fatalf("DetectCertAlgorithm failed: %v", err)
 	}
 	if algo != KeyRSA2048 {
 		t.Fatalf("expected KeyRSA2048, got %s", algo)
@@ -775,7 +775,7 @@ func TestDetectCertAlgorithm_RSA2048(t *testing.T) {
 }
 
 func TestDetectCertAlgorithm_FileNotFound(t *testing.T) {
-	_, err := detectCertAlgorithm("/nonexistent/cert.pem")
+	_, err := DetectCertAlgorithm("/nonexistent/cert.pem")
 	if err == nil {
 		t.Fatal("expected error for nonexistent cert")
 	}
@@ -791,7 +791,7 @@ func TestDetectCertAlgorithm_InvalidPEM(t *testing.T) {
 		t.Fatalf("failed to write: %v", err)
 	}
 
-	_, err := detectCertAlgorithm(certFile)
+	_, err := DetectCertAlgorithm(certFile)
 	if err == nil {
 		t.Fatal("expected error for invalid PEM")
 	}

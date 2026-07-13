@@ -15,7 +15,7 @@ bedrud/
 │   │   ├── auth/         AuthService, JWT, session store, OAuth (Goth)
 │   │   ├── database/     GORM init (SQLite/Postgres), auto-migrations
 │   │   ├── handlers/     HTTP route handlers (auth, rooms, users, admin, prefs)
-│   │   ├── install/      Debian systemd installer
+│   │   ├── install/      Linux installer + update/upgrade
 │   │   ├── livekit/      Embedded LK binary (embed.FS + subprocess mgmt)
 │   │   ├── lkutil/       Shared LiveKit helpers (NewClient, AuthContext, SendSystemMessage)
 │   │   ├── middleware/    JWT auth + RBAC middleware

@@ -24,6 +24,51 @@ type Config struct {
 	RateLimit RateLimitConfig `yaml:"rateLimit"`
 	Queue     QueueConfig     `yaml:"queue"`
 	Email     EmailConfig     `yaml:"email"`
+	// Webxdc is experimental mini-apps in meetings (opt-in; requires domain).
+	Webxdc WebxdcConfig `yaml:"webxdc"`
+}
+
+// WebxdcConfig controls experimental WebXDC mini-apps (default off).
+// Production: subdomain hosts webxdc-<id>.{baseDomain} + wildcard DNS/TLS.
+// Local make dev: set baseDomain to localhost and/or devPathMode: true so
+// packages serve at {publicBaseURL}/__webxdc/{id}/ (no wildcard DNS needed).
+type WebxdcConfig struct {
+	Enabled      bool   `yaml:"enabled" env:"WEBXDC_ENABLED"`
+	BaseDomain   string `yaml:"baseDomain" env:"WEBXDC_BASE_DOMAIN"`
+	UploadPolicy string `yaml:"uploadPolicy" env:"WEBXDC_UPLOAD_POLICY"` // owner_mod | any_member
+	// StorageDir holds package .xdc files on disk (default ./data/webxdc).
+	StorageDir string `yaml:"storageDir"`
+	// TicketTTLMinutes is capability ticket lifetime (default 10).
+	TicketTTLMinutes int `yaml:"ticketTTLMinutes"`
+	// DevPathMode serves assets under /__webxdc/{instanceId}/ on the API host
+	// instead of subdomains. Prefer false + baseDomain localhost for make dev
+	// (browsers resolve webxdc-*.localhost → 127.0.0.1). Env: WEBXDC_DEV_PATH_MODE
+	DevPathMode bool `yaml:"devPathMode" env:"WEBXDC_DEV_PATH_MODE"`
+	// PublicBaseURL is the absolute API origin for path-mode iframe URLs,
+	// e.g. http://localhost:7071. Env: WEBXDC_PUBLIC_BASE_URL
+	PublicBaseURL string `yaml:"publicBaseURL" env:"WEBXDC_PUBLIC_BASE_URL"`
+	// PublicPort is appended to subdomain iframe hosts when not 80/443
+	// (local: 7071 → http://webxdc-id.localhost:7071). Env: WEBXDC_PUBLIC_PORT
+	// Default: server.port when baseDomain is localhost.
+	PublicPort string `yaml:"publicPort" env:"WEBXDC_PUBLIC_PORT"`
+	// Limits
+	MaxArchiveBytes      int64 `yaml:"maxArchiveBytes"`
+	MaxUncompressedTotal int64 `yaml:"maxUncompressedTotal"`
+	MaxEntries           int   `yaml:"maxEntries"`
+	MaxSingleFileBytes   int64 `yaml:"maxSingleFileBytes"`
+	StatusLogMaxUpdates  int   `yaml:"statusLogMaxUpdates"`
+	SendUpdateMaxSize    int   `yaml:"sendUpdateMaxSize"`
+	SendUpdateIntervalMs int   `yaml:"sendUpdateIntervalMs"`
+	// Gallery is optional; default off.
+	Gallery WebxdcGalleryConfig `yaml:"gallery"`
+}
+
+type WebxdcGalleryConfig struct {
+	Enabled bool   `yaml:"enabled" env:"WEBXDC_GALLERY_ENABLED"`
+	Source  string `yaml:"source"` // local | remote | both
+	// RemoteCatalogURL is the catalog JSON/base URL (also admin-overridable in SystemSettings).
+	RemoteCatalogURL    string `yaml:"remoteCatalogURL" env:"WEBXDC_GALLERY_REMOTE_URL"`
+	AllowRemoteDownload bool   `yaml:"allowRemoteDownload"`
 }
 
 type ServerConfig struct {
@@ -610,9 +655,183 @@ func Load(configPath string) (*Config, error) {
 				config.Recording.CleanupIntervalHours = i
 			}
 		}
+
+		// WebXDC (experimental)
+		if v := os.Getenv("WEBXDC_ENABLED"); v != "" {
+			if b, err := strconv.ParseBool(v); err == nil {
+				config.Webxdc.Enabled = b
+			} else if envIsTruthy(v) {
+				config.Webxdc.Enabled = true
+			}
+		}
+		if v := os.Getenv("WEBXDC_BASE_DOMAIN"); v != "" {
+			config.Webxdc.BaseDomain = strings.TrimSpace(v)
+		}
+		if v := os.Getenv("WEBXDC_UPLOAD_POLICY"); v != "" {
+			config.Webxdc.UploadPolicy = strings.TrimSpace(v)
+		}
+		if v := os.Getenv("WEBXDC_DEV_PATH_MODE"); v != "" {
+			if b, err := strconv.ParseBool(v); err == nil {
+				config.Webxdc.DevPathMode = b
+			} else if envIsTruthy(v) {
+				config.Webxdc.DevPathMode = true
+			}
+		}
+		if v := os.Getenv("WEBXDC_PUBLIC_BASE_URL"); v != "" {
+			config.Webxdc.PublicBaseURL = strings.TrimSpace(v)
+		}
+		if v := os.Getenv("WEBXDC_PUBLIC_PORT"); v != "" {
+			config.Webxdc.PublicPort = strings.TrimSpace(v)
+		}
+		if v := os.Getenv("WEBXDC_GALLERY_ENABLED"); v != "" {
+			if b, err := strconv.ParseBool(v); err == nil {
+				config.Webxdc.Gallery.Enabled = b
+			}
+		}
+		config.Webxdc.applyDefaults()
+		// Defaults that depend on server.port
+		if config.Webxdc.PublicPort == "" && isLocalDevHost(config.Webxdc.BaseDomain) {
+			port := strings.TrimSpace(config.Server.Port)
+			if port == "" {
+				port = "7071"
+			}
+			config.Webxdc.PublicPort = port
+		}
+		if config.Webxdc.UsePathMode() && config.Webxdc.PublicBaseURL == "" {
+			port := strings.TrimSpace(config.Webxdc.PublicPort)
+			if port == "" {
+				port = strings.TrimSpace(config.Server.Port)
+			}
+			if port == "" {
+				port = "7071"
+			}
+			config.Webxdc.PublicBaseURL = "http://localhost:" + port
+		}
+		if err := config.Webxdc.Validate(config.Server.Domain); err != nil {
+			log.Warn().Err(err).Msg("webxdc config invalid; WebXDC subsystem will stay disabled")
+			config.Webxdc.Enabled = false
+		}
 	})
 
 	return config, loadErr
+}
+
+func (w *WebxdcConfig) applyDefaults() {
+	if w.UploadPolicy == "" {
+		w.UploadPolicy = "owner_mod"
+	}
+	if w.StorageDir == "" {
+		w.StorageDir = "./data/webxdc"
+	}
+	if w.TicketTTLMinutes <= 0 {
+		w.TicketTTLMinutes = 10
+	}
+	if w.MaxArchiveBytes <= 0 {
+		w.MaxArchiveBytes = 10 << 20
+	}
+	if w.MaxUncompressedTotal <= 0 {
+		w.MaxUncompressedTotal = 30 << 20
+	}
+	if w.MaxEntries <= 0 {
+		w.MaxEntries = 500
+	}
+	if w.MaxSingleFileBytes <= 0 {
+		w.MaxSingleFileBytes = 5 << 20
+	}
+	if w.StatusLogMaxUpdates <= 0 {
+		w.StatusLogMaxUpdates = 500
+	}
+	if w.SendUpdateMaxSize <= 0 {
+		w.SendUpdateMaxSize = 128000
+	}
+	if w.SendUpdateIntervalMs <= 0 {
+		w.SendUpdateIntervalMs = 10000
+	}
+	if w.Gallery.Source == "" {
+		w.Gallery.Source = "local"
+	}
+}
+
+// UsePathMode is true only when explicitly enabled (devPathMode: true).
+// Default local setup uses subdomains: webxdc-{id}.localhost:{port}.
+func (w *WebxdcConfig) UsePathMode() bool {
+	return w != nil && w.DevPathMode
+}
+
+func isLocalDevHost(s string) bool {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if i := strings.IndexByte(s, ':'); i >= 0 {
+		s = s[:i]
+	}
+	return s == "localhost" || s == "127.0.0.1" || strings.HasSuffix(s, ".localhost")
+}
+
+// Validate checks experimental WebXDC config. When disabled, always ok.
+func (w *WebxdcConfig) Validate(serverDomain string) error {
+	if !w.Enabled {
+		return nil
+	}
+	domain := strings.TrimSpace(serverDomain)
+	pathMode := w.UsePathMode()
+	if pathMode {
+		// Local make dev: allow localhost domain / baseDomain.
+		if domain == "" {
+			return fmt.Errorf("webxdc.enabled requires server.domain (use localhost for make dev)")
+		}
+		if looksLikeIP(domain) && !isLocalDevHost(domain) {
+			return fmt.Errorf("webxdc.enabled requires server.domain (hostname), not IP-only")
+		}
+	} else {
+		if domain == "" || looksLikeIP(domain) {
+			return fmt.Errorf("webxdc.enabled requires server.domain (hostname), not IP-only")
+		}
+	}
+	base := strings.TrimSpace(w.BaseDomain)
+	if base == "" {
+		return fmt.Errorf("webxdc.enabled requires webxdc.baseDomain (e.g. wx.example.com or localhost)")
+	}
+	if looksLikeIP(base) && !isLocalDevHost(base) {
+		return fmt.Errorf("webxdc.enabled requires webxdc.baseDomain (e.g. wx.example.com), not IP-only")
+	}
+	if w.UploadPolicy != "owner_mod" && w.UploadPolicy != "any_member" {
+		return fmt.Errorf("webxdc.uploadPolicy must be owner_mod or any_member")
+	}
+	return nil
+}
+
+// Active is true when WebXDC should run.
+func (w *WebxdcConfig) Active(serverDomain string) bool {
+	return w.Enabled && w.Validate(serverDomain) == nil
+}
+
+func looksLikeIP(s string) bool {
+	s = strings.TrimSpace(s)
+	if strings.Count(s, ".") == 3 {
+		parts := strings.Split(s, ".")
+		ok := true
+		for _, p := range parts {
+			if p == "" {
+				ok = false
+				break
+			}
+			for _, c := range p {
+				if c < '0' || c > '9' {
+					ok = false
+					break
+				}
+			}
+			if !ok {
+				break
+			}
+		}
+		if ok {
+			return true
+		}
+	}
+	if strings.Contains(s, ":") && !strings.Contains(s, ".") {
+		return !strings.ContainsAny(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	}
+	return false
 }
 
 // Get returns the loaded configuration.

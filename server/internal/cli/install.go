@@ -34,6 +34,7 @@ func newInstallCmd() *cobra.Command {
 			cfg.EnableTLS = (enableTLS || selfSigned) && !noTLS
 			cfg.SelfSigned = selfSigned && !noTLS
 			cfg.DisableTLS = noTLS
+			cfg.Version = Version
 
 			if err := install.LinuxInstall(&cfg); err != nil {
 				return fmt.Errorf("installation: %w", err)

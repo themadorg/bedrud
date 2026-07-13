@@ -93,10 +93,42 @@
     border-radius: 0 !important;
     box-sizing: border-box;
   }
+  /*
+   * Radius exceptions MUST live in this same @layer base block, after the * rule.
+   * Unlayered `border-radius: … !important` loses to layered !important (layer order
+   * reverses for important declarations).
+   * Tokens: --meet-*-radius in meeting.css.
+   */
+  .meet-controls-bar {
+    border-radius: var(--meet-controls-bar-radius) !important;
+  }
+  .meet-btn-leave {
+    border-radius: var(--meet-btn-leave-radius) !important;
+  }
+  .meet-gallery-app-icon {
+    border-radius: var(--meet-gallery-icon-radius) !important;
+  }
+  .meet-gallery-app-card {
+    border-radius: var(--meet-gallery-card-radius) !important;
+  }
+  .meet-avatar-circle {
+    border-radius: 50% !important;
+  }
   html,
   body,
   #app {
     min-height: 100%;
+  }
+  /*
+   * iOS Safari visual viewport (set by visual-viewport.ts + early head script).
+   * Never size full-screen fixed UI with bare 100vh/100vw — chrome clips edges.
+   * Prefer: width/height + left/top from --app-* vars (not inset-0 + 100vw).
+   */
+  :root {
+    --app-height: 100svh;
+    --app-width: 100svw;
+    --app-offset-top: 0px;
+    --app-offset-left: 0px;
   }
   body {
     background-color: var(--background);
@@ -106,6 +138,17 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+}
+
+/* Full-screen fixed layers that must stay inside the visible iOS Safari area */
+.app-fixed-viewport {
+  position: fixed;
+  top: var(--app-offset-top, 0px);
+  left: var(--app-offset-left, 0px);
+  width: var(--app-width, 100svw);
+  max-width: var(--app-width, 100svw);
+  height: var(--app-height, 100svh);
+  max-height: var(--app-height, 100svh);
 }
 
 /* ── Meeting Room ───────────────────────────────────────────────────────── */

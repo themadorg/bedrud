@@ -34,5 +34,6 @@ if [ ! -f /etc/bedrud/config.yaml ] || [ ! -f /etc/bedrud/livekit.yaml ]; then
     echo "Docs: https://themadorg.github.io/bedrud/getting-started/installation/"
 else
     echo ""
-    echo "Bedrud upgraded. Services livekit + bedrud were restarted if systemd is available."
+    echo "Bedrud package upgraded. Services livekit + bedrud were restarted if systemd is available."
+    echo "To run database/version migrations explicitly: sudo bedrud update --skip-binary"
 fi

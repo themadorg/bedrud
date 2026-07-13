@@ -94,6 +94,21 @@ tail -f /var/log/bedrud/bedrud.log
 journalctl -u bedrud -f
 ```
 
+## Updating
+
+Upgrade without wiping config or data:
+
+```bash
+# After placing a newer bedrud binary on the host
+sudo bedrud update
+# or
+sudo bedrud upgrade
+```
+
+This replaces the installed binary, runs database and version migrations if needed, refreshes init units, and restarts services. Secrets and `/etc/bedrud/config.yaml` are preserved.
+
+See [Updating](/ja/docs/getting-started/installation#updating) and [CLI Reference](/ja/docs/getting-started/cli-reference#update--upgrade).
+
 ## Uninstallation
 
 ```bash

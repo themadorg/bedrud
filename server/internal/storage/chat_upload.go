@@ -37,20 +37,25 @@ const (
 
 // ChatAttachment is the metadata returned after a successful upload.
 type ChatAttachment struct {
-	Kind   string `json:"kind"`
+	Kind   string `json:"kind"` // "image" | "file"
 	URL    string `json:"url"`
 	Mime   string `json:"mime"`
 	Size   int64  `json:"size"`
 	Width  int    `json:"w"`
 	Height int    `json:"h"`
+	// Name is the original filename for non-image file attachments (WebXDC sendToChat, etc.).
+	Name string `json:"name,omitempty"`
 	// StorageBackend is server-only for cleanup routing (disk/s3 both use /uploads/chat/).
 	StorageBackend string `json:"-"`
 }
 
-// ChatUploadStore handles persisting uploaded chat images.
+// ChatUploadStore handles persisting uploaded chat images and generic files.
 type ChatUploadStore interface {
-	// Store writes data under roomID/userID/{hash}{ext}.
+	// Store writes image data under roomID/userID/{hash}{ext} (image types only).
 	Store(roomID, userID string, data []byte) (*ChatAttachment, error)
+	// StoreNamed stores an image when possible; otherwise a generic file attachment
+	// with the sanitized original filename (for sendToChat / file-only chat).
+	StoreNamed(roomID, userID string, data []byte, filename string) (*ChatAttachment, error)
 }
 
 // ChatObjectKey is the relative storage key / URL suffix: room/user/hash.ext
@@ -154,6 +159,77 @@ func SniffMime(data []byte) (string, error) {
 	return mime, nil
 }
 
+// SanitizeChatFilename keeps a safe display name for file attachments.
+func SanitizeChatFilename(filename string) string {
+	base := filepath.Base(strings.ReplaceAll(filename, "\\", "/"))
+	base = strings.TrimSpace(base)
+	base = strings.Map(func(r rune) rune {
+		if r < 32 || r == 127 {
+			return -1
+		}
+		return r
+	}, base)
+	if base == "" || base == "." || base == ".." {
+		return "file.bin"
+	}
+	if len(base) > 120 {
+		// keep extension when truncating
+		ext := filepath.Ext(base)
+		stem := strings.TrimSuffix(base, ext)
+		if len(stem) > 100 {
+			stem = stem[:100]
+		}
+		base = stem + ext
+	}
+	return base
+}
+
+// SafeChatFileExt returns a short alphanumeric extension (with leading dot) or ".bin".
+func SafeChatFileExt(filename string) string {
+	ext := strings.ToLower(filepath.Ext(SanitizeChatFilename(filename)))
+	if ext == "" || len(ext) > 12 {
+		return ".bin"
+	}
+	for _, r := range ext[1:] {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') {
+			return ".bin"
+		}
+	}
+	return ext
+}
+
+// SniffFileMime returns a content-type for generic file storage (not image-restricted).
+func SniffFileMime(data []byte, filename string) string {
+	if mime, err := SniffMime(data); err == nil {
+		return mime
+	}
+	mime := http.DetectContentType(data)
+	if i := strings.Index(mime, ";"); i != -1 {
+		mime = strings.TrimSpace(mime[:i])
+	}
+	if mime == "" || mime == "application/octet-stream" {
+		// Prefer a better guess from extension for common text types.
+		switch SafeChatFileExt(filename) {
+		case ".txt", ".md", ".csv", ".log":
+			return "text/plain"
+		case ".json":
+			return "application/json"
+		case ".pdf":
+			return "application/pdf"
+		case ".zip", ".xdc":
+			return "application/zip"
+		case ".html", ".htm":
+			return "text/html"
+		case ".wasm":
+			return "application/wasm"
+		}
+	}
+	if mime == "" {
+		return "application/octet-stream"
+	}
+	return mime
+}
+
 // ContentHash returns a hex-encoded SHA256 of the data — used as filename.
 func ContentHash(data []byte) string {
 	h := sha256.Sum256(data)
@@ -195,27 +271,32 @@ func NewChatUploadStore(cfg *config.ChatUploadConfig) ChatUploadStore {
 
 type diskStore struct{ dir string }
 
+func (s *diskStore) writeBytes(roomID, userID, ext string, data []byte) (key string, err error) {
+	hash := ContentHash(data)
+	key = ChatObjectKey(roomID, userID, hash, ext)
+	path := filepath.Join(s.dir, filepath.FromSlash(key))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "", fmt.Errorf("failed to create upload dir: %w", err)
+	}
+	// Write only if not already present (content-addressed = idempotent).
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			return "", fmt.Errorf("failed to write upload: %w", err)
+		}
+	}
+	return key, nil
+}
+
 func (s *diskStore) Store(roomID, userID string, data []byte) (*ChatAttachment, error) {
 	mime, err := SniffMime(data)
 	if err != nil {
 		return nil, err
 	}
 	ext := allowedMimeTypes[mime]
-	hash := ContentHash(data)
-	key := ChatObjectKey(roomID, userID, hash, ext)
-
-	path := filepath.Join(s.dir, filepath.FromSlash(key))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return nil, fmt.Errorf("failed to create upload dir: %w", err)
+	key, err := s.writeBytes(roomID, userID, ext, data)
+	if err != nil {
+		return nil, err
 	}
-
-	// Write only if not already present (content-addressed = idempotent).
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if err := os.WriteFile(path, data, 0o644); err != nil {
-			return nil, fmt.Errorf("failed to write upload: %w", err)
-		}
-	}
-
 	w, h := imageDimensions(data)
 	return &ChatAttachment{
 		Kind:           "image",
@@ -224,6 +305,27 @@ func (s *diskStore) Store(roomID, userID string, data []byte) (*ChatAttachment, 
 		Size:           int64(len(data)),
 		Width:          w,
 		Height:         h,
+		StorageBackend: uploadBackendDisk,
+	}, nil
+}
+
+func (s *diskStore) StoreNamed(roomID, userID string, data []byte, filename string) (*ChatAttachment, error) {
+	if _, err := SniffMime(data); err == nil {
+		return s.Store(roomID, userID, data)
+	}
+	name := SanitizeChatFilename(filename)
+	ext := SafeChatFileExt(name)
+	mime := SniffFileMime(data, name)
+	key, err := s.writeBytes(roomID, userID, ext, data)
+	if err != nil {
+		return nil, err
+	}
+	return &ChatAttachment{
+		Kind:           "file",
+		URL:            "/uploads/chat/" + key,
+		Mime:           mime,
+		Size:           int64(len(data)),
+		Name:           name,
 		StorageBackend: uploadBackendDisk,
 	}, nil
 }
@@ -252,6 +354,25 @@ func (s *inlineStore) Store(roomID, userID string, data []byte) (*ChatAttachment
 	}, nil
 }
 
+func (s *inlineStore) StoreNamed(roomID, userID string, data []byte, filename string) (*ChatAttachment, error) {
+	if _, err := SniffMime(data); err == nil {
+		return s.Store(roomID, userID, data)
+	}
+	_, _ = roomID, userID
+	name := SanitizeChatFilename(filename)
+	mime := SniffFileMime(data, name)
+	encoded := base64.StdEncoding.EncodeToString(data)
+	dataURI := "data:" + mime + ";base64," + encoded
+	return &ChatAttachment{
+		Kind:           "file",
+		URL:            dataURI,
+		Mime:           mime,
+		Size:           int64(len(data)),
+		Name:           name,
+		StorageBackend: uploadBackendInline,
+	}, nil
+}
+
 // ─── Hybrid backend (inline if small, disk otherwise) ─────────────────────────
 
 type hybridStore struct {
@@ -264,6 +385,13 @@ func (s *hybridStore) Store(roomID, userID string, data []byte) (*ChatAttachment
 		return (&inlineStore{}).Store(roomID, userID, data)
 	}
 	return s.disk.Store(roomID, userID, data)
+}
+
+func (s *hybridStore) StoreNamed(roomID, userID string, data []byte, filename string) (*ChatAttachment, error) {
+	if int64(len(data)) < s.inlineMaxBytes {
+		return (&inlineStore{}).StoreNamed(roomID, userID, data, filename)
+	}
+	return s.disk.StoreNamed(roomID, userID, data, filename)
 }
 
 // ─── S3-compatible backend ─────────────────────────────────────────────────────
@@ -309,6 +437,34 @@ func (s *s3Store) Store(roomID, userID string, data []byte) (*ChatAttachment, er
 		Size:           int64(len(data)),
 		Width:          w,
 		Height:         h,
+		StorageBackend: uploadBackendS3,
+	}, nil
+}
+
+func (s *s3Store) StoreNamed(roomID, userID string, data []byte, filename string) (*ChatAttachment, error) {
+	if s.cfg.Endpoint == "" || s.cfg.Bucket == "" || s.cfg.AccessKey == "" {
+		return s.diskFallback.StoreNamed(roomID, userID, data, filename)
+	}
+	if s.inlineMaxBytes > 0 && int64(len(data)) < s.inlineMaxBytes {
+		return (&inlineStore{}).StoreNamed(roomID, userID, data, filename)
+	}
+	if _, err := SniffMime(data); err == nil {
+		return s.Store(roomID, userID, data)
+	}
+	name := SanitizeChatFilename(filename)
+	ext := SafeChatFileExt(name)
+	mime := SniffFileMime(data, name)
+	hash := ContentHash(data)
+	key := ChatObjectKey(roomID, userID, hash, ext)
+	if err := s.putObject(key, mime, data); err != nil {
+		return nil, fmt.Errorf("s3 upload failed: %w", err)
+	}
+	return &ChatAttachment{
+		Kind:           "file",
+		URL:            "/uploads/chat/" + key,
+		Mime:           mime,
+		Size:           int64(len(data)),
+		Name:           name,
 		StorageBackend: uploadBackendS3,
 	}, nil
 }

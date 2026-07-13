@@ -20,9 +20,15 @@ export function messagePreview(message: ChatMessage): string {
   const text = message.message.trim()
   if (text) parts.push(text)
   if (message.poll) parts.push(`Poll: ${message.poll.question}`)
-  if (message.attachments.some((att) => att.kind === 'image' || att.mime.startsWith('image/'))) {
-    parts.push('Image')
+  let hasImage = false
+  const fileNames: string[] = []
+  for (const att of message.attachments) {
+    if (att.kind === 'file') fileNames.push(att.name)
+    else hasImage = true
   }
+  if (hasImage) parts.push('Image')
+  if (fileNames.length === 1) parts.push(`File: ${fileNames[0]}`)
+  else if (fileNames.length > 1) parts.push(`${fileNames.length} files`)
   return parts.join(' · ') || 'Empty message'
 }
 
@@ -46,12 +52,12 @@ export function ChatMessageInfoModal({ message, senderName, open, onOpenChange, 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="meet-dialog max-h-[min(85vh,520px)] max-w-[min(92vw,380px)] gap-0 overflow-hidden p-0 shadow-2xl">
+      <DialogContent className="meet-dialog max-h-[min(calc(var(--app-height,100svh)*0.85),520px)] max-w-[min(380px,calc(var(--app-width,100svw)-2rem))] gap-0 overflow-hidden p-0 shadow-2xl">
         <DialogHeader className="border-b border-white/[0.08] px-4 py-3">
           <DialogTitle className="text-[15px] font-semibold text-white/90">Message info</DialogTitle>
         </DialogHeader>
 
-        <div className="meet-scroll flex max-h-[min(60vh,400px)] flex-col gap-4 overflow-y-auto px-4 py-4">
+        <div className="meet-scroll flex max-h-[min(calc(var(--app-height,100svh)*0.6),400px)] flex-col gap-4 overflow-y-auto px-4 py-4">
           <div className="flex flex-col gap-1">
             <span className="text-[11px] font-medium uppercase tracking-wide text-white/40">Sent by</span>
             <p className="m-0 text-[14px] font-semibold text-white/95">{senderName}</p>

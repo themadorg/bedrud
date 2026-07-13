@@ -148,7 +148,25 @@ export function validateLocalSettings(s: SystemSettings): Record<string, string>
     ['twitterRedirectUrl', s.twitterRedirectUrl],
     ['chatUploadS3Endpoint', s.chatUploadS3Endpoint],
     ['chatUploadS3PublicUrl', s.chatUploadS3PublicUrl],
+    ['webxdcGalleryRemoteCatalogUrl', s.webxdcGalleryRemoteCatalogUrl],
   ]
+
+  // WebXDC gallery source
+  if (s.webxdcGallerySource && !['local', 'remote', 'both', 'semi-remote'].includes(s.webxdcGallerySource)) {
+    errors.webxdcGallerySource = 'Must be local, semi-remote, remote, or both'
+  }
+  if (s.webxdcMaxArchiveMB != null && (s.webxdcMaxArchiveMB < 0 || s.webxdcMaxArchiveMB > 512)) {
+    errors.webxdcMaxArchiveMB = 'Must be 0–512 MiB'
+  }
+  if (s.webxdcMaxUncompressedMB != null && (s.webxdcMaxUncompressedMB < 0 || s.webxdcMaxUncompressedMB > 1024)) {
+    errors.webxdcMaxUncompressedMB = 'Must be 0–1024 MiB'
+  }
+  if (s.webxdcMaxSingleFileMB != null && (s.webxdcMaxSingleFileMB < 0 || s.webxdcMaxSingleFileMB > 256)) {
+    errors.webxdcMaxSingleFileMB = 'Must be 0–256 MiB'
+  }
+  if (s.webxdcMaxEntries != null && (s.webxdcMaxEntries < 0 || s.webxdcMaxEntries > 10000)) {
+    errors.webxdcMaxEntries = 'Must be 0–10000'
+  }
   for (const [name, val] of strictUrlFields) {
     if (!val) continue
     if (!isValidURL(val, false)) {

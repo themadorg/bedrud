@@ -23,6 +23,11 @@
   --meet-btn-leave-bg: #dc2626;
   --meet-btn-leave-fg: #ffffff;
   --meet-btn-leave-hover: #b91c1c;
+  /* Subtle chrome radii (global * zeros radius; @layer base exceptions use these) */
+  --meet-controls-bar-radius: 4px;
+  --meet-btn-leave-radius: 3px;
+  --meet-gallery-icon-radius: 8px;
+  --meet-gallery-card-radius: var(--meet-btn-leave-radius);
   --meet-tile-action-bg: rgba(23, 23, 23, 0.54);
   --meet-tile-action-fg: rgba(255, 255, 255, 0.94);
   --meet-tile-action-border: rgba(255, 255, 255, 0.14);

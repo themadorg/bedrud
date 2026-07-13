@@ -210,7 +210,8 @@ function LoginPage() {
       )}
 
       {/* Email/password form */}
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      {/* method=post: never serialize password into the URL if JS fails to intercept */}
+      <form method="post" action="#" onSubmit={handleSubmit} className="space-y-4" noValidate>
         <div className="space-y-1.5">
           <Label htmlFor="email">
             <FormattedMessage id="auth.login.email" defaultMessage="Email" />

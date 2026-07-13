@@ -25,10 +25,10 @@ bedrud/
 │   ├── config/          # Config structs + Load() + livekit example
 │   ├── internal/
 │   │   ├── auth/        # JWT, passkeys, OAuth, sessions
-│   │   ├── cli/         # Cobra commands (run, install, user, room, …)
+│   │   ├── cli/         # Cobra commands (run, install, update, user, room, …)
 │   │   ├── database/    # GORM init + migrations
 │   │   ├── handlers/    # Fiber HTTP handlers
-│   │   ├── install/     # bedrud install (systemd/OpenRC/SysV)
+│   │   ├── install/     # bedrud install/update (systemd/OpenRC/SysV)
 │   │   ├── livekit/     # Embedded LiveKit binary lifecycle
 │   │   ├── lkutil/      # LiveKit client helpers
 │   │   ├── middleware/  # Auth, RBAC, rate limits
@@ -49,7 +49,7 @@ bedrud/
 ## Directory Map
 
 ### `/cmd/bedrud`
-Production entrypoint: Cobra CLI (`run`, `install`, `user`, `room`, `config`, …).
+Production entrypoint: Cobra CLI (`run`, `install`, `update`/`upgrade`, `user`, `room`, `config`, …).
 
 ### `/cmd/server`
 Dev API process (Air). No full CLI surface; may differ slightly from prod route registration.
@@ -66,7 +66,7 @@ Dev API process (Air). No full CLI surface; may differ slightly from prod route 
 | `cli` | All management subcommands |
 | `database` | SQLite/Postgres connection, AutoMigrate |
 | `handlers` | HTTP: auth, rooms, admin, webhooks, LiveKit webhook, certs |
-| `install` | Linux installer |
+| `install` | Linux installer, in-place `update`/`upgrade` |
 | `livekit` | Extract/run embedded `livekit-server` |
 | `lkutil` | Shared LiveKit API helpers |
 | `middleware` | `Protected`, `RequireAccess`, rate limiters, email-verified gate |

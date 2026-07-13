@@ -51,11 +51,19 @@ export function ChatToastNotifier({ chatOpen }: ChatToastNotifierProps) {
   if (toasts.length === 0) return null
 
   return (
-    <div className="fixed top-[calc(68px+env(safe-area-inset-top))] right-[calc(16px+env(safe-area-inset-right))] z-50 flex flex-col gap-2 pointer-events-none">
+    <div
+      className="pointer-events-none fixed z-50 flex flex-col gap-2"
+      style={{
+        top: 'calc(var(--app-offset-top, 0px) + 68px + env(safe-area-inset-top, 0px))',
+        // Pin to the right edge of the *visual* viewport (not layout 100vw).
+        left: 'calc(var(--app-offset-left, 0px) + var(--app-width, 100svw) - 16px)',
+        transform: 'translateX(-100%)',
+      }}
+    >
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className="chat-toast flex flex-col gap-[5px] bg-[#0f0f1c]/96 rounded-[14px] px-4 py-[13px] shadow-[0_8px_28px_rgba(0,0,0,0.5)] backdrop-blur-lg max-w-[min(340px,calc(100vw-32px))]"
+          className="chat-toast flex max-w-[min(340px,calc(var(--app-width,100svw)-32px))] flex-col gap-[5px] rounded-[14px] bg-[#0f0f1c]/96 px-4 py-[13px] shadow-[0_8px_28px_rgba(0,0,0,0.5)] backdrop-blur-lg"
           style={{ border: '1px solid color-mix(in oklab, var(--primary) 35%, transparent)' }}
         >
           <span className="text-[13px] font-semibold text-teal-400">{toast.sender}</span>

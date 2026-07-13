@@ -17,7 +17,7 @@ interface UseFocusTrapOptions {
  * closes on Escape. Only active when `enabled` is true.
  */
 export function useFocusTrap(options: UseFocusTrapOptions) {
-  const ref = useRef<HTMLDivElement>(null)
+  const ref = useRef<HTMLElement | null>(null)
   const prevFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
@@ -38,6 +38,8 @@ export function useFocusTrap(options: UseFocusTrapOptions) {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
+        // Stop expanded WebXDC (window listener) from also collapsing on the same Escape.
+        e.stopPropagation()
         options.onClose()
         return
       }

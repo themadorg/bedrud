@@ -500,6 +500,55 @@ docker compose up -d
 
 ---
 
+## Updating
+
+Upgrade an existing server install **without** wiping config, secrets, certificates, or the database.
+
+`bedrud update` and `bedrud upgrade` are the same command.
+
+### Binary / release install
+
+```bash
+# 1. Get the new binary (example: installer without re-running setup)
+curl -fsSL https://bedrud.org/install.sh | bash -s -- --no-setup
+
+# 2. Apply binary + migrations + service restart
+sudo bedrud update
+```
+
+Or run the new release binary directly:
+
+```bash
+sudo ./bedrud update
+```
+
+### Package manager
+
+```bash
+# Debian / Ubuntu
+sudo apt update && sudo apt install --only-upgrade bedrud
+sudo bedrud update --skip-binary   # if postinst already restarted; still runs migrations
+
+# Fedora / RHEL
+sudo dnf upgrade bedrud
+sudo bedrud update --skip-binary
+```
+
+### What is preserved
+
+| Kept | Changed |
+|------|---------|
+| `/etc/bedrud/config.yaml` (secrets, domain, TLS paths) | Installed binary |
+| Certificates | Init service unit files (refreshed) |
+| SQLite/Postgres data | DB schema (AutoMigrate) |
+| Logs under `/var/log/bedrud` | `/var/lib/bedrud/version` |
+
+For a clean reinstall that regenerates secrets, use `sudo bedrud install --fresh` (destructive).
+
+Full CLI flags: [CLI Reference — update / upgrade](/es/docs/getting-started/cli-reference#update--upgrade).
+
+---
+
 ## Uninstallation
 
 To completely remove Bedrud:

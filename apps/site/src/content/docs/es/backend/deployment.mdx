@@ -18,6 +18,18 @@ The installer handles security automatically:
 - **Self-Signed Certs:** If no domain is provided, it generates a self-signed certificate so that the site still works over HTTPS. The server auto-renews the certificate daily when it's within 30 days of expiry. Use `bedrud cert renew` for manual renewal.
 - **Reverse Proxy:** The backend acts as a reverse proxy. It receives traffic on port 443 and sends `/livekit` requests to the internal media server.
 
+## Updating
+
+In-place upgrade (preserves config and database):
+
+```bash
+sudo bedrud update
+# alias:
+sudo bedrud upgrade
+```
+
+Replaces the binary with the running executable, runs versioned install migrations and DB AutoMigrate, refreshes init units, and restarts services. See [Updating](/es/docs/getting-started/installation#updating).
+
 ## Uninstallation
 
 If you need to remove Bedrud, you can run:

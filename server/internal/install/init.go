@@ -138,7 +138,7 @@ func buildServiceConfig(isExternalLK bool) serviceConfig {
 	cfg := serviceConfig{
 		HasLivekit:     !isExternalLK,
 		LivekitManaged: !isExternalLK,
-		ConfigPath:     "/etc/bedrud/config.yaml",
+		ConfigPath:     etcConfigPath,
 		Services:       []string{"bedrud"},
 	}
 	if cfg.HasLivekit {
@@ -218,22 +218,22 @@ func writeSystemdFiles(cfg *serviceConfig, lkService, serviceContent string) err
 }
 
 func printContainerInstructions() {
-	bin := "/usr/local/bin/bedrud"
-	if _, err := os.Stat("/usr/bin/bedrud"); err == nil {
-		bin = "/usr/bin/bedrud"
+	bin := binaryLocalPath
+	if _, err := os.Stat(binaryPackagePath); err == nil {
+		bin = binaryPackagePath
 	}
 	fmt.Println("\n⚠ Container environment detected (no init system).")
 	fmt.Println("  Service files were skipped — systemd/service commands won't work here.")
 	fmt.Println()
 	fmt.Println("  To start Bedrud (API; starts embedded LiveKit unless LIVEKIT_MANAGED=true):")
-	fmt.Printf("    %s run --config /etc/bedrud/config.yaml\n", bin)
+	fmt.Printf("    %s run --config %s\n", bin, etcConfigPath)
 	fmt.Println()
 	fmt.Println("  To run LiveKit separately (embedded binary):")
-	fmt.Printf("    %s --livekit --config /etc/bedrud/livekit.yaml\n", bin)
+	fmt.Printf("    %s --livekit --config %s\n", bin, etcLivekitPath)
 	fmt.Println()
 	fmt.Println("  To run in background:")
-	fmt.Printf("    nohup %s run --config /etc/bedrud/config.yaml \\\n", bin)
-	fmt.Println("      > /var/log/bedrud/bedrud.log 2>&1 &")
+	fmt.Printf("    nohup %s run --config %s \\\n", bin, etcConfigPath)
+	fmt.Printf("      > %s/bedrud.log 2>&1 &\n", varLogDir)
 	fmt.Println()
 	fmt.Println("  For proper service management, use the Docker image with --init")
 	fmt.Println("  or tini as PID 1.")

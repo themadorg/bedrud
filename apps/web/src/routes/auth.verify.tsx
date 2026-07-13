@@ -111,7 +111,7 @@ function ResendVerificationForm() {
   }
 
   return (
-    <form onSubmit={handleResend} className="space-y-3">
+    <form method="post" action="#" onSubmit={handleResend} className="space-y-3">
       <div className="space-y-1 text-left">
         <Label htmlFor="resend-email">Email address</Label>
         <div className="flex gap-2">

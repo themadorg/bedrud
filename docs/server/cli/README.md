@@ -46,7 +46,8 @@ See [global-flags.md](./global-flags.md) for JSON envelope format and config res
 
 | Command | Doc |
 |---------|-----|
-| `bedrud cert renew` | [cert.md](./cert.md) |
+| `bedrud certificate regenerate` | [cert.md](./cert.md) |
+| `bedrud cert renew` | [cert.md](./cert.md) (alias of certificate) |
 | `bedrud cert info` | [cert.md](./cert.md) |
 
 ### Users (`bedrud user …`)

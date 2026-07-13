@@ -1,12 +1,19 @@
 // TODO oncoming feature
 import { useConnectionState, useRoomContext } from '@livekit/components-react'
 import { ConnectionState } from 'livekit-client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { useRoomPublishReady } from '#/lib/livekit-publish'
 import { liveKitTransportModeLabel, useLiveKitTransportMode } from '#/lib/livekit-transport-type'
 import { cn } from '#/lib/utils'
 import { meetRightInsetClass, useMeetingUILayout } from '@/components/meeting/MeetingUILayoutContext'
+import {
+  formatMeetingClock,
+  formatMeetingElapsed,
+  getMeetingJoinedAtMs,
+  noteMeetingConnected,
+  noteMeetingDisconnected,
+} from '@/components/meeting/meetingSessionTime'
 
 interface MeetingHeaderProps {
   meetId: string
@@ -14,19 +21,6 @@ interface MeetingHeaderProps {
   sessionStartedAt?: number
   infoOpen?: boolean
   onToggleInfo?: () => void
-}
-
-function formatElapsed(ms: number): string {
-  const totalSec = Math.floor(ms / 1000)
-  const h = Math.floor(totalSec / 3600)
-  const m = Math.floor((totalSec % 3600) / 60)
-  const s = totalSec % 60
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
-
-function formatClock(now: Date): string {
-  return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
 /** Top-of-screen header showing connection status, room name, and elapsed time. */
@@ -46,18 +40,16 @@ export function MeetingHeader({ meetId, infoOpen = false, onToggleInfo }: Meetin
         ? 'P2P · chat'
         : 'Connecting chat'
     : String(state)
-  const joinTimeRef = useRef<number | null>(null)
   const [elapsed, setElapsed] = useState('00:00')
   const [showClock, setShowClock] = useState(false)
-  const [clockTime, setClockTime] = useState(() => formatClock(new Date()))
+  const [clockTime, setClockTime] = useState(() => formatMeetingClock(new Date()))
 
-  // Set join timestamp when first connected
+  // Set shared join timestamp when first connected
   useEffect(() => {
-    if (isConnected && joinTimeRef.current === null) {
-      joinTimeRef.current = Date.now()
-    }
-    if (!isConnected) {
-      joinTimeRef.current = null
+    if (isConnected) {
+      noteMeetingConnected()
+    } else {
+      noteMeetingDisconnected()
       setElapsed('00:00')
     }
   }, [isConnected])
@@ -66,8 +58,9 @@ export function MeetingHeader({ meetId, infoOpen = false, onToggleInfo }: Meetin
   useEffect(() => {
     if (!isConnected) return
     const id = setInterval(() => {
-      if (joinTimeRef.current !== null) {
-        setElapsed(formatElapsed(Date.now() - joinTimeRef.current))
+      const joined = getMeetingJoinedAtMs()
+      if (joined != null) {
+        setElapsed(formatMeetingElapsed(Date.now() - joined))
       }
     }, 1000)
     return () => clearInterval(id)
@@ -75,7 +68,7 @@ export function MeetingHeader({ meetId, infoOpen = false, onToggleInfo }: Meetin
 
   useEffect(() => {
     if (!showClock) return
-    const tick = () => setClockTime(formatClock(new Date()))
+    const tick = () => setClockTime(formatMeetingClock(new Date()))
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)

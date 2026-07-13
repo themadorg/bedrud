@@ -20,7 +20,7 @@ Load by task type. Routes to focused leaf skill.
 | queue, job, worker, scheduler, cron, background, async, cleanup service, room cleanup, chat upload storage, RecordingService, RecordingStore, process_recording, recording_delete, SMTP send (handler), dispatch webhook, avatar storage files | `bedrud-jobs` |
 | email template, Cerberus, HTML email, dark mode email, hybrid grid, email design, Outlook email, transactional email template | `bedrud-email-cerberus` |
 | embedded livekit, livekit binary, livekit server, TURN, TLS setup (LK), node IP, realtime, LIVEKIT_MANAGED, generateTempConfig | `bedrud-realtime` |
-| install, uninstall, debian, systemd, OpenRC, SysV, CLI user, promote, demote, roomcli, room list/close/suspend (CLI), TLS cert gen/renew, key gen, utils, outbound IP, safe I/O, invite-token CLI, config CLI, settings CLI, db migrate CLI | `bedrud-ops-cli` |
+| install, uninstall, update, upgrade, debian, systemd, OpenRC, SysV, CLI user, promote, demote, roomcli, room list/close/suspend (CLI), TLS cert gen/renew, key gen, utils, outbound IP, safe I/O, invite-token CLI, config CLI, settings CLI, db migrate CLI | `bedrud-ops-cli` |
 
 **Recording (backend):** Handlers + service + store + queue payloads are **shipped**; prod route/worker wiring may still be partial/commented. Route by concern:
 

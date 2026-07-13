@@ -44,6 +44,7 @@ import (
 	"bedrud/internal/services"
 	"bedrud/internal/storage"
 	"bedrud/internal/utils"
+	wxhost "bedrud/internal/webxdc"
 
 	root "bedrud"
 
@@ -323,6 +324,12 @@ func Run(configPath, version string) error {
 	// recordingService := services.NewRecordingService(settingsRepo, recordingRepo, roomRepo, egressClient, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret)
 	// recordingHandler := handlers.NewRecordingHandler(roomRepo, recordingService, recordingRepo, recordingStore)
 	cleanupSvc := services.NewRoomCleanupService(roomRepo, nil, lkClient, nil, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, uploadTracker)
+	webxdcRepo := repository.NewWebxdcRepository(database.GetDB())
+	if cfg.Webxdc.Active(cfg.Server.Domain) {
+		cleanupSvc.SetWebxdcCleanup(webxdcRepo, cfg.Webxdc.StorageDir)
+		log.Info().Str("baseDomain", cfg.Webxdc.BaseDomain).Msg("WebXDC experimental subsystem enabled")
+	}
+	webxdcHandler := handlers.NewWebxdcHandler(cfg, webxdcRepo, roomRepo).WithSettings(settingsRepo)
 
 	// Queue worker — runs async jobs for deletion, uploads, etc.
 	queueConcurrency := cfg.Queue.Concurrency
@@ -539,7 +546,29 @@ func Run(configPath, version string) error {
 	adminGroup.Post("/rooms/bulk/suspend", roomHandler.BulkSuspendRooms)
 	adminGroup.Post("/rooms/bulk/close", roomHandler.BulkCloseRooms)
 	api.Get("/auth/settings", adminHandler.GetPublicSettings)
+	api.Get("/webxdc/config", webxdcHandler.PublicConfig)
 	api.Get("/cert", certHandler.GetCert)
+
+	// Experimental WebXDC room APIs
+	if cfg.Webxdc.Active(cfg.Server.Domain) {
+		api.Get("/webxdc/gallery", append(requireAuth, webxdcHandler.ListGallery)...)
+		api.Get("/webxdc/packages/:id/icon", append(requireAuth, webxdcHandler.GetPackageIcon)...)
+		api.Post("/rooms/:roomId/webxdc/gallery/import", append(requireAuthMut, middleware.APIRateLimiter(cfg.RateLimit), webxdcHandler.ImportGalleryApp)...)
+		api.Post("/rooms/:roomId/webxdc/packages", append(requireAuthMut, middleware.APIRateLimiter(cfg.RateLimit), webxdcHandler.UploadPackage)...)
+		api.Get("/rooms/:roomId/webxdc/packages", append(requireAuth, webxdcHandler.ListPackages)...)
+		api.Post("/rooms/:roomId/webxdc/instances", append(requireAuthMut, middleware.APIRateLimiter(cfg.RateLimit), webxdcHandler.CreateInstance)...)
+		api.Get("/rooms/:roomId/webxdc/instances", append(requireAuth, webxdcHandler.ListInstances)...)
+		api.Post("/rooms/:roomId/webxdc/instances/:instanceId/ticket", append(requireAuthMut, webxdcHandler.MintTicket)...)
+		api.Post("/rooms/:roomId/webxdc/instances/:instanceId/close", append(requireAuthMut, webxdcHandler.CloseInstance)...)
+		api.Post("/rooms/:roomId/webxdc/instances/:instanceId/updates", append(requireAuthMut, middleware.APIRateLimiter(cfg.RateLimit), webxdcHandler.PostUpdate)...)
+		api.Get("/rooms/:roomId/webxdc/instances/:instanceId/updates", append(requireAuth, webxdcHandler.ListUpdates)...)
+		// Instance catalog (admin-uploaded packages shared across rooms)
+		adminGroup.Get("/webxdc/catalog", webxdcHandler.AdminListInstanceCatalog)
+		adminGroup.Post("/webxdc/catalog", middleware.APIRateLimiter(cfg.RateLimit), webxdcHandler.AdminUploadInstanceCatalog)
+		adminGroup.Get("/webxdc/catalog/:id/icon", webxdcHandler.AdminGetInstanceCatalogIcon)
+		adminGroup.Put("/webxdc/catalog/:id", webxdcHandler.AdminUpdateInstanceCatalog)
+		adminGroup.Delete("/webxdc/catalog/:id", webxdcHandler.AdminDeleteInstanceCatalog)
+	}
 	adminGroup.Get("/settings", adminHandler.GetSettings)
 	adminGroup.Put("/settings", adminHandler.UpdateSettings)
 	adminGroup.Post("/settings/send-test-email", adminHandler.SendTestEmail)
@@ -564,6 +593,29 @@ func Run(configPath, version string) error {
 	// LiveKit webhook (no app auth middleware — uses LiveKit's own JWT signature)
 	livekitWebhookHandler := handlers.NewLiveKitWebhookHandler(&cfg.LiveKit, roomRepo, recordingRepo, webhookRepo, database.GetDB())
 	api.Post("/livekit/webhook", livekitWebhookHandler.Handle)
+
+	// WebXDC asset host before SPA static files
+	if cfg.Webxdc.Active(cfg.Server.Domain) {
+		if cfg.Webxdc.UsePathMode() {
+			// Optional path mode: http://localhost:7071/__webxdc/{id}/…
+			log.Info().
+				Str("publicBaseURL", cfg.Webxdc.PublicBaseURL).
+				Msg("WebXDC path mode: packages at {publicBaseURL}/__webxdc/{id}/")
+			app.All(wxhost.PathModePrefix+"/:instanceId", webxdcHandler.ServeHostPath)
+			app.All(wxhost.PathModePrefix+"/:instanceId/*", webxdcHandler.ServeHostPath)
+		}
+		// Subdomain hosts: webxdc-<id>.{baseDomain}[:port] (local: *.localhost → 127.0.0.1)
+		log.Info().
+			Str("baseDomain", cfg.Webxdc.BaseDomain).
+			Str("publicPort", cfg.Webxdc.PublicPort).
+			Msg("WebXDC subdomain hosts: webxdc-<id>.{baseDomain}")
+		app.Use(func(c *fiber.Ctx) error {
+			if _, ok := wxhost.ParseInstanceHost(c.Hostname(), cfg.Webxdc.BaseDomain); ok {
+				return webxdcHandler.ServeHost(c)
+			}
+			return c.Next()
+		})
+	}
 
 	app.Use("/", filesystem.New(filesystem.Config{Root: http.FS(root.UI), PathPrefix: "frontend"}))
 

@@ -25,3 +25,8 @@ export function DeafenHeadphonesIcon({ size, off = false, className }: DeafenHea
     </span>
   )
 }
+
+/** @deprecated Alias kept so stale HMR bundles that still call RailDeafenIcon do not crash. */
+export function RailDeafenIcon({ off = false, className }: { off?: boolean; className?: string }) {
+  return <DeafenHeadphonesIcon size={16} off={off} className={cn('h-4 w-4', className)} />
+}

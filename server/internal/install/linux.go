@@ -64,6 +64,11 @@ type installConfigYAML struct {
 		AllowedOrigins   string `yaml:"allowedOrigins"`
 		AllowCredentials bool   `yaml:"allowCredentials"`
 	} `yaml:"cors"`
+	Webxdc struct {
+		Enabled      bool   `yaml:"enabled"`
+		BaseDomain   string `yaml:"baseDomain,omitempty"`
+		UploadPolicy string `yaml:"uploadPolicy,omitempty"`
+	} `yaml:"webxdc"`
 }
 
 func LinuxInstall(cfg *InstallConfig) error {
@@ -100,17 +105,17 @@ func LinuxInstall(cfg *InstallConfig) error {
 		fmt.Println("➜ Using Domain:", cfg.Domain)
 	}
 
-	if err := os.MkdirAll("/etc/bedrud", 0o755); err != nil {
-		return fmt.Errorf("failed to create /etc/bedrud: %w", err)
+	if err := os.MkdirAll(etcDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create %s: %w", etcDir, err)
 	}
-	if err := os.MkdirAll("/var/lib/bedrud", 0o755); err != nil {
-		return fmt.Errorf("failed to create /var/lib/bedrud: %w", err)
+	if err := os.MkdirAll(varLibDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create %s: %w", varLibDir, err)
 	}
-	if err := os.MkdirAll("/var/lib/bedrud/certs", 0o750); err != nil {
-		return fmt.Errorf("failed to create /var/lib/bedrud/certs: %w", err)
+	if err := os.MkdirAll(varLibDir+"/certs", 0o750); err != nil {
+		return fmt.Errorf("failed to create %s/certs: %w", varLibDir, err)
 	}
-	if err := os.MkdirAll("/var/log/bedrud", 0o755); err != nil {
-		return fmt.Errorf("failed to create /var/log/bedrud: %w", err)
+	if err := os.MkdirAll(varLogDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create %s: %w", varLogDir, err)
 	}
 
 	if err := createBedrudUser(); err != nil {
@@ -120,36 +125,25 @@ func LinuxInstall(cfg *InstallConfig) error {
 	// 1. Stop existing services and remove standalone binary to avoid ETXTBSY
 	fmt.Println("➜ Stopping existing services...")
 	stopAllInitSystems([]string{"bedrud", "livekit"})
-	_ = os.Remove("/usr/local/bin/bedrud")
+	_ = os.Remove(binaryLocalPath)
 
 	// Chown directories to bedrud:bedrud
-	for _, dir := range []string{"/etc/bedrud", "/var/lib/bedrud", "/var/log/bedrud"} {
-		if out, err := exec.Command("chown", "-R", "bedrud:bedrud", dir).CombinedOutput(); err != nil {
-			return fmt.Errorf("failed to chown %s: %s %w", dir, string(out), err)
+	for _, dir := range []string{etcDir, varLibDir, varLogDir} {
+		if err := runChownR("bedrud:bedrud", dir); err != nil {
+			return err
 		}
 	}
 
 	// 2. Install Bedrud Binary
 	// Prefer package path (/usr/bin) when dpkg/rpm already placed the binary there
 	// so apt/dnf upgrades keep working and we don't maintain a second copy.
-	bedrudBin := "/usr/local/bin/bedrud"
-	if _, err := os.Stat("/usr/bin/bedrud"); err == nil {
-		bedrudBin = "/usr/bin/bedrud"
+	bedrudBin := binaryLocalPath
+	if _, err := os.Stat(binaryPackagePath); err == nil {
+		bedrudBin = binaryPackagePath
 		fmt.Println("➜ Using package binary at", bedrudBin)
 	} else {
-		selfBytes, err := os.ReadFile("/proc/self/exe")
-		if err != nil {
-			execPath, errFallback := os.Executable()
-			if errFallback != nil {
-				return fmt.Errorf("failed to get executable path: %w", errFallback)
-			}
-			selfBytes, err = os.ReadFile(execPath)
-		}
-		if err != nil || len(selfBytes) == 0 {
-			return fmt.Errorf("failed to read current binary for installation: %w", err)
-		}
-		if err := os.WriteFile(bedrudBin, selfBytes, 0o755); err != nil {
-			return fmt.Errorf("failed to install binary to %s: %w", bedrudBin, err)
+		if err := installSelfBinary(bedrudBin); err != nil {
+			return err
 		}
 		fmt.Println("➜ Installed binary to", bedrudBin)
 	}
@@ -166,11 +160,11 @@ func LinuxInstall(cfg *InstallConfig) error {
 
 	certFile := cfg.CertPath
 	if certFile == "" {
-		certFile = "/etc/bedrud/cert.pem"
+		certFile = etcDir + "/cert.pem"
 	}
 	keyFile := cfg.KeyPath
 	if keyFile == "" {
-		keyFile = "/etc/bedrud/key.pem"
+		keyFile = etcDir + "/key.pem"
 	}
 
 	hostForLK := cfg.OverrideIP
@@ -225,7 +219,7 @@ func LinuxInstall(cfg *InstallConfig) error {
 	}
 
 	configYAML.Database.Type = "sqlite"
-	configYAML.Database.Path = "/var/lib/bedrud/bedrud.db"
+	configYAML.Database.Path = varLibDir + "/bedrud.db"
 
 	configYAML.LiveKit.Host = livekitPublicHost
 	configYAML.LiveKit.InternalHost = fmt.Sprintf("http://%s:%s", loopbackIPv4, cfg.LKPort)
@@ -235,7 +229,7 @@ func LinuxInstall(cfg *InstallConfig) error {
 	configYAML.LiveKit.APIKey = apiKey
 	configYAML.LiveKit.APISecret = apiSecret
 	if !isExternalLK {
-		configYAML.LiveKit.ConfigPath = "/etc/bedrud/livekit.yaml"
+		configYAML.LiveKit.ConfigPath = etcLivekitPath
 	}
 	configYAML.LiveKit.SkipTLSVerify = true
 	configYAML.LiveKit.External = isExternalLK || hasSeparateLKDomain
@@ -245,19 +239,27 @@ func LinuxInstall(cfg *InstallConfig) error {
 	configYAML.Auth.TokenDuration = 24
 
 	configYAML.Logger.Level = "debug"
-	configYAML.Logger.OutputPath = "/var/log/bedrud/bedrud.log"
+	configYAML.Logger.OutputPath = varLogDir + "/bedrud.log"
 
 	configYAML.CORS.AllowedOrigins = corsOrigins
 	configYAML.CORS.AllowCredentials = corsCredentials
+
+	if cfg.EnableWebxdc && cfg.Domain != "" && cfg.WebxdcBaseDomain != "" && cfg.WebxdcDNSAck {
+		configYAML.Webxdc.Enabled = true
+		configYAML.Webxdc.BaseDomain = cfg.WebxdcBaseDomain
+		configYAML.Webxdc.UploadPolicy = "owner_mod"
+	} else {
+		configYAML.Webxdc.Enabled = false
+	}
 
 	configData, err := yaml.Marshal(&configYAML)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config.yaml: %w", err)
 	}
-	if err := os.WriteFile("/etc/bedrud/config.yaml", configData, 0o600); err != nil {
+	if err := os.WriteFile(etcConfigPath, configData, 0o600); err != nil {
 		return fmt.Errorf("failed to write config.yaml: %w", err)
 	}
-	_ = exec.Command("chown", "bedrud:bedrud", "/etc/bedrud/config.yaml").Run()
+	_ = runChown("bedrud:bedrud", etcConfigPath)
 
 	// 3. Create LiveKit Config
 	if !isExternalLK {
@@ -320,14 +322,14 @@ func LinuxInstall(cfg *InstallConfig) error {
 		if err != nil {
 			return fmt.Errorf("failed to marshal livekit.yaml: %w", err)
 		}
-		if err := os.WriteFile("/etc/bedrud/livekit.yaml", lkData, 0o600); err != nil {
+		if err := os.WriteFile(etcLivekitPath, lkData, 0o600); err != nil {
 			return fmt.Errorf("failed to write livekit.yaml: %w", err)
 		}
-		_ = exec.Command("chown", "bedrud:bedrud", "/etc/bedrud/livekit.yaml").Run()
+		_ = runChown("bedrud:bedrud", etcLivekitPath)
 	}
 
 	if cfg.EnableTLS && cfg.CertPath == "" && cfg.KeyPath == "" {
-		cp, kp := "/etc/bedrud/cert.pem", "/etc/bedrud/key.pem"
+		cp, kp := etcDir+"/cert.pem", etcDir+"/key.pem"
 		if _, err := os.Stat(cp); os.IsNotExist(err) {
 			hosts := []string{"localhost", loopbackIPv4, loopbackIPv6}
 			if cfg.OverrideIP != "" && cfg.OverrideIP != loopbackIPv4 && cfg.OverrideIP != "localhost" {
@@ -347,83 +349,14 @@ func LinuxInstall(cfg *InstallConfig) error {
 	}
 
 	// 4. Detect init system and install services
-	initSystem := detectInitSystem()
-	fmt.Println("➜ Detected init system:", initSystem)
+	if err := refreshServices(bedrudBin, isExternalLK); err != nil {
+		return err
+	}
 
-	if initSystem == InitSystemNone {
-		fmt.Println("➜ Skipping service file installation (container environment)")
-	} else {
-		serviceCfg := buildServiceConfig(isExternalLK)
-		cleanupStaleServiceFiles(initSystem)
-
-		lkManagedEnv := ""
-		bedrudAfter := "network.target"
-		if !isExternalLK {
-			lkManagedEnv = "\nEnvironment=LIVEKIT_MANAGED=true"
-			bedrudAfter = "network.target livekit.service"
-		}
-
-		lkService := fmt.Sprintf(`[Unit]
-Description=Bedrud LiveKit Media Server (embedded)
-Documentation=https://docs.bedrud.com
-After=network.target network-online.target
-Wants=network-online.target
-
-[Service]
-User=bedrud
-Group=bedrud
-Type=simple
-ExecStart=%s --livekit --config /etc/bedrud/livekit.yaml
-Restart=on-failure
-RestartSec=5s
-WorkingDirectory=/etc/bedrud
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=livekit
-
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ReadWritePaths=/var/lib/bedrud /var/log/bedrud /etc/bedrud /tmp
-
-[Install]
-WantedBy=multi-user.target
-`, bedrudBin)
-
-		serviceContent := fmt.Sprintf(`[Unit]
-Description=Bedrud Video Meeting Server
-Documentation=https://docs.bedrud.com
-After=%s network-online.target
-Wants=network-online.target
-
-[Service]
-User=bedrud
-Group=bedrud
-Type=simple
-ExecStart=%s run --config /etc/bedrud/config.yaml
-Restart=on-failure
-RestartSec=5s
-Environment=CONFIG_PATH=/etc/bedrud/config.yaml%s
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=bedrud
-
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ReadWritePaths=/var/lib/bedrud /var/log/bedrud /etc/bedrud
-
-[Install]
-WantedBy=multi-user.target
-`, bedrudAfter, bedrudBin, lkManagedEnv)
-
-		if err := writeServiceFiles(initSystem, &serviceCfg, bedrudBin, bedrudAfter, lkManagedEnv, lkService, serviceContent); err != nil {
-			return fmt.Errorf("failed to write service files: %w", err)
-		}
-
-		fmt.Println("➜ Enabling and starting services...")
-		if err := enableAndStartServices(initSystem, &serviceCfg); err != nil {
-			return fmt.Errorf("failed to enable/start services: %w", err)
+	// Record installed version when known (CLI may set InstallConfig.Version).
+	if cfg.Version != "" {
+		if err := writeInstalledVersion(cfg.Version); err != nil {
+			fmt.Printf("⚠ Warning: could not write version file: %v\n", err)
 		}
 	}
 
@@ -440,6 +373,14 @@ WantedBy=multi-user.target
 	fmt.Println("  Access URL: ", accessURL)
 	if cfg.Domain != "" {
 		fmt.Println("  Domain URL: ", fmt.Sprintf("%s://%s", protocol, cfg.Domain))
+	}
+	if cfg.EnableWebxdc && configYAML.Webxdc.Enabled {
+		fmt.Println("  WebXDC:          enabled (experimental)")
+		fmt.Println("  WebXDC base:     ", cfg.WebxdcBaseDomain)
+		fmt.Println("  WebXDC DNS:      *."+cfg.WebxdcBaseDomain, "→ MUST point to this server / reverse proxy")
+		fmt.Println("  WebXDC TLS:      cert MUST cover *." + cfg.WebxdcBaseDomain)
+	} else {
+		fmt.Println("  WebXDC:          disabled")
 	}
 	fmt.Println("  LiveKit Host:", livekitPublicHost)
 	if !isExternalLK {
@@ -504,6 +445,51 @@ func promptConfig(r io.Reader, w io.Writer, cfg *InstallConfig) {
 			cfg.EnableTLS = true
 		}
 	}
+
+	// Experimental WebXDC — domain required (not IP-only)
+	if cfg.Domain == "" {
+		fmt.Fprintln(w, "  WebXDC: skipped (requires a domain name; not available on IP-only installs)")
+		cfg.EnableWebxdc = false
+	} else if !cfg.EnableWebxdc {
+		fmt.Fprintf(w, "➜ Enable experimental WebXDC mini-apps in meetings? [y/N]:\n")
+		fmt.Fprintf(w, "  (Requires DNS *.<baseDomain> → this server/proxy, and a wildcard TLS cert)\n  ")
+		var yn string
+		_, _ = fmt.Fscanln(r, &yn)
+		if yn == "y" || yn == "Y" || yn == "yes" {
+			cfg.EnableWebxdc = true
+		}
+	}
+	if cfg.EnableWebxdc && cfg.Domain != "" {
+		if cfg.WebxdcBaseDomain == "" {
+			cfg.WebxdcBaseDomain = "wx." + cfg.Domain
+			fmt.Fprintf(w, "➜ WebXDC base domain [%s]: ", cfg.WebxdcBaseDomain)
+			var bd string
+			_, _ = fmt.Fscanln(r, &bd)
+			if strings.TrimSpace(bd) != "" {
+				cfg.WebxdcBaseDomain = strings.TrimSpace(bd)
+			}
+		}
+		fmt.Fprintln(w, "")
+		fmt.Fprintln(w, "╔══════════════════════════════════════════════════════════════════╗")
+		fmt.Fprintln(w, "║  WebXDC — REQUIRED DNS (do this now)                             ║")
+		fmt.Fprintln(w, "╠══════════════════════════════════════════════════════════════════╣")
+		fmt.Fprintf(w, "║  Add wildcard DNS:  *.%s\n", cfg.WebxdcBaseDomain)
+		fmt.Fprintln(w, "║  → same IP / target as your main Bedrud domain                   ║")
+		fmt.Fprintf(w, "║  TLS must cover:    *.%s\n", cfg.WebxdcBaseDomain)
+		fmt.Fprintln(w, "║  Without this, mini-apps will not load.                          ║")
+		fmt.Fprintln(w, "╚══════════════════════════════════════════════════════════════════╝")
+		if !cfg.WebxdcDNSAck {
+			fmt.Fprintf(w, "➜ Confirm: I will (or already did) point *.%s at this server/proxy [y/N]: ", cfg.WebxdcBaseDomain)
+			var ack string
+			_, _ = fmt.Fscanln(r, &ack)
+			if ack != "y" && ack != "Y" && ack != "yes" {
+				fmt.Fprintln(w, "  WebXDC left disabled (DNS not acknowledged).")
+				cfg.EnableWebxdc = false
+			} else {
+				cfg.WebxdcDNSAck = true
+			}
+		}
+	}
 }
 
 func createBedrudUser() error {
@@ -513,7 +499,7 @@ func createBedrudUser() error {
 	}
 
 	// Create system user: no-login, home at /var/lib/bedrud
-	cmd := exec.Command("useradd", "-r", "-s", "/usr/sbin/nologin", "-d", "/var/lib/bedrud", "bedrud")
+	cmd := exec.Command("useradd", "-r", "-s", "/usr/sbin/nologin", "-d", varLibDir, "bedrud")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to create bedrud user: %s %w", string(out), err)
 	}
@@ -568,8 +554,8 @@ func LinuxUninstall() error {
 	// Remove binaries
 	fmt.Println("➜ Removing binaries...")
 	var errs []error
-	if err := os.Remove("/usr/local/bin/bedrud"); err != nil && !os.IsNotExist(err) {
-		errs = append(errs, fmt.Errorf("failed to remove /usr/local/bin/bedrud: %w", err))
+	if err := os.Remove(binaryLocalPath); err != nil && !os.IsNotExist(err) {
+		errs = append(errs, fmt.Errorf("failed to remove %s: %w", binaryLocalPath, err))
 	}
 	if err := os.Remove("/tmp/bedrud"); err != nil && !os.IsNotExist(err) {
 		errs = append(errs, fmt.Errorf("failed to remove /tmp/bedrud: %w", err))
@@ -588,14 +574,14 @@ func LinuxUninstall() error {
 
 	// Remove config and data
 	fmt.Println("➜ Removing configurations and data...")
-	if err := os.RemoveAll("/etc/bedrud"); err != nil {
-		errs = append(errs, fmt.Errorf("failed to remove /etc/bedrud: %w", err))
+	if err := os.RemoveAll(etcDir); err != nil {
+		errs = append(errs, fmt.Errorf("failed to remove %s: %w", etcDir, err))
 	}
-	if err := os.RemoveAll("/var/lib/bedrud"); err != nil {
-		errs = append(errs, fmt.Errorf("failed to remove /var/lib/bedrud: %w", err))
+	if err := os.RemoveAll(varLibDir); err != nil {
+		errs = append(errs, fmt.Errorf("failed to remove %s: %w", varLibDir, err))
 	}
-	if err := os.RemoveAll("/var/log/bedrud"); err != nil {
-		errs = append(errs, fmt.Errorf("failed to remove /var/log/bedrud: %w", err))
+	if err := os.RemoveAll(varLogDir); err != nil {
+		errs = append(errs, fmt.Errorf("failed to remove %s: %w", varLogDir, err))
 	}
 
 	if _, err := exec.Command("getent", "passwd", "bedrud").Output(); err == nil {

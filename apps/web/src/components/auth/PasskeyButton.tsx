@@ -197,7 +197,7 @@ function PasskeySignupForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form method="post" action="#" onSubmit={handleSubmit} className="space-y-3">
       <div className="space-y-1">
         <Label htmlFor="pk-name">Name</Label>
         <Input id="pk-name" name="name" placeholder="Your name" required />

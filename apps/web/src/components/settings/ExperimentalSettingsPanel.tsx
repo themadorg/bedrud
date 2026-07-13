@@ -1,8 +1,9 @@
-import { useMutation } from '@tanstack/react-query'
-import { Check, Film, FlaskConical, Loader2, PenLine } from 'lucide-react'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { Check, Film, FlaskConical, Loader2, Package, PenLine } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
 import { patchUserPreferences } from '#/lib/user-preferences'
+import { fetchWebxdcConfig } from '@/components/meeting/webxdc/webxdcApi'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { isMeetingTone, panelSurfaceClass, type SettingsPanelTone } from './settingsPanelTone'
@@ -11,11 +12,20 @@ export function ExperimentalSettingsPanel({ tone = 'default' }: { tone?: Setting
   const meeting = isMeetingTone(tone)
   const whiteboardEnabled = useExperimentalPreferencesStore((s) => s.whiteboardEnabled)
   const youtubeEnabled = useExperimentalPreferencesStore((s) => s.youtubeEnabled)
+  const webxdcEnabled = useExperimentalPreferencesStore((s) => s.webxdcEnabled)
   const setWhiteboardEnabled = useExperimentalPreferencesStore((s) => s.setWhiteboardEnabled)
   const setYoutubeEnabled = useExperimentalPreferencesStore((s) => s.setYoutubeEnabled)
+  const setWebxdcEnabled = useExperimentalPreferencesStore((s) => s.setWebxdcEnabled)
 
-  const experimentalPrefsRef = useRef({ whiteboardEnabled, youtubeEnabled })
-  experimentalPrefsRef.current = { whiteboardEnabled, youtubeEnabled }
+  const serverWebxdc = useQuery({
+    queryKey: ['webxdc-config'],
+    queryFn: fetchWebxdcConfig,
+    staleTime: 60_000,
+  })
+  const serverWebxdcOn = serverWebxdc.data?.enabled === true
+
+  const experimentalPrefsRef = useRef({ whiteboardEnabled, youtubeEnabled, webxdcEnabled })
+  experimentalPrefsRef.current = { whiteboardEnabled, youtubeEnabled, webxdcEnabled }
 
   const syncMutation = useMutation({
     mutationFn: () => patchUserPreferences({ experimental: experimentalPrefsRef.current }),
@@ -27,13 +37,19 @@ export function ExperimentalSettingsPanel({ tone = 'default' }: { tone?: Setting
   useEffect(() => {
     const timer = setTimeout(() => mutateRef.current(), 1000)
     return () => clearTimeout(timer)
-  }, [whiteboardEnabled, youtubeEnabled])
+  }, [whiteboardEnabled, youtubeEnabled, webxdcEnabled])
 
   useEffect(() => {
     return () => {
       void patchUserPreferences({ experimental: experimentalPrefsRef.current })
     }
   }, [])
+
+  useEffect(() => {
+    if (serverWebxdc.isSuccess && !serverWebxdcOn && webxdcEnabled) {
+      setWebxdcEnabled(false)
+    }
+  }, [serverWebxdc.isSuccess, serverWebxdcOn, webxdcEnabled, setWebxdcEnabled])
 
   const syncStatus = syncMutation.isPending
     ? 'saving'
@@ -72,7 +88,9 @@ export function ExperimentalSettingsPanel({ tone = 'default' }: { tone?: Setting
         <Switch checked={whiteboardEnabled} onCheckedChange={setWhiteboardEnabled} />
       </div>
 
-      <div className="flex items-center justify-between gap-4 px-5 py-4">
+      <div
+        className={cn('flex items-center justify-between gap-4 border-b px-5 py-4', meeting && 'border-white/[0.08]')}
+      >
         <div className="flex min-w-0 items-start gap-3">
           <Film className={cn('mt-0.5 h-4 w-4 shrink-0', meeting ? 'text-white/50' : 'text-muted-foreground')} />
           <div className="min-w-0">
@@ -83,6 +101,27 @@ export function ExperimentalSettingsPanel({ tone = 'default' }: { tone?: Setting
           </div>
         </div>
         <Switch checked={youtubeEnabled} onCheckedChange={setYoutubeEnabled} />
+      </div>
+
+      <div className="flex items-center justify-between gap-4 px-5 py-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <Package className={cn('mt-0.5 h-4 w-4 shrink-0', meeting ? 'text-white/50' : 'text-muted-foreground')} />
+          <div className="min-w-0">
+            <p className="text-sm font-medium">WebXDC mini-apps</p>
+            <p className={cn('text-xs', meeting ? 'text-white/50' : 'text-muted-foreground')}>
+              {serverWebxdc.isLoading
+                ? 'Checking server support…'
+                : serverWebxdcOn
+                  ? `Sandboxed .xdc apps in meetings (base: ${serverWebxdc.data?.baseDomain ?? 'configured'}). Server needs domain + wildcard DNS.`
+                  : 'Unavailable: enable webxdc in server config (domain + baseDomain). Then turn this on.'}
+            </p>
+          </div>
+        </div>
+        <Switch
+          checked={webxdcEnabled && serverWebxdcOn}
+          disabled={!serverWebxdcOn}
+          onCheckedChange={setWebxdcEnabled}
+        />
       </div>
 
       {syncStatus !== 'idle' && (

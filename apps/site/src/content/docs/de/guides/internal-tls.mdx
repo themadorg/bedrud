@@ -168,7 +168,8 @@ Restart browsers, then open `https://YOUR_SERVER_IP` (replace with the server's 
 |---------|-----|
 | Browser still warns certificate untrusted | Clear browser cache, restart browser after CA install |
 | Camera/mic blocked | Verify CA is in Trusted Root CAs, not intermediate |
-| Certificate expired | Run `sudo bedrud cert renew` to regenerate (auto-renewal every 24h at 09:00) |
+| Certificate expired | Run `sudo bedrud certificate regenerate` (or `cert renew`) then restart services (auto-renewal every 24h at 09:00) |
+| WebXDC mini-apps fail TLS (hostname mismatch) | Cert lacks `*.{webxdc.baseDomain}`. Run `sudo bedrud certificate regenerate` and restart |
 | CN mismatch | Modern browsers ignore the CN field — SAN is authoritative. Use the installer's built-in cert generation (recommended) or add `-addext 'subjectAltName=...'` to the openssl command |
 | Missing SANs | Modern browsers ignore the CN field. Use the installer's built-in cert generation (recommended) or add `-addext 'subjectAltName=...'` to the openssl command |
 

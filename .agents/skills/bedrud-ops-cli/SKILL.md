@@ -28,7 +28,8 @@ func main() { cli.Execute(version) }
 | `run.go` | `run` / `server` — start meeting server |
 | `livekit.go` | `livekit` — start embedded LiveKit |
 | `install.go` | `install` / `uninstall` |
-| `cert.go` | `cert renew` / `cert info` |
+| `update.go` | `update` / `upgrade` (in-place binary + migrations + restart) |
+| `cert.go` | `certificate`/`cert` → `regenerate` / `renew` / `info` (WebXDC wildcard SANs) |
 | `user.go` | `user *` → `usercli` |
 | `room.go` | `room *` → `roomcli` |
 | `config.go` | `config path|show|get|set|validate` |
@@ -63,8 +64,10 @@ bedrud [--config PATH] [--json]
 ├── livekit [--config LK_YAML]        → livekit.RunLiveKit
 ├── install [flags...]                → install.LinuxInstall
 ├── uninstall                         → install.LinuxUninstall
-├── cert
-│   ├── renew [--algo ALGO]
+├── update | upgrade [flags...]       → install.LinuxUpdate
+├── certificate | cert
+│   ├── regenerate [--algo ALGO] [--force]   # SANs + WebXDC *.baseDomain
+│   ├── renew [--algo ALGO]                  # same SAN rebuild as regenerate
 │   └── info
 ├── user
 │   ├── create --email --password --name [--admin]
@@ -147,16 +150,33 @@ bedrud [--config PATH] [--json]
 
 ## `internal/install/` — Linux installer
 
-6 files. Entry APIs: **`LinuxInstall` / `LinuxUninstall`** (not Debian*).
+Entry APIs: **`LinuxInstall` / `LinuxUninstall` / `LinuxUpdate`** (not Debian*).
 
 | File | Purpose |
 |------|---------|
 | `linux.go` | Install/uninstall flow, interactive prompt, binary copy, config write, user creation |
-| `config.go` | `InstallConfig` struct + `SetDefaults()` |
+| `update.go` | In-place upgrade: binary replace, version + DB migrations, service restart |
+| `version.go` | `/var/lib/bedrud/version` + ordered versioned install migrations |
+| `binary.go` | Self-binary copy, package-managed detection, chown helpers |
+| `services.go` | Shared service unit rewrite + enable/start (`refreshServices`) |
+| `paths.go` | Standard path constants (`/etc/bedrud`, `/usr/local/bin`, …) |
+| `config.go` | `InstallConfig` struct + `SetDefaults()` (+ `Version` for version file) |
 | `init.go` | Init detection (systemd / OpenRC / SysV / none=container), service enable/start, stop/disable |
 | `openrc.go` | OpenRC init scripts for bedrud + livekit |
 | `sysv.go` | SysV init scripts |
 | `secrets.go` | `generateSecret(n)` — crypto/rand → base64 URL |
+
+### `LinuxUpdate(opts)` flow
+
+1. Require existing config (`/etc/bedrud/config.yaml` or `--config`)
+2. Stop bedrud/livekit
+3. Replace binary (skip package-managed `/usr/bin` when self is already that path; else `/usr/local/bin`)
+4. Run versioned install migrations (`versionMigrations`) when previous → new crosses them
+5. `database.RunMigrations` (unless `--skip-migrate`)
+6. `refreshServices` — rewrite units from LiveKit topology, enable+start
+7. Write `/var/lib/bedrud/version`
+
+Flags: `--skip-binary`, `--skip-migrate`, `--skip-restart`. CLI: `update` ≡ `upgrade`.
 
 ### `InstallConfig`
 
@@ -272,11 +292,14 @@ Helpers: `withRepo`, `getRoomByIDOrName`, `buildCleanupService` (LK client + cha
 | `GenerateSelfSignedCertWithAlgo(...)` | Explicit algo; uses `SafeCreate` |
 | `RenewSelfSignedCert(...)` | Detect algo from existing cert, preserve |
 | `RenewSelfSignedCertWithAlgo(...)` | Explicit algo; atomic `.new` + rename |
-| `ParseSanHosts(hosts...)` | Split DNS vs IP SANs |
+| `DetectCertAlgorithm(certFile)` | Read PEM → ed25519 / ecdsa256 / rsa2048 |
+| `ParseSanHosts(hosts...)` | Split DNS vs IP SANs (supports `*.domain` wildcards) |
 | `ValidateTLSCertPair(cert, key)` | Parse, match key, check validity → `*CertInfo` |
 | `CertInfo` | Subject, Issuer, NotBefore/After, DaysRemaining, SANs, Status (`valid`/`expiring`) |
 
-Internal: `detectCertAlgorithm`, `keyUsageForAlgo` (RSA → DigitalSignature\|KeyEncipherment; else DigitalSignature), `generateKey`.
+**CLI SANs** (`buildCertSANHosts`): domain, host, outbound IP, localhost; when WebXDC active and not path-mode → `baseDomain` + `*.baseDomain`.
+
+Internal: `keyUsageForAlgo` (RSA → DigitalSignature\|KeyEncipherment; else DigitalSignature), `generateKey`.
 
 ### `email.go`
 
@@ -301,7 +324,7 @@ Internal: `detectCertAlgorithm`, `keyUsageForAlgo` (RSA → DigitalSignature\|Ke
 cmd/bedrud
   └─ internal/cli
        ├─ server.Run / livekit.RunLiveKit
-       ├─ install.LinuxInstall / LinuxUninstall
+       ├─ install.LinuxInstall / LinuxUninstall / LinuxUpdate
        ├─ usercli  → config, database, auth, repository, services, storage, lkutil, clioutput
        ├─ roomcli  → config, database, repository, services, storage, lkutil, clioutput
        ├─ utils    (cert renew/info, OutboundIP)

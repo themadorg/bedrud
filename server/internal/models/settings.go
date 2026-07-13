@@ -82,6 +82,20 @@ type SystemSettings struct {
 	RecordingMaxDurationMins int  `gorm:"default:60" json:"recordingMaxDurationMins"` // 0 = unlimited
 	RecordingMaxFileSizeMB   int  `gorm:"default:2048" json:"recordingMaxFileSizeMB"` // 0 = unlimited
 
+	// Experimental WebXDC gallery (admin-configurable; runtime host still needs webxdc.enabled + domain in config.yaml)
+	WebxdcGalleryEnabled             bool   `gorm:"default:false" json:"webxdcGalleryEnabled"`
+	WebxdcGalleryRemoteCatalogURL    string `gorm:"size:1024" json:"webxdcGalleryRemoteCatalogUrl"`
+	WebxdcGallerySource              string `gorm:"size:20" json:"webxdcGallerySource"` // local | remote | both | semi-remote
+	WebxdcGalleryAllowRemoteDownload bool   `gorm:"default:false" json:"webxdcGalleryAllowRemoteDownload"`
+	// Instance catalog: admin-uploaded .xdc packages shared across all rooms (in addition to remote/semi-remote).
+	WebxdcGalleryInstanceCatalogEnabled bool `gorm:"default:false" json:"webxdcGalleryInstanceCatalogEnabled"`
+	// Package size limits (MiB / counts). 0 = use config.yaml defaults (10 / 30 / 5 MiB, 500 entries).
+	// Max single file is the usual "entry too large" limit for large files inside a .xdc zip.
+	WebxdcMaxArchiveMB      int `gorm:"default:0" json:"webxdcMaxArchiveMB"`
+	WebxdcMaxUncompressedMB int `gorm:"default:0" json:"webxdcMaxUncompressedMB"`
+	WebxdcMaxSingleFileMB   int `gorm:"default:0" json:"webxdcMaxSingleFileMB"`
+	WebxdcMaxEntries        int `gorm:"default:0" json:"webxdcMaxEntries"`
+
 	// RNNoise WASM noise suppression (optional; ~1.9 MB download when used).
 	// Off by default. When disabled, clients must not load the RNNoise package.
 	RNNoiseEnabled bool `gorm:"not null;default:false" json:"rnnoiseEnabled"`

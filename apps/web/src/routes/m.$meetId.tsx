@@ -53,6 +53,9 @@ import { StageScreenShareOverlay } from '@/components/meeting/stage/StageScreenS
 import { WhiteboardOverlay } from '@/components/meeting/whiteboard/WhiteboardOverlay'
 import { WhiteboardWatchProvider } from '@/components/meeting/whiteboard/WhiteboardWatchContext'
 import { YoutubeShareDialog } from '@/components/meeting/youtube/YoutubeShareDialog'
+import { WebxdcMeetingDropZone } from '@/components/meeting/webxdc/WebxdcMeetingDropZone'
+import { WebxdcStageOverlay } from '@/components/meeting/webxdc/WebxdcStageOverlay'
+import { WebxdcWatchProvider } from '@/components/meeting/webxdc/WebxdcWatchContext'
 import { YoutubeWatchProvider } from '@/components/meeting/youtube/YoutubeWatchContext'
 import { YoutubeWatchOverlay } from '@/components/meeting/youtube/YoutubeWatchOverlay'
 import { Button } from '@/components/ui/button'
@@ -70,6 +73,10 @@ interface JoinResponse {
     recordingsAllowed: boolean
   }
   activeRecordingId?: string
+  /** Bedrud JWT from guest-join so guests can mint WebXDC tickets / call room APIs. */
+  accessToken?: string
+  refreshToken?: string
+  tokens?: { accessToken: string; refreshToken?: string | null }
 }
 
 interface ArchivedOwnedResponse {
@@ -548,7 +555,14 @@ function MeetingPage() {
         .then((data) => {
           if (cancelledRef.current) return
           addRecent(meetId)
+          // Join data first so the join effect does not race into /api/room/join when tokens appear.
           setJoinData({ ...data, isPublic: data.isPublic ?? false })
+          // Store API tokens so mint ticket / updates work (LiveKit token alone is not enough).
+          const access = data.tokens?.accessToken || data.accessToken
+          const refresh = data.tokens?.refreshToken ?? data.refreshToken ?? null
+          if (access) {
+            useAuthStore.getState().setTokens({ accessToken: access, refreshToken: refresh }, 'ephemeral')
+          }
         })
         .catch((err: Error) => {
           if (!cancelledRef.current) setJoinError(err.message)
@@ -566,7 +580,7 @@ function MeetingPage() {
   // so guestName is always null and tokens always null during SSR.
   if (mounted && !tokens && guestName === null) {
     return (
-      <div className="meet-room fixed inset-0 flex items-center justify-center bg-[var(--meet-bg)]">
+      <div className="meet-room app-fixed-viewport flex items-center justify-center bg-[var(--meet-bg)]">
         <div className="meet-prejoin-panel flex flex-col gap-5">
           <div>
             <p className="m-0 text-[17px] font-semibold text-[var(--meet-fg)]">Join as guest</p>
@@ -609,7 +623,7 @@ function MeetingPage() {
   // Archived room owned by current user — show recreate dialog
   if (archivedRoom) {
     return (
-      <div className="meet-room fixed inset-0 flex items-center justify-center bg-[var(--meet-bg)]">
+      <div className="meet-room app-fixed-viewport flex items-center justify-center bg-[var(--meet-bg)]">
         <div className="meet-prejoin-panel meet-prejoin-panel-wide flex flex-col gap-5">
           <div>
             <p className="m-0 text-[17px] font-semibold text-[var(--meet-fg)]">This meeting has ended</p>
@@ -797,7 +811,7 @@ function MeetingPage() {
             }}
           />
         )}
-        <div className="meet-room fixed inset-0 overflow-hidden bg-[var(--meet-bg)]">
+        <div className="meet-room app-fixed-viewport overflow-hidden bg-[var(--meet-bg)]">
           {/* Skip links */}
           <a
             href="#meet-grid"
@@ -812,6 +826,7 @@ function MeetingPage() {
             Skip to controls
           </a>
           <SecureContextBanner />
+          {/* Stage must wrap YouTube / whiteboard / WebXDC providers (they call useMeetingStage). */}
           <MeetingStageProvider>
             <MeetingProvider
               roomId={id}
@@ -827,57 +842,62 @@ function MeetingPage() {
             >
               <YoutubeWatchProvider>
                 <WhiteboardWatchProvider>
-                  <StageJoinNotifier />
-                  <BeforeUnloadLock />
-                  <KickDetector onKicked={() => setWasKicked(true)} onRoomDeleted={handleRoomDeleted} />
-                  <AskActionBanner />
-                  <AudioProcessorManager />
-                  <MeetingRoomAudioRenderer />
-                  <MeetingSoundEffects />
-                  {/* Ambient depth gradients */}
-                  <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-                    <div
-                      className="absolute rounded-full"
-                      style={{
-                        width: 900,
-                        height: 900,
-                        background: 'radial-gradient(circle, var(--meet-ambient-a) 0%, transparent 65%)',
-                        top: '-300px',
-                        left: '-300px',
-                      }}
-                    />
-                    <div
-                      className="absolute rounded-full"
-                      style={{
-                        width: 700,
-                        height: 700,
-                        background: 'radial-gradient(circle, var(--meet-ambient-b) 0%, transparent 65%)',
-                        bottom: '-200px',
-                        right: '-150px',
-                      }}
-                    />
-                  </div>
+                  {/* WebXDC needs MeetingProvider (roomId) + MeetingStageProvider (claimStage). */}
+                  <WebxdcWatchProvider>
+                    <StageJoinNotifier />
+                    <BeforeUnloadLock />
+                    <KickDetector onKicked={() => setWasKicked(true)} onRoomDeleted={handleRoomDeleted} />
+                    <AskActionBanner />
+                    <AudioProcessorManager />
+                    <MeetingRoomAudioRenderer />
+                    <MeetingSoundEffects />
+                    <WebxdcMeetingDropZone />
+                    {/* Ambient depth gradients */}
+                    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+                      <div
+                        className="absolute rounded-full"
+                        style={{
+                          width: 900,
+                          height: 900,
+                          background: 'radial-gradient(circle, var(--meet-ambient-a) 0%, transparent 65%)',
+                          top: '-300px',
+                          left: '-300px',
+                        }}
+                      />
+                      <div
+                        className="absolute rounded-full"
+                        style={{
+                          width: 700,
+                          height: 700,
+                          background: 'radial-gradient(circle, var(--meet-ambient-b) 0%, transparent 65%)',
+                          bottom: '-200px',
+                          right: '-150px',
+                        }}
+                      />
+                    </div>
 
-                  <MeetingRoomShell meetId={meetId} navigate={() => navigate({ to: '/dashboard' })}>
-                    <MeetingLayout />
-                    <YoutubeWatchOverlay />
-                    <WhiteboardOverlay />
-                    <StageScreenShareOverlay />
+                    <MeetingRoomShell meetId={meetId} navigate={() => navigate({ to: '/dashboard' })}>
+                      <MeetingLayout />
+                      <YoutubeWatchOverlay />
+                      <WhiteboardOverlay />
+                      <StageScreenShareOverlay />
+                      <WebxdcStageOverlay />
 
-                    <div
-                      className="pointer-events-none absolute start-0 end-0 top-0 z-10 h-[calc(96px+env(safe-area-inset-top))]"
-                      style={{
-                        background: 'linear-gradient(to bottom, var(--meet-vignette-top) 0%, transparent 100%)',
-                      }}
-                    />
-                    <div
-                      className="pointer-events-none absolute bottom-0 start-0 end-0 z-10 h-[calc(128px+env(safe-area-inset-bottom))]"
-                      style={{
-                        background: 'linear-gradient(to top, var(--meet-vignette-bottom) 0%, transparent 100%)',
-                      }}
-                    />
-                  </MeetingRoomShell>
-                  <YoutubeShareDialog />
+                      <div
+                        className="pointer-events-none absolute start-0 end-0 top-0 z-10 h-[calc(96px+env(safe-area-inset-top))]"
+                        style={{
+                          background: 'linear-gradient(to bottom, var(--meet-vignette-top) 0%, transparent 100%)',
+                        }}
+                      />
+                      <div
+                        className="pointer-events-none absolute bottom-0 start-0 end-0 z-10 h-[calc(128px+env(safe-area-inset-bottom))]"
+                        style={{
+                          background: 'linear-gradient(to top, var(--meet-vignette-bottom) 0%, transparent 100%)',
+                        }}
+                      />
+                    </MeetingRoomShell>
+                    <YoutubeShareDialog />
+                  </WebxdcWatchProvider>
                 </WhiteboardWatchProvider>
               </YoutubeWatchProvider>
             </MeetingProvider>
@@ -899,7 +919,7 @@ function DisconnectedOverlay({
   onLeave: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+    <div className="app-fixed-viewport z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-sm">
       <div className="mx-4 max-w-sm text-center">
         {mode === 'reconnecting' ? (
           <>

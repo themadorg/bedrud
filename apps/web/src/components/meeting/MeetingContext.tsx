@@ -57,12 +57,15 @@ export type SystemEventName =
   | 'room_deleted'
   | 'room_ended'
   | 'room_closed'
+  /** Stage share (YouTube / whiteboard / screenshare / WebXDC) — chat event line, not a bubble. */
+  | 'stage'
 
 export interface SystemMessage {
   type: 'system'
   event: SystemEventName
   actor?: string
   target?: string
+  /** Free-form label for events like stage shares (preferred over actor/target templates). */
   message?: string
   deletedIdentity?: string
   ts: number
@@ -70,14 +73,24 @@ export interface SystemMessage {
 
 export type RoomDeletionEvent = Extract<SystemEventName, 'room_deleted' | 'room_ended' | 'room_closed'>
 
-export interface ChatAttachment {
-  kind: 'image'
-  url: string
-  mime: string
-  w: number
-  h: number
-  size: number
-}
+/** Chat media attachment — images (gallery) or generic files (WebXDC sendToChat, etc.). */
+export type ChatAttachment =
+  | {
+      kind: 'image'
+      url: string
+      mime: string
+      w: number
+      h: number
+      size: number
+      name?: string
+    }
+  | {
+      kind: 'file'
+      url: string
+      mime: string
+      name: string
+      size: number
+    }
 
 /** Normalize upload/API payloads and legacy messages missing `kind`. */
 export function normalizeChatAttachment(raw: unknown): ChatAttachment | null {
@@ -86,15 +99,32 @@ export function normalizeChatAttachment(raw: unknown): ChatAttachment | null {
   const url = typeof att.url === 'string' ? att.url : null
   const mime = typeof att.mime === 'string' ? att.mime : null
   if (!url || !mime) return null
-  if (att.kind !== 'image' && !mime.startsWith('image/')) return null
-  return {
-    kind: 'image',
-    url,
-    mime,
-    w: typeof att.w === 'number' ? att.w : 0,
-    h: typeof att.h === 'number' ? att.h : 0,
-    size: typeof att.size === 'number' ? att.size : 0,
+  const size = typeof att.size === 'number' ? att.size : 0
+  const name = typeof att.name === 'string' ? att.name.trim() : ''
+
+  // Explicit file attachment (sendToChat / generic upload).
+  if (att.kind === 'file' || (name && !mime.startsWith('image/') && att.kind !== 'image')) {
+    if (!name) return null
+    return { kind: 'file', url, mime, name, size }
   }
+
+  // Image (legacy payloads may omit kind).
+  if (att.kind === 'image' || mime.startsWith('image/')) {
+    return {
+      kind: 'image',
+      url,
+      mime,
+      w: typeof att.w === 'number' ? att.w : 0,
+      h: typeof att.h === 'number' ? att.h : 0,
+      size,
+      ...(name ? { name } : {}),
+    }
+  }
+  // Fallback: treat unknown non-image with a name as a file.
+  if (name) {
+    return { kind: 'file', url, mime, name, size }
+  }
+  return null
 }
 
 function normalizeAttachments(raw: unknown): ChatAttachment[] {
@@ -173,6 +203,7 @@ const KNOWN_SYSTEM_EVENTS = new Set([
   'room_deleted',
   'room_ended',
   'room_closed',
+  'stage',
 ])
 
 const ROOM_DELETION_EVENTS: Set<string> = new Set(['room_deleted', 'room_ended', 'room_closed'])
@@ -227,6 +258,8 @@ interface MeetingChatContextValue {
   chatMessages: ChatMessage[]
   systemMessages: SystemMessage[]
   sendChat: (text: string, attachments?: ChatAttachment[], poll?: ChatPoll) => void
+  /** Local system/event line in chat (not a user bubble). Used for stage share notices. */
+  appendSystemMessage: (msg: Omit<SystemMessage, 'type' | 'ts'> & { ts?: number }) => void
   votePoll: (messageId: string, optionId: string) => void
   reactToMessage: (messageId: string, emoji: string) => void
   unreadCount: number
@@ -910,6 +943,22 @@ export function MeetingProvider({
               )
               return
             }
+            // Stage / free-form event lines (message text; no target required).
+            if (
+              raw.event === 'stage' &&
+              typeof raw.message === 'string' &&
+              raw.message.trim().length > 0
+            ) {
+              const msg: SystemMessage = {
+                type: 'system',
+                event: 'stage',
+                actor: typeof raw.actor === 'string' ? raw.actor : undefined,
+                message: raw.message.trim(),
+                ts: typeof raw.ts === 'number' ? raw.ts : Date.now(),
+              }
+              setSystemMessages((prev) => capMessages([...prev, msg], MEMORY_SYSTEM_CAP))
+              return
+            }
             if (
               typeof raw.actor === 'string' &&
               raw.actor.length > 0 &&
@@ -1113,6 +1162,20 @@ export function MeetingProvider({
     setUnreadCount(0)
   }, []) // stable reference – does not cause chatValue to change on message arrival
 
+  const appendSystemMessage = useCallback((partial: Omit<SystemMessage, 'type' | 'ts'> & { ts?: number }) => {
+    if (!KNOWN_SYSTEM_EVENTS.has(partial.event)) return
+    const msg: SystemMessage = {
+      type: 'system',
+      event: partial.event,
+      actor: partial.actor,
+      target: partial.target,
+      message: partial.message,
+      deletedIdentity: partial.deletedIdentity,
+      ts: partial.ts ?? Date.now(),
+    }
+    setSystemMessages((prev) => capMessages([...prev, msg], MEMORY_SYSTEM_CAP))
+  }, [])
+
   // sendChat publishes a reliable data packet on the "chat" topic.
   // The message is also echoed locally immediately for zero-latency feedback.
   const sendChat = useCallback(
@@ -1287,12 +1350,13 @@ export function MeetingProvider({
       chatMessages,
       systemMessages,
       sendChat,
+      appendSystemMessage,
       votePoll,
       reactToMessage,
       unreadCount,
       markRead,
     }),
-    [chatMessages, systemMessages, sendChat, votePoll, reactToMessage, unreadCount, markRead],
+    [chatMessages, systemMessages, sendChat, appendSystemMessage, votePoll, reactToMessage, unreadCount, markRead],
   )
 
   return (

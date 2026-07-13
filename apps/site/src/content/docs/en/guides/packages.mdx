@@ -212,6 +212,19 @@ docker run -d \
 
 See the [Docker Guide](/en/docs/guides/docker) for full details including volume mounts and reverse proxy setup.
 
+### Upgrading the server
+
+After a package or binary upgrade, apply migrations and refresh services:
+
+```bash
+sudo apt upgrade bedrud          # or: dnf upgrade bedrud
+sudo bedrud update               # binary + migrations + restart
+# if the package already replaced the binary:
+sudo bedrud update --skip-binary
+```
+
+`update` and `upgrade` are aliases. Details: [Updating](/en/docs/getting-started/installation#updating).
+
 ---
 
 ## Desktop Client Installation

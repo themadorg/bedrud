@@ -356,7 +356,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   )
 
   return (
-    <div className="border-t border-[var(--meet-border)] px-1.5 py-1.5">
+    <div className="shrink-0 border-t border-[var(--meet-border)] px-1.5 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom,0px))] sm:pb-1.5">
       {error && <p className="m-0 mb-1.5 text-[11px] text-red-400/90">{error}</p>}
       {uploading && <p className="m-0 mb-1.5 text-[11px] text-[var(--meet-accent)]">Uploading image…</p>}
 

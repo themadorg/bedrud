@@ -3,6 +3,11 @@
 *.db
 *.db-shm
 *.db-wal
+
+# Local reference clones (see context/README.md) — nested git, do not commit
+/context/webxdc-website/
+/context/deltachat-desktop/
+
 # Build artifacts
 dist
 server/dist/

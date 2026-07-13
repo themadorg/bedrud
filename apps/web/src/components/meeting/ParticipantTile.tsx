@@ -1,8 +1,8 @@
 import { useIsSpeaking, useParticipantInfo, VideoTrack } from '@livekit/components-react'
 import type { Participant, RemoteParticipant } from 'livekit-client'
 import { Track } from 'livekit-client'
-import { MicOff, Pin } from 'lucide-react'
-import { useEffect, useMemo, useRef } from 'react'
+import { Maximize2, MicOff, Pin, Scan } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { DeafenHeadphonesIcon } from '#/components/meeting/DeafenHeadphonesIcon'
 import { ParticipantAvatar } from '#/components/meeting/ParticipantAvatar'
 import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
@@ -155,6 +155,8 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
 
   const cameraTrack = useCameraTrackPublication(participant)
   const showCameraVideo = hasCameraVideo(cameraTrack)
+  /** cover = crop/fill tile; contain = fit full frame centered (letterbox) */
+  const [videoFit, setVideoFit] = useState<'cover' | 'contain'>('cover')
   const mirrorWebcam = useVideoPreferencesStore((s) => s.mirrorWebcam)
   const pushToTalkEnabled = useAudioPreferencesStore((s) => s.pushToTalkEnabled)
   const displayName = getParticipantDisplayName(participant)
@@ -195,24 +197,48 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
     [avatarPx, fontSizePx, isSpeaking, palette.avatar, palette.glow],
   )
 
+  const tileActionBtnClass =
+    'z-10 flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-lg border backdrop-blur-sm transition-[opacity,background,color,border-color] duration-150'
+
   const pinButtonClass = cn(
-    'absolute top-2 right-2 flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-lg border backdrop-blur-sm transition-[opacity,background,color,border-color] duration-150',
+    'absolute top-2 right-2',
+    tileActionBtnClass,
     isPinned
       ? 'border-[color-mix(in_oklab,var(--accent-600)_35%,transparent)] bg-[var(--meet-btn-muted-bg)] text-[var(--meet-btn-muted-fg)]'
       : 'border-[var(--meet-tile-action-border)] bg-[var(--meet-tile-action-bg)] text-[var(--meet-tile-action-fg)]',
     isPinned ? '' : 'opacity-0 group-hover:opacity-100',
   )
 
+  const isFitContain = videoFit === 'contain'
+  const fitButtonClass = cn(
+    'absolute top-2',
+    onTogglePin ? 'right-[42px]' : 'right-2',
+    tileActionBtnClass,
+    isFitContain
+      ? 'border-[color-mix(in_oklab,var(--accent-600)_35%,transparent)] bg-[var(--meet-btn-muted-bg)] text-[var(--meet-btn-muted-fg)]'
+      : 'border-[var(--meet-tile-action-border)] bg-[var(--meet-tile-action-bg)] text-[var(--meet-tile-action-fg)]',
+    // Stay visible while fit mode is on so the user can switch back without hunting
+    isFitContain ? '' : 'opacity-0 group-hover:opacity-100',
+  )
+
   return (
     <div className={cn('meet-tile group h-full w-full', isSpeaking && 'meet-speaking')} style={tileStyle}>
       {showCameraVideo && cameraTrack ? (
         <div
-          className="absolute inset-0"
+          className={cn('absolute inset-0', isFitContain && 'bg-black')}
           style={{ transform: participant.isLocal && mirrorWebcam ? 'scaleX(-1)' : undefined }}
         >
+          {/*
+            LiveKit ships `.lk-participant-media-video[data-lk-orientation=landscape] { object-fit: cover }`
+            which beats Tailwind utilities. Inline style is required to actually switch fit modes.
+          */}
           <VideoTrack
             trackRef={{ participant, source: Track.Source.Camera, publication: cameraTrack }}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 h-full w-full"
+            style={{
+              objectFit: isFitContain ? 'contain' : 'cover',
+              objectPosition: 'center',
+            }}
           />
         </div>
       ) : (
@@ -260,6 +286,23 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
           />
           {isDeafened && <DeafenHeadphonesIcon size={11} off className="text-red-400" />}
         </div>
+      )}
+
+      {/* Fit video — hover only when cover; always visible when contain so it can be undone */}
+      {showCameraVideo && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            setVideoFit((mode) => (mode === 'cover' ? 'contain' : 'cover'))
+          }}
+          className={fitButtonClass}
+          aria-label={isFitContain ? 'Fill video in tile' : 'Fit video (center, no crop)'}
+          aria-pressed={isFitContain}
+          title={isFitContain ? 'Fill video' : 'Fit video'}
+        >
+          {isFitContain ? <Maximize2 size={13} /> : <Scan size={13} />}
+        </button>
       )}
 
       {/* Pin button — always visible when pinned, appears on hover otherwise */}

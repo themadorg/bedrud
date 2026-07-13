@@ -296,9 +296,9 @@ export function MeetingWelcomeScreen({ roomId, roomName, isPublic = false, onJoi
   }
 
   return (
-    <div className="meet-room fixed inset-0 flex items-center justify-center overflow-hidden bg-[var(--meet-bg)] p-4">
+    <div className="meet-room app-fixed-viewport flex items-center justify-center overflow-hidden bg-[var(--meet-bg)] p-4">
       <WelcomePresenceBackdrop roomId={roomId} enabled={isPublic} />
-      <div className="relative z-10 flex max-h-[calc(100vh-32px)] w-full max-w-[480px] flex-col items-center gap-3">
+      <div className="relative z-10 flex max-h-[calc(var(--app-height,100svh)-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-32px)] w-full max-w-[480px] flex-col items-center gap-3">
         <div className="meet-welcome-panel meet-prejoin-panel flex max-h-full w-full flex-col gap-5 overflow-y-auto meet-scroll">
           <div>
             <p className="m-0 text-[17px] font-semibold text-[var(--meet-fg)]">Ready to join?</p>

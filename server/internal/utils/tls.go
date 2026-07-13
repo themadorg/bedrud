@@ -47,7 +47,7 @@ func GenerateSelfSignedCertWithAlgo(certFile, keyFile string, algo KeyAlgorithm,
 }
 
 func RenewSelfSignedCert(certFile, keyFile string, hosts ...string) error {
-	algo, err := detectCertAlgorithm(certFile)
+	algo, err := DetectCertAlgorithm(certFile)
 	if err != nil {
 		return fmt.Errorf("failed to detect cert algorithm: %w", err)
 	}
@@ -272,7 +272,8 @@ func keyUsageForAlgo(algo KeyAlgorithm) x509.KeyUsage {
 	}
 }
 
-func detectCertAlgorithm(certFile string) (KeyAlgorithm, error) {
+// DetectCertAlgorithm reads a PEM certificate and returns its public key algorithm.
+func DetectCertAlgorithm(certFile string) (KeyAlgorithm, error) {
 	data, err := os.ReadFile(certFile)
 	if err != nil {
 		return "", fmt.Errorf("cannot read cert file: %w", err)

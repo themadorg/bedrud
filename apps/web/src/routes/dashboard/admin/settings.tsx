@@ -16,6 +16,7 @@ import {
   ServerTab,
   type SystemSettings,
   validateLocalSettings,
+  WebxdcTab,
 } from '#/components/admin/settings'
 import { WebhookSection } from '#/components/admin/settings/webhook-section'
 import { api } from '#/lib/api'
@@ -47,6 +48,7 @@ const TABS = [
   { id: 'audio', label: 'Audio' },
   // TODO oncoming feature
   // { id: 'recordings', label: 'Recordings' },
+  { id: 'webxdc', label: 'WebXDC' },
   { id: 'logging', label: 'Logging' },
   { id: 'webhooks', label: 'Webhooks' },
 ] as const
@@ -155,6 +157,17 @@ const TAB_FIELDS: Record<AdminSettingsTabId, (keyof SystemSettings)[]> = {
     'chatMessageTTLHours',
     'maxUploadBytesPerUser',
     'globalDiskThresholdBytes',
+  ],
+  webxdc: [
+    'webxdcGalleryEnabled',
+    'webxdcGalleryRemoteCatalogUrl',
+    'webxdcGallerySource',
+    'webxdcGalleryAllowRemoteDownload',
+    'webxdcGalleryInstanceCatalogEnabled',
+    'webxdcMaxArchiveMB',
+    'webxdcMaxUncompressedMB',
+    'webxdcMaxSingleFileMB',
+    'webxdcMaxEntries',
   ],
   audio: ['rnnoiseEnabled', 'krispEnabled'],
   logging: ['logLevel'],
@@ -405,6 +418,15 @@ export function AdminSettingsPage({ initialTab }: { initialTab: AdminSettingsTab
             </TabsContent>
             <TabsContent value="chat">
               <ChatTab
+                settings={current}
+                setSettings={handleTabChange}
+                errors={localErrors}
+                clearFieldError={clearFieldError}
+              />
+            </TabsContent>
+            {/* TODO oncoming feature — RecordingsTab removed */}
+            <TabsContent value="webxdc">
+              <WebxdcTab
                 settings={current}
                 setSettings={handleTabChange}
                 errors={localErrors}

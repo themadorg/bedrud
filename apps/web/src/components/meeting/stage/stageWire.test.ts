@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { parseMeetingStage, parseStageWire, stageDescription } from './stageWire'
+import { parseMeetingStage, parseStageWire, stageDescription, stageShareKey } from './stageWire'
 
 describe('parseStageWire', () => {
   test('parses stage_set for whiteboard', () => {
@@ -56,5 +56,37 @@ describe('stageDescription', () => {
         updatedAt: 1,
       }),
     ).toContain('YouTube')
+  })
+
+  test('parses and describes webxdc stage', () => {
+    const stage = parseMeetingStage({
+      kind: 'webxdc',
+      ownerIdentity: 'u1',
+      ownerName: 'Ada',
+      instanceId: 'inst-1',
+      packageId: 'pkg-1',
+      name: 'Chess',
+      updatedAt: 99,
+    })
+    expect(stage?.kind).toBe('webxdc')
+    expect(stageDescription(stage!)).toContain('mini-app')
+    expect(stageDescription(stage!)).toContain('Chess')
+  })
+})
+
+describe('stageShareKey', () => {
+  test('ignores updatedAt so playhead sync does not re-key', () => {
+    const a = {
+      kind: 'webxdc' as const,
+      ownerIdentity: 'u1',
+      ownerName: 'Ada',
+      instanceId: 'inst-1',
+      packageId: 'pkg-1',
+      name: 'Chess',
+      updatedAt: 1,
+    }
+    const b = { ...a, updatedAt: 999 }
+    expect(stageShareKey(a)).toBe(stageShareKey(b))
+    expect(stageShareKey(a)).toBe('webxdc:inst-1')
   })
 })

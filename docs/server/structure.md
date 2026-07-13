@@ -127,7 +127,7 @@ Cobra command tree. See [CLI](./cli.md).
 | `run.go` | `bedrud run` |
 | `livekit.go` | `bedrud livekit` |
 | `install.go` | `bedrud install`, `bedrud uninstall` |
-| `cert.go` | `bedrud cert renew`, `bedrud cert info` |
+| `cert.go` | `bedrud certificate regenerate` / `renew` / `info` (alias: `cert`) |
 | `user.go` | `bedrud user create/delete/promote/demote/list/info/password/…` |
 | `room.go` | `bedrud room list/info/close/suspend/reactivate/kick` |
 | `config.go` | `bedrud config path/show/get/set/validate` |

@@ -37,7 +37,7 @@ const (
 | `RenewSelfSignedCert(certFile, keyFile, hosts...)` | Auto-detect existing algo, renew |
 | `RenewSelfSignedCertWithAlgo(certFile, keyFile, algo, hosts...)` | Explicit algo override |
 | `ValidateTLSCertPair(certFile, keyFile)` | Parse, check expiry, verify key match |
-| `detectCertAlgorithm(certFile)` | Read existing cert's public key type |
+| `DetectCertAlgorithm(certFile)` | Read existing cert's public key type |
 
 ### CertInfo
 

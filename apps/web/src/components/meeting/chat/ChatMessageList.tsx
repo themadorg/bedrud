@@ -6,6 +6,7 @@ import { ChatImageLightbox } from './ChatImageLightbox'
 import { ChatMessageCluster } from './ChatMessageCluster'
 import { ChatScrollManager } from './ChatScrollManager'
 import { groupMessages } from './chatGrouping'
+import { systemMessageLabel } from './systemMessageLabel'
 
 interface Props {
   chatMessages: ChatMessage[]
@@ -46,6 +47,20 @@ export function ChatMessageList({
     }
   }, [onScrollUnreadChange])
 
+  /** Instant jump to bottom (no smooth animation). */
+  const scrollMessagesToBottom = useCallback(() => {
+    const el = messagesRef.current
+    if (!el) return
+    // Double-rAF so layout/images settle before measuring scrollHeight.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const node = messagesRef.current
+        if (!node) return
+        node.scrollTop = node.scrollHeight
+      })
+    })
+  }, [])
+
   const totalCount = chatMessages.length + systemMessages.length
 
   useEffect(() => {
@@ -53,7 +68,7 @@ export function ChatMessageList({
     if (delta <= 0) return
     prevCountRef.current = totalCount
     if (autoFollowRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      scrollMessagesToBottom()
     } else {
       setScrollUnread((n) => {
         const next = n + delta
@@ -61,15 +76,15 @@ export function ChatMessageList({
         return next
       })
     }
-  }, [totalCount, onScrollUnreadChange])
+  }, [totalCount, onScrollUnreadChange, scrollMessagesToBottom])
 
   const scrollToBottom = useCallback(() => {
     autoFollowRef.current = true
     setShowScrollBtn(false)
     setScrollUnread(0)
     onScrollUnreadChange(0)
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [onScrollUnreadChange])
+    scrollMessagesToBottom()
+  }, [onScrollUnreadChange, scrollMessagesToBottom])
 
   const handleDrop = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
@@ -124,11 +139,10 @@ export function ChatMessageList({
             }
 
             if (item.kind === 'system') {
-              const label = item.msg.event === 'kick' ? 'was kicked by' : 'was banned by'
               return (
                 <div key={item.id} className={cn('flex justify-center py-0.5', stackGap)}>
-                  <span className="text-[11px] text-white/50 bg-white/[0.05] border border-white/[0.08] rounded-full px-2.5 py-[3px] italic">
-                    {item.msg.target} {label} {item.msg.actor}
+                  <span className="max-w-[90%] text-center text-[11px] text-white/50 bg-white/[0.05] border border-white/[0.08] rounded-full px-2.5 py-[3px] italic">
+                    {systemMessageLabel(item.msg)}
                   </span>
                 </div>
               )
