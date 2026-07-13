@@ -25,7 +25,7 @@ jobs:
     outputs:
       site: ${{ steps.decide.outputs.site }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # Commit that triggered CI (or current for manual run)
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
@@ -64,7 +64,7 @@ jobs:
     needs: should-deploy
     if: needs.should-deploy.outputs.site == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Import and Export GPG public key
