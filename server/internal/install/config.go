@@ -26,6 +26,11 @@ type InstallConfig struct {
 	EnableWebxdc     bool
 	WebxdcBaseDomain string
 	WebxdcDNSAck     bool
+	// Cloudflare DNS-01 for free wildcard TLS (*.domain / *.webxdcBaseDomain).
+	// When set with UseACME, server.acme.challenge=dns-01 and provider=cloudflare.
+	CloudflareAPIToken string
+	// PreferCloudflareACME is true when the operator chose CF DNS-01 during install.
+	PreferCloudflareACME bool
 	// Version is recorded to /var/lib/bedrud/version on successful install (from CLI ldflags).
 	Version string
 }

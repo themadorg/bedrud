@@ -30,6 +30,7 @@ func main() { cli.Execute(version) }
 | `install.go` | `install` / `uninstall` |
 | `update.go` | `update` / `upgrade` (in-place binary + migrations + restart) |
 | `cert.go` | `certificate`/`cert` → `regenerate` / `renew` / `info` (WebXDC wildcard SANs) |
+| (install) | WebXDC + `--cloudflare-token` → ACME DNS-01 free `*.domain` via Cloudflare |
 | `user.go` | `user *` → `usercli` |
 | `room.go` | `room *` → `roomcli` |
 | `config.go` | `config path|show|get|set|validate` |

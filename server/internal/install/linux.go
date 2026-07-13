@@ -34,6 +34,7 @@ type installConfigYAML struct {
 		Domain         string   `yaml:"domain"`
 		Email          string   `yaml:"email"`
 		UseACME        bool     `yaml:"useACME"`
+		ACME           *installACMEYAML `yaml:"acme,omitempty"`
 		BehindProxy    bool     `yaml:"behindProxy,omitempty"`
 		TrustedProxies []string `yaml:"trustedProxies,omitempty"`
 		ProxyHeader    string   `yaml:"proxyHeader,omitempty"`
@@ -69,6 +70,13 @@ type installConfigYAML struct {
 		BaseDomain   string `yaml:"baseDomain,omitempty"`
 		UploadPolicy string `yaml:"uploadPolicy,omitempty"`
 	} `yaml:"webxdc"`
+}
+
+// installACMEYAML is written when Cloudflare DNS-01 is selected at install time.
+type installACMEYAML struct {
+	Challenge          string `yaml:"challenge"`
+	DNSProvider        string `yaml:"dnsProvider"`
+	CloudflareAPIToken string `yaml:"cloudflareAPIToken"`
 }
 
 func LinuxInstall(cfg *InstallConfig) error {
@@ -207,7 +215,21 @@ func LinuxInstall(cfg *InstallConfig) error {
 	configYAML.Server.KeyFile = keyFile
 	configYAML.Server.Domain = cfg.Domain
 	configYAML.Server.Email = cfg.Email
-	configYAML.Server.UseACME = (cfg.Email != "" && !cfg.DisableTLS && cfg.Domain != "")
+	// ACME: domain+email, not custom cert files. Cloudflare DNS-01 for WebXDC wildcards.
+	useACME := cfg.Email != "" && !cfg.DisableTLS && cfg.Domain != "" && cfg.CertPath == ""
+	if cfg.PreferCloudflareACME && strings.TrimSpace(cfg.CloudflareAPIToken) != "" {
+		useACME = true
+		cfg.EnableTLS = true
+		configYAML.Server.EnableTLS = true
+	}
+	configYAML.Server.UseACME = useACME
+	if useACME && cfg.PreferCloudflareACME && strings.TrimSpace(cfg.CloudflareAPIToken) != "" {
+		configYAML.Server.ACME = &installACMEYAML{
+			Challenge:          "dns-01",
+			DNSProvider:        "cloudflare",
+			CloudflareAPIToken: strings.TrimSpace(cfg.CloudflareAPIToken),
+		}
+	}
 
 	if cfg.BehindProxy || (!cfg.EnableTLS && cfg.Domain != "") {
 		configYAML.Server.BehindProxy = true
@@ -328,7 +350,8 @@ func LinuxInstall(cfg *InstallConfig) error {
 		_ = runChown("bedrud:bedrud", etcLivekitPath)
 	}
 
-	if cfg.EnableTLS && cfg.CertPath == "" && cfg.KeyPath == "" {
+	// Self-signed only when not using ACME (HTTP-01 or Cloudflare DNS-01 obtain certs at runtime).
+	if cfg.EnableTLS && cfg.CertPath == "" && cfg.KeyPath == "" && !configYAML.Server.UseACME {
 		cp, kp := etcDir+"/cert.pem", etcDir+"/key.pem"
 		if _, err := os.Stat(cp); os.IsNotExist(err) {
 			hosts := []string{"localhost", loopbackIPv4, loopbackIPv6}
@@ -489,6 +512,57 @@ func promptConfig(r io.Reader, w io.Writer, cfg *InstallConfig) {
 				cfg.WebxdcDNSAck = true
 			}
 		}
+		// Wildcard TLS: free via Cloudflare DNS-01 (Let's Encrypt)
+		if cfg.EnableWebxdc && cfg.WebxdcDNSAck {
+			promptCloudflareACME(r, w, cfg)
+		}
+	}
+}
+
+// promptCloudflareACME asks whether to use Cloudflare DNS-01 for free
+// wildcard certificates (*.baseDomain and apex). Token needs Zone:DNS:Edit.
+func promptCloudflareACME(r io.Reader, w io.Writer, cfg *InstallConfig) {
+	if cfg.CloudflareAPIToken != "" {
+		cfg.PreferCloudflareACME = true
+		return
+	}
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "╔══════════════════════════════════════════════════════════════════╗")
+	fmt.Fprintln(w, "║  WebXDC TLS — free wildcard cert (Let's Encrypt DNS-01)          ║")
+	fmt.Fprintln(w, "╠══════════════════════════════════════════════════════════════════╣")
+	fmt.Fprintln(w, "║  HTTP-01 cannot issue *.domain. Cloudflare DNS-01 can.           ║")
+	fmt.Fprintln(w, "║  Create a token: Cloudflare → My Profile → API Tokens            ║")
+	fmt.Fprintln(w, "║  Permissions: Zone → DNS → Edit  (+ Zone → Zone → Read)          ║")
+	fmt.Fprintln(w, "║  Zone Resources: Include → Specific zone → your domain           ║")
+	fmt.Fprintln(w, "╚══════════════════════════════════════════════════════════════════╝")
+	fmt.Fprintf(w, "➜ Use Cloudflare for automatic wildcard TLS (*.%s)? [Y/n]: ", cfg.WebxdcBaseDomain)
+	var yn string
+	_, _ = fmt.Fscanln(r, &yn)
+	if yn == "n" || yn == "N" || yn == "no" {
+		fmt.Fprintln(w, "  Skipping Cloudflare DNS-01. HTTPS for mini-apps will use per-host")
+		fmt.Fprintln(w, "  ACME HTTP-01 certs on first visit (or provide certs yourself).")
+		return
+	}
+	// default yes
+	if cfg.Email == "" {
+		fmt.Fprintf(w, "➜ Email for Let's Encrypt account: ")
+		_, _ = fmt.Fscanln(r, &cfg.Email)
+	}
+	fmt.Fprintf(w, "➜ Cloudflare API token: ")
+	var token string
+	_, _ = fmt.Fscanln(r, &token)
+	token = strings.TrimSpace(token)
+	if token == "" {
+		fmt.Fprintln(w, "  Empty token — Cloudflare DNS-01 not configured.")
+		return
+	}
+	cfg.CloudflareAPIToken = token
+	cfg.PreferCloudflareACME = true
+	cfg.EnableTLS = true
+	fmt.Fprintln(w, "  Cloudflare DNS-01 will issue certs for:")
+	fmt.Fprintf(w, "    %s  and  *.%s\n", cfg.Domain, cfg.Domain)
+	if cfg.WebxdcBaseDomain != "" && cfg.WebxdcBaseDomain != cfg.Domain {
+		fmt.Fprintf(w, "    %s  and  *.%s\n", cfg.WebxdcBaseDomain, cfg.WebxdcBaseDomain)
 	}
 }
 

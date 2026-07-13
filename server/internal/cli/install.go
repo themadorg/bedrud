@@ -35,16 +35,25 @@ func newInstallCmd() *cobra.Command {
 			cfg.SelfSigned = selfSigned && !noTLS
 			cfg.DisableTLS = noTLS
 			cfg.Version = Version
+			if cfg.CloudflareAPIToken != "" {
+				cfg.PreferCloudflareACME = true
+				cfg.EnableTLS = true
+			}
+			if cfg.EnableWebxdc && cfg.Domain != "" {
+				cfg.WebxdcDNSAck = true // non-interactive --webxdc assumes DNS is ready
+			}
 
 			if err := install.LinuxInstall(&cfg); err != nil {
 				return fmt.Errorf("installation: %w", err)
 			}
 			return clioutput.Success("✓ Bedrud installed successfully", map[string]any{
-				"enableTls":   cfg.EnableTLS,
-				"selfSigned":  cfg.SelfSigned,
-				"disableTls":  cfg.DisableTLS,
-				"behindProxy": cfg.BehindProxy,
-				"domain":      cfg.Domain,
+				"enableTls":        cfg.EnableTLS,
+				"selfSigned":       cfg.SelfSigned,
+				"disableTls":       cfg.DisableTLS,
+				"behindProxy":      cfg.BehindProxy,
+				"domain":           cfg.Domain,
+				"webxdc":           cfg.EnableWebxdc,
+				"cloudflareAcme":   cfg.PreferCloudflareACME,
 			})
 		},
 	}
@@ -69,6 +78,9 @@ func newInstallCmd() *cobra.Command {
 	f.StringVar(&cfg.LKIP, "lk-ip", "", "Separate IP for LiveKit NodeIP (when server behind CDN)")
 	f.StringVar(&udpRange, "lk-udp-range", "", "UDP port range for WebRTC media, e.g. 50000-60000")
 	f.StringVar(&cfg.CertAlgorithm, "cert-algorithm", "", "Key algorithm for self-signed cert: ed25519 (default), ecdsa256, rsa2048, rsa4096")
+	f.StringVar(&cfg.CloudflareAPIToken, "cloudflare-token", "", "Cloudflare API token for ACME DNS-01 wildcard certs (Zone:DNS:Edit); enables free *.domain for WebXDC")
+	f.BoolVar(&cfg.EnableWebxdc, "webxdc", false, "Enable experimental WebXDC mini-apps (requires --domain)")
+	f.StringVar(&cfg.WebxdcBaseDomain, "webxdc-base-domain", "", "WebXDC base domain (default: wx.<domain>); hosts are webxdc-<id>.<base>")
 
 	return cmd
 }

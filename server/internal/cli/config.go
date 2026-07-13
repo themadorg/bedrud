@@ -189,7 +189,10 @@ func maskSecrets(cfg *config.Config) map[string]any {
 	out := map[string]any{}
 	bytes, _ := yaml.Marshal(cfg)
 	_ = yaml.Unmarshal(bytes, &out)
-	maskInPlace(out, []string{"jwtSecret", "sessionSecret", "apiSecret", "clientSecret", "secretKey", "accessKey", "password"})
+	maskInPlace(out, []string{
+		"jwtSecret", "sessionSecret", "apiSecret", "clientSecret", "secretKey", "accessKey", "password",
+		"cloudflareAPIToken", "apiToken",
+	})
 	return out
 }
 

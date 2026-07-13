@@ -84,8 +84,12 @@ type ServerConfig struct {
 	Domain         string    `yaml:"domain" env:"SERVER_DOMAIN"`
 	Email          string    `yaml:"email" env:"SERVER_EMAIL"`
 	UseACME        bool      `yaml:"useACME" env:"SERVER_USE_ACME"`
-	TrustedProxies []string  `yaml:"trustedProxies"`
-	ProxyHeader    string    `yaml:"proxyHeader"`
+	// ACME configures Let's Encrypt challenges. When empty/default, HTTP-01 is used.
+	// Set challenge to "dns-01" with dnsProvider "cloudflare" for free wildcards
+	// (*.domain) required by WebXDC subdomain hosts.
+	ACME ACMEConfig `yaml:"acme"`
+	TrustedProxies []string `yaml:"trustedProxies"`
+	ProxyHeader    string   `yaml:"proxyHeader"`
 	// BehindProxy enables trusted-proxy mode. Set to true when running
 	// behind Cloudflare, nginx, or any reverse proxy that terminates TLS.
 	BehindProxy bool `yaml:"behindProxy"`
@@ -102,6 +106,36 @@ type ServerConfig struct {
 	// 0 means unlimited. Default when used as fallback: 100.
 	// Env: SERVER_MAX_ROOMS_PER_USER
 	MaxRoomsPerUser int `yaml:"maxRoomsPerUser" env:"SERVER_MAX_ROOMS_PER_USER"`
+}
+
+// ACMEConfig controls certificate issuance when server.useACME is true.
+type ACMEConfig struct {
+	// Challenge is "http-01" (default) or "dns-01".
+	// Env: SERVER_ACME_CHALLENGE
+	Challenge string `yaml:"challenge" env:"SERVER_ACME_CHALLENGE"`
+	// DNSProvider is required for dns-01. Currently: "cloudflare".
+	// Env: SERVER_ACME_DNS_PROVIDER
+	DNSProvider string `yaml:"dnsProvider" env:"SERVER_ACME_DNS_PROVIDER"`
+	// CloudflareAPIToken needs Zone → DNS → Edit (and Zone → Zone → Read for zone lookup).
+	// Env: CLOUDFLARE_API_TOKEN or CF_API_TOKEN
+	CloudflareAPIToken string `yaml:"cloudflareAPIToken" env:"CLOUDFLARE_API_TOKEN"`
+}
+
+// UseDNS01 reports whether ACME should use DNS-01 (wildcard-capable).
+func (a ACMEConfig) UseDNS01() bool {
+	c := strings.ToLower(strings.TrimSpace(a.Challenge))
+	return c == "dns-01" || c == "dns01" || c == "dns"
+}
+
+// CloudflareToken returns the API token from config or env.
+func (a ACMEConfig) CloudflareToken() string {
+	if t := strings.TrimSpace(a.CloudflareAPIToken); t != "" {
+		return t
+	}
+	if t := strings.TrimSpace(os.Getenv("CLOUDFLARE_API_TOKEN")); t != "" {
+		return t
+	}
+	return strings.TrimSpace(os.Getenv("CF_API_TOKEN"))
 }
 
 type DatabaseConfig struct {
@@ -402,6 +436,17 @@ func Load(configPath string) (*Config, error) {
 			if b, err := strconv.ParseBool(envUseACME); err == nil {
 				config.Server.UseACME = b
 			}
+		}
+		if envACMEChallenge := os.Getenv("SERVER_ACME_CHALLENGE"); envACMEChallenge != "" {
+			config.Server.ACME.Challenge = envACMEChallenge
+		}
+		if envACMEDNSProvider := os.Getenv("SERVER_ACME_DNS_PROVIDER"); envACMEDNSProvider != "" {
+			config.Server.ACME.DNSProvider = envACMEDNSProvider
+		}
+		if envCF := os.Getenv("CLOUDFLARE_API_TOKEN"); envCF != "" {
+			config.Server.ACME.CloudflareAPIToken = envCF
+		} else if envCF := os.Getenv("CF_API_TOKEN"); envCF != "" {
+			config.Server.ACME.CloudflareAPIToken = envCF
 		}
 		if envTrustedProxies := os.Getenv("SERVER_TRUSTED_PROXIES"); envTrustedProxies != "" {
 			config.Server.TrustedProxies = strings.Split(envTrustedProxies, ",")

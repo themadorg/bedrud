@@ -89,6 +89,31 @@ When enabled, `data` includes `subject`, `issuer`, `notBefore`, `notAfter`, `day
 
 ---
 
+## Cloudflare DNS-01 (free wildcards for WebXDC)
+
+HTTP-01 cannot issue `*.domain`. For WebXDC mini-app hosts, use Cloudflare DNS-01:
+
+```yaml
+server:
+  domain: example.com
+  email: admin@example.com
+  enableTLS: true
+  useACME: true
+  acme:
+    challenge: dns-01
+    dnsProvider: cloudflare
+    cloudflareAPIToken: "<Zone DNS Edit token>"
+webxdc:
+  enabled: true
+  baseDomain: example.com   # or wx.example.com
+```
+
+Env alternatives: `CLOUDFLARE_API_TOKEN` / `CF_API_TOKEN`, `SERVER_ACME_CHALLENGE=dns-01`.
+
+Installer: when WebXDC is enabled interactively, Bedrud offers Cloudflare DNS-01 and prompts for the token (`--cloudflare-token` for non-interactive).
+
+Implementation: `server/internal/tlsacme` (certmagic + libdns/cloudflare).
+
 ## Related
 
 - [../configuration.md](../configuration.md) — `server.enableTls`, cert paths, webxdc

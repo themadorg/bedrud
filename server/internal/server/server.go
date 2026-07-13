@@ -43,6 +43,7 @@ import (
 	"bedrud/internal/scheduler"
 	"bedrud/internal/services"
 	"bedrud/internal/storage"
+	"bedrud/internal/tlsacme"
 	"bedrud/internal/utils"
 	wxhost "bedrud/internal/webxdc"
 
@@ -56,7 +57,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/crypto/acme/autocert"
 )
 
 func Run(configPath, version string) error {
@@ -643,48 +643,47 @@ func Run(configPath, version string) error {
 		if cfg.Server.UseACME && cfg.Server.Domain != "" {
 			log.Info().Msgf("➜ Enabling Let's Encrypt for domain: %s", cfg.Server.Domain)
 
-			// Allow apex + subdomains (e.g. webxdc-<id>.bedrud.xyz). autocert issues
-			// per-host certs via HTTP-01 — not a single wildcard cert — so DNS for
-			// *.<domain> must point at this host for mini-app hosts to succeed.
-			domain := strings.ToLower(strings.TrimSpace(cfg.Server.Domain))
-			hostPolicy := func(ctx context.Context, host string) error {
-				h := strings.ToLower(strings.TrimSpace(host))
-				if h == domain || strings.HasSuffix(h, "."+domain) {
-					return nil
+			var tlsConfig *tls.Config
+			if cfg.Server.ACME.UseDNS01() {
+				// DNS-01 (Cloudflare): free wildcards for WebXDC (*.domain).
+				cfgTLS, err := tlsacme.DNS01Config(context.Background(), cfg)
+				if err != nil {
+					log.Error().Err(err).Msg("ACME DNS-01 setup failed — falling back to plain HTTP/manual TLS")
+				} else {
+					tlsConfig = cfgTLS
+					tlsacme.StartHTTPRedirect()
+					log.Info().
+						Str("challenge", "dns-01").
+						Str("provider", cfg.Server.ACME.DNSProvider).
+						Msg("ACME DNS-01 ready (wildcard certs via Cloudflare)")
 				}
-				return fmt.Errorf("acme: host %q not allowed (want %s or *.%s)", host, domain, domain)
-			}
-
-			certManager := &autocert.Manager{
-				Prompt:     autocert.AcceptTOS,
-				HostPolicy: hostPolicy,
-				Email:      cfg.Server.Email,
-				Cache:      autocert.DirCache("/var/lib/bedrud/certs"),
-			}
-
-			// Manager for HTTP-01 challenge on port 80
-			go func() {
-				log.Info().Msgf("➜ Starting ACME challenge server on %s (bound 0.0.0.0:80)", utils.DisplayAddr("0.0.0.0", "80"))
-				if err := http.ListenAndServe(":80", certManager.HTTPHandler(nil)); err != nil {
-					log.Error().Err(err).Msg("ACME challenge server failed")
-				}
-			}()
-
-			tlsConfig := &tls.Config{
-				GetCertificate: certManager.GetCertificate,
-				MinVersion:     tls.VersionTLS12,
-			}
-
-			ln, err := tls.Listen("tcp", ":443", tlsConfig)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to listen on :443 for ACME — falling back to plain HTTP")
-				// fall through to the plain-HTTP / manual-TLS block below
 			} else {
-				log.Info().Msgf("➜ Bedrud is running on HTTPS %s (bound 0.0.0.0:443)", utils.DisplayAddr("0.0.0.0", "443"))
-				if err := app.Listener(ln); err != nil {
-					log.Error().Err(err).Msg("ACME TLS listener failed")
+				// HTTP-01: apex + per-host subdomains on first request (no true wildcard).
+				certManager := tlsacme.HTTP01Manager(cfg)
+				go func() {
+					log.Info().Msgf("➜ Starting ACME challenge server on %s (bound 0.0.0.0:80)", utils.DisplayAddr("0.0.0.0", "80"))
+					if err := http.ListenAndServe(":80", certManager.HTTPHandler(nil)); err != nil {
+						log.Error().Err(err).Msg("ACME challenge server failed")
+					}
+				}()
+				tlsConfig = &tls.Config{
+					GetCertificate: certManager.GetCertificate,
+					MinVersion:     tls.VersionTLS12,
 				}
-				return
+			}
+
+			if tlsConfig != nil {
+				ln, err := tls.Listen("tcp", ":443", tlsConfig)
+				if err != nil {
+					log.Error().Err(err).Msg("Failed to listen on :443 for ACME — falling back to plain HTTP")
+					// fall through to the plain-HTTP / manual-TLS block below
+				} else {
+					log.Info().Msgf("➜ Bedrud is running on HTTPS %s (bound 0.0.0.0:443)", utils.DisplayAddr("0.0.0.0", "443"))
+					if err := app.Listener(ln); err != nil {
+						log.Error().Err(err).Msg("ACME TLS listener failed")
+					}
+					return
+				}
 			}
 		}
 
