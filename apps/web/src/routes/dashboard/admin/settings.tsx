@@ -1,10 +1,11 @@
 // TODO oncoming feature
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { Loader2, Save } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import {
+  AudioTab,
   AuthTab,
   ChatTab,
   CorsTab,
@@ -20,23 +21,21 @@ import {
 import { WebhookSection } from '#/components/admin/settings/webhook-section'
 import { api } from '#/lib/api'
 import { getErrorMessage } from '#/lib/errors'
+import { refreshPublicSettings } from '#/lib/use-public-settings'
 import { useUserStore } from '#/lib/user.store'
 import { cn } from '#/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-export const Route = createFileRoute('/dashboard/admin/settings')({
-  beforeLoad: () => {
-    if (typeof window === 'undefined') return
-    const user = useUserStore.getState().user
-    const accesses = user?.accesses ?? []
-    if (accesses.includes('moderator') || (!user?.isSuperAdmin && !accesses.includes('admin'))) {
-      throw redirect({ to: '/dashboard/admin' })
-    }
-  },
-  component: AdminSettingsPage,
-})
+export function requireAdminSettingsAccess() {
+  if (typeof window === 'undefined') return
+  const user = useUserStore.getState().user
+  const accesses = user?.accesses ?? []
+  if (accesses.includes('moderator') || (!user?.isSuperAdmin && !accesses.includes('admin'))) {
+    throw redirect({ to: '/dashboard/admin' })
+  }
+}
 
 const TABS = [
   { id: 'general', label: 'General' },
@@ -46,6 +45,7 @@ const TABS = [
   { id: 'email', label: 'Email' },
   { id: 'cors', label: 'CORS' },
   { id: 'chat', label: 'Chat' },
+  { id: 'audio', label: 'Audio' },
   // TODO oncoming feature
   // { id: 'recordings', label: 'Recordings' },
   { id: 'webxdc', label: 'WebXDC' },
@@ -53,10 +53,35 @@ const TABS = [
   { id: 'webhooks', label: 'Webhooks' },
 ] as const
 
-type TabId = (typeof TABS)[number]['id']
+export type AdminSettingsTabId = (typeof TABS)[number]['id']
+
+const TAB_IDS = new Set<string>(TABS.map((t) => t.id))
+
+function parseTab(raw: unknown): AdminSettingsTabId | undefined {
+  if (typeof raw !== 'string') return undefined
+  if (raw === 'audio') return undefined // audio uses its own path
+  if (TAB_IDS.has(raw)) return raw as AdminSettingsTabId
+  return undefined
+}
+
+type SettingsSearch = { tab?: AdminSettingsTabId }
+
+export const Route = createFileRoute('/dashboard/admin/settings')({
+  beforeLoad: requireAdminSettingsAccess,
+  validateSearch: (search: Record<string, unknown>): SettingsSearch => {
+    const tab = parseTab(search.tab)
+    return tab ? { tab } : {}
+  },
+  component: AdminSettingsIndexRoute,
+})
+
+function AdminSettingsIndexRoute() {
+  const { tab } = Route.useSearch()
+  return <AdminSettingsPage initialTab={tab ?? 'general'} />
+}
 
 // Fields each tab owns. Save only sends the current tab's fields.
-const TAB_FIELDS: Record<TabId, (keyof SystemSettings)[]> = {
+const TAB_FIELDS: Record<AdminSettingsTabId, (keyof SystemSettings)[]> = {
   general: ['registrationEnabled', 'tokenRegistrationOnly'],
   auth: [
     'passkeysEnabled',
@@ -144,26 +169,34 @@ const TAB_FIELDS: Record<TabId, (keyof SystemSettings)[]> = {
     'webxdcMaxSingleFileMB',
     'webxdcMaxEntries',
   ],
+  audio: ['rnnoiseEnabled', 'krispEnabled'],
   logging: ['logLevel'],
   webhooks: [],
 }
 
-function AdminSettingsPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('general')
-  // Per-tab pending partial changes. Only fields the user actually modified on each tab.
-  const [drafts, setDrafts] = useState<Partial<Record<TabId, Partial<SystemSettings>>>>({})
+export function AdminSettingsPage({ initialTab }: { initialTab: AdminSettingsTabId }) {
+  const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState<AdminSettingsTabId>(initialTab)
+  const [drafts, setDrafts] = useState<Partial<Record<AdminSettingsTabId, Partial<SystemSettings>>>>({})
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({})
   const queryClient = useQueryClient()
+
+  useEffect(() => {
+    setActiveTab(initialTab)
+  }, [initialTab])
 
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ['admin', 'settings'],
     queryFn: () => api.get<SystemSettings>('/api/admin/settings'),
   })
 
-  // Merge server settings with ALL drafts for rendering — each tab sees its pending changes
   const current = useMemo(() => {
     if (!settings) return null
-    const merged = { ...settings }
+    const merged = {
+      ...settings,
+      rnnoiseEnabled: settings.rnnoiseEnabled ?? false,
+      krispEnabled: settings.krispEnabled ?? false,
+    }
     for (const draft of Object.values(drafts)) {
       if (draft) Object.assign(merged, draft)
     }
@@ -182,38 +215,40 @@ function AdminSettingsPage() {
   const saveSettings = useMutation({
     mutationFn: (s: Partial<SystemSettings>) => api.put('/api/admin/settings', s),
     onSuccess: () => {
-      // Clear only the saved tab's draft; other tabs' drafts stay
       setDrafts((prev) => {
         const next = { ...prev }
         delete next[activeTab]
         return next
       })
       setLocalErrors({})
-      // Refetch settings so UI shows latest values
       queryClient.invalidateQueries({ queryKey: ['admin', 'settings'] })
+      refreshPublicSettings()
     },
     onError: (err) => {
       toast.error(getErrorMessage(err, 'Failed to save settings'))
     },
   })
 
-  function onTabChange(v: TabId) {
+  function onTabChange(v: AdminSettingsTabId) {
     saveSettings.reset()
     setLocalErrors({})
-    setActiveTab(v)
+    if (v === 'audio') {
+      void navigate({ to: '/dashboard/admin/settings/audio' })
+      return
+    }
+    // Leaving audio deep-link or switching tabs on index: keep selection via search
+    void navigate({
+      to: '/dashboard/admin/settings',
+      search: v === 'general' ? {} : { tab: v },
+    })
   }
 
-  // Used by GeneralTab for immediate auto-save
   function handlePatch(partial: Partial<SystemSettings>) {
     if (!settings) return
     if (saveSettings.isPending) return
-
-    // GeneralTab only changes registration mode fields — no complex validation needed.
-    // Backend validates and returns 400 on error, shown as toast.
     saveSettings.mutate(partial)
   }
 
-  // Used by non-General tabs — stores only the current tab's changed fields
   function handleTabChange(newSettings: SystemSettings) {
     if (!settings) return
     const tabFields = TAB_FIELDS[activeTab]
@@ -229,7 +264,6 @@ function AdminSettingsPage() {
     }))
   }
 
-  // Save only the current tab's pending changes
   function saveCurrentTab() {
     if (!settings) return
     if (saveSettings.isPending) return
@@ -237,14 +271,11 @@ function AdminSettingsPage() {
     const draft = drafts[activeTab]
     if (!draft) return
 
-    // Merge all drafts to build the full state for cross-field validation
     const merged = { ...settings }
     for (const d of Object.values(drafts)) {
       if (d) Object.assign(merged, d)
     }
     const allErrors = validateLocalSettings(merged)
-    // Only show errors for fields on the current tab — other tabs' bad values
-    // shouldn't block saving on this tab.
     const tabFields = new Set(TAB_FIELDS[activeTab])
     const errors: Record<string, string> = {}
     for (const [field, msg] of Object.entries(allErrors)) {
@@ -258,7 +289,7 @@ function AdminSettingsPage() {
     saveSettings.mutate(draft)
   }
 
-  const hasDraft = !!drafts[activeTab] && Object.keys(drafts[activeTab]).length > 0
+  const hasDraft = !!drafts[activeTab] && Object.keys(drafts[activeTab]!).length > 0
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4">
@@ -267,14 +298,14 @@ function AdminSettingsPage() {
         <p className="text-xs text-muted-foreground">Manage auth, infrastructure, and server configuration.</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as TabId)}>
-        <TabsList className="w-full justify-start border-b rounded-none bg-transparent p-0 h-auto">
+      <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as AdminSettingsTabId)}>
+        <TabsList className="flex h-auto w-full flex-wrap justify-start rounded-none border-b bg-transparent p-0">
           {TABS.map((tab) => (
             <TabsTrigger
               key={tab.id}
               value={tab.id}
               className={cn(
-                'shrink-0 px-3 py-2.5 text-xs font-medium rounded-none data-[state=active]:shadow-none',
+                'shrink-0 rounded-none px-3 py-2.5 text-xs font-medium data-[state=active]:shadow-none',
                 'data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary',
                 'data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground',
               )}
@@ -394,14 +425,6 @@ function AdminSettingsPage() {
               />
             </TabsContent>
             {/* TODO oncoming feature — RecordingsTab removed */}
-            {/* <TabsContent value="recordings">
-              <RecordingsTab
-                settings={current}
-                setSettings={handleTabChange}
-                errors={localErrors}
-                clearFieldError={clearFieldError}
-              />
-            </TabsContent> */}
             <TabsContent value="webxdc">
               <WebxdcTab
                 settings={current}
@@ -409,6 +432,9 @@ function AdminSettingsPage() {
                 errors={localErrors}
                 clearFieldError={clearFieldError}
               />
+            </TabsContent>
+            <TabsContent value="audio">
+              <AudioTab settings={current} setSettings={handleTabChange} />
             </TabsContent>
             <TabsContent value="logging">
               <LoggingTab settings={current} setSettings={handleTabChange} />

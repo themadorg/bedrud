@@ -62,6 +62,14 @@ Load by task type. Routes to focused leaf skill.
 
 ---
 
+## Repo / process tasks
+
+| Task keywords | Load skill |
+|---------------|------------|
+| create issue, open issue, file bug, feature request, GitHub issue, gh issue, report bug, track work, issue template, issue type, priority field, screenshot on issue | `create-bedrud-issue` |
+
+---
+
 ## Fallback
 
 If unclear, load `bedrud-http` (most common task target) + `bedrud-data` (foundation).

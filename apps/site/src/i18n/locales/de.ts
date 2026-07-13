@@ -135,7 +135,7 @@ export default {
       guestJoinJitsi: "Ja",
       guestJoinBbb: "Ja (Moderator-Genehmigung)",
       audioProcessing: "Audioverarbeitung (Geräuschunterdrückung)",
-      audioProcessingBedrud: "RNNoise / Krisp",
+      audioProcessingBedrud: "RNNoise",
       audioProcessingJitsi: "Basis",
       audioProcessingBbb: "Basis",
       screenShare: "Bildschirmfreigabe",
@@ -750,7 +750,7 @@ export default {
       pain: "Hintergrundgeräusche in Besprechungen sind ablenkend und unprofessionell.",
       title: "Audioverarbeitung",
       description:
-        "Integrierte Geräuschunterdrückung durch RNNoise. Optionale Krisp-Integration für Premium-KI-Geräuschunterdrückung. Sauberes Audio, jeder Anruf.",
+        "RNNoise-Geräuschunterdrückung standardmäßig enthalten. Optionale Krisp-Anbindung ist standardmäßig aus — Sie müssen sie aktivieren und eine gültige Krisp-Lizenz sicherstellen (z. B. LiveKit Cloud oder Krisp-Handelslizenz). Bedrud enthält keine kostenlose Krisp-Lizenz.",
     },
     whiteboard: {
       pain: "Whiteboards in einer anderen App unterbrechen den Meeting-Fluss.",

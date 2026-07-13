@@ -96,6 +96,15 @@ type SystemSettings struct {
 	WebxdcMaxSingleFileMB   int `gorm:"default:0" json:"webxdcMaxSingleFileMB"`
 	WebxdcMaxEntries        int `gorm:"default:0" json:"webxdcMaxEntries"`
 
+	// RNNoise WASM noise suppression (optional; ~1.9 MB download when used).
+	// Off by default. When disabled, clients must not load the RNNoise package.
+	RNNoiseEnabled bool `gorm:"not null;default:false" json:"rnnoiseEnabled"`
+
+	// Krisp noise cancellation (optional proprietary filter via @livekit/krisp-noise-filter).
+	// Off by default. Admins must enable after confirming their own Krisp/LiveKit licensing.
+	// Bedrud does not ship a Krisp license.
+	KrispEnabled bool `gorm:"not null;default:false" json:"krispEnabled"`
+
 	// Email branding
 	EmailInstanceName string `gorm:"size:255" json:"emailInstanceName"`
 	EmailSupportEmail string `gorm:"size:255" json:"emailSupportEmail"`

@@ -82,6 +82,11 @@ export interface SystemSettings {
   /** Max files inside a .xdc package (default 500). */
   webxdcMaxEntries: number
 
+  /** Instance allows RNNoise WASM (off by default; not downloaded until enabled + selected). */
+  rnnoiseEnabled: boolean
+  /** Instance allows users to select Krisp (off by default; requires operator licensing). */
+  krispEnabled: boolean
+
   // Email branding
   emailInstanceName: string
   emailSupportEmail: string

@@ -11,9 +11,63 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ── Path filters: only run jobs when their trees change ──
+  #
+  # Separation of concerns:
+  #   apps/web     → meeting product UI (embedded in Go binary / Docker)
+  #   apps/site    → landing + public docs (GitHub Pages only)
+  #   docs/        → repo/developer markdown (not the binary). If ONLY this
+  #                  changes, run nothing except site/landing deploy path.
+  #   server/      → Go API; site rebuilds too (copies server/docs/swagger.json)
+  #
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      server: ${{ steps.filter.outputs.server }}
+      web: ${{ steps.filter.outputs.web }}
+      site: ${{ steps.filter.outputs.site }}
+      android: ${{ steps.filter.outputs.android }}
+      desktop: ${{ steps.filter.outputs.desktop }}
+      ios: ${{ steps.filter.outputs.ios }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            server:
+              - 'server/**'
+              - '.github/workflows/ci.yml'
+            web:
+              - 'apps/web/**'
+              - '.github/workflows/ci.yml'
+            # Landing + public docs only. Includes root docs/ so docs-only pushes
+            # still refresh the site path when relevant, without building products.
+            site:
+              - 'apps/site/**'
+              - 'docs/**'
+              - 'server/docs/**'
+              - 'server/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/deploy-site.yml'
+            android:
+              - 'apps/android/**'
+              - '.github/workflows/ci.yml'
+            desktop:
+              - 'apps/desktop/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.github/workflows/ci.yml'
+            ios:
+              - 'apps/ios/**'
+              - '.github/workflows/ci.yml'
+
   # ── Server (Go) ───────────────────────────────────────────────
   server:
     name: Server – Build & Vet
+    needs: changes
+    if: needs.changes.outputs.server == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -34,7 +88,8 @@ jobs:
   server-test:
     name: Server – Tests
     runs-on: ubuntu-latest
-    needs: server
+    needs: [changes, server]
+    if: needs.changes.outputs.server == 'true'
     defaults:
       run:
         working-directory: server
@@ -49,9 +104,11 @@ jobs:
       - run: mkdir -p internal/livekit/bin && touch internal/livekit/bin/livekit-server
       - run: go test -race -count=1 ./...
 
-  # ── Web (React) ───────────────────────────────────────────────
+  # ── Web (React meeting app — embedded in binary) ──────────────
   web:
     name: Web – Build & Check
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -68,6 +125,8 @@ jobs:
   # ── Android ───────────────────────────────────────────────────
   android:
     name: Android – Lint & Test
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -127,6 +186,8 @@ jobs:
   # ── iOS ───────────────────────────────────────────────────────
   ios:
     name: iOS – Build & Test
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
     runs-on: macos-15
     defaults:
       run:
@@ -200,6 +261,8 @@ jobs:
   # ── Desktop (Rust/Slint) ──────────────────────────────────────
   desktop:
     name: Desktop – Build & Test
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -230,9 +293,13 @@ jobs:
       - name: Test
         run: cargo test -p bedrud-desktop
 
-  # ── Site (Astro) ───────────────────────────────────────────────
+  # ── Site (Astro landing + public docs) ─────────────────────────
+  # Not part of the Go binary / Docker image.
+  # If ONLY docs/ (or apps/site) changes, this is the only product-ish job that runs.
   site:
     name: Site – Build & Check
+    needs: changes
+    if: needs.changes.outputs.site == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:

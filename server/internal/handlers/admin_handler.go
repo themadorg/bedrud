@@ -326,7 +326,9 @@ func (h *AdminHandler) GetPublicSettings(c *fiber.Ctx) error {
 		"chatMessageTTLHours":      s.ChatMessageTTLHours,
 		"chatUploadMaxBytes":       maxBytes,
 		"chatUploadMaxDimension":   maxDim,
-		"recordingsEnabled":        s.RecordingsEnabled,
+		"recordingsEnabled": s.RecordingsEnabled,
+		"rnnoiseEnabled":    s.RNNoiseEnabled,
+		"krispEnabled":      s.KrispEnabled,
 		"webxdc": fiber.Map{
 			"enabled":      webxdcEnabled,
 			"experimental": true,
@@ -566,6 +568,7 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 			"livekitExternal", "corsAllowCredentials", "guestLoginEnabled",
 			"recordingsEnabled",
 			"webxdcGalleryEnabled", "webxdcGalleryAllowRemoteDownload", "webxdcGalleryInstanceCatalogEnabled",
+			"rnnoiseEnabled", "krispEnabled",
 			"emailTlsSkipVerify", "emailSmtpsMode":
 			var b bool
 			if err := json.Unmarshal(val, &b); err != nil {
@@ -598,6 +601,10 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 				existing.WebxdcGalleryAllowRemoteDownload = b
 			case "webxdcGalleryInstanceCatalogEnabled":
 				existing.WebxdcGalleryInstanceCatalogEnabled = b
+			case "rnnoiseEnabled":
+				existing.RNNoiseEnabled = b
+			case "krispEnabled":
+				existing.KrispEnabled = b
 			case "emailTlsSkipVerify":
 				existing.EmailTLSSkipVerify = b
 			case "emailSmtpsMode":

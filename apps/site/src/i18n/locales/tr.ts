@@ -136,7 +136,7 @@ export default {
       guestJoinJitsi: "Evet",
       guestJoinBbb: "Evet (moderatör onayı)",
       audioProcessing: "Ses İşleme (Gürültü Engelleme)",
-      audioProcessingBedrud: "RNNoise / Krisp",
+      audioProcessingBedrud: "RNNoise",
       audioProcessingJitsi: "Temel",
       audioProcessingBbb: "Temel",
       screenShare: "Ekran Paylaşımı",
@@ -648,7 +648,7 @@ export default {
       pain: "Toplantılarda arka plan gürültüsü dikkati dağıtır ve profesyonel değildir.",
       title: "Ses İşleme",
       description:
-        "RNNoise ile çalışan yerleşik gürültü engelleme. Premium AI gürültü engelleme için isteğe bağlı Krisp entegrasyonu. Her aramada temiz ses.",
+        "RNNoise gürültü engelleme varsayılan olarak dahildir. İsteğe bağlı Krisp bağlantısı varsayılan olarak kapalıdır — etkinleştirmeniz ve geçerli bir Krisp lisansına (ör. LiveKit Cloud veya Krisp ticari lisans) sahip olduğunuzdan emin olmanız gerekir. Bedrud ücretsiz Krisp lisansı sağlamaz.",
     },
     whiteboard: {
       pain: "Başka bir uygulamadaki beyaz tahtalar toplantı akışını bozar.",

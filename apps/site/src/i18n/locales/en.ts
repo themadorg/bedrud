@@ -373,7 +373,7 @@ export default {
       pain: "Background noise in meetings is distracting and unprofessional.",
       title: "Built-in Noise Cancellation",
       description:
-        "RNNoise noise suppression included. Optional Krisp integration for premium AI cancellation. Clean audio on every call, even from noisy environments.",
+        "RNNoise noise suppression included by default. Optional Krisp wiring is available but off by default — you must enable it and ensure you have a valid Krisp license (e.g. LiveKit Cloud or Krisp commercial). Bedrud does not include a free Krisp license.",
     },
     whiteboard: {
       pain: "Whiteboards that live in another app break meeting flow.",

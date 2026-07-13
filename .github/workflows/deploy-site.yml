@@ -17,11 +17,56 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  # Landing/docs (apps/site) do not ship in the server binary / Docker image.
+  # They only need a rebuild when site content changes, or when server docs/swagger change.
+  should-deploy:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    outputs:
+      site: ${{ steps.decide.outputs.site }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Commit that triggered CI (or current for manual run)
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Decide whether site needs deploy
+        id: decide
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "site=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch — always deploy site"
+            exit 0
+          fi
+
+          HEAD="${{ github.event.workflow_run.head_sha }}"
+          # Previous commit on the branch (or empty tree for first push)
+          BASE=$(git rev-parse "${HEAD}^" 2>/dev/null || echo "")
+          if [ -z "$BASE" ]; then
+            echo "site=true" >> "$GITHUB_OUTPUT"
+            echo "No parent commit — deploy site"
+            exit 0
+          fi
+
+          # Landing/docs deploy when public site, repo docs/, or server (swagger) change.
+          # Product trees (apps/web, android, desktop) do not force a site deploy.
+          if git diff --name-only "$BASE" "$HEAD" | grep -E '^(apps/site/|docs/|server/|\.github/workflows/(ci|deploy-site)\.yml)' >/dev/null; then
+            echo "site=true" >> "$GITHUB_OUTPUT"
+            echo "Relevant site/docs/server paths changed — deploy site"
+          else
+            echo "site=false" >> "$GITHUB_OUTPUT"
+            echo "No apps/site, docs/, or server changes — skip site deploy"
+          fi
+
+  build:
+    runs-on: ubuntu-latest
+    needs: should-deploy
+    if: needs.should-deploy.outputs.site == 'true'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Import and Export GPG public key
         env:
           APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
@@ -57,6 +102,7 @@ jobs:
 
   deploy:
     needs: build
+    if: needs.build.result == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

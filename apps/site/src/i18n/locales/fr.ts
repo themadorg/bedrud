@@ -137,7 +137,7 @@ export default {
       guestJoinJitsi: "Oui",
       guestJoinBbb: "Oui (approbation modérateur)",
       audioProcessing: "Traitement audio (Suppression bruit)",
-      audioProcessingBedrud: "RNNoise / Krisp",
+      audioProcessingBedrud: "RNNoise",
       audioProcessingJitsi: "Basique",
       audioProcessingBbb: "Basique",
       screenShare: "Partage d'écran",
@@ -723,7 +723,7 @@ export default {
       pain: "Le bruit de fond dans les réunions est distrayant et non professionnel.",
       title: "Traitement audio",
       description:
-        "Suppression de bruit intégrée propulsée par RNNoise. Intégration Krisp facultative pour la suppression de bruit IA premium. Audio propre, chaque appel.",
+        "Suppression de bruit RNNoise incluse par défaut. Le branchement Krisp optionnel est désactivé par défaut — vous devez l'activer et disposer d'une licence Krisp valide (ex. LiveKit Cloud ou licence commerciale Krisp). Bedrud n'inclut pas de licence Krisp gratuite.",
     },
     whiteboard: {
       pain: "Les tableaux blancs dans une autre app cassent le flux de la réunion.",

@@ -130,7 +130,8 @@ const config = defineConfig({
       'react/jsx-runtime',
       'react/jsx-dev-runtime',
       '@livekit/components-react',
-      '@livekit/krisp-noise-filter',
+      // Do NOT prebundle Krisp — only dynamic-imported when instance admin enables it
+      // and a user selects Krisp mode (see audio-processor.service.ts).
       'livekit-client',
       'yjs',
       'y-protocols/sync',
@@ -142,7 +143,10 @@ const config = defineConfig({
     ],
     // Keep vendored package *names* out of prebundle as npm packages — they resolve
     // to apps/web/src/vendor/excalidraw source via aliases (project patches).
+    // Heavy noise packages stay excluded so they are never eagerly optimized/loaded at dev start.
     exclude: [
+      '@livekit/krisp-noise-filter',
+      '@jitsi/rnnoise-wasm',
       '@excalidraw/excalidraw',
       '@excalidraw/element',
       '@excalidraw/common',

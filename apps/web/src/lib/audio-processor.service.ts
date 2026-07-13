@@ -6,10 +6,41 @@ import type { NoiseSuppressionMode } from '#/lib/audio-preferences.store'
  *
  * Used as a module-level singleton so both ControlsBar (quick toggle) and
  * AudioProcessorManager (meeting room) share the same processor state.
+ *
+ * Heavy SDKs are only dynamic-imported when the instance admin has enabled
+ * them AND the active mode matches:
+ * - RNNoise (`#/lib/rnnoise-processor` + WASM) → `setRNNoiseAllowed(true)` + mode `rnnoise`
+ * - Krisp (`@livekit/krisp-noise-filter`) → `setKrispAllowed(true)` + mode `krisp`
+ * Otherwise those packages are never fetched.
  */
 export class AudioProcessorService {
   private track: LocalAudioTrack | null = null
   private currentMode: NoiseSuppressionMode = 'none'
+  /** Instance-level gates from public settings (admin System → Audio). */
+  private rnnoiseInstanceAllowed = false
+  private krispInstanceAllowed = false
+
+  setRNNoiseAllowed(allowed: boolean): void {
+    this.rnnoiseInstanceAllowed = allowed
+  }
+
+  isRNNoiseAllowed(): boolean {
+    return this.rnnoiseInstanceAllowed
+  }
+
+  setKrispAllowed(allowed: boolean): void {
+    this.krispInstanceAllowed = allowed
+  }
+
+  isKrispAllowed(): boolean {
+    return this.krispInstanceAllowed
+  }
+
+  /** Apply both instance gates (from public settings). */
+  setNoisePackageAllowed(opts: { rnnoise?: boolean; krisp?: boolean }): void {
+    if (opts.rnnoise !== undefined) this.rnnoiseInstanceAllowed = opts.rnnoise
+    if (opts.krisp !== undefined) this.krispInstanceAllowed = opts.krisp
+  }
 
   /** Attach to a track and apply the given mode. Called on room connect. */
   async attach(track: LocalAudioTrack, mode: NoiseSuppressionMode): Promise<void> {
@@ -21,9 +52,6 @@ export class AudioProcessorService {
   /**
    * Switch to a new noise suppression mode.
    * Tears down any existing processor first to avoid double-processing.
-   *
-   * Echo cancellation is applied independently of noise suppression mode —
-   * it's a WebRTC feature that works alongside LiveKit audio processors.
    */
   async switchMode(
     mode: NoiseSuppressionMode,
@@ -31,9 +59,13 @@ export class AudioProcessorService {
   ): Promise<void> {
     if (!this.track) return
 
-    const modeChanged = mode !== this.currentMode
+    // Never load heavy packages unless instance admin enabled them.
+    let effective: NoiseSuppressionMode = mode
+    if (mode === 'rnnoise' && !this.rnnoiseInstanceAllowed) effective = 'browser'
+    if (mode === 'krisp' && !this.krispInstanceAllowed) effective = 'browser'
 
-    // Remove existing processor when switching away from a LiveKit processor
+    const modeChanged = effective !== this.currentMode
+
     if (modeChanged && this.currentMode !== 'none' && this.currentMode !== 'browser') {
       try {
         await this.track.stopProcessor()
@@ -42,20 +74,16 @@ export class AudioProcessorService {
       }
     }
 
-    this.currentMode = mode
+    this.currentMode = effective
 
-    // Apply WebRTC-level constraints.
-    // Noise suppression is only enabled for browser mode (to avoid double-processing
-    // with LiveKit processors), but echo cancellation and AGC are independent —
-    // they should honour the user's preference regardless of noise mode.
     const mediaTrack = this.track.mediaStreamTrack
     if (mediaTrack) {
-      const browserNS = mode === 'browser'
+      const browserNS = effective === 'browser'
       mediaTrack
         .applyConstraints({
           noiseSuppression: browserNS,
           echoCancellation: opts?.echoCancellation ?? true,
-          autoGainControl: opts?.autoGainControl ?? mode === 'browser',
+          autoGainControl: opts?.autoGainControl ?? effective === 'browser',
         })
         .catch((err) => {
           if (import.meta.env.DEV) console.warn('[AudioProcessorService] applyConstraints failed:', err)
@@ -63,21 +91,18 @@ export class AudioProcessorService {
     }
 
     if (modeChanged) {
-      if (mode === 'rnnoise') {
-        // Dynamic import: keeps the ~8 MB rnnoise WASM out of the initial bundle.
+      if (effective === 'rnnoise') {
+        // Only when rnnoiseInstanceAllowed. Dynamic import → no download when disabled.
         const { RNNoiseProcessor } = await import('#/lib/rnnoise-processor')
         await this.track.setProcessor(new RNNoiseProcessor())
-      } else if (mode === 'krisp') {
-        // Dynamic import: krisp SDK is only fetched when user activates krisp mode.
+      } else if (effective === 'krisp') {
+        // Only when krispInstanceAllowed. Dynamic import → no download when disabled.
         const { KrispNoiseFilter } = await import('@livekit/krisp-noise-filter')
         await this.track.setProcessor(KrispNoiseFilter())
       }
     }
   }
 
-  /**
-   * Update echo cancellation on the live track without changing the noise mode.
-   */
   async setEchoCancellation(enabled: boolean): Promise<void> {
     if (!this.track) return
     const mediaTrack = this.track.mediaStreamTrack
@@ -88,7 +113,6 @@ export class AudioProcessorService {
     }
   }
 
-  /** Detach from the track. Called on room disconnect / unmount. */
   async detach(): Promise<void> {
     if (this.track && this.currentMode !== 'none' && this.currentMode !== 'browser') {
       try {
@@ -101,11 +125,6 @@ export class AudioProcessorService {
     this.currentMode = 'none'
   }
 
-  /**
-   * Lightweight browser-capability check for Krisp support.
-   * Avoids importing the full krisp SDK at startup — Krisp requires a
-   * Chromium-based browser with AudioWorklet in a secure context.
-   */
   static isKrispSupported(): boolean {
     if (typeof window === 'undefined') return false
     const isFirefox = navigator.userAgent.toLowerCase().includes('firefox')

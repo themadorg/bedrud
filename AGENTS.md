@@ -256,6 +256,12 @@ Prefer **leaf** skills for focused work. Use umbrellas only for broad exploratio
 | admin users/rooms/queue/settings/webhooks | `bedrud-api-admin` |
 | DTOs, Swagger shapes, source file index | `bedrud-api-types` |
 
+### Process leaves
+
+| Task keywords | Skill |
+|---------------|--------|
+| create/open GitHub issue, file bug, feature request, gh issue, issue template, priority | `create-bedrud-issue` |
+
 **Load:** say skill name or describe task. Auto-dispatches via `bedrud-dispatch`.
 
 ---
@@ -288,6 +294,7 @@ Per-app design docs: `apps/web/DESIGN.md`, `apps/desktop/DESIGN.md`, `apps/site/
 - `.agents/skills/bedrud-server/SKILL.md` — Full Go backend map (umbrella)
 - `.agents/skills/bedrud-frontend/SKILL.md` — Full React frontend map (umbrella)
 - `.agents/skills/bedrud-api/SKILL.md` — Complete API endpoint ref (umbrella)
+- `.agents/skills/create-bedrud-issue/SKILL.md` — GitHub issue filing (`gh`, templates, type/priority)
 - `.agents/skills/bedrud-*/SKILL.md` — Focused leaves (data, auth, http, jobs, fe-*, api-*, …)
 
 ---

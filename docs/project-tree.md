@@ -264,12 +264,13 @@ Do not edit manually; produced by `make build-site`.
 ```
 .github/
 ├── workflows/
-│   ├── ci.yml                       # Main CI (server, web, site, mobile, desktop)
-│   ├── release.yml                  # Release builds on version tags
-│   ├── deploy-site.yml              # GitHub Pages deploy
-│   ├── deploy-server.yml            # Server deployment
+│   ├── ci.yml                       # Path-filtered CI (server, web, site, mobile, desktop)
+│   ├── release.yml                  # Full release on v* tags
+│   ├── deploy-site.yml              # GitHub Pages (landing/docs; path-gated)
+│   ├── dev-nightly.yml              # Dev/nightly pre-releases + GHCR (path-gated)
 │   ├── codeql.yml                   # Security scanning
-│   └── …                            # apt-repo, dnf-repo, pr-beta, dev-nightly
+│   └── …                            # apt-repo, dnf-repo, pr-beta
+# See docs/developer/ci.md for pipeline details
 ├── ISSUE_TEMPLATE/                  # Bug, feature, security, etc.
 ├── pull_request_template.md
 └── dependabot.yml

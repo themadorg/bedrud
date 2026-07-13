@@ -17,6 +17,10 @@ export interface PublicSettings {
   chatUploadMaxDimension: number
   // TODO oncoming feature - always disabled
   recordingsEnabled: boolean
+  /** Admin enabled RNNoise for this instance (users may then select it). Default false. */
+  rnnoiseEnabled?: boolean
+  /** Admin enabled Krisp for this instance (users may then select it). Default false. */
+  krispEnabled?: boolean
 }
 
 let cached: PublicSettings | null = null

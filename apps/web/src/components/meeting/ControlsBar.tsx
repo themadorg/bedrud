@@ -32,10 +32,12 @@ import { DeafenHeadphonesIcon } from '#/components/meeting/DeafenHeadphonesIcon'
 import { useMeetingMicKeyboard } from '#/components/meeting/useMeetingMicKeyboard'
 import { BedrudSettingsDialog } from '#/components/settings/BedrudSettingsDialog'
 import { type NoiseSuppressionMode, useAudioPreferencesStore } from '#/lib/audio-preferences.store'
-import { AudioProcessorService } from '#/lib/audio-processor.service'
+import { AudioProcessorService, audioProcessorService } from '#/lib/audio-processor.service'
 import { useAuthStore } from '#/lib/auth.store'
 import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
 import { readMeetingDeviceId, writeMeetingDeviceId } from '#/lib/meeting-device-storage'
+import { getPublicSettings, refreshPublicSettings } from '#/lib/use-public-settings'
+import { useRequestNoiseMode } from '#/lib/use-request-noise-mode'
 import { cn } from '#/lib/utils'
 import { DeviceSelector } from '@/components/meeting/DeviceSelector'
 import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
@@ -194,7 +196,7 @@ const NOISE_MODES: { value: NoiseSuppressionMode; label: string }[] = [
   { value: 'none', label: 'Off' },
   { value: 'browser', label: 'Browser' },
   { value: 'rnnoise', label: 'RNNoise' },
-  { value: 'krisp', label: 'Krisp AI' },
+  { value: 'krisp', label: 'Krisp' },
 ]
 
 /* ── Device list hook (replaces individual DeviceSelector for audio) ──────── */
@@ -324,6 +326,34 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
 
   const noiseMode = useAudioPreferencesStore((s) => s.noiseSuppressionMode)
   const setMode = useAudioPreferencesStore((s) => s.setMode)
+  const [rnnoiseAllowed, setRnnoiseAllowed] = useState(false)
+  const [krispAllowed, setKrispAllowed] = useState(false)
+  useEffect(() => {
+    refreshPublicSettings()
+    void getPublicSettings().then((s) => {
+      const rn = !!s.rnnoiseEnabled
+      const kr = !!s.krispEnabled
+      setRnnoiseAllowed(rn)
+      setKrispAllowed(kr)
+      audioProcessorService.setNoisePackageAllowed({ rnnoise: rn, krisp: kr })
+    })
+  }, [])
+  const { requestMode } = useRequestNoiseMode({ rnnoiseAllowed, krispAllowed })
+  useEffect(() => {
+    if ((noiseMode === 'rnnoise' && !rnnoiseAllowed) || (noiseMode === 'krisp' && !krispAllowed)) {
+      setMode('browser')
+    }
+  }, [noiseMode, rnnoiseAllowed, krispAllowed, setMode])
+  // Hide RNNoise/Krisp entirely when instance admin has not enabled them.
+  const noiseModes = useMemo(
+    () =>
+      NOISE_MODES.filter((m) => {
+        if (m.value === 'rnnoise') return rnnoiseAllowed
+        if (m.value === 'krisp') return krispAllowed
+        return true
+      }),
+    [rnnoiseAllowed, krispAllowed],
+  )
 
   const mics = useDeviceList('audioinput')
   const speakers = useDeviceList('audiooutput')
@@ -832,13 +862,13 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
                 )}
 
                 <DropdownMenuLabel className={meetMenuLabelCn}>Noise Suppression</DropdownMenuLabel>
-                {NOISE_MODES.map(({ value, label }) => {
+                {noiseModes.map(({ value, label }) => {
                   const disabled = value === 'krisp' && !AudioProcessorService.isKrispSupported()
                   return (
                     <DropdownMenuItem
                       key={value}
                       disabled={disabled}
-                      onSelect={() => setMode(value)}
+                      onSelect={() => requestMode(value)}
                       className={cn(meetMenuItemCn, disabled && 'cursor-not-allowed')}
                     >
                       <Check
@@ -1009,7 +1039,7 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
                 Noise Suppression
               </h3>
               <ul className="m-0 list-none overflow-hidden rounded-xl border border-[var(--meet-border)] bg-[var(--meet-surface-muted)] p-0">
-                {NOISE_MODES.map(({ value, label }, i) => {
+                {noiseModes.map(({ value, label }, i) => {
                   const disabled = value === 'krisp' && !AudioProcessorService.isKrispSupported()
                   const active = noiseMode === value
                   return (
@@ -1019,7 +1049,7 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
                         disabled={disabled}
                         onClick={() => {
                           if (disabled) return
-                          setMode(value)
+                          requestMode(value)
                         }}
                         className={cn(
                           'flex w-full items-center gap-3 border-none bg-transparent px-3.5 py-3.5 text-start transition-colors',

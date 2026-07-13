@@ -134,7 +134,7 @@ export default {
       guestJoinJitsi: "はい",
       guestJoinBbb: "はい（モデレーター承認）",
       audioProcessing: "オーディオ処理（ノイズキャンセル）",
-      audioProcessingBedrud: "RNNoise / Krisp",
+      audioProcessingBedrud: "RNNoise",
       audioProcessingJitsi: "基本",
       audioProcessingBbb: "基本",
       screenShare: "画面共有",
@@ -699,7 +699,7 @@ export default {
       pain: "ミーティングの背景ノイズは気を散らし、非プロフェッショナルです。",
       title: "オーディオ処理",
       description:
-        "RNNoise駆動の内蔵ノイズ抑制。プレミアムAIノイズ抑制用のオプションKrisp統合。すべての通話でクリーンなオーディオ。",
+        "RNNoiseノイズ抑制を標準搭載。オプションのKrisp連携は既定でオフです。有効にする前に、有効なKrispライセンス（LiveKit CloudまたはKrisp商用ライセンスなど）を確認してください。Bedrudは無料のKrispライセンスを含みません。",
     },
     whiteboard: {
       pain: "別アプリのホワイトボードは会議の流れを断ちます。",

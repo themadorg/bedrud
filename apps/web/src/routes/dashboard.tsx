@@ -61,7 +61,8 @@ const ADMIN_NAV = [
   // { to: '/dashboard/admin/recordings' as const, label: 'Recordings', icon: Radio },
   { to: '/dashboard/admin/users' as const, label: 'Users', icon: Users },
   { to: '/dashboard/admin/rooms' as const, label: 'Rooms', icon: Video },
-  { to: '/dashboard/admin/settings' as const, label: 'Settings', icon: Settings },
+  // "System" not "Settings" — personal audio/Krisp lives under Main → Settings
+  { to: '/dashboard/admin/settings' as const, label: 'System', icon: Settings },
 ]
 
 function NavLink({

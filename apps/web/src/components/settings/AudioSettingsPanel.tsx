@@ -7,8 +7,10 @@ import {
   type NoiseSuppressionMode,
   useAudioPreferencesStore,
 } from '#/lib/audio-preferences.store'
-import { AudioProcessorService } from '#/lib/audio-processor.service'
+import { AudioProcessorService, audioProcessorService } from '#/lib/audio-processor.service'
 import { deviceIdToSelectValue, selectValueToDeviceId } from '#/lib/meeting-device-storage'
+import { getPublicSettings, refreshPublicSettings } from '#/lib/use-public-settings'
+import { useRequestNoiseMode } from '#/lib/use-request-noise-mode'
 import { patchUserPreferences } from '#/lib/user-preferences'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -266,8 +268,33 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
   const setPushToTalkEnabled = useAudioPreferencesStore((s) => s.setPushToTalkEnabled)
   const setPushToTalkKey = useAudioPreferencesStore((s) => s.setPushToTalkKey)
 
+  const [rnnoiseAllowed, setRnnoiseAllowed] = useState(false)
+  const [krispAllowed, setKrispAllowed] = useState(false)
+  useEffect(() => {
+    // Always re-fetch so admin toggle is reflected without a full page reload.
+    refreshPublicSettings()
+    void getPublicSettings().then((s) => {
+      const rn = !!s.rnnoiseEnabled
+      const kr = !!s.krispEnabled
+      setRnnoiseAllowed(rn)
+      setKrispAllowed(kr)
+      // Keep processor gates in sync so heavy SDKs are never loaded when disabled.
+      audioProcessorService.setNoisePackageAllowed({ rnnoise: rn, krisp: kr })
+    })
+  }, [])
+
+  const { requestMode } = useRequestNoiseMode({ rnnoiseAllowed, krispAllowed })
   const krispSupported = AudioProcessorService.isKrispSupported()
   const mic = useMicTest(mode, echoCancellation, inputGain, noiseGate)
+
+  // If admin disabled a package while user still has it selected, fall back to browser.
+  useEffect(() => {
+    if ((mode === 'rnnoise' && !rnnoiseAllowed) || (mode === 'krisp' && !krispAllowed)) {
+      setMode('browser')
+    }
+  }, [mode, rnnoiseAllowed, krispAllowed, setMode])
+
+  const krispLicenseAcknowledged = useAudioPreferencesStore((s) => s.krispLicenseAcknowledged)
 
   const audioPrefsRef = useRef<AudioPreferences>({
     noiseSuppressionMode: mode,
@@ -279,6 +306,7 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
     mutedBeepInterval,
     pushToTalkEnabled,
     pushToTalkKey,
+    krispLicenseAcknowledged,
   })
   audioPrefsRef.current = {
     noiseSuppressionMode: mode,
@@ -290,6 +318,7 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
     mutedBeepInterval,
     pushToTalkEnabled,
     pushToTalkKey,
+    krispLicenseAcknowledged,
   }
 
   const syncMutation = useMutation({
@@ -312,6 +341,7 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
     mutedBeepInterval,
     pushToTalkEnabled,
     pushToTalkKey,
+    krispLicenseAcknowledged,
   ])
 
   useEffect(() => {
@@ -333,18 +363,25 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
     meeting ? 'border-white/10 bg-white/[0.04]' : 'border-border bg-muted/40',
   )
 
+  // When admin disables RNNoise/Krisp, omit them entirely (not grayed out).
+  const visibleModes = MODES.filter((m) => {
+    if (m.value === 'rnnoise') return rnnoiseAllowed
+    if (m.value === 'krisp') return krispAllowed
+    return true
+  })
+
   return (
     <div className="flex flex-col gap-6">
       <Card>
         <CardHeader className="border-b px-5 py-3">
           <CardTitle className="text-sm font-semibold">Noise suppression</CardTitle>
           <CardDescription className="text-xs text-muted-foreground">
-            Choose how your microphone is processed before others hear you
+            Choose how your microphone is processed before others hear you.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-5">
           <div className={segmentTrackClass} role="radiogroup" aria-label="Noise suppression mode">
-            {MODES.map(({ value, label, icon: Icon }) => {
+            {visibleModes.map(({ value, label, icon: Icon }) => {
               const active = mode === value
               const disabled = value === 'krisp' && !krispSupported
               return (
@@ -354,7 +391,7 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
                     name="noise-suppression-mode"
                     value={value}
                     checked={active}
-                    onChange={() => setMode(value)}
+                    onChange={() => requestMode(value)}
                     disabled={disabled}
                     className="sr-only"
                   />
@@ -376,7 +413,7 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
             )}
           </div>
 
-          {(mode === 'rnnoise' || mode === 'krisp') && (
+          {((mode === 'rnnoise' && rnnoiseAllowed) || (mode === 'krisp' && krispAllowed)) && (
             <p className={cn('text-[10px]', meeting ? 'text-white/50' : 'text-muted-foreground')}>
               {mode === 'krisp' ? 'Krisp' : 'RNNoise'} runs in-call only — preview shows gain and gate.
             </p>

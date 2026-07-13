@@ -36,7 +36,7 @@ go run ./cmd/bedrud user promote --email you@example.com
 | [Contributing](./contributing.md) | Branches, commits, PRs, pre-submit checks |
 | [Makefile Reference](./makefile.md) | All build/dev/test commands |
 | [Debugging](./debugging.md) | Port conflicts, DB, LiveKit, auth issues |
-| [CI/CD](./ci.md) | GitHub Actions jobs and local equivalents |
+| [CI/CD pipelines](./ci.md) | All workflows, path filters, job deps, steps |
 
 ### By application
 

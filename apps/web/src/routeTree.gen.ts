@@ -38,6 +38,7 @@ import { Route as DashboardAdminRecordingsRouteImport } from './routes/dashboard
 import { Route as DashboardAdminQueueRouteImport } from './routes/dashboard/admin/queue'
 import { Route as DashboardAdminUsersRecentSignupsRouteImport } from './routes/dashboard/admin/users_.recent-signups'
 import { Route as DashboardAdminUsersUserIdRouteImport } from './routes/dashboard/admin/users_.$userId'
+import { Route as DashboardAdminSettingsAudioRouteImport } from './routes/dashboard/admin/settings_.audio'
 import { Route as DashboardAdminRoomsEventsRouteImport } from './routes/dashboard/admin/rooms_.events'
 import { Route as DashboardAdminRoomsRoomIdRouteImport } from './routes/dashboard/admin/rooms_.$roomId'
 
@@ -190,6 +191,12 @@ const DashboardAdminUsersUserIdRoute =
     path: '/users/$userId',
     getParentRoute: () => DashboardAdminRoute,
   } as any)
+const DashboardAdminSettingsAudioRoute =
+  DashboardAdminSettingsAudioRouteImport.update({
+    id: '/settings_/audio',
+    path: '/settings/audio',
+    getParentRoute: () => DashboardAdminRoute,
+  } as any)
 const DashboardAdminRoomsEventsRoute =
   DashboardAdminRoomsEventsRouteImport.update({
     id: '/rooms_/events',
@@ -233,6 +240,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/': typeof DashboardSettingsIndexRoute
   '/dashboard/admin/rooms/$roomId': typeof DashboardAdminRoomsRoomIdRoute
   '/dashboard/admin/rooms/events': typeof DashboardAdminRoomsEventsRoute
+  '/dashboard/admin/settings/audio': typeof DashboardAdminSettingsAudioRoute
   '/dashboard/admin/users/$userId': typeof DashboardAdminUsersUserIdRoute
   '/dashboard/admin/users/recent-signups': typeof DashboardAdminUsersRecentSignupsRoute
 }
@@ -262,6 +270,7 @@ export interface FileRoutesByTo {
   '/dashboard/settings': typeof DashboardSettingsIndexRoute
   '/dashboard/admin/rooms/$roomId': typeof DashboardAdminRoomsRoomIdRoute
   '/dashboard/admin/rooms/events': typeof DashboardAdminRoomsEventsRoute
+  '/dashboard/admin/settings/audio': typeof DashboardAdminSettingsAudioRoute
   '/dashboard/admin/users/$userId': typeof DashboardAdminUsersUserIdRoute
   '/dashboard/admin/users/recent-signups': typeof DashboardAdminUsersRecentSignupsRoute
 }
@@ -296,6 +305,7 @@ export interface FileRoutesById {
   '/dashboard/settings/': typeof DashboardSettingsIndexRoute
   '/dashboard/admin/rooms_/$roomId': typeof DashboardAdminRoomsRoomIdRoute
   '/dashboard/admin/rooms_/events': typeof DashboardAdminRoomsEventsRoute
+  '/dashboard/admin/settings_/audio': typeof DashboardAdminSettingsAudioRoute
   '/dashboard/admin/users_/$userId': typeof DashboardAdminUsersUserIdRoute
   '/dashboard/admin/users_/recent-signups': typeof DashboardAdminUsersRecentSignupsRoute
 }
@@ -331,6 +341,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/'
     | '/dashboard/admin/rooms/$roomId'
     | '/dashboard/admin/rooms/events'
+    | '/dashboard/admin/settings/audio'
     | '/dashboard/admin/users/$userId'
     | '/dashboard/admin/users/recent-signups'
   fileRoutesByTo: FileRoutesByTo
@@ -360,6 +371,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings'
     | '/dashboard/admin/rooms/$roomId'
     | '/dashboard/admin/rooms/events'
+    | '/dashboard/admin/settings/audio'
     | '/dashboard/admin/users/$userId'
     | '/dashboard/admin/users/recent-signups'
   id:
@@ -393,6 +405,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/'
     | '/dashboard/admin/rooms_/$roomId'
     | '/dashboard/admin/rooms_/events'
+    | '/dashboard/admin/settings_/audio'
     | '/dashboard/admin/users_/$userId'
     | '/dashboard/admin/users_/recent-signups'
   fileRoutesById: FileRoutesById
@@ -611,6 +624,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminUsersUserIdRouteImport
       parentRoute: typeof DashboardAdminRoute
     }
+    '/dashboard/admin/settings_/audio': {
+      id: '/dashboard/admin/settings_/audio'
+      path: '/settings/audio'
+      fullPath: '/dashboard/admin/settings/audio'
+      preLoaderRoute: typeof DashboardAdminSettingsAudioRouteImport
+      parentRoute: typeof DashboardAdminRoute
+    }
     '/dashboard/admin/rooms_/events': {
       id: '/dashboard/admin/rooms_/events'
       path: '/rooms/events'
@@ -659,6 +679,7 @@ interface DashboardAdminRouteChildren {
   DashboardAdminIndexRoute: typeof DashboardAdminIndexRoute
   DashboardAdminRoomsRoomIdRoute: typeof DashboardAdminRoomsRoomIdRoute
   DashboardAdminRoomsEventsRoute: typeof DashboardAdminRoomsEventsRoute
+  DashboardAdminSettingsAudioRoute: typeof DashboardAdminSettingsAudioRoute
   DashboardAdminUsersUserIdRoute: typeof DashboardAdminUsersUserIdRoute
   DashboardAdminUsersRecentSignupsRoute: typeof DashboardAdminUsersRecentSignupsRoute
 }
@@ -672,6 +693,7 @@ const DashboardAdminRouteChildren: DashboardAdminRouteChildren = {
   DashboardAdminIndexRoute: DashboardAdminIndexRoute,
   DashboardAdminRoomsRoomIdRoute: DashboardAdminRoomsRoomIdRoute,
   DashboardAdminRoomsEventsRoute: DashboardAdminRoomsEventsRoute,
+  DashboardAdminSettingsAudioRoute: DashboardAdminSettingsAudioRoute,
   DashboardAdminUsersUserIdRoute: DashboardAdminUsersUserIdRoute,
   DashboardAdminUsersRecentSignupsRoute: DashboardAdminUsersRecentSignupsRoute,
 }

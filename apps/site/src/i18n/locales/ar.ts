@@ -134,7 +134,7 @@ export default {
       guestJoinJitsi: "نعم",
       guestJoinBbb: "نعم (بموافقة المشرف)",
       audioProcessing: "معالجة الصوت (إلغاء الضوضاء)",
-      audioProcessingBedrud: "RNNoise / Krisp",
+      audioProcessingBedrud: "RNNoise",
       audioProcessingJitsi: "أساسي",
       audioProcessingBbb: "أساسي",
       screenShare: "مشاركة الشاشة",
@@ -643,7 +643,7 @@ export default {
       pain: "الضوضاء الخلفية في الاجتماعات مشتتة وغير احترافية.",
       title: "معالجة الصوت",
       description:
-        "إلغاء ضوضاء مدمج مدعوم بـ RNNoise. تكامل Krisp اختياري لإلغاء ضوضاء بالذكاء الاصطناعي المتميز. صوت نقي في كل مكالمة.",
+        "إلغاء ضوضاء RNNoise مضمّن افتراضيًا. ربط Krisp الاختياري معطّل افتراضيًا — يجب تفعيله والتأكد من وجود ترخيص Krisp صالح (مثل LiveKit Cloud أو ترخيص Krisp التجاري). Bedrud لا يوفّر ترخيص Krisp مجانيًا.",
     },
     whiteboard: {
       pain: "السبورات التي تعيش في تطبيق آخر تقطع تدفق الاجتماع.",

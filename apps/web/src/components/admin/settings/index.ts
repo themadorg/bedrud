@@ -1,3 +1,4 @@
+export { AudioTab } from './audio-tab'
 export { AuthTab } from './auth-tab'
 export { ChatTab } from './chat-tab'
 export { CorsTab } from './cors-tab'

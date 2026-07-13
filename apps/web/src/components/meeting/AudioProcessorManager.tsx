@@ -1,51 +1,62 @@
 import { useConnectionState, useLocalParticipant } from '@livekit/components-react'
 import type { LocalAudioTrack } from 'livekit-client'
 import { ConnectionState, Track } from 'livekit-client'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
 import { audioProcessorService } from '#/lib/audio-processor.service'
+import { getPublicSettings, refreshPublicSettings } from '#/lib/use-public-settings'
 
 /**
  * Null-rendering component that manages the AudioProcessor lifecycle inside
  * the meeting room. Must be placed inside <LiveKitRoom> so hooks work.
  *
- * - Attaches the processor once the room reaches Connected state
- * - Switches processor when the user changes mode mid-meeting
- * - Detaches and cleans up on unmount
+ * Never loads RNNoise/Krisp SDKs unless admin enabled them for the instance.
  */
 export function AudioProcessorManager() {
   const { localParticipant } = useLocalParticipant()
   const connectionState = useConnectionState()
   const mode = useAudioPreferencesStore((s) => s.noiseSuppressionMode)
+  const krispLicenseAcknowledged = useAudioPreferencesStore((s) => s.krispLicenseAcknowledged)
   const echoCancellation = useAudioPreferencesStore((s) => s.echoCancellation)
   const autoGainControl = useAudioPreferencesStore((s) => s.autoGainControl)
+  const [rnnoiseAllowed, setRnnoiseAllowed] = useState(false)
+  const [krispAllowed, setKrispAllowed] = useState(false)
 
-  // Attach on connect
+  useEffect(() => {
+    refreshPublicSettings()
+    void getPublicSettings().then((s) => {
+      const rn = !!s.rnnoiseEnabled
+      const kr = !!s.krispEnabled
+      setRnnoiseAllowed(rn)
+      setKrispAllowed(kr)
+      audioProcessorService.setNoisePackageAllowed({ rnnoise: rn, krisp: kr })
+    })
+  }, [])
+
+  let effectiveMode = mode
+  if (mode === 'rnnoise' && !rnnoiseAllowed) effectiveMode = 'browser'
+  if (mode === 'krisp' && (!krispAllowed || !krispLicenseAcknowledged)) effectiveMode = 'browser'
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: only attach once on connect; mode changes are handled by the next effect
   useEffect(() => {
     if (connectionState !== ConnectionState.Connected) return
     const pub = localParticipant?.getTrackPublication(Track.Source.Microphone)
     const track = pub?.track
     if (track) {
-      audioProcessorService.attach(track as LocalAudioTrack, mode)
+      audioProcessorService.attach(track as LocalAudioTrack, effectiveMode)
     }
-    // We intentionally only run this when connection state changes to Connected,
-    // not on every mode change — mode changes are handled by the effect below.
   }, [connectionState, localParticipant])
 
-  // Switch processor when mode changes mid-meeting, passing current EC/AGC prefs
   useEffect(() => {
     if (connectionState !== ConnectionState.Connected) return
-    audioProcessorService.switchMode(mode, { echoCancellation, autoGainControl })
-  }, [mode, connectionState, echoCancellation, autoGainControl])
+    audioProcessorService.switchMode(effectiveMode, { echoCancellation, autoGainControl })
+  }, [effectiveMode, connectionState, echoCancellation, autoGainControl])
 
-  // Apply echo cancellation changes live (without re-triggering full mode switch)
   useEffect(() => {
     if (connectionState !== ConnectionState.Connected) return
     audioProcessorService.setEchoCancellation(echoCancellation)
   }, [echoCancellation, connectionState])
 
-  // Cleanup on unmount
   useEffect(
     () => () => {
       audioProcessorService.detach()

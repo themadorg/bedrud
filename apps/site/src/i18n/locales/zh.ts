@@ -134,7 +134,7 @@ export default {
       guestJoinJitsi: "是",
       guestJoinBbb: "是 (需要主持人批准)",
       audioProcessing: "音频处理 (降噪)",
-      audioProcessingBedrud: "RNNoise / Krisp",
+      audioProcessingBedrud: "RNNoise",
       audioProcessingJitsi: "基础",
       audioProcessingBbb: "基础",
       screenShare: "屏幕共享",
@@ -740,7 +740,7 @@ export default {
       pain: "会议中的背景噪音让人分心且不专业。",
       title: "音频处理",
       description:
-        "由 RNNoise 驱动的内置降噪。可选的 Krisp 集成，用于高级 AI 降噪。每次通话都有清晰的音频。",
+        "默认内置 RNNoise 降噪。可选的 Krisp 接线默认关闭——需自行启用并确认持有有效 Krisp 许可（如 LiveKit Cloud 或 Krisp 商业许可）。Bedrud 不提供免费 Krisp 许可。",
     },
     whiteboard: {
       pain: "白板放在另一个应用里会打断会议流程。",
