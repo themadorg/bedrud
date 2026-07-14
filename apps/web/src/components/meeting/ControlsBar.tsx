@@ -36,6 +36,7 @@ import { AudioProcessorService, audioProcessorService } from '#/lib/audio-proces
 import { useAuthStore } from '#/lib/auth.store'
 import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
 import { readMeetingDeviceId, writeMeetingDeviceId } from '#/lib/meeting-device-storage'
+import { SCREEN_SHARE_CAPTURE_OPTIONS } from '#/lib/screen-share-capture'
 import { getPublicSettings, refreshPublicSettings } from '#/lib/use-public-settings'
 import { useRequestNoiseMode } from '#/lib/use-request-noise-mode'
 import { cn } from '#/lib/utils'
@@ -668,7 +669,7 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
                       toast.error(err)
                       return
                     }
-                    await localParticipant?.setScreenShareEnabled(true)
+                    await localParticipant?.setScreenShareEnabled(true, SCREEN_SHARE_CAPTURE_OPTIONS)
                     const ready = localParticipant ? await waitForScreenSharePublication(localParticipant) : false
                     if (!ready) {
                       clearStage()
