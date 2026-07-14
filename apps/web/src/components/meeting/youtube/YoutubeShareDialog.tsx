@@ -45,8 +45,8 @@ export function YoutubeShareDialog() {
         }}
       >
         <DialogHeader>
-          <DialogTitle className="text-white">Share YouTube</DialogTitle>
-          <DialogDescription className="text-white/50">
+          <DialogTitle className="text-[var(--meet-fg-strong)]">Share YouTube</DialogTitle>
+          <DialogDescription className="text-[var(--meet-fg-muted)]">
             Paste a YouTube link. Everyone in the room will watch together in sync.
           </DialogDescription>
         </DialogHeader>
@@ -62,17 +62,17 @@ export function YoutubeShareDialog() {
             if (e.key === 'Enter') handleSubmit()
           }}
           placeholder="https://youtube.com/watch?v=..."
-          className="border-white/[0.12] bg-white/[0.06] text-white placeholder:text-white/35"
+          className="rounded-lg border border-[var(--meet-border)] bg-[var(--meet-control)] px-2.5 text-[var(--meet-fg-strong)] placeholder:text-[var(--meet-fg-subtle)] focus-visible:border-[color-mix(in_oklab,var(--meet-accent)_40%,transparent)]"
         />
 
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button
             type="button"
             variant="ghost"
             onClick={() => closeShareDialog()}
-            className="border border-white/10 text-white/60 hover:bg-white/10 hover:text-white"
+            className="border border-[var(--meet-border-subtle)] text-[var(--meet-fg-muted)] hover:bg-[var(--meet-control)] hover:text-[var(--meet-fg-strong)]"
           >
             Cancel
           </Button>

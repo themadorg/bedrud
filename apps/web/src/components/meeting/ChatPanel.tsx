@@ -9,11 +9,8 @@ import {
   type SystemMessage,
 } from '@/components/meeting/MeetingContext'
 import { MeetingElevatedLeftDock } from '@/components/meeting/MeetingElevatedLeftDock'
-import {
-  MeetingElevatedMeetingSubheader,
-  MeetingElevatedPanelBody,
-  MeetingElevatedPanelHeader,
-} from '@/components/meeting/MeetingElevatedPanelChrome'
+import { MeetingElevatedPanelBody, MeetingElevatedPanelHeader } from '@/components/meeting/MeetingElevatedPanelChrome'
+import { useMeetingExpandChromeHandlers } from '@/components/meeting/meeting-expand-chrome-context'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { ChatInput, type ChatInputHandle } from './chat/ChatInput'
@@ -87,6 +84,8 @@ export function ChatPanel({
   const inputRef = useRef<ChatInputHandle>(null)
   const noop = useCallback(() => {}, [])
   const isMobile = useIsMobileChat()
+  const { closeChat: closeElevatedChat } = useMeetingExpandChromeHandlers()
+  const handleClose = elevated ? closeElevatedChat : onClose
   // Mobile is always a full-screen modal — never dock/stick.
   const isDocked = stuck && !isMobile
   const fromLeft = side === 'left' && !isMobile
@@ -117,7 +116,7 @@ export function ChatPanel({
   )
 
   // Modal / overlay / elevated: trap focus. Docked desktop sidebar: leave focus free.
-  const trapRef = useFocusTrap({ enabled: isOverlay || elevated, onClose })
+  const trapRef = useFocusTrap({ enabled: isOverlay || elevated, onClose: handleClose })
 
   const chatBody = (
     <>
@@ -128,11 +127,12 @@ export function ChatPanel({
         onVotePoll={votePoll}
         onReactToMessage={reactToMessage}
         onScrollUnreadChange={noop}
+        elevated={elevated}
         onDrop={(file) => {
           inputRef.current?.attachFile(file)
         }}
       />
-      <ChatInput ref={inputRef} onSend={sendChat} onUpload={uploadAndSend} />
+      <ChatInput ref={inputRef} onSend={sendChat} onUpload={uploadAndSend} elevated={elevated} />
     </>
   )
 
@@ -154,7 +154,7 @@ export function ChatPanel({
           )}
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className={cn(headerBtnClass(), 'h-11 w-11 max-sm:rounded-lg')}
             aria-label="Close chat"
           >
@@ -169,8 +169,7 @@ export function ChatPanel({
   if (elevated) {
     return (
       <MeetingElevatedLeftDock label="Chat" marker="chat" shellRef={trapRef}>
-        <MeetingElevatedPanelHeader title="Chat" onClose={onClose} closeLabel="Close chat" />
-        <MeetingElevatedMeetingSubheader />
+        <MeetingElevatedPanelHeader title="Chat" onClose={handleClose} closeLabel="Close chat" />
         <MeetingElevatedPanelBody>{chatBody}</MeetingElevatedPanelBody>
       </MeetingElevatedLeftDock>
     )

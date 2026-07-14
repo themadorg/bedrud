@@ -151,9 +151,17 @@ interface Props {
   onImageOpen?: (url: string) => void
   onVotePoll: (messageId: string, optionId: string) => void
   onReactToMessage: (messageId: string, emoji: string) => void
+  elevated?: boolean
 }
 
-export function ChatMessageCluster({ cluster, currentIdentity, onImageOpen, onVotePoll, onReactToMessage }: Props) {
+export function ChatMessageCluster({
+  cluster,
+  currentIdentity,
+  onImageOpen,
+  onVotePoll,
+  onReactToMessage,
+  elevated = false,
+}: Props) {
   const room = useRoomContext()
   const localIdentity = room.localParticipant.identity
   const { sender, identity, messages } = cluster
@@ -202,6 +210,7 @@ export function ChatMessageCluster({ cluster, currentIdentity, onImageOpen, onVo
             senderName={sender}
             currentIdentity={currentIdentity}
             onReact={(emoji) => onReactToMessage(msg.id, emoji)}
+            elevated={elevated}
           >
             <div className={cn(loneEmoji ? 'min-w-0 text-[56px] leading-none select-none' : chromeClass)}>
               {msg.attachments.map((att, ai) => {

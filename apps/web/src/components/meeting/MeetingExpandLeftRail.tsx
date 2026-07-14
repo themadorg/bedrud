@@ -177,7 +177,7 @@ export function MeetingExpandLeftRail({ activePanel, chromeDetail, onLeave, leav
           ) : null}
         </div>
       </aside>
-      <RoomAccessDialog open={accessDialogOpen} onOpenChange={setAccessDialogOpen} />
+      <RoomAccessDialog open={accessDialogOpen} onOpenChange={setAccessDialogOpen} aboveElevatedDock />
     </>
   )
 }

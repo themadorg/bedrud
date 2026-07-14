@@ -19,6 +19,9 @@ interface UseFocusTrapOptions {
 export function useFocusTrap(options: UseFocusTrapOptions) {
   const ref = useRef<HTMLElement | null>(null)
   const prevFocusRef = useRef<HTMLElement | null>(null)
+  const onCloseRef = useRef(options.onClose)
+
+  onCloseRef.current = options.onClose
 
   useEffect(() => {
     if (!options.enabled) return
@@ -26,10 +29,8 @@ export function useFocusTrap(options: UseFocusTrapOptions) {
     const el = ref.current
     if (!el) return
 
-    // Save previously focused element
     prevFocusRef.current = document.activeElement as HTMLElement
 
-    // Focus first focusable inside
     const focusable = getFocusable(el)
     if (focusable.length > 0) {
       focusable[0].focus()
@@ -38,9 +39,8 @@ export function useFocusTrap(options: UseFocusTrapOptions) {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        // Stop expanded WebXDC (window listener) from also collapsing on the same Escape.
         e.stopPropagation()
-        options.onClose()
+        onCloseRef.current()
         return
       }
 
@@ -75,7 +75,7 @@ export function useFocusTrap(options: UseFocusTrapOptions) {
       // Restore focus to trigger element
       prevFocusRef.current?.focus()
     }
-  }, [options.enabled, options.onClose])
+  }, [options.enabled])
 
   return ref
 }

@@ -3,6 +3,8 @@ import { createContext, useContext } from 'react'
 export type MeetingExpandChromeHandlers = {
   openChat: () => void
   openInfo: () => void
+  closeChat: () => void
+  closeInfo: () => void
 }
 
 export const MeetingExpandChromeContext = createContext<MeetingExpandChromeHandlers | null>(null)

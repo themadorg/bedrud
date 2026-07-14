@@ -1,5 +1,6 @@
 import { Smile } from 'lucide-react'
 import { lazy, Suspense, useCallback, useState } from 'react'
+import { meetingElevatedOverlayClass } from '@/components/meeting/MeetingElevatedLeftDock'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { QUICK_REACTIONS } from './chatReactions'
@@ -20,6 +21,7 @@ interface Props {
   variant?: 'ghost' | 'boxed'
   className?: string
   ariaLabel?: string
+  elevated?: boolean
 }
 
 export function ChatEmojiPicker({
@@ -32,6 +34,7 @@ export function ChatEmojiPicker({
   variant = 'boxed',
   className,
   ariaLabel = 'Insert emoji',
+  elevated = false,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
@@ -130,7 +133,10 @@ export function ChatEmojiPicker({
       <PopoverContent
         side={side}
         align={align}
-        className="w-auto border-[var(--meet-border)] bg-transparent p-0 shadow-none"
+        className={cn(
+          'w-auto border-[var(--meet-border)] bg-transparent p-0 shadow-none',
+          elevated && meetingElevatedOverlayClass,
+        )}
       >
         {pickerContent}
       </PopoverContent>

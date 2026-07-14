@@ -16,6 +16,7 @@ interface Props {
   onReactToMessage: (messageId: string, emoji: string) => void
   onScrollUnreadChange: (n: number) => void
   onDrop: (file: File) => void
+  elevated?: boolean
 }
 
 export function ChatMessageList({
@@ -26,6 +27,7 @@ export function ChatMessageList({
   onReactToMessage,
   onScrollUnreadChange,
   onDrop,
+  elevated = false,
 }: Props) {
   const messagesRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -165,6 +167,7 @@ export function ChatMessageList({
                   onImageOpen={setPreviewUrl}
                   onVotePoll={onVotePoll}
                   onReactToMessage={onReactToMessage}
+                  elevated={elevated}
                 />
               </div>
             )

@@ -1,7 +1,7 @@
 import { useParticipants } from '@livekit/components-react'
 import { BarChart3, Copy, Info } from 'lucide-react'
 import { type ReactNode, useCallback, useMemo, useState } from 'react'
-
+import { meetingElevatedOverlayClass } from '@/components/meeting/MeetingElevatedLeftDock'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -24,9 +24,17 @@ interface Props {
   currentIdentity: string
   onReact: (emoji: string) => void
   children: ReactNode
+  elevated?: boolean
 }
 
-export function ChatMessageContextMenu({ message, senderName, currentIdentity, onReact, children }: Props) {
+export function ChatMessageContextMenu({
+  message,
+  senderName,
+  currentIdentity,
+  onReact,
+  children,
+  elevated = false,
+}: Props) {
   const [infoOpen, setInfoOpen] = useState(false)
   const [resultsOpen, setResultsOpen] = useState(false)
   const participants = useParticipants()
@@ -58,7 +66,8 @@ export function ChatMessageContextMenu({ message, senderName, currentIdentity, o
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent
         className={cn(
-          'meet-dialog z-50 min-w-[200px] max-w-[min(260px,85vw)] border-white/10 bg-[#0f0f1c]/98 p-1 text-white/90 shadow-lg backdrop-blur-xl',
+          'meet-dialog min-w-[200px] max-w-[min(260px,85vw)] border-white/10 bg-[#0f0f1c]/98 p-1 text-white/90 shadow-lg backdrop-blur-xl',
+          elevated ? meetingElevatedOverlayClass : 'z-50',
         )}
       >
         <ContextMenuGroup className="grid grid-cols-4 gap-0.5 px-2 py-1.5">
@@ -143,6 +152,7 @@ export function ChatMessageContextMenu({ message, senderName, currentIdentity, o
           open={resultsOpen}
           onOpenChange={setResultsOpen}
           currentIdentity={currentIdentity}
+          aboveElevatedDock={elevated}
         />
       )}
 
@@ -152,6 +162,7 @@ export function ChatMessageContextMenu({ message, senderName, currentIdentity, o
         open={infoOpen}
         onOpenChange={setInfoOpen}
         currentIdentity={currentIdentity}
+        aboveElevatedDock={elevated}
       />
     </ContextMenu>
   )

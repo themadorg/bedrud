@@ -38,16 +38,17 @@ const DialogContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
     /** Stack above expanded WebXDC (z-200) and similar overlays. */
     elevated?: boolean
+    /** Stack above elevated left dock (z-250). */
+    aboveElevatedDock?: boolean
   }
->(({ className, children, elevated = false, ...props }, ref) => (
+>(({ className, children, elevated = false, aboveElevatedDock = false, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay className={elevated ? 'z-[219]' : undefined} />
+    <DialogOverlay className={aboveElevatedDock ? 'z-[259]' : elevated ? 'z-[219]' : undefined} />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        // Center inside the *visual* viewport (toolbar-safe on iPhone Safari).
         'fixed z-50 grid gap-4 border bg-background p-6 shadow-lg duration-200',
-        elevated && 'z-[220]',
+        aboveElevatedDock ? 'z-[260]' : elevated && 'z-[220]',
         'left-[calc(var(--app-offset-left,0px)+var(--app-width,100svw)/2)]',
         'top-[calc(var(--app-offset-top,0px)+var(--app-height,100svh)/2)]',
         '-translate-x-1/2 -translate-y-1/2',

@@ -10,9 +10,10 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   currentIdentity: string
+  aboveElevatedDock?: boolean
 }
 
-export function ChatPollResultsModal({ poll, open, onOpenChange, currentIdentity }: Props) {
+export function ChatPollResultsModal({ poll, open, onOpenChange, currentIdentity, aboveElevatedDock = false }: Props) {
   const participants = useParticipants()
 
   const resolveName = useCallback(
@@ -29,7 +30,10 @@ export function ChatPollResultsModal({ poll, open, onOpenChange, currentIdentity
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="meet-dialog max-h-[min(calc(var(--app-height,100svh)*0.85),520px)] max-w-[min(380px,calc(var(--app-width,100svw)-2rem))] gap-0 overflow-hidden p-0 shadow-2xl">
+      <DialogContent
+        aboveElevatedDock={aboveElevatedDock}
+        className="meet-dialog max-h-[min(calc(var(--app-height,100svh)*0.85),520px)] max-w-[min(380px,calc(var(--app-width,100svw)-2rem))] gap-0 overflow-hidden p-0 shadow-2xl"
+      >
         <DialogHeader className="border-b border-white/[0.08] px-4 py-3">
           <DialogTitle className="text-[15px] font-semibold text-white/90">Poll results</DialogTitle>
         </DialogHeader>

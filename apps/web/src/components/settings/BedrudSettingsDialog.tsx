@@ -10,7 +10,6 @@ import { VideoSettingsPanel } from '#/components/settings/VideoSettingsPanel'
 import { cn } from '#/lib/utils'
 import { MeetingElevatedLeftDock } from '@/components/meeting/MeetingElevatedLeftDock'
 import {
-  MeetingElevatedMeetingSubheader,
   MeetingElevatedPanelHeader,
   MeetingElevatedPanelSectionSubheader,
 } from '@/components/meeting/MeetingElevatedPanelChrome'
@@ -100,8 +99,6 @@ function SettingsListNav({
           ) : undefined
         }
       />
-
-      <MeetingElevatedMeetingSubheader />
 
       {page && activeTabMeta && (
         <MeetingElevatedPanelSectionSubheader title={activeTabMeta.label} className={pageAnimClass} />

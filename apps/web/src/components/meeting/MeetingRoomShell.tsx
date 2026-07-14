@@ -134,12 +134,40 @@ export function MeetingRoomShell({ meetId, navigate, children }: MeetingRoomShel
     publishMeetingChromeState('info')
   }, [])
 
+  const closeChatFromExpand = useCallback(() => {
+    setParticipantsOpen(false)
+    setInfoOpen(false)
+    setChatOpen(false)
+    setChatStuck(false)
+    setElevatedPanel((p) => {
+      if (p === 'chat') {
+        publishMeetingChromeState(null)
+        return null
+      }
+      return p
+    })
+    setChatSide('right')
+  }, [])
+
+  const closeInfoFromExpand = useCallback(() => {
+    setInfoOpen(false)
+    setElevatedPanel((p) => {
+      if (p === 'info') {
+        publishMeetingChromeState(null)
+        return null
+      }
+      return p
+    })
+  }, [])
+
   const expandChromeHandlers = useMemo(
     () => ({
       openChat: () => openChatFromExpand(),
       openInfo: () => openInfoFromExpand(),
+      closeChat: () => closeChatFromExpand(),
+      closeInfo: () => closeInfoFromExpand(),
     }),
-    [openChatFromExpand, openInfoFromExpand],
+    [openChatFromExpand, openInfoFromExpand, closeChatFromExpand, closeInfoFromExpand],
   )
 
   useEffect(() => {

@@ -13,6 +13,7 @@ import {
   MeetingElevatedPanelHeader,
   useMeetingElapsedClock,
 } from '@/components/meeting/MeetingElevatedPanelChrome'
+import { useMeetingExpandChromeHandlers } from '@/components/meeting/meeting-expand-chrome-context'
 import { WebxdcPanel } from '@/components/meeting/webxdc/WebxdcPanel'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
@@ -214,11 +215,13 @@ interface RoomInfoPanelProps {
 }
 
 export function RoomInfoPanel({ open, onOpenChange, roomId, elevated = false }: RoomInfoPanelProps) {
+  const { closeInfo: closeElevatedInfo } = useMeetingExpandChromeHandlers()
   const close = () => onOpenChange(false)
+  const handleClose = elevated ? closeElevatedInfo : close
 
   const sheetBody = (
     <>
-      <RoomInfoSheetHeader onClose={close} />
+      <RoomInfoSheetHeader onClose={handleClose} />
       <RoomInfoContent roomId={roomId} active={open} />
     </>
   )

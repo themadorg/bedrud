@@ -8,6 +8,11 @@ export const MEETING_ELEVATED_DOCK_WIDTH = 'min(360px, calc(var(--app-width, 100
 /** Above expanded WebXDC (inline zIndex 200). */
 export const MEETING_ELEVATED_Z = 250
 
+/** Popovers, context menus, and dialogs opened from an elevated dock. */
+export const MEETING_ELEVATED_OVERLAY_Z = MEETING_ELEVATED_Z + 10
+
+export const meetingElevatedOverlayClass = `z-[${MEETING_ELEVATED_OVERLAY_Z}]`
+
 const dockStyle: CSSProperties = {
   zIndex: MEETING_ELEVATED_Z,
   // Flush against expand left rail (w-12 = 3rem).

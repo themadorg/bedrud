@@ -61,6 +61,7 @@ interface Props {
   onSend: (text: string, attachments?: ChatAttachment[], poll?: ChatPoll) => void
   onUpload: (file: File) => Promise<ChatAttachment>
   disabled?: boolean
+  elevated?: boolean
 }
 
 export interface ChatInputHandle {
@@ -84,7 +85,10 @@ const iconBtnClass = (enabled: boolean) =>
       : 'cursor-default text-[var(--meet-fg-subtle)]',
   )
 
-export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({ onSend, onUpload, disabled }, ref) {
+export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput(
+  { onSend, onUpload, disabled, elevated = false },
+  ref,
+) {
   const [draft, setDraft] = useState('')
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([])
   const [uploading, setUploading] = useState(false)
@@ -305,6 +309,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       variant="ghost"
       className="h-7 w-7"
       ariaLabel="Insert emoji"
+      elevated={elevated}
     />
   )
 

@@ -50,9 +50,7 @@ export function MeetingElevatedPanelHeader({ title, onClose, closeLabel, leading
   return (
     <header className="flex shrink-0 items-center gap-1 border-b border-[var(--meet-border)]">
       <div className="flex h-12 w-full items-center px-1">
-        {leading ?? (
-          <span className="flex-1 px-3 text-[17px] font-semibold text-[var(--meet-fg-strong)]">{title}</span>
-        )}
+        {leading ?? <span className="flex-1 px-3 text-[17px] font-semibold text-[var(--meet-fg-strong)]">{title}</span>}
         <button
           type="button"
           onClick={onClose}
@@ -89,13 +87,7 @@ export function MeetingElevatedMeetingSubheader() {
   )
 }
 
-export function MeetingElevatedPanelSectionSubheader({
-  title,
-  className,
-}: {
-  title: string
-  className?: string
-}) {
+export function MeetingElevatedPanelSectionSubheader({ title, className }: { title: string; className?: string }) {
   return (
     <div className={cn('shrink-0 border-b border-[var(--meet-border)] px-4 py-2', className)}>
       <h2 className="text-[15px] font-semibold text-[var(--meet-fg-strong)]">{title}</h2>
@@ -103,12 +95,6 @@ export function MeetingElevatedPanelSectionSubheader({
   )
 }
 
-export function MeetingElevatedPanelBody({
-  children,
-  className,
-}: {
-  children: ReactNode
-  className?: string
-}) {
+export function MeetingElevatedPanelBody({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn('flex min-h-0 flex-1 flex-col', className)}>{children}</div>
 }
