@@ -4,7 +4,7 @@ import { MeetingPanels } from '@/components/meeting/MeetingPanels'
 import { MeetingUILayoutProvider, participantsDockOffset } from '@/components/meeting/MeetingUILayoutContext'
 import { MeetingViewportPanProvider } from '@/components/meeting/MeetingViewportPan'
 import {
-  isWebxdcExpandSource,
+  isExpandChromeSource,
   MEETING_CLOSE_ELEVATED_CHROME,
   MEETING_OPEN_CHAT,
   MEETING_OPEN_ROOM_INFO,
@@ -104,7 +104,7 @@ export function MeetingRoomShell({ meetId, navigate, children }: MeetingRoomShel
   // WebXDC left rail (and other chrome) can request panels without prop drilling.
   useEffect(() => {
     const onChat = (e: Event) => {
-      const fromWx = isWebxdcExpandSource((e as CustomEvent).detail)
+      const fromWx = isExpandChromeSource((e as CustomEvent).detail)
       setParticipantsOpen(false)
       setInfoOpen(false)
 
@@ -134,7 +134,7 @@ export function MeetingRoomShell({ meetId, navigate, children }: MeetingRoomShel
     }
 
     const onInfo = (e: Event) => {
-      const fromWx = isWebxdcExpandSource((e as CustomEvent).detail)
+      const fromWx = isExpandChromeSource((e as CustomEvent).detail)
       setParticipantsOpen(false)
 
       if (fromWx) {
@@ -165,7 +165,7 @@ export function MeetingRoomShell({ meetId, navigate, children }: MeetingRoomShel
 
     // Settings opened from rail: close elevated chat/info so only one left dock shows.
     const onSettings = (e: Event) => {
-      if (!isWebxdcExpandSource((e as CustomEvent).detail)) return
+      if (!isExpandChromeSource((e as CustomEvent).detail)) return
       setParticipantsOpen(false)
       setInfoOpen(false)
       if (!chatStuck) {

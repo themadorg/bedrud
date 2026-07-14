@@ -57,7 +57,7 @@ export function ChatMessageContextMenu({ message, senderName, currentIdentity, c
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent
         className={cn(
-          'z-50 min-w-[200px] max-w-[min(260px,85vw)] border-white/10 bg-[#0f0f1c]/98 p-1 text-white/90 shadow-lg backdrop-blur-xl',
+          'meet-dialog z-50 min-w-[200px] max-w-[min(260px,85vw)] border-white/10 bg-[#0f0f1c]/98 p-1 text-white/90 shadow-lg backdrop-blur-xl',
         )}
       >
         <ContextMenuLabel className="px-2 py-1.5 text-[13px] font-semibold leading-tight text-white/95">

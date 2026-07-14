@@ -45,7 +45,9 @@ interface Props {
 const headerBtnClass = (active = false) =>
   cn(
     'flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] border-none bg-transparent cursor-pointer transition-[background,color] duration-150',
-    active ? 'text-accent-400' : 'text-white/50 hover:text-white/70',
+    active
+      ? 'text-[var(--meet-accent)]'
+      : 'text-[var(--meet-fg-muted)] hover:bg-[var(--meet-control)] hover:text-[var(--meet-fg-strong)]',
   )
 
 function useIsMobileChat() {
@@ -114,8 +116,8 @@ export function ChatPanel({
 
   const body = (
     <>
-      <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/[0.06] px-3 sm:h-[52px] sm:px-4">
-        <span className="text-base font-semibold text-white/85">Chat</span>
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--meet-border-subtle)] px-3 sm:h-[52px] sm:px-4">
+        <span className="text-base font-semibold text-[var(--meet-fg-strong)]">Chat</span>
         <div className="flex items-center gap-1 sm:gap-2">
           {!elevated && (
             <button
@@ -180,7 +182,7 @@ export function ChatPanel({
           : undefined
       }
       className={cn(
-        'flex flex-col bg-[var(--meet-sidebar)] backdrop-blur-2xl transition-[left,right,width,top,height] duration-200',
+        'meet-dialog flex flex-col bg-[var(--meet-sidebar)] backdrop-blur-2xl transition-[left,right,width,top,height] duration-200',
         'z-40',
         // Mobile: full-screen on *visual* viewport (iOS Safari toolbar-safe).
         'fixed left-[var(--app-offset-left,0px)] top-[var(--app-offset-top,0px)] h-[var(--app-height,100svh)] w-[var(--app-width,100svw)] max-h-[var(--app-height,100svh)] max-w-[var(--app-width,100svw)]',

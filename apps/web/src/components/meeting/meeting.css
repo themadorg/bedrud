@@ -339,58 +339,199 @@
   fill: var(--meet-accent);
 }
 
-.meet-room .text-white\/95,
-.meet-room .text-white\/90,
-.meet-dialog .text-white\/95,
-.meet-dialog .text-white\/90 {
+/* Body-portaled meeting panels (chat, elevated docks) sit outside .meet-room — include them here. */
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .text-white\/95,
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .text-white\/90 {
   color: var(--meet-fg);
 }
 
-.meet-room .text-white\/85,
-.meet-room .text-white\/80,
-.meet-dialog .text-white\/85,
-.meet-dialog .text-white\/80 {
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .text-white\/85,
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .text-white\/80 {
   color: var(--meet-fg-strong);
 }
 
-.meet-room .text-white\/75,
-.meet-room .text-white\/70,
-.meet-room .text-white\/65,
-.meet-dialog .text-white\/75,
-.meet-dialog .text-white\/70,
-.meet-dialog .text-white\/65 {
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .text-white\/75,
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .text-white\/70,
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .text-white\/65 {
   color: var(--meet-control-fg);
 }
 
-.meet-room .text-white\/60,
-.meet-room .text-white\/55,
-.meet-room .text-white\/50,
-.meet-room .text-white\/45,
-.meet-room .text-white\/40,
-.meet-room .text-white\/35,
-.meet-dialog .text-white\/60,
-.meet-dialog .text-white\/55,
-.meet-dialog .text-white\/50,
-.meet-dialog .text-white\/45,
-.meet-dialog .text-white\/40,
-.meet-dialog .text-white\/35 {
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .text-white\/60,
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .text-white\/55,
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .text-white\/50,
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .text-white\/45,
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .text-white\/40,
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .text-white\/35 {
   color: var(--meet-fg-muted);
 }
 
-.meet-room .border-white\/5,
-.meet-room .border-white\/10,
-.meet-room .border-white\/\[0\.06\],
-.meet-room .border-white\/\[0\.07\],
-.meet-room .border-white\/\[0\.08\],
-.meet-room .border-white\/\[0\.09\],
-.meet-room .border-white\/\[0\.12\],
-.meet-dialog .border-white\/5,
-.meet-dialog .border-white\/10,
-.meet-dialog .border-white\/\[0\.06\],
-.meet-dialog .border-white\/\[0\.07\],
-.meet-dialog .border-white\/\[0\.08\],
-.meet-dialog .border-white\/\[0\.09\],
-.meet-dialog .border-white\/\[0\.12\] {
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .border-white\/5,
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .border-white\/10,
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .border-white\/\[0\.06\],
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .border-white\/\[0\.07\],
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .border-white\/\[0\.08\],
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .border-white\/\[0\.09\],
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .border-white\/\[0\.12\] {
   border-color: var(--meet-border);
 }
 
@@ -442,12 +583,33 @@
   background-color: var(--meet-bg) !important;
 }
 
-.meet-room .hover\:text-white\/70:hover,
-.meet-room .hover\:text-white\/75:hover,
-.meet-room .hover\:text-white\/80:hover,
-.meet-dialog .hover\:text-white\/70:hover,
-.meet-dialog .hover\:text-white\/75:hover,
-.meet-dialog .hover\:text-white\/80:hover {
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .hover\:text-white\/70:hover,
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .hover\:text-white\/75:hover,
+:is(
+    .meet-room,
+    .meet-dialog,
+    aside[aria-label="Chat"],
+    aside[data-chat-overlay="true"],
+    aside[data-elevated-chat="true"],
+    [data-screenshare-overlay="true"]
+  )
+  .hover\:text-white\/80:hover {
   color: var(--meet-fg-strong);
 }
 

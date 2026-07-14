@@ -43,7 +43,7 @@ import { DeviceSelector } from '@/components/meeting/DeviceSelector'
 import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
 import { meetControlsDockClass, useMeetingUILayout } from '@/components/meeting/MeetingUILayoutContext'
 import {
-  isWebxdcExpandSource,
+  isExpandChromeSource,
   MEETING_CLOSE_ELEVATED_CHROME,
   MEETING_CLOSE_SETTINGS,
   MEETING_OPEN_SETTINGS,
@@ -385,7 +385,7 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
   // WebXDC left rail / other chrome can open settings without prop drilling.
   useEffect(() => {
     const onSettings = (e: Event) => {
-      const fromWx = isWebxdcExpandSource((e as CustomEvent).detail)
+      const fromWx = isExpandChromeSource((e as CustomEvent).detail)
       // Toggle: second click on left-rail settings while elevated → close.
       if (fromWx && settingsOpen && settingsElevated) {
         setSettingsOpen(false)

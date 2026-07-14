@@ -55,7 +55,7 @@ export function MeetingElevatedLeftDock({ label, marker, children, className, sh
       {...markerProps}
       style={dockStyle}
       className={cn(
-        'fixed z-[250] flex flex-col overflow-hidden bg-[var(--meet-sidebar)] shadow-2xl backdrop-blur-2xl',
+        'meet-dialog fixed z-[250] flex flex-col overflow-hidden bg-[var(--meet-sidebar)] shadow-2xl backdrop-blur-2xl',
         'border-r border-[var(--meet-border-subtle)]',
         'pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]',
         'animate-in fade-in-0 slide-in-from-left duration-200',
