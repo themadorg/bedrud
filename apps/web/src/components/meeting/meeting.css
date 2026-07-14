@@ -50,14 +50,21 @@
   --meet-scroll-track: rgba(23, 23, 23, 0.05);
   --meet-scroll-thumb: #c9ece6;
   --meet-scroll-thumb-hover: #8fd9cc;
-  --meet-chat-bubble-in-bg: #ffffff;
-  --meet-chat-bubble-in-border: rgba(23, 23, 23, 0.08);
-  --meet-chat-bubble-in-fg: rgba(23, 23, 23, 0.88);
-  --meet-chat-bubble-in-shadow: 0 1px 2px rgba(23, 23, 23, 0.06);
-  --meet-chat-bubble-out-bg: #ecfdf9;
-  --meet-chat-bubble-out-border: rgba(13, 148, 136, 0.18);
-  --meet-chat-bubble-out-fg: #0f766e;
-  --meet-chat-bubble-out-shadow: 0 1px 2px rgba(23, 23, 23, 0.04);
+  --meet-chat-bubble-in-bg: #e4e6eb;
+  --meet-chat-bubble-in-border: transparent;
+  --meet-chat-bubble-in-fg: #050505;
+  --meet-chat-bubble-in-shadow: none;
+  --meet-chat-bubble-out-bg: #0084ff;
+  --meet-chat-bubble-out-border: transparent;
+  --meet-chat-bubble-out-fg: #ffffff;
+  --meet-chat-bubble-out-shadow: none;
+  --meet-chat-bubble-radius: var(--meet-controls-bar-radius);
+  --meet-chat-bubble-radius-near: var(--meet-btn-leave-radius);
+  --meet-chat-bubble-padding-block: 8px;
+  --meet-chat-bubble-padding-inline: 12px;
+  --meet-chat-bubble-padding-media: 4px;
+  --meet-chat-bubble-stack-gap: 2px;
+  --meet-chat-bubble-max-width: 280px;
   --meet-chat-action-bg: #ecfdf9;
   --meet-chat-action-border: rgba(13, 148, 136, 0.22);
   --meet-chat-action-fg: #0f766e;
@@ -65,14 +72,14 @@
   --meet-chat-control-bg: #ffffff;
   --meet-chat-control-border: rgba(23, 23, 23, 0.08);
   --meet-chat-control-shadow: 0 2px 8px rgba(23, 23, 23, 0.08);
-  --meet-chat-md-link-local: #0f766e;
-  --meet-chat-md-link-remote: #0d9488;
-  --meet-chat-md-code-local: rgba(13, 148, 136, 0.12);
-  --meet-chat-md-code-remote: rgba(23, 23, 23, 0.06);
-  --meet-chat-md-quote-border-local: rgba(13, 148, 136, 0.35);
-  --meet-chat-md-quote-border-remote: rgba(23, 23, 23, 0.12);
-  --meet-chat-md-quote-fg-local: rgba(15, 118, 110, 0.75);
-  --meet-chat-md-quote-fg-remote: rgba(23, 23, 23, 0.55);
+  --meet-chat-md-link-local: #ffffff;
+  --meet-chat-md-link-remote: #0084ff;
+  --meet-chat-md-code-local: rgba(255, 255, 255, 0.18);
+  --meet-chat-md-code-remote: rgba(0, 0, 0, 0.06);
+  --meet-chat-md-quote-border-local: rgba(255, 255, 255, 0.45);
+  --meet-chat-md-quote-border-remote: rgba(0, 0, 0, 0.12);
+  --meet-chat-md-quote-fg-local: rgba(255, 255, 255, 0.82);
+  --meet-chat-md-quote-fg-remote: rgba(5, 5, 5, 0.55);
   --meet-loading-fg: rgba(23, 23, 23, 0.45);
   --meet-loading-track: color-mix(in oklab, var(--accent-600) 22%, transparent);
   --meet-loading-accent: var(--accent-600);
@@ -134,14 +141,14 @@
   --meet-scroll-track: rgba(255, 255, 255, 0.06);
   --meet-scroll-thumb: color-mix(in oklab, var(--accent-400) 42%, transparent);
   --meet-scroll-thumb-hover: color-mix(in oklab, var(--accent-400) 68%, transparent);
-  --meet-chat-bubble-in-bg: rgba(255, 255, 255, 0.08);
-  --meet-chat-bubble-in-border: rgba(255, 255, 255, 0.07);
-  --meet-chat-bubble-in-fg: rgba(255, 255, 255, 0.82);
-  --meet-chat-bubble-in-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
-  --meet-chat-bubble-out-bg: color-mix(in oklab, var(--primary) 78%, transparent);
-  --meet-chat-bubble-out-border: color-mix(in oklab, var(--accent-400) 22%, transparent);
-  --meet-chat-bubble-out-fg: rgba(255, 255, 255, 0.95);
-  --meet-chat-bubble-out-shadow: 0 1px 2px color-mix(in oklab, var(--primary) 20%, transparent);
+  --meet-chat-bubble-in-bg: rgba(255, 255, 255, 0.12);
+  --meet-chat-bubble-in-border: transparent;
+  --meet-chat-bubble-in-fg: rgba(255, 255, 255, 0.92);
+  --meet-chat-bubble-in-shadow: none;
+  --meet-chat-bubble-out-bg: #0084ff;
+  --meet-chat-bubble-out-border: transparent;
+  --meet-chat-bubble-out-fg: #ffffff;
+  --meet-chat-bubble-out-shadow: none;
   --meet-chat-action-bg: color-mix(in oklab, var(--primary) 82%, transparent);
   --meet-chat-action-border: color-mix(in oklab, var(--accent-400) 28%, transparent);
   --meet-chat-action-fg: rgba(255, 255, 255, 0.95);
@@ -149,14 +156,14 @@
   --meet-chat-control-bg: rgba(255, 255, 255, 0.08);
   --meet-chat-control-border: rgba(255, 255, 255, 0.08);
   --meet-chat-control-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-  --meet-chat-md-link-local: rgba(255, 255, 255, 0.9);
-  --meet-chat-md-link-remote: color-mix(in oklab, var(--accent-400) 90%, transparent);
-  --meet-chat-md-code-local: rgba(0, 0, 0, 0.25);
-  --meet-chat-md-code-remote: color-mix(in oklab, var(--primary) 15%, transparent);
-  --meet-chat-md-quote-border-local: rgba(255, 255, 255, 0.4);
-  --meet-chat-md-quote-border-remote: color-mix(in oklab, var(--accent-400) 40%, transparent);
-  --meet-chat-md-quote-fg-local: rgba(255, 255, 255, 0.7);
-  --meet-chat-md-quote-fg-remote: rgba(255, 255, 255, 0.5);
+  --meet-chat-md-link-local: #ffffff;
+  --meet-chat-md-link-remote: #53b1fd;
+  --meet-chat-md-code-local: rgba(255, 255, 255, 0.18);
+  --meet-chat-md-code-remote: rgba(255, 255, 255, 0.1);
+  --meet-chat-md-quote-border-local: rgba(255, 255, 255, 0.45);
+  --meet-chat-md-quote-border-remote: rgba(255, 255, 255, 0.25);
+  --meet-chat-md-quote-fg-local: rgba(255, 255, 255, 0.82);
+  --meet-chat-md-quote-fg-remote: rgba(255, 255, 255, 0.62);
   --meet-loading-fg: rgba(255, 255, 255, 0.45);
   --meet-loading-track: color-mix(in oklab, var(--primary) 30%, transparent);
   --meet-loading-accent: var(--primary);
@@ -690,6 +697,39 @@
 @keyframes meet-connecting-spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+.meet-chat-bubble {
+  padding: var(--meet-chat-bubble-padding-block) var(--meet-chat-bubble-padding-inline);
+  border: none;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.meet-chat-bubble--media {
+  padding: var(--meet-chat-bubble-padding-media);
+}
+
+.meet-chat-bubble--in {
+  background: var(--meet-chat-bubble-in-bg);
+  color: var(--meet-chat-bubble-in-fg);
+  box-shadow: var(--meet-chat-bubble-in-shadow);
+}
+
+.meet-chat-bubble--out {
+  background: var(--meet-chat-bubble-out-bg);
+  color: var(--meet-chat-bubble-out-fg);
+  box-shadow: var(--meet-chat-bubble-out-shadow);
+}
+
+.meet-chat-bubble--stacked {
+  margin-top: var(--meet-chat-bubble-stack-gap);
+}
+
+.meet-chat-cluster-self {
+  max-width: min(100%, var(--meet-chat-bubble-max-width));
 }
 
 .meet-scroll,

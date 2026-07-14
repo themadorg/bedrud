@@ -2,6 +2,7 @@ import { X } from 'lucide-react'
 import { useCallback, useEffect, useRef } from 'react'
 import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
 import { meetStageShellClass, useMeetingUILayout } from '@/components/meeting/MeetingUILayoutContext'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { isYoutubePlayerReady } from './loadYoutubeIframeApi'
 import { useYoutubePlayer } from './useYoutubePlayer'
@@ -83,18 +84,24 @@ export function YoutubeWatchOverlay() {
 
   return (
     <div className={cn(meetStageShellClass(layout, 'p-2 max-sm:p-1.5'))}>
-      <div className="meet-dialog relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[var(--meet-border)] bg-[var(--meet-bg-panel)] shadow-[var(--meet-shadow)]">
-        <div ref={containerRef} className="absolute inset-0 h-full w-full bg-black" />
+      <div className="meet-dialog flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[var(--meet-border)] bg-[var(--meet-bg-panel)] shadow-[var(--meet-shadow)]">
         {isHost && (
-          <button
-            type="button"
-            onClick={() => stopShare()}
-            className="absolute top-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--meet-tile-action-border)] bg-[var(--meet-tile-action-bg)] text-[var(--meet-tile-action-fg)] backdrop-blur-sm transition-opacity hover:opacity-90"
-            aria-label="Stop YouTube share"
-          >
-            <X size={16} />
-          </button>
+          <div className="flex shrink-0 items-center justify-end border-b border-[var(--meet-border-subtle)] bg-[var(--meet-chrome)] px-2 py-1.5 sm:px-3 sm:py-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              aria-label="Stop YouTube share"
+              onClick={() => stopShare()}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         )}
+        <div className="relative min-h-0 flex-1 bg-black">
+          <div ref={containerRef} className="absolute inset-0 h-full w-full" />
+        </div>
       </div>
     </div>
   )

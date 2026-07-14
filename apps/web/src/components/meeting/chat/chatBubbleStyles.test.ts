@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { bubblePosition, bubbleRadius } from './chatBubbleStyles'
+import { bubbleClassName, bubblePosition } from './chatBubbleStyles'
 
 describe('chatBubbleStyles', () => {
-  it('uses asymmetric corners for single remote bubble', () => {
-    expect(bubbleRadius(false, 'only')).toBe('16px 16px 16px 4px')
+  it('applies incoming single-bubble classes', () => {
+    expect(bubbleClassName(false, 'only', false)).toContain('meet-chat-bubble--in')
+    expect(bubbleClassName(false, 'only', false)).toContain('meet-chat-bubble--only')
   })
 
   it('connects middle bubbles in a cluster', () => {
-    expect(bubbleRadius(true, 'middle')).toBe('16px 4px 4px 16px')
+    expect(bubbleClassName(true, 'middle', true)).toContain('meet-chat-bubble--stacked')
+    expect(bubbleClassName(true, 'first', true)).not.toContain('meet-chat-bubble--stacked')
     expect(bubblePosition(1, 3)).toBe('middle')
   })
 })

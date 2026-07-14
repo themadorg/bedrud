@@ -11,7 +11,7 @@ import { ChatMessageContextMenu } from './ChatMessageContextMenu'
 import { ChatPollBubble } from './ChatPollBubble'
 import { ChatReactionList } from './ChatReactionList'
 import { ChatReactionPicker } from './ChatReactionPicker'
-import { bubbleChrome, bubblePosition } from './chatBubbleStyles'
+import { bubbleClassName, bubblePosition } from './chatBubbleStyles'
 import { isSingleEmojiMessage } from './chatEmojiMessage'
 import type { ClusterGroup } from './chatGrouping'
 import { absoluteTime, avatarColor, avatarInitials, relativeTime } from './chatGrouping'
@@ -170,10 +170,12 @@ export function ChatMessageCluster({ cluster, currentIdentity, onImageOpen, onVo
     const pos = bubblePosition(idx, total)
     const stacked = total > 1
     const loneEmoji = isSingleEmojiMessage(msg)
-    const chrome = loneEmoji ? null : bubbleChrome(isSelf, pos, stacked)
     const hasAttachments = msg.attachments.length > 0
     const hasPoll = Boolean(msg.poll)
     const hasRichContent = hasAttachments || hasPoll
+    const chromeClass = loneEmoji
+      ? null
+      : bubbleClassName(isSelf, pos, stacked, { media: hasRichContent && !msg.message })
 
     return (
       <div
@@ -195,20 +197,17 @@ export function ChatMessageCluster({ cluster, currentIdentity, onImageOpen, onVo
           >
             <ChatReactionPicker isLocal={isSelf} onReact={(emoji) => onReactToMessage(msg.id, emoji)} />
           </div>
-          <ChatMessageContextMenu message={msg} senderName={sender} currentIdentity={currentIdentity}>
+          <ChatMessageContextMenu
+            message={msg}
+            senderName={sender}
+            currentIdentity={currentIdentity}
+            onReact={(emoji) => onReactToMessage(msg.id, emoji)}
+          >
             <div
               className={
                 loneEmoji
                   ? 'min-w-0 text-[56px] leading-none select-none'
-                  : 'min-w-0 text-[13px] leading-[1.45] break-words overflow-hidden'
-              }
-              style={
-                loneEmoji
-                  ? undefined
-                  : {
-                      padding: hasRichContent && !msg.message ? '4px' : '7px 12px',
-                      ...chrome,
-                    }
+                  : chromeClass
               }
             >
               {msg.attachments.map((att, ai) => {
@@ -282,7 +281,7 @@ export function ChatMessageCluster({ cluster, currentIdentity, onImageOpen, onVo
     <div
       className={cn(
         'flex flex-col',
-        isSelf ? 'ms-auto w-fit max-w-[min(100%,320px)] items-end gap-0.5' : 'w-full items-start gap-1',
+        isSelf ? 'meet-chat-cluster-self ms-auto w-fit items-end gap-0.5' : 'w-full items-start gap-1',
         lastIsLoneEmoji && !isSelf && 'mb-1',
       )}
     >
@@ -300,7 +299,7 @@ export function ChatMessageCluster({ cluster, currentIdentity, onImageOpen, onVo
               {initials}
             </div>
           </div>
-          <div className="flex min-w-0 max-w-[78%] flex-col items-start gap-2">{messageRows}</div>
+          <div className="flex min-w-0 max-w-[78%] flex-col items-start gap-0.5">{messageRows}</div>
         </div>
       )}
 

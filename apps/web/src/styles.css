@@ -114,6 +114,32 @@
   .meet-avatar-circle {
     border-radius: 50% !important;
   }
+  .meet-chat-bubble--out.meet-chat-bubble--only,
+  .meet-chat-bubble--out.meet-chat-bubble--first {
+    border-radius: var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius-near) var(--meet-chat-bubble-radius) !important;
+  }
+  .meet-chat-bubble--out.meet-chat-bubble--middle {
+    border-radius: var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius-near) var(--meet-chat-bubble-radius-near) var(--meet-chat-bubble-radius) !important;
+  }
+  .meet-chat-bubble--out.meet-chat-bubble--last {
+    border-radius: var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius-near) var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius) !important;
+  }
+  .meet-chat-bubble--in.meet-chat-bubble--only,
+  .meet-chat-bubble--in.meet-chat-bubble--first {
+    border-radius: var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius-near) !important;
+  }
+  .meet-chat-bubble--in.meet-chat-bubble--middle {
+    border-radius: var(--meet-chat-bubble-radius-near) var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius-near) !important;
+  }
+  .meet-chat-bubble--in.meet-chat-bubble--last {
+    border-radius: var(--meet-chat-bubble-radius-near) var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius) !important;
+  }
+  .meet-chat-action-bubble {
+    border-radius: var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius-near) var(--meet-chat-bubble-radius) !important;
+  }
+  .meet-chat-control-bubble {
+    border-radius: var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius) var(--meet-chat-bubble-radius-near) !important;
+  }
   html,
   body,
   #app {

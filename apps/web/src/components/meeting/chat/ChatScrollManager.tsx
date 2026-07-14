@@ -19,7 +19,7 @@ export function ChatScrollManager({ show, unreadCount, onScrollToBottom }: Props
           <button
             type="button"
             onClick={onScrollToBottom}
-            className="cursor-pointer whitespace-nowrap px-3.5 py-2 text-xs font-semibold leading-none"
+            className="meet-chat-action-bubble cursor-pointer whitespace-nowrap px-3.5 py-2 text-xs font-semibold leading-none"
             style={actionBubbleChrome()}
           >
             {label}
