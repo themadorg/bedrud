@@ -328,6 +328,7 @@ dev-ios:
 
 # Open Android project in Android Studio
 dev-android:
+	git submodule update --init apps/android
 	open -a "Android Studio" "$(CURDIR)/apps/android"
 
 # Run Astro site dev server
@@ -488,11 +489,13 @@ livekit-download:
 
 # Build Android debug APK
 build-android-debug:
+	git submodule update --init apps/android
 	cd apps/android && ./gradlew assembleDebug
 	@echo "Debug APK: apps/android/app/build/outputs/apk/debug/app-debug.apk"
 
 # Build Android release APK (requires keystore.properties)
 build-android:
+	git submodule update --init apps/android
 	cd apps/android && ./gradlew assembleRelease
 	@echo "Release APK: apps/android/app/build/outputs/apk/release/app-release.apk"
 
