@@ -113,6 +113,7 @@ jobs:
           base: ${{ steps.base.outputs.ref }}
           filters: |
             android:
+              - 'apps/android'
               - 'apps/android/**'
               - '.github/workflows/dev-nightly.yml'
             desktop:
@@ -137,6 +138,7 @@ jobs:
             product:
               - 'server/**'
               - 'apps/web/**'
+              - 'apps/android'
               - 'apps/android/**'
               - 'apps/desktop/**'
               - 'Cargo.toml'
@@ -429,6 +431,8 @@ jobs:
         working-directory: apps/android
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: recursive
 
       - uses: actions/setup-java@v5
         with:
