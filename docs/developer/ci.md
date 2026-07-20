@@ -50,11 +50,13 @@ Used by **CI**, **Deploy Site**, and **Dev/Nightly**. Compare changed files to p
 | **server** | `server/**` |
 | **web** | `apps/web/**` (meeting UI; embedded in binary) |
 | **site** | `apps/site/**`, **`docs/**`**, `server/**` (swagger), related workflow files |
-| **android** | `apps/android/**` |
+| **android** | `apps/android` (submodule pointer), `apps/android/**` |
 | **desktop** | `apps/desktop/**`, `Cargo.toml`, `Cargo.lock` |
 | **ios** | `apps/ios/**` |
 | **docker** (nightly only) | `server/**`, `apps/web/**`, `Dockerfile` |
 | **product** (nightly publish) | server, web, android, desktop, Dockerfile — **not** `docs/` or `apps/site` alone |
+
+`apps/android` is a git submodule pointing at [bedrud-android](https://github.com/themadorg/bedrud-android) (source lives there now). The filter matches both the bare `apps/android` gitlink entry (so bumping the pinned commit triggers the job) and `apps/android/**` (belt-and-suspenders).
 
 **Important examples**
 
@@ -118,6 +120,7 @@ Jobs run only if their path flag is true (except `changes`, always).
 
 ### `android` (if `android`)
 
+- Checkout with `submodules: recursive` (pulls the pinned bedrud-android commit)
 - Java 17 + Gradle 9.5  
 - `lint` → unit tests → `assembleDebug` / `bundleDebug`  
 - Upload APKs/AAB (7-day artifacts)
@@ -305,7 +308,8 @@ cd apps/site && bun run check && bun run typecheck:astro && bun run build
 # desktop
 cargo test -p bedrud-desktop
 
-# android
+# android (submodule — init it first if you cloned without --recurse-submodules)
+git submodule update --init apps/android
 cd apps/android && ./gradlew lint testDebugUnitTest
 
 # prod-ish binary
