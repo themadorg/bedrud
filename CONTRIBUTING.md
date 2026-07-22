@@ -39,7 +39,7 @@ See the [Development Workflow](docs/guides/development.md) for detailed setup in
 | `server/`       | Go               | Backend API and embedded LiveKit |
 | `apps/web/`     | TypeScript/React | Web frontend                     |
 | `apps/desktop/` | Rust + Slint     | Desktop app                      |
-| `apps/android/` | Kotlin           | Android app                      |
+| `apps/android/` | Kotlin           | Android app (git submodule → [bedrud-android](https://github.com/themadorg/bedrud-android)) |
 | `apps/ios/`     | Swift            | iOS app                          |
 | `agents/`       | Python           | Bot agents                       |
 | `packages/`     | TypeScript       | Shared type definitions          |

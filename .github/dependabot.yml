@@ -29,19 +29,7 @@ updates:
           - "*"
     open-pull-requests-limit: 5
 
-  # Android (Gradle)
-  - package-ecosystem: "gradle"
-    directory: "/apps/android"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    commit-message:
-      prefix: "deps(android)"
-    groups:
-      gradle-all:
-        patterns:
-          - "*"
-    open-pull-requests-limit: 5
+  # Android (Gradle) — now tracked in the bedrud-android repo's own dependabot config
 
   # Python agents
   - package-ecosystem: "pip"

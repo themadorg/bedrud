@@ -50,11 +50,13 @@ Used by **CI**, **Deploy Site**, and **Dev/Nightly**. Compare changed files to p
 | **server** | `server/**` |
 | **web** | `apps/web/**` (meeting UI; embedded in binary) |
 | **site** | `apps/site/**`, **`docs/**`**, `server/**` (swagger), related workflow files |
-| **android** | `apps/android/**` |
+| **android** | `apps/android` (submodule pointer), `apps/android/**` |
 | **desktop** | `apps/desktop/**`, `Cargo.toml`, `Cargo.lock` |
 | **ios** | `apps/ios/**` |
 | **docker** (nightly only) | `server/**`, `apps/web/**`, `Dockerfile` |
 | **product** (nightly publish) | server, web, android, desktop, Dockerfile — **not** `docs/` or `apps/site` alone |
+
+`apps/android` is a git submodule pointing at [bedrud-android](https://github.com/themadorg/bedrud-android) (source lives there now). The filter matches both the bare `apps/android` gitlink entry (so bumping the pinned commit triggers the job) and `apps/android/**` (belt-and-suspenders).
 
 **Important examples**
 
@@ -118,6 +120,7 @@ Jobs run only if their path flag is true (except `changes`, always).
 
 ### `android` (if `android`)
 
+- Checkout with `submodules: recursive` (pulls the pinned bedrud-android commit)
 - Java 17 + Gradle 9.5  
 - `lint` → unit tests → `assembleDebug` / `bundleDebug`  
 - Upload APKs/AAB (7-day artifacts)
@@ -215,6 +218,7 @@ flowchart TB
 ### `android` / `desktop`
 
 - Build + upload installers/APKs (desktop matrix: Linux/Windows/macOS arches)
+- `android` always runs on the nightly schedule (even if the path-filter sees no change here), and builds whatever bedrud-android has most recently tagged `beta-v*` — not the submodule commit pinned in this repo's index. No historical reproducibility needed for nightly, unlike `release.yml` below.
 
 ### `web`
 
@@ -261,6 +265,19 @@ flowchart TB
 - **release:** GitHub Release with all artifacts  
 - **Downstream** (secret-gated): Telegram, AUR, Snap, Flatpak, Chocolatey, Homebrew, WinGet  
 
+**Android submodule pinning:** unlike nightly, an official release must permanently and
+reproducibly reference the exact bedrud-android commit it shipped with. So the submodule
+pointer is bumped and committed *before* tagging, not dynamically at build time:
+
+```
+make pin-android-stable   # checks out apps/android at the latest stable-v* tag
+git add apps/android && git commit -m "chore(android): pin submodule to bedrud-android@stable-vX.Y.Z"
+git tag vX.Y.Z && git push origin master vX.Y.Z
+```
+
+`release.yml` then just checks out the submodule at whatever commit is already pinned
+(`submodules: recursive`) — no dynamic tag resolution happens in CI for this workflow.
+
 ---
 
 ## PR Beta (`pr-beta.yml`)
@@ -305,7 +322,8 @@ cd apps/site && bun run check && bun run typecheck:astro && bun run build
 # desktop
 cargo test -p bedrud-desktop
 
-# android
+# android (submodule — init it first if you cloned without --recurse-submodules)
+git submodule update --init apps/android
 cd apps/android && ./gradlew lint testDebugUnitTest
 
 # prod-ish binary

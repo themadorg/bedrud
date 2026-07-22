@@ -52,6 +52,7 @@ jobs:
               - '.github/workflows/ci.yml'
               - '.github/workflows/deploy-site.yml'
             android:
+              - 'apps/android'
               - 'apps/android/**'
               - '.github/workflows/ci.yml'
             desktop:
@@ -133,6 +134,8 @@ jobs:
         working-directory: apps/android
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: recursive
       - uses: actions/setup-java@v5
         with:
           distribution: temurin

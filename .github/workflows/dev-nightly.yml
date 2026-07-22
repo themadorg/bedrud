@@ -113,6 +113,7 @@ jobs:
           base: ${{ steps.base.outputs.ref }}
           filters: |
             android:
+              - 'apps/android'
               - 'apps/android/**'
               - '.github/workflows/dev-nightly.yml'
             desktop:
@@ -137,6 +138,7 @@ jobs:
             product:
               - 'server/**'
               - 'apps/web/**'
+              - 'apps/android'
               - 'apps/android/**'
               - 'apps/desktop/**'
               - 'Cargo.toml'
@@ -423,12 +425,35 @@ jobs:
     name: Android APK
     runs-on: ubuntu-latest
     needs: [prepare, changes]
-    if: needs.changes.outputs.android == 'true'
+    # Nightly always rebuilds Android on schedule, even if the path-filter above sees no
+    # change here - bedrud-android can ship a new beta-v* tag with no commit in this repo.
+    if: needs.changes.outputs.android == 'true' || github.event_name == 'schedule'
     defaults:
       run:
         working-directory: apps/android
     steps:
       - uses: actions/checkout@v6
+
+      # Nightly doesn't need historical reproducibility (unlike release.yml, which pins
+      # an exact commit), so build whatever bedrud-android has most recently tagged for
+      # beta instead of this repo's pinned submodule commit.
+      - name: Determine latest beta-v* tag from bedrud-android
+        id: beta
+        working-directory: ${{ github.workspace }}
+        run: |
+          TAG=$(git ls-remote --tags --refs https://github.com/themadorg/bedrud-android.git 'refs/tags/beta-v*' \
+            | awk '{ print $2 }' | sed 's#refs/tags/##' | sort -V | tail -n1)
+          if [ -z "$TAG" ]; then
+            echo "::error::No beta-v* tag found in bedrud-android"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout bedrud-android at ${{ steps.beta.outputs.tag }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          rm -rf apps/android
+          git clone --depth 1 --branch "${{ steps.beta.outputs.tag }}" https://github.com/themadorg/bedrud-android.git apps/android
 
       - uses: actions/setup-java@v5
         with:
