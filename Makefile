@@ -92,6 +92,7 @@ help:
 	@echo "  install-android      Install release APK on device"
 	@echo "  install-android-debug Install debug APK on device"
 	@echo "  release-android      Build + install release APK"
+	@echo "  pin-android-stable   Pin submodule to latest stable-v* tag (before cutting a release)"
 	@echo ""
 	@echo "iOS:"
 	@echo "  build-ios            Build iOS archive (Release)"
@@ -508,6 +509,18 @@ install-android-debug:
 
 # Build + install Android release on device
 release-android: build-android install-android
+
+# Pin the apps/android submodule to the latest stable-v* tag from bedrud-android, ahead
+# of cutting an official bedrud release. Only checks it out - review and commit yourself,
+# so every release permanently records the exact android commit it shipped with.
+pin-android-stable:
+	git submodule update --init apps/android
+	cd apps/android && git fetch --tags origin && \
+		TAG=$$(git tag -l "stable-v*" --sort=-v:refname | head -1) && \
+		if [ -z "$$TAG" ]; then echo "No stable-v* tag found in bedrud-android" >&2; exit 1; fi && \
+		git checkout "$$TAG" && \
+		echo "Pinned apps/android to $$TAG - now run:" && \
+		echo "  git add apps/android && git commit -m \"chore(android): pin submodule to bedrud-android@$$TAG\""
 
 # Build iOS archive (Release)
 build-ios:

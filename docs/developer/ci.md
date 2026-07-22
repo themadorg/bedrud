@@ -218,6 +218,7 @@ flowchart TB
 ### `android` / `desktop`
 
 - Build + upload installers/APKs (desktop matrix: Linux/Windows/macOS arches)
+- `android` always runs on the nightly schedule (even if the path-filter sees no change here), and builds whatever bedrud-android has most recently tagged `beta-v*` — not the submodule commit pinned in this repo's index. No historical reproducibility needed for nightly, unlike `release.yml` below.
 
 ### `web`
 
@@ -263,6 +264,19 @@ flowchart TB
 - **android / ios / desktop:** full client builds (signing when secrets present)  
 - **release:** GitHub Release with all artifacts  
 - **Downstream** (secret-gated): Telegram, AUR, Snap, Flatpak, Chocolatey, Homebrew, WinGet  
+
+**Android submodule pinning:** unlike nightly, an official release must permanently and
+reproducibly reference the exact bedrud-android commit it shipped with. So the submodule
+pointer is bumped and committed *before* tagging, not dynamically at build time:
+
+```
+make pin-android-stable   # checks out apps/android at the latest stable-v* tag
+git add apps/android && git commit -m "chore(android): pin submodule to bedrud-android@stable-vX.Y.Z"
+git tag vX.Y.Z && git push origin master vX.Y.Z
+```
+
+`release.yml` then just checks out the submodule at whatever commit is already pinned
+(`submodules: recursive`) — no dynamic tag resolution happens in CI for this workflow.
 
 ---
 
