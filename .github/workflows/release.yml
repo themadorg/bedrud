@@ -42,7 +42,7 @@ jobs:
             cgo: "1"
             cc: zig cc -target x86_64-windows-gnu
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: mlugg/setup-zig@v2
         with:
@@ -52,7 +52,7 @@ jobs:
         with:
           bun-version: latest
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.26"
           cache-dependency-path: server/go.sum
@@ -65,7 +65,7 @@ jobs:
 
       - name: Cache LiveKit binary
         id: lk-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: /tmp/livekit-cache
           key: livekit-${{ env.LIVEKIT_VERSION }}-${{ matrix.goos }}-${{ matrix.goarch }}
@@ -461,7 +461,7 @@ jobs:
       run:
         working-directory: apps/android
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -554,7 +554,7 @@ jobs:
       run:
         working-directory: apps/ios
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install Apple certificate and provisioning profile
         env:
@@ -584,7 +584,7 @@ jobs:
           fi
 
       - name: Cache Swift packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: apps/ios/.spm-cache
           key: ios-spm-${{ hashFiles('apps/ios/Bedrud.xcodeproj/project.pbxproj') }}
@@ -684,7 +684,7 @@ jobs:
             target: aarch64-apple-darwin
             name: macos-arm64
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -951,7 +951,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [server-binary, docker-debian, docker-alpine, docker-distroless, android, desktop]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/download-artifact@v8
         with:
@@ -1248,7 +1248,7 @@ jobs:
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_aur == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Update PKGBUILD checksums
         env:
@@ -1291,7 +1291,7 @@ jobs:
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_aur == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Update PKGBUILD checksums
         env:
@@ -1333,7 +1333,7 @@ jobs:
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_snap == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/download-artifact@v8
         with:
@@ -1375,7 +1375,7 @@ jobs:
     needs: [release, check-secrets]
     if: needs.check-secrets.result == 'success'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install Flatpak tools
         run: |
@@ -1465,7 +1465,7 @@ jobs:
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_choco == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Update nuspec version and checksums
         env:
@@ -1515,7 +1515,7 @@ jobs:
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_homebrew == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Compute macOS tarball checksums
         env:
@@ -1569,7 +1569,7 @@ jobs:
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_winget == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Submit WinGet manifests
         uses: vedantmgoyal9/winget-releaser@v2

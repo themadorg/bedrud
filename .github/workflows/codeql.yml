@@ -32,7 +32,7 @@ jobs:
           # Re-add once CodeQL ships support for it.
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -43,7 +43,7 @@ jobs:
       # Go: set up Go + bun so autobuild can compile the server
       - name: Set up Go
         if: matrix.language == 'go'
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: "1.26"
           cache-dependency-path: server/go.sum
