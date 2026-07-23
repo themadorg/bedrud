@@ -454,25 +454,80 @@ jobs:
           path: bedrud-docker-distroless-arm64.tar.gz
 
   # ── Android APK ──────────────────────────────────────────────
-  android:
-    name: Android APK
+  android-debug:
+    name: Android APK (debug)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: apps/android
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           submodules: recursive
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
         with:
           gradle-version: "9.5.0"
+          cache-provider: basic
+
+      - name: Generate Gradle Wrapper jar
+        run: gradle wrapper --gradle-version 9.5.0
+
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Build debug APKs
+        run: ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-debug-universal
+          path: apps/android/app/build/outputs/apk/debug/app-universal-debug.apk
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-debug-arm64-v8a
+          path: apps/android/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-debug-armeabi-v7a
+          path: apps/android/app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-debug-x86_64
+          path: apps/android/app/build/outputs/apk/debug/app-x86_64-debug.apk
+
+  android-release:
+    name: Android APK (release)
+    runs-on: ubuntu-latest
+    # This job decodes the real production signing key (same key bedrud-android's
+    # production-signing environment gates) - require the same human approval here
+    # before it can run, instead of signing unattended on every v* tag push.
+    environment: production-signing
+    defaults:
+      run:
+        working-directory: apps/android
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
+        with:
+          gradle-version: "9.5.0"
+          cache-provider: basic
 
       - name: Generate Gradle Wrapper jar
         run: gradle wrapper --gradle-version 9.5.0
@@ -487,12 +542,6 @@ jobs:
             echo "$KEYSTORE_PROPERTIES" > keystore.properties
           fi
 
-      - name: Run unit tests
-        run: ./gradlew testDebugUnitTest
-
-      - name: Build debug APKs
-        run: ./gradlew assembleDebug
-
       - name: Build release APKs
         run: |
           if [ -f keystore.properties ]; then
@@ -501,45 +550,25 @@ jobs:
             echo "⚠ Skipping release build — no signing key configured"
           fi
 
-      - uses: actions/upload-artifact@v7
-        with:
-          name: android-debug-universal
-          path: apps/android/app/build/outputs/apk/debug/app-universal-debug.apk
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: android-debug-arm64-v8a
-          path: apps/android/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: android-debug-armeabi-v7a
-          path: apps/android/app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: android-debug-x86_64
-          path: apps/android/app/build/outputs/apk/debug/app-x86_64-debug.apk
-
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: ${{ hashFiles('apps/android/keystore.properties') != '' }}
         with:
           name: android-release-universal
           path: apps/android/app/build/outputs/apk/release/app-universal-release.apk
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: ${{ hashFiles('apps/android/keystore.properties') != '' }}
         with:
           name: android-release-arm64-v8a
           path: apps/android/app/build/outputs/apk/release/app-arm64-v8a-release.apk
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: ${{ hashFiles('apps/android/keystore.properties') != '' }}
         with:
           name: android-release-armeabi-v7a
           path: apps/android/app/build/outputs/apk/release/app-armeabi-v7a-release.apk
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: ${{ hashFiles('apps/android/keystore.properties') != '' }}
         with:
           name: android-release-x86_64
@@ -949,7 +978,7 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [server-binary, docker-debian, docker-alpine, docker-distroless, android, desktop]
+    needs: [server-binary, docker-debian, docker-alpine, docker-distroless, android-debug, android-release, desktop]
     steps:
       - uses: actions/checkout@v6
 
