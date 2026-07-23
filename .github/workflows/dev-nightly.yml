@@ -451,9 +451,15 @@ jobs:
 
       - name: Checkout bedrud-android at ${{ steps.beta.outputs.tag }}
         working-directory: ${{ github.workspace }}
+        # BETA_TAG goes through env, not inlined into the script - git tag names allow many
+        # shell metacharacters (unlike a commit SHA), so interpolating it directly into the
+        # run: block would let anyone who can push a beta-v* tag to bedrud-android run
+        # arbitrary shell commands in this job (which has contents: write on this repo).
+        env:
+          BETA_TAG: ${{ steps.beta.outputs.tag }}
         run: |
           rm -rf apps/android
-          git clone --depth 1 --branch "${{ steps.beta.outputs.tag }}" https://github.com/themadorg/bedrud-android.git apps/android
+          git clone --depth 1 --branch "$BETA_TAG" https://github.com/themadorg/bedrud-android.git apps/android
 
       - uses: actions/setup-java@v5
         with:
