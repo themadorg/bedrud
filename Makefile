@@ -510,15 +510,17 @@ install-android-debug:
 # Build + install Android release on device
 release-android: build-android install-android
 
-# Pin the apps/android submodule to the latest stable-v* tag from bedrud-android, ahead
-# of cutting an official bedrud release. Only checks it out - review and commit yourself,
-# so every release permanently records the exact android commit it shipped with.
+# Pin the apps/android submodule to bedrud-android's latest stable release, ahead of
+# cutting an official bedrud release. Only checks it out - review and commit yourself, so
+# every release permanently records the exact android commit it shipped with.
+# bedrud-android tags are plain version numbers with no channel prefix - beta vs. stable
+# is a GitHub Release attribute (`prerelease`) set at dispatch time, not derivable from
+# the tag string, so this queries the Releases API rather than listing tags.
 pin-android-stable:
 	git submodule update --init apps/android
-	cd apps/android && git fetch --tags origin && \
-		TAG=$$(git tag -l "stable-v*" --sort=-v:refname | head -1) && \
-		if [ -z "$$TAG" ]; then echo "No stable-v* tag found in bedrud-android" >&2; exit 1; fi && \
-		git checkout "$$TAG" && \
+	TAG=$$(curl -fsSL "https://api.github.com/repos/themadorg/bedrud-android/releases" | jq -r '[.[] | select(.prerelease == false)] | first | .tag_name // empty') && \
+		if [ -z "$$TAG" ]; then echo "No stable release found in bedrud-android" >&2; exit 1; fi && \
+		cd apps/android && git fetch --tags origin && git checkout "$$TAG" && \
 		echo "Pinned apps/android to $$TAG - now run:" && \
 		echo "  git add apps/android && git commit -m \"chore(android): pin submodule to bedrud-android@$$TAG\""
 

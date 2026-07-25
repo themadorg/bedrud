@@ -218,7 +218,7 @@ flowchart TB
 ### `android` / `desktop`
 
 - Build + upload installers/APKs (desktop matrix: Linux/Windows/macOS arches)
-- `android` always runs on the nightly schedule (even if the path-filter sees no change here), and builds whatever bedrud-android has most recently tagged `beta-v*` — not the submodule commit pinned in this repo's index. No historical reproducibility needed for nightly, unlike `release.yml` below.
+- `android` always runs on the nightly schedule (even if the path-filter sees no change here), and builds whatever bedrud-android's latest pre-release points at (queried from the Releases API, since channel is a Release attribute there, not part of the tag) — not the submodule commit pinned in this repo's index. No historical reproducibility needed for nightly.
 
 ### `web`
 
@@ -245,10 +245,9 @@ flowchart TB
   SB[server-binary] --> D1[docker-debian]
   SB --> D2[docker-alpine]
   SB --> D3[docker-distroless]
-  A[android]
   I[ios]
   Desk[desktop]
-  SB & D1 & D2 & D3 & A & Desk --> R[release]
+  SB & D1 & D2 & D3 & Desk --> R[release]
   R --> Sec[check-secrets]
   Sec --> Tel[telegram]
   Sec --> AUR[aur-desktop / aur-server]
@@ -261,22 +260,26 @@ flowchart TB
 
 - **server-binary:** multi-OS packages + deb/rpm  
 - **docker-\*:** push GHCR + offline `.tar.gz`  
-- **android / ios / desktop:** full client builds (signing when secrets present)  
+- **ios / desktop:** full client builds (signing when secrets present)  
 - **release:** GitHub Release with all artifacts  
 - **Downstream** (secret-gated): Telegram, AUR, Snap, Flatpak, Chocolatey, Homebrew, WinGet  
 
-**Android submodule pinning:** unlike nightly, an official release must permanently and
-reproducibly reference the exact bedrud-android commit it shipped with. So the submodule
-pointer is bumped and committed *before* tagging, not dynamically at build time:
+**Android moved out of this repo entirely.** `release.yml` no longer builds or signs an
+Android APK - bedrud-android has its own tag → `workflow_dispatch` → beta/stable release
+pipeline (with its own signing key and reviewer gates), independent of bedrud's own
+release cadence. The Telegram announcement just links to bedrud-android's latest release
+instead of attaching APKs.
+
+The `apps/android` submodule pointer still exists (used by `make dev-android` /
+`build-android` / `ci.yml`'s PR-time lint+test job), and should still be bumped to a known
+-good bedrud-android release before cutting an official bedrud release, for the same
+reproducibility reason as before - just no longer to *build* anything here:
 
 ```
-make pin-android-stable   # checks out apps/android at the latest stable-v* tag
-git add apps/android && git commit -m "chore(android): pin submodule to bedrud-android@stable-vX.Y.Z"
+make pin-android-stable   # checks out apps/android at bedrud-android's latest stable release
+git add apps/android && git commit -m "chore(android): pin submodule to bedrud-android@X.Y.Z"
 git tag vX.Y.Z && git push origin master vX.Y.Z
 ```
-
-`release.yml` then just checks out the submodule at whatever commit is already pinned
-(`submodules: recursive`) — no dynamic tag resolution happens in CI for this workflow.
 
 ---
 
