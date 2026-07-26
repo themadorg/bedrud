@@ -212,8 +212,6 @@ func LinuxInstall(cfg *InstallConfig) error {
 	configYAML.Server.Port = cfg.Port
 	configYAML.Server.Host = cfg.OverrideIP
 	configYAML.Server.EnableTLS = cfg.EnableTLS
-	configYAML.Server.CertFile = certFile
-	configYAML.Server.KeyFile = keyFile
 	configYAML.Server.Domain = cfg.Domain
 	configYAML.Server.Email = cfg.Email
 	// ACME only when not providing your own cert files. Explicit --cert/--key always wins.
@@ -229,6 +227,15 @@ func LinuxInstall(cfg *InstallConfig) error {
 		configYAML.Server.EnableTLS = true
 	}
 	configYAML.Server.UseACME = useACME
+	// Write cert paths only for file-based TLS. Leaving them empty for ACME is
+	// required so TLSMode selects ACME (any set certFile/keyFile forces manual).
+	if useACME {
+		configYAML.Server.CertFile = ""
+		configYAML.Server.KeyFile = ""
+	} else {
+		configYAML.Server.CertFile = certFile
+		configYAML.Server.KeyFile = keyFile
+	}
 	if useACME && cfg.PreferCloudflareACME && strings.TrimSpace(cfg.CloudflareAPIToken) != "" {
 		configYAML.Server.ACME = &installACMEYAML{
 			Challenge:          "dns-01",

@@ -91,7 +91,7 @@ When enabled, `data` includes `subject`, `issuer`, `notBefore`, `notAfter`, `day
 
 ## Manual certificate files
 
-When both `server.certFile` and `server.keyFile` are set, Bedrud **always** serves those files and **ignores** `useACME` (a warning is logged). Set `useACME: false` explicitly:
+When `server.certFile` and/or `server.keyFile` are set, Bedrud **always** serves those PEM files and **ignores** `useACME` (a warning is logged if `useACME` is still true). Unset half of the pair defaults to `/etc/bedrud/cert.pem` or `/etc/bedrud/key.pem`. Prefer setting both and `useACME: false` explicitly:
 
 ```yaml
 server:
@@ -101,6 +101,8 @@ server:
   keyFile: /etc/ssl/bedrud/privkey.pem
   domain: example.com   # still useful for links / WebXDC
 ```
+
+For Let's Encrypt (`useACME: true`), leave `certFile` and `keyFile` **empty** so ACME is selected. Install with ACME no longer writes placeholder cert paths.
 
 For WebXDC, the cert must include `*.{webxdc.baseDomain}` (or each mini-app hostname). Install with `--cert` / `--key` also forces `useACME: false`.
 

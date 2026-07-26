@@ -76,14 +76,7 @@ func (h *CertHandler) GetCertInfo(c *fiber.Ctx) error {
 		})
 	}
 
-	certFile := h.cfg.Server.CertFile
-	keyFile := h.cfg.Server.KeyFile
-	if certFile == "" {
-		certFile = "/etc/bedrud/cert.pem"
-	}
-	if keyFile == "" {
-		keyFile = "/etc/bedrud/key.pem"
-	}
+	certFile, keyFile := h.cfg.Server.ResolveCertPaths()
 
 	info, err := utils.ValidateTLSCertPair(certFile, keyFile)
 	if err != nil {

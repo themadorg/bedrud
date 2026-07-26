@@ -43,15 +43,9 @@ func Initialize(db *gorm.DB, roomRepo *repository.RoomRepository, userRepo *repo
 	certFile = ""
 	keyFile = ""
 	certHosts = nil
-	if serverCfg.EnableTLS && !serverCfg.DisableTLS && !serverCfg.UseACME {
-		certFile = serverCfg.CertFile
-		keyFile = serverCfg.KeyFile
-		if certFile == "" {
-			certFile = "/etc/bedrud/cert.pem"
-		}
-		if keyFile == "" {
-			keyFile = "/etc/bedrud/key.pem"
-		}
+	// Only auto-renew self-signed / file-based certs — not ACME-managed ones.
+	if serverCfg.TLSMode() == config.TLSModeManual {
+		certFile, keyFile = serverCfg.ResolveCertPaths()
 		var hosts []string
 		if serverCfg.Domain != "" {
 			hosts = append(hosts, serverCfg.Domain)

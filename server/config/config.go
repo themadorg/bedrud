@@ -145,22 +145,30 @@ const (
 	TLSModeACME   = "acme"   // Let's Encrypt HTTP-01 or DNS-01
 )
 
-// HasExplicitCertFiles reports whether both certFile and keyFile are set in config.
-// Explicit files always take precedence over ACME (see TLSMode).
+// Default install paths used when enableTLS is on and cert paths are empty.
+const (
+	DefaultCertFile = "/etc/bedrud/cert.pem"
+	DefaultKeyFile  = "/etc/bedrud/key.pem"
+)
+
+// HasExplicitCertFiles reports whether the operator set certFile and/or keyFile.
+// Any non-empty path is treated as intent to use file-based TLS; missing half
+// of the pair is filled by ResolveCertPaths defaults. Explicit paths always
+// take precedence over ACME (see TLSMode).
 func (s ServerConfig) HasExplicitCertFiles() bool {
-	return strings.TrimSpace(s.CertFile) != "" && strings.TrimSpace(s.KeyFile) != ""
+	return strings.TrimSpace(s.CertFile) != "" || strings.TrimSpace(s.KeyFile) != ""
 }
 
 // ResolveCertPaths returns cert/key paths for manual TLS, applying install defaults
-// when paths are empty.
+// when paths are empty. Operator-set paths are never replaced.
 func (s ServerConfig) ResolveCertPaths() (certFile, keyFile string) {
 	certFile = strings.TrimSpace(s.CertFile)
 	keyFile = strings.TrimSpace(s.KeyFile)
 	if certFile == "" {
-		certFile = "/etc/bedrud/cert.pem"
+		certFile = DefaultCertFile
 	}
 	if keyFile == "" {
-		keyFile = "/etc/bedrud/key.pem"
+		keyFile = DefaultKeyFile
 	}
 	return certFile, keyFile
 }
@@ -175,9 +183,8 @@ func (s ServerConfig) ResolveHTTPPort() string {
 	return "80"
 }
 
-// ResolveACMEHTTPSPort returns the HTTPS listen port for ACME mode.
-// Empty server.port → "443" (public LE default). Explicit port always wins.
-// Manual TLS uses Port as-is (no ACME default) via ListenTLS.
+// ResolveACMEHTTPSPort returns the HTTPS listen port for ACME and manual TLS.
+// Empty server.port → "443". Explicit port always wins.
 func (s ServerConfig) ResolveACMEHTTPSPort() string {
 	if p := strings.TrimSpace(s.Port); p != "" {
 		return p
@@ -199,16 +206,17 @@ func (s ServerConfig) ListenAddr(port string) string {
 //
 // Precedence (highest first):
 //  1. none     — TLS disabled
-//  2. manual   — certFile+keyFile explicitly set (wins even if useACME is true)
-//  3. acme     — useACME + domain, no explicit cert files
+//  2. manual   — certFile and/or keyFile set (wins even if useACME is true)
+//  3. acme     — useACME + domain, no cert paths in config
 //  4. manual   — enableTLS with default /etc/bedrud/{cert,key}.pem paths
 //
-// This prevents ACME from ignoring operator-supplied certificate files when
-// useACME was left enabled from install.
+// Setting certFile/keyFile always selects file-based TLS. Leave both empty when
+// using Let's Encrypt so ACME is not overridden by install placeholders.
 func (s ServerConfig) TLSMode() string {
 	if !s.EnableTLS || s.DisableTLS {
 		return TLSModeNone
 	}
+	// Operator-supplied cert paths always win over ACME.
 	if s.HasExplicitCertFiles() {
 		return TLSModeManual
 	}
