@@ -20,6 +20,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/swaggo/swag v1.16.6
 	github.com/twitchtv/twirp v8.1.3+incompatible
+	github.com/ulikunitz/xz v0.5.12
 	golang.org/x/crypto v0.52.0
 	golang.org/x/mod v0.35.0
 	golang.org/x/net v0.54.0

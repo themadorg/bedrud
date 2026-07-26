@@ -34,4 +34,15 @@ package() {
     install -dm755 "${pkgdir}/etc/bedrud"
     install -dm755 "${pkgdir}/var/lib/bedrud"
     install -dm755 "${pkgdir}/var/log/bedrud"
+
+    # Config examples (bundled in release tar.xz when present)
+    if [ -d examples ]; then
+        install -dm755 "${pkgdir}/usr/share/doc/bedrud/examples"
+        install -m644 examples/* "${pkgdir}/usr/share/doc/bedrud/examples/"
+    fi
+
+    # Man page when shipped in the release tarball
+    if [ -f bedrud.1 ]; then
+        install -Dm644 bedrud.1 "${pkgdir}/usr/share/man/man1/bedrud.1"
+    fi
 }

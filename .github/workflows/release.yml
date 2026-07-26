@@ -111,8 +111,11 @@ jobs:
         run: |
           cd dist
           cp bedrud bedrud_${{ matrix.suffix }}
-          tar -cJf bedrud_${{ matrix.suffix }}.tar.xz bedrud
-          rm bedrud
+          mkdir -p examples
+          cp ../server/internal/install/examples/* examples/
+          cp ../server/internal/install/man/bedrud.1 ./bedrud.1
+          tar -cJf bedrud_${{ matrix.suffix }}.tar.xz bedrud examples bedrud.1
+          rm -rf examples bedrud bedrud.1
 
       - name: Package binary (Windows)
         if: matrix.goos == 'windows'
@@ -127,6 +130,8 @@ jobs:
           mkdir -p deb/DEBIAN \
             deb/usr/bin \
             deb/usr/lib/systemd/system \
+            deb/usr/share/doc/bedrud/examples \
+            deb/usr/share/man/man1 \
             deb/etc/bedrud \
             deb/var/lib/bedrud \
             deb/var/log/bedrud
@@ -134,6 +139,10 @@ jobs:
           cp dist/bedrud_${{ matrix.suffix }} deb/usr/bin/bedrud
           cp apps/server/installer/linux/bedrud.service deb/usr/lib/systemd/system/
           cp apps/server/installer/linux/livekit.service deb/usr/lib/systemd/system/
+          cp server/internal/install/examples/* deb/usr/share/doc/bedrud/examples/
+          cp server/internal/install/man/bedrud.1 deb/usr/share/man/man1/
+          gzip -9n deb/usr/share/man/man1/bedrud.1
+          # Shell completions: generated at postinst / bedrud install|update
 
           {
             echo "Package: bedrud"
@@ -194,6 +203,9 @@ jobs:
             rpmbuild/BUILD/bedrud.service
           install -Dm644 apps/server/installer/linux/livekit.service \
             rpmbuild/BUILD/livekit.service
+          mkdir -p rpmbuild/BUILD/examples
+          cp server/internal/install/examples/* rpmbuild/BUILD/examples/
+          cp server/internal/install/man/bedrud.1 rpmbuild/BUILD/bedrud.1
 
           rpmbuild --define "_topdir $(pwd)/rpmbuild" \
             --define "_builddir $(pwd)/rpmbuild/BUILD" \
@@ -978,6 +990,17 @@ jobs:
 
           # Server .apk packages (Alpine)
           find artifacts/server-apk-* -name "*.apk" -exec cp {} release-assets/ \; 2>/dev/null || true
+
+          # Checksums for bedrud update latest / supply-chain verification
+          (
+            cd release-assets
+            # Prefer server Linux archives; include other bedrud_* artifacts when present
+            shopt -s nullglob
+            files=(bedrud_linux_*.tar.xz bedrud_*.deb bedrud-*.rpm bedrud_windows_*.zip)
+            if [ ${#files[@]} -gt 0 ]; then
+              sha256sum "${files[@]}" > SHA256SUMS
+            fi
+          )
 
           # Android debug APKs
           for f in \

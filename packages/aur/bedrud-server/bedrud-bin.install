@@ -10,7 +10,19 @@ post_install() {
     echo "==>   sudo bedrud install"
     echo "==> Or with existing configs:"
     echo "==>   systemctl enable --now livekit bedrud"
+    echo "==> Example configs: /usr/share/doc/bedrud/examples/"
+    echo "==> Manual: man bedrud"
+    echo "==> Completions: run sudo bedrud update --skip-binary (or bedrud completion …)"
     echo "==> Docs: https://themadorg.github.io/bedrud/"
+    # Refresh shell completions from the installed binary
+    if command -v bedrud >/dev/null 2>&1; then
+        mkdir -p /usr/share/bash-completion/completions \
+                 /usr/share/zsh/site-functions \
+                 /usr/share/fish/vendor_completions.d 2>/dev/null || true
+        bedrud completion bash >/usr/share/bash-completion/completions/bedrud 2>/dev/null || true
+        bedrud completion zsh  >/usr/share/zsh/site-functions/_bedrud 2>/dev/null || true
+        bedrud completion fish >/usr/share/fish/vendor_completions.d/bedrud.fish 2>/dev/null || true
+    fi
     systemctl daemon-reload
 }
 

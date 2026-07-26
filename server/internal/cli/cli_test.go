@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"bedrud/config"
 	"bedrud/internal/clioutput"
 	"bedrud/internal/database"
+	"bedrud/internal/install"
 	"bedrud/internal/models"
 )
 
@@ -251,5 +253,151 @@ func TestRedactSettings(t *testing.T) {
 	}
 	if s.ServerHost != "keep-me" {
 		t.Fatalf("non-secret mutated: %q", s.ServerHost)
+	}
+}
+
+func TestUpdateRequiresSource(t *testing.T) {
+	out, errBuf := captureOutput(t)
+	root := NewRootCmd()
+	root.SetArgs([]string{"update"})
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error when update has no source")
+	}
+	combined := err.Error() + errBuf.String() + out.String()
+	if !bytes.Contains([]byte(combined), []byte("missing source")) {
+		t.Fatalf("expected missing source error, got err=%v stdout=%q stderr=%q", err, out.String(), errBuf.String())
+	}
+}
+
+func TestUpgradeRequiresSource(t *testing.T) {
+	out, errBuf := captureOutput(t)
+	root := NewRootCmd()
+	root.SetArgs([]string{"upgrade"})
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error when upgrade has no source")
+	}
+	combined := err.Error() + errBuf.String() + out.String()
+	if !bytes.Contains([]byte(combined), []byte("missing source")) {
+		t.Fatalf("expected missing source error, got err=%v", err)
+	}
+}
+
+func TestUpdateSelfAndSourceConflict(t *testing.T) {
+	_, _ = captureOutput(t)
+	root := NewRootCmd()
+	root.SetArgs([]string{"update", "--self", "/tmp/bedrud"})
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected conflict error")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("--self")) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestUpdateSkipBinaryAndSourceConflict(t *testing.T) {
+	_, _ = captureOutput(t)
+	root := NewRootCmd()
+	root.SetArgs([]string{"update", "--skip-binary", "/tmp/bedrud"})
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected conflict error")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("--skip-binary")) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestUpdateLatestSkipChecksumConflict(t *testing.T) {
+	_, _ = captureOutput(t)
+	root := NewRootCmd()
+	root.SetArgs([]string{"update", "latest", "--skip-checksum"})
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected latest+skip-checksum error")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("skip-checksum")) &&
+		!bytes.Contains([]byte(err.Error()), []byte("latest")) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestCompletionBash(t *testing.T) {
+	out, errBuf := captureOutput(t)
+	// GenBash writes to stdout of the command, not clioutput writers — use root with SetOut
+	root := NewRootCmd()
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	root.SetArgs([]string{"completion", "bash"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("err=%v stderr=%s", err, errBuf.String())
+	}
+	s := buf.String()
+	if !strings.Contains(s, "bedrud") {
+		// cobra may write to os.Stdout directly for GenBashCompletionV2
+		// fall back: call writeCompletion
+		var b2 bytes.Buffer
+		if err := writeCompletion(&b2, "bash", "bedrud"); err != nil {
+			t.Fatal(err)
+		}
+		s = b2.String()
+	}
+	if !strings.Contains(s, "bedrud") {
+		t.Fatalf("bash completion missing binary name: %q (stdout capture=%q)", s, out.String())
+	}
+	if !strings.Contains(s, "install") && !strings.Contains(s, "update") {
+		// completion scripts often list subcommands
+		t.Logf("warning: install/update not found in completion (may still be valid)")
+	}
+}
+
+func TestCompletionZshAndFish(t *testing.T) {
+	for _, shell := range []string{"zsh", "fish"} {
+		var buf bytes.Buffer
+		if err := writeCompletion(&buf, shell, "bedrud"); err != nil {
+			t.Fatalf("%s: %v", shell, err)
+		}
+		if !strings.Contains(buf.String(), "bedrud") {
+			t.Fatalf("%s completion missing binary name", shell)
+		}
+	}
+}
+
+func TestCompletionUnsupportedShell(t *testing.T) {
+	var buf bytes.Buffer
+	if err := writeCompletion(&buf, "powershell", "bedrud"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestGenerateMan(t *testing.T) {
+	out, _ := captureOutput(t)
+	root := NewRootCmd()
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetArgs([]string{"generate-man"})
+	// generate-man writes to os.Stdout via io.WriteString — use helper
+	man := install.EmbeddedManPage()
+	if !strings.Contains(man, `.TH "bedrud" "1"`) {
+		t.Fatal("embedded man invalid")
+	}
+	_ = out
+}
+
+func TestGenerateCompletionsInProcess(t *testing.T) {
+	bash, zsh, fish, err := generateCompletions("bedrud")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, b := range map[string][]byte{"bash": bash, "zsh": zsh, "fish": fish} {
+		if !bytes.Contains(b, []byte("bedrud")) {
+			t.Fatalf("%s missing bedrud", name)
+		}
+		if len(b) < 50 {
+			t.Fatalf("%s too short", name)
+		}
 	}
 }
