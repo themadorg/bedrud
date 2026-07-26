@@ -397,6 +397,19 @@ func LinuxInstall(cfg *InstallConfig) error {
 		}
 	}
 
+	if err := installDocExamples(); err != nil {
+		fmt.Printf("⚠ Warning: could not write doc examples: %v\n", err)
+	} else {
+		fmt.Println("➜ Doc examples:", docExamplesDir)
+	}
+
+	if err := installCLIDocs(); err != nil {
+		fmt.Printf("⚠ Warning: could not install man page / shell completions: %v\n", err)
+	} else {
+		fmt.Println("➜ Man page and shell completions installed (bash, zsh, fish)")
+		fmt.Println("  man", binaryNameFromArgv())
+	}
+
 	fmt.Println("\n✓ Installation complete!")
 	fmt.Println("--------------------------------------------------")
 	fmt.Println("Sensitive credentials were generated and written to configuration files.")
@@ -670,6 +683,12 @@ func LinuxUninstall() error {
 	}
 	if err := os.RemoveAll(varLogDir); err != nil {
 		errs = append(errs, fmt.Errorf("failed to remove %s: %w", varLogDir, err))
+	}
+	if err := removeDocTree(); err != nil {
+		errs = append(errs, err)
+	}
+	if err := removeCLIDocs(); err != nil {
+		errs = append(errs, err)
 	}
 
 	if _, err := exec.Command("getent", "passwd", "bedrud").Output(); err == nil {

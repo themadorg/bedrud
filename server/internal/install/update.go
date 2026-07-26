@@ -22,26 +22,39 @@ type UpdateOptions struct {
 	Version string
 	// ConfigPath overrides the default /etc/bedrud/config.yaml.
 	ConfigPath string
+	// Source is a local binary path, archive path, HTTPS URL, or "latest".
+	// Empty when Self or SkipBinary is set.
+	Source string
+	// Self installs from the currently running executable (--self).
+	Self bool
 	// SkipBinary skips replacing the installed binary (migrations + restart only).
 	SkipBinary bool
 	// SkipMigrate skips database AutoMigrate.
 	SkipMigrate bool
 	// SkipRestart skips stopping/starting init services.
 	SkipRestart bool
+	// SkipChecksum allows local operator-provided files without SHA256SUMS.
+	// Never used for "latest" (always verified).
+	SkipChecksum bool
 }
 
 // LinuxUpdate upgrades an existing Bedrud installation in place:
 //  1. Verify prior install
-//  2. Stop services
-//  3. Replace binary (unless package-managed or SkipBinary)
-//  4. Run versioned install migrations + database migrations
-//  5. Refresh service units and restart
-//  6. Record installed version
+//  2. Resolve binary source (BIN_PATH, archive, URL, latest, or --self)
+//  3. Stop services
+//  4. Replace binary (unless SkipBinary)
+//  5. Run versioned install migrations + database migrations
+//  6. Refresh service units and restart; write doc examples
+//  7. Record installed version
 //
 // Config, secrets, database, and certificates are preserved.
 func LinuxUpdate(opts UpdateOptions) error {
 	if runtime.GOOS != "linux" {
 		return fmt.Errorf("only linux is supported")
+	}
+
+	if err := validateUpdateOptions(opts); err != nil {
+		return err
 	}
 
 	cfgPath := opts.ConfigPath
@@ -77,6 +90,31 @@ func LinuxUpdate(opts UpdateOptions) error {
 	fmt.Println("  New version:     ", newVersion)
 	fmt.Println("  Config:          ", cfgPath)
 
+	// Resolve binary source before stopping services so network/checksum
+	// failures leave the running install untouched.
+	var (
+		srcBinary string
+		cleanup   func()
+		srcMeta   resolvedSource
+	)
+	if !opts.SkipBinary {
+		var err error
+		srcMeta, err = resolveUpdateSource(opts)
+		if err != nil {
+			return err
+		}
+		srcBinary = srcMeta.BinaryPath
+		cleanup = srcMeta.Cleanup
+		if cleanup != nil {
+			defer cleanup()
+		}
+		if srcMeta.Version != "" {
+			newVersion = srcMeta.Version
+			fmt.Println("  Source version: ", newVersion)
+		}
+		fmt.Println("  Source:         ", srcMeta.Description)
+	}
+
 	// Ensure runtime layout still exists (partial upgrades / moved data).
 	for _, dir := range []string{etcDir, varLibDir, varLibDir + "/certs", varLogDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -100,32 +138,19 @@ func LinuxUpdate(opts UpdateOptions) error {
 	binaryUpdated := false
 	if opts.SkipBinary {
 		fmt.Println("➜ Skipping binary replacement (--skip-binary)")
-	} else if packageManaged {
-		// Package managers own /usr/bin/bedrud. If the operator is running a newer
-		// downloaded binary, install it to /usr/local/bin instead (PATH usually
-		// prefers /usr/local/bin). If we're already the package binary, just
-		// migrate + restart after apt/dnf already replaced the file.
-		selfPath, _ := os.Executable()
-		if selfPath != "" && !sameFile(selfPath, targetBin) {
-			fmt.Printf("➜ Package-managed binary at %s — installing self to %s\n", targetBin, binaryLocalPath)
-			if err := installSelfBinary(binaryLocalPath); err != nil {
-				return err
-			}
-			targetBin = binaryLocalPath
-			binaryUpdated = true
-			fmt.Println("➜ Installed binary to", targetBin)
-			fmt.Println("  Note: ensure PATH prefers /usr/local/bin over /usr/bin, or update service ExecStart.")
-		} else {
-			fmt.Printf("➜ Package-managed binary at %s — leaving package binary in place\n", targetBin)
-		}
 	} else {
-		// Self is the installed path: still re-copy (new file after download to same path
-		// is handled by remove+write). If self is a different path (e.g. /tmp/bedrud),
-		// install over the system path.
-		fmt.Println("➜ Replacing binary at", targetBin)
-		if err := installSelfBinary(targetBin); err != nil {
+		installTarget := targetBin
+		if packageManaged {
+			// Package managers own /usr/bin/bedrud — install to /usr/local/bin instead.
+			fmt.Printf("➜ Package-managed binary at %s — installing to %s\n", targetBin, binaryLocalPath)
+			installTarget = binaryLocalPath
+			fmt.Println("  Note: ensure PATH prefers /usr/local/bin over /usr/bin, or update service ExecStart.")
+		}
+		fmt.Println("➜ Replacing binary at", installTarget)
+		if err := installBinaryFile(installTarget, srcBinary); err != nil {
 			return err
 		}
+		targetBin = installTarget
 		binaryUpdated = true
 		fmt.Println("➜ Binary updated:", targetBin)
 	}
@@ -167,6 +192,19 @@ func LinuxUpdate(opts UpdateOptions) error {
 		fmt.Println("➜ Skipping service restart (--skip-restart)")
 	}
 
+	if err := installDocExamples(); err != nil {
+		fmt.Printf("⚠ Warning: could not write doc examples: %v\n", err)
+	} else {
+		fmt.Println("➜ Doc examples:", docExamplesDir)
+	}
+
+	// Refresh man page + shell completions so tab-completion matches this binary.
+	if err := installCLIDocs(); err != nil {
+		fmt.Printf("⚠ Warning: could not refresh man page / shell completions: %v\n", err)
+	} else {
+		fmt.Println("➜ Man page and shell completions updated (bash, zsh, fish)")
+	}
+
 	if err := writeInstalledVersion(newVersion); err != nil {
 		fmt.Printf("⚠ Warning: could not write version file: %v\n", err)
 	}
@@ -181,9 +219,27 @@ func LinuxUpdate(opts UpdateOptions) error {
 	fmt.Println()
 	fmt.Println("  Config:   preserved")
 	fmt.Println("  Database: migrated")
+	fmt.Println("  Examples: ", docExamplesDir)
+	fmt.Println("  Docs:     man page + bash/zsh/fish completions refreshed")
 	fmt.Println("--------------------------------------------------")
 	fmt.Println("  Status:   systemctl status bedrud livekit")
 	fmt.Println("  Logs:     journalctl -u bedrud -f")
+	return nil
+}
+
+func validateUpdateOptions(opts UpdateOptions) error {
+	if opts.SkipBinary {
+		if opts.Source != "" || opts.Self {
+			return fmt.Errorf("--skip-binary cannot be combined with a source or --self")
+		}
+		return nil
+	}
+	if opts.Self && opts.Source != "" {
+		return fmt.Errorf("--self cannot be combined with a source argument")
+	}
+	if !opts.Self && opts.Source == "" {
+		return fmt.Errorf("missing source: path, URL, \"latest\", or --self (or use --skip-binary for migrations only)")
+	}
 	return nil
 }
 

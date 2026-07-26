@@ -22,6 +22,13 @@ install -Dm644 livekit.service %{buildroot}%{_unitdir}/livekit.service
 install -dm755 %{buildroot}%{_sysconfdir}/bedrud
 install -dm755 %{buildroot}%{_sharedstatedir}/bedrud
 install -dm755 %{buildroot}/var/log/bedrud
+install -dm755 %{buildroot}%{_docdir}/bedrud/examples
+if [ -d examples ]; then
+    install -m644 examples/* %{buildroot}%{_docdir}/bedrud/examples/
+fi
+if [ -f bedrud.1 ]; then
+    install -Dm644 bedrud.1 %{buildroot}%{_mandir}/man1/bedrud.1
+fi
 
 %files
 %{_bindir}/bedrud
@@ -30,6 +37,10 @@ install -dm755 %{buildroot}/var/log/bedrud
 %dir %{_sysconfdir}/bedrud
 %dir %{_sharedstatedir}/bedrud
 %dir /var/log/bedrud
+%dir %{_docdir}/bedrud
+%dir %{_docdir}/bedrud/examples
+%{_docdir}/bedrud/examples/*
+%{_mandir}/man1/bedrud.1*
 
 %post
 getent group bedrud >/dev/null || groupadd -r bedrud
@@ -45,6 +56,7 @@ else
     echo ""
     echo "Bedrud installed. Generate config + LiveKit setup:"
     echo "  sudo bedrud install"
+    echo "Example configs: /usr/share/doc/bedrud/examples/"
     echo "Docs: https://themadorg.github.io/bedrud/"
 fi
 

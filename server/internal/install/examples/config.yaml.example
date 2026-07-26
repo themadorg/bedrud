@@ -1,0 +1,135 @@
+# Example production-style Bedrud config.
+# Copy to /etc/bedrud/config.yaml and replace all CHANGE_ME_* values.
+# Prefer: sudo bedrud install  (generates secrets and services for you).
+#
+# NEVER commit real secrets. Mode of live config should be 0600.
+
+server:
+  # HTTPS port when enableTLS is true (default 443). HTTP-only installs often use 8090.
+  port: "443"
+  # HTTP listener when TLS is enabled (redirect / ACME). Default "80". Unprivileged: "8080".
+  # Env: SERVER_HTTP_PORT
+  httpPort: "80"
+  host: "0.0.0.0"
+  readTimeout: 30
+  writeTimeout: 30
+  enableTLS: true
+  # Manual cert pair (or paths written by install / cert CLI).
+  certFile: "/etc/bedrud/cert.pem"
+  keyFile: "/etc/bedrud/key.pem"
+  # Public domain (required for Let's Encrypt / ACME and many reverse-proxy setups).
+  domain: "meet.example.com"
+  email: "admin@example.com"
+  # true when using ACME (Let's Encrypt). Install sets this when domain+email given.
+  useACME: false
+  # Self-signed cert key algorithm: ed25519 (default), ecdsa256, rsa2048, rsa4096.
+  # Env: SERVER_CERT_ALGORITHM
+  certAlgorithm: "ed25519"
+  # maxParticipantsLimit: hard ceiling for room capacity (0 = unlimited). Env: SERVER_MAX_PARTICIPANTS_LIMIT
+  maxParticipantsLimit: 1000
+  # maxRoomsPerUser: active rooms per user (0 = unlimited). Env: SERVER_MAX_ROOMS_PER_USER
+  maxRoomsPerUser: 100
+  # behindProxy: true when TLS terminates at CDN/reverse proxy.
+  # behindProxy: false
+  # trustedProxies: ["10.0.0.0/8"]
+  # proxyHeader: "X-Forwarded-For"
+
+database:
+  type: "sqlite"
+  path: "/var/lib/bedrud/bedrud.db"
+  # PostgreSQL example:
+  # type: "postgres"
+  # dsn: "host=localhost user=bedrud password=CHANGE_ME dbname=bedrud port=5432 sslmode=disable"
+
+logger:
+  # empty/off/disabled = quiet. debug/info/warn/error. Env: LOG_LEVEL
+  level: "info"
+  # Append JSON logs to this file (plus stdout). Env: LOG_OUTPUT_PATH
+  outputPath: "/var/log/bedrud/bedrud.log"
+
+livekit:
+  # Browser signaling URL (public). Behind reverse proxy use wss://domain/livekit or similar.
+  host: "wss://meet.example.com/livekit"
+  # Server-side API to LiveKit (loopback for embedded).
+  internalHost: "http://127.0.0.1:7880"
+  apiKey: "CHANGE_ME_LIVEKIT_API_KEY"
+  apiSecret: "CHANGE_ME_LIVEKIT_API_SECRET"
+  # Path to LiveKit YAML (written by install for embedded LiveKit).
+  configPath: "/etc/bedrud/livekit.yaml"
+  # external: true  # use remote LiveKit Cloud / self-hosted; no local livekit service
+  skipTLSVerify: false
+  # Webhook (disconnect detection):
+  #   Embedded LiveKit auto-configures webhook URL -> local API.
+  #   External LiveKit: set webhook in dashboard to https://<domain>/api/livekit/webhook
+
+auth:
+  # Use long random secrets (32+ chars). Install generates these for you.
+  jwtSecret: "CHANGE_ME_32_CHAR_RANDOM_STRING!!!!!!!!"
+  sessionSecret: "CHANGE_ME_32_CHAR_RANDOM_STRING!!!!!!!!"
+  tokenDuration: 24
+  passkeyChallengeTTL: 5
+  requireEmailVerification: false
+  verificationEmailCooldownMins: 2
+  verificationTokenTTLHours: 24
+  unverifiedAccountTTLHours: 48
+  # Public web UI origin (used in emails / OAuth redirects).
+  frontendURL: "https://meet.example.com"
+  google:
+    clientId: ""
+    clientSecret: ""
+    redirectUrl: "https://meet.example.com/api/auth/google/callback"
+  github:
+    clientId: ""
+    clientSecret: ""
+    redirectUrl: "https://meet.example.com/api/auth/github/callback"
+  twitter:
+    clientId: ""
+    clientSecret: ""
+    redirectUrl: "https://meet.example.com/api/auth/twitter/callback"
+
+rateLimit:
+  authMaxRequests: 10
+  authWindowSecs: 60
+  guestMaxRequests: 5
+  guestWindowSecs: 60
+
+cors:
+  allowedOrigins: "https://meet.example.com"
+  allowedHeaders: "Origin, Content-Type, Accept, Authorization"
+  allowedMethods: "GET, POST, PUT, DELETE, OPTIONS"
+  allowCredentials: true
+
+chat:
+  maxUploadBytesPerUser: 524288000
+  globalDiskThresholdBytes: 0
+  maxMessageCount: 10000
+  messageTTLHours: 2160
+
+queue:
+  pollInterval: 500
+  maxAttempts: 3
+  concurrency: 1
+
+recording:
+  maxFileSizeMB: 2048
+  storageDir: "/var/lib/bedrud/recordings"
+  maxRecordingsPerRoom: 0
+  retentionHours: 720
+  cleanupIntervalHours: 24
+
+email:
+  smtpHost: ""
+  smtpPort: 587
+  username: ""
+  password: ""
+  fromAddress: ""
+  fromName: "Bedrud"
+  tlsSkipVerify: false
+  smtpsMode: false
+
+# Experimental WebXDC mini-apps (requires DNS *.<baseDomain> + TLS covering the wildcard):
+# webxdc:
+#   enabled: true
+#   baseDomain: "wx.example.com"
+#   uploadPolicy: owner_mod
+#   storageDir: "/var/lib/bedrud/webxdc"

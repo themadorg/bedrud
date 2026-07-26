@@ -1,0 +1,38 @@
+# Example LiveKit YAML for embedded LiveKit (written to /etc/bedrud/livekit.yaml by install).
+# Keys must match livekit.apiKey / livekit.apiSecret in config.yaml.
+# Prefer: sudo bedrud install
+
+port: 7880
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 60000
+  use_external_ip: true
+  # When the server is behind CDN and media uses a different public IP:
+  # node_ip: 203.0.113.10
+
+turn:
+  enabled: true
+  # Must be a real domain when TURN/TLS is used (often same as server.domain).
+  domain: meet.example.com
+  udp_port: 3478
+  tls_port: 5349
+  # cert_file / key_file: install may point these at the server TLS cert when enableTLS is true.
+
+keys:
+  # Map apiKey -> apiSecret (same values as config.yaml livekit section).
+  CHANGE_ME_LIVEKIT_API_KEY: "CHANGE_ME_LIVEKIT_API_SECRET"
+
+# Redis is only required for multi-node / distributed deployments.
+# redis:
+#   address: redis:6379
+
+room:
+  auto_create: true
+  empty_timeout: 60
+  departure_timeout: 60
+  max_participants: 20
+  enable_remote_unmute: true
+
+logging:
+  level: info

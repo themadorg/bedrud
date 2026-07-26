@@ -1,0 +1,231 @@
+.\" Manual page for bedrud(1)
+.TH "bedrud" "1" "" "User Commands" "Bedrud"
+.SH NAME
+bedrud \- self\-hosted video meeting server and operator CLI
+.SH SYNOPSIS
+.B bedrud
+[\fIoptions\fR]
+.PP
+.B bedrud
+\fIcommand\fR [\fIsubcommand\fR] [\fIoptions\fR] [\fIarguments\fR...]
+.PP
+Common forms:
+.PP
+.B bedrud
+[\fB\-\-config\fR \fIfile\fR] [\fB\-\-json\fR]
+.PP
+.B bedrud run
+[\fB\-\-skip\-migrate\fR]
+.PP
+.B bedrud install
+[\fIflags\fR...]
+.PP
+.B bedrud update
+\fIsource\fR | \fB\-\-self\fR | \fB\-\-skip\-binary\fR
+.SH DESCRIPTION
+.B bedrud
+is a single executable that runs a video meeting API server, serves an
+embedded web UI, and can manage an embedded LiveKit WebRTC media server.
+It also provides operator commands for installation, upgrades, users,
+rooms, configuration, certificates, and database maintenance.
+.PP
+Invoking management subcommands opens the configuration file and (when
+needed) the application database on the host where the server is installed.
+.SH OPTIONS
+Global options apply to all subcommands unless noted.
+.TP
+.B \-\-config \fIpath\fR
+Path to the configuration YAML file.
+Environment:
+.BR BEDRUD_CONFIG ,
+.BR CONFIG_PATH .
+Default for installed systems:
+.IR /etc/bedrud/config.yaml .
+.TP
+.B \-\-json
+Emit machine\-readable JSON on stdout for successful operations and errors.
+.TP
+.B \-h , \-\-help
+Show help for a command.
+.SH COMMANDS
+.SS Server
+.TP
+.B run , server
+Start the meeting API server (and related services according to config).
+.TP
+.B livekit
+Start the embedded LiveKit process (legacy/service unit entrypoint).
+.SS Installation and lifecycle
+.TP
+.B install
+Create system user and directories, write
+.I /etc/bedrud
+configuration and LiveKit YAML when applicable, install init units, TLS
+material as requested, example configs under
+.IR /usr/share/doc/bedrud/examples/ ,
+the manual page, and shell tab\-completion scripts.
+.TP
+.B uninstall
+Stop services and remove installed files, configuration, and data
+(destructive).
+.TP
+.B update , upgrade
+Upgrade an existing installation.
+A source is required: a local binary path, a release archive
+(\fB.tar.xz\fR / \fB.tar.gz\fR), an HTTPS URL, the keyword
+.BR latest
+(GitHub release with checksum verification),
+.BR \-\-self
+(use the running executable), or
+.BR \-\-skip\-binary
+(migrations and restart only after a package manager replaced the binary).
+.IP
+After a successful update, database migrations run (unless skipped),
+service units are refreshed, example configs under
+.I /usr/share/doc/bedrud/examples/
+are rewritten, and the man page plus bash/zsh/fish completions are
+refreshed.
+.SS Users and rooms
+.TP
+.B user
+Manage accounts (create, delete, list, promote, password, enable/disable, …).
+.TP
+.B room
+Manage rooms (list, info, close, suspend, reactivate, kick).
+.SS Configuration and operations
+.TP
+.B config
+Show or modify configuration path/values; validate config.
+.TP
+.B settings
+Show or set runtime settings stored in the database.
+.TP
+.B certificate , cert
+Regenerate, renew, or show TLS certificate information.
+.TP
+.B invite\-token , invite
+Manage registration invite tokens.
+.TP
+.B db
+Run or inspect database migrations.
+.TP
+.B version
+Print the package version.
+.SS Shell integration
+.TP
+.B completion
+Print a shell tab\-completion script.
+Supported shells:
+.BR bash ,
+.BR zsh ,
+.BR fish .
+Redirect to the system completion path (see FILES), or rely on
+.B install
+/
+.B update
+to install completions automatically on system installs.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B non\-zero
+Invalid usage, missing privileges, configuration error, or command failure.
+.SH ENVIRONMENT
+.TP
+.B BEDRUD_CONFIG , CONFIG_PATH
+Override the configuration file path.
+.TP
+.B SERVER_HTTP_PORT , SERVER_CERT_ALGORITHM , LOG_LEVEL
+See configuration documentation; many keys also accept environment overrides.
+.SH FILES
+.TP
+.I /etc/bedrud/config.yaml
+Primary application configuration (mode 0600 recommended).
+.TP
+.I /etc/bedrud/livekit.yaml
+Embedded LiveKit configuration when not using external LiveKit.
+.TP
+.I /var/lib/bedrud/
+State directory (database, certs, uploads, version file).
+.TP
+.I /var/log/bedrud/
+Log directory when file logging is enabled.
+.TP
+.I /usr/share/doc/bedrud/examples/
+Example configuration templates.
+.TP
+.I /usr/share/man/man1/bedrud.1
+This manual page (installed by
+.B install
+/
+.BR update ).
+.TP
+.I /usr/share/bash\-completion/completions/bedrud
+Bash completion script.
+.TP
+.I /usr/share/zsh/site\-functions/_bedrud
+Zsh completion script.
+.TP
+.I /usr/share/fish/vendor_completions.d/bedrud.fish
+Fish completion script.
+.SH EXAMPLES
+Install on a Linux host (interactive when a TTY is present):
+.PP
+.nf
+.RS
+sudo bedrud install
+.RE
+.fi
+.PP
+Upgrade from a downloaded binary:
+.PP
+.nf
+.RS
+sudo bedrud update /tmp/bedrud
+.RE
+.fi
+.PP
+Upgrade to the latest GitHub release (HTTPS + SHA256):
+.PP
+.nf
+.RS
+sudo bedrud update latest
+.RE
+.fi
+.PP
+After an apt/dnf package upgrade of the binary only:
+.PP
+.nf
+.RS
+sudo bedrud update \-\-skip\-binary
+.RE
+.fi
+.PP
+Install shell completions manually:
+.PP
+.nf
+.RS
+bedrud completion bash | sudo tee /usr/share/bash\-completion/completions/bedrud
+bedrud completion zsh  | sudo tee /usr/share/zsh/site\-functions/_bedrud
+bedrud completion fish | sudo tee /usr/share/fish/vendor_completions.d/bedrud.fish
+.RE
+.fi
+.PP
+Read this page after install:
+.PP
+.nf
+.RS
+man bedrud
+.RE
+.fi
+.SH SEE ALSO
+Online documentation:
+.UR https://bedrud.org/
+.UE
+and
+.UR https://themadorg.github.io/bedrud/
+.UE
+.PP
+Configuration examples on an installed system:
+.IR /usr/share/doc/bedrud/examples/ .

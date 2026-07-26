@@ -91,15 +91,32 @@ func installSelfBinary(targetPath string) error {
 	if err != nil {
 		return err
 	}
+	return installBinaryBytes(targetPath, selfBytes)
+}
+
+// installBinaryBytes writes data to targetPath (0755), removing the target first
+// to avoid ETXTBSY when replacing a running binary.
+func installBinaryBytes(targetPath string, data []byte) error {
+	if len(data) == 0 {
+		return fmt.Errorf("empty binary data")
+	}
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 		return fmt.Errorf("create binary dir: %w", err)
 	}
-	// Avoid ETXTBSY: remove then write (same approach as LinuxInstall).
 	_ = os.Remove(targetPath)
-	if err := os.WriteFile(targetPath, selfBytes, 0o755); err != nil {
+	if err := os.WriteFile(targetPath, data, 0o755); err != nil {
 		return fmt.Errorf("failed to install binary to %s: %w", targetPath, err)
 	}
 	return nil
+}
+
+// installBinaryFile copies srcPath to targetPath using ETXTBSY-safe replace.
+func installBinaryFile(targetPath, srcPath string) error {
+	data, err := os.ReadFile(srcPath)
+	if err != nil {
+		return fmt.Errorf("read source binary %s: %w", srcPath, err)
+	}
+	return installBinaryBytes(targetPath, data)
 }
 
 func runChown(userGroup, path string) error {

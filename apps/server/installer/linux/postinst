@@ -22,6 +22,20 @@ if command -v systemctl > /dev/null 2>&1 && systemctl is-system-running --quiet 
     fi
 fi
 
+# Install / refresh man page is shipped in the package; shell completions are
+# generated from the installed binary so they always match this version.
+if command -v bedrud >/dev/null 2>&1; then
+    mkdir -p /usr/share/bash-completion/completions \
+             /usr/share/zsh/site-functions \
+             /usr/share/fish/vendor_completions.d 2>/dev/null || true
+    bedrud completion bash >/usr/share/bash-completion/completions/bedrud 2>/dev/null || true
+    bedrud completion zsh  >/usr/share/zsh/site-functions/_bedrud 2>/dev/null || true
+    bedrud completion fish >/usr/share/fish/vendor_completions.d/bedrud.fish 2>/dev/null || true
+    if command -v mandb >/dev/null 2>&1; then
+        mandb -q 2>/dev/null || true
+    fi
+fi
+
 if [ ! -f /etc/bedrud/config.yaml ] || [ ! -f /etc/bedrud/livekit.yaml ]; then
     echo ""
     echo "Bedrud installed. Generate config + LiveKit setup, then start services:"
@@ -31,9 +45,14 @@ if [ ! -f /etc/bedrud/config.yaml ] || [ ! -f /etc/bedrud/livekit.yaml ]; then
     echo "and enables livekit.service (embedded LiveKit from the bedrud binary)"
     echo "plus bedrud.service."
     echo ""
+    echo "Example configs: /usr/share/doc/bedrud/examples/"
+    echo "Manual:          man bedrud"
+    echo "Completions:     bash / zsh / fish (installed under /usr/share)"
     echo "Docs: https://themadorg.github.io/bedrud/getting-started/installation/"
 else
     echo ""
     echo "Bedrud package upgraded. Services livekit + bedrud were restarted if systemd is available."
     echo "To run database/version migrations explicitly: sudo bedrud update --skip-binary"
+    echo "Example configs: /usr/share/doc/bedrud/examples/"
+    echo "Manual:          man bedrud (completions refreshed)"
 fi

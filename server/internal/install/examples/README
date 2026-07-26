@@ -1,0 +1,29 @@
+Bedrud configuration examples
+=============================
+
+These files are reference templates only. They are not used at runtime.
+
+Installed live config (written by `sudo bedrud install`):
+  /etc/bedrud/config.yaml
+  /etc/bedrud/livekit.yaml
+
+Quick start
+-----------
+1. Prefer generating a full install (secrets, services, TLS):
+
+     sudo bedrud install
+
+2. Or copy an example and edit placeholders (CHANGE_ME_*):
+
+     sudo cp /usr/share/doc/bedrud/examples/config.yaml.example /etc/bedrud/config.yaml
+     sudo cp /usr/share/doc/bedrud/examples/livekit.yaml.example /etc/bedrud/livekit.yaml
+     sudo chmod 600 /etc/bedrud/config.yaml /etc/bedrud/livekit.yaml
+     # edit secrets, domain, ports
+     sudo systemctl enable --now livekit bedrud
+
+Docs: https://bedrud.org/  and  https://themadorg.github.io/bedrud/
+
+Update the server binary:
+  sudo bedrud update --self              # use this running binary
+  sudo bedrud update /path/to/bedrud     # bare binary
+  sudo bedrud update latest              # GitHub latest (checksum verified)

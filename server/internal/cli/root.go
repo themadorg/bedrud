@@ -70,6 +70,9 @@ configuration, and certificate management.`,
 		newInviteTokenCmd(),
 		newDBCmd(),
 		newVersionCmd(),
+		newCompletionCmd(),
+		newGenerateManCmd(),
+		newGenerateFishCompletionCmd(),
 	)
 
 	return root
