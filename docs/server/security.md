@@ -70,7 +70,7 @@ Per-IP sliding window on auth, guest, resend, and API endpoints. **Must configur
 |------|-------|
 | Manual | Cert/key pair validated at startup |
 | Self-signed | Ed25519 default, auto-renewal at 30 days |
-| ACME | Let's Encrypt, HTTP-01 on :80, HTTPS on :443 |
+| ACME | Let's Encrypt; HTTP-01 challenge / DNS-01 redirect on `httpPort` (default 80); HTTPS on `port` (ACME default 443 when empty) |
 | Embedded LK TURN/TLS | Port 5349, uses server cert when TLS enabled |
 
 ---

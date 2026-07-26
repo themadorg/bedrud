@@ -85,11 +85,11 @@ Requests to `/livekit/*` are proxied to `livekit.internalHost` (default `http://
 | Mode | Trigger | Behavior |
 |------|---------|----------|
 | None | `enableTLS: false` | HTTP only on `server.port` |
-| Manual | `enableTLS: true`, cert/key files | HTTPS on `server.port`, HTTP redirect on `httpPort` |
+| Manual | `enableTLS: true`, cert/key files | HTTPS on `server.port`, HTTP dual-listen on `httpPort` |
 | Self-signed | Install or cert generation | Ed25519 default, auto-renewal at 30 days |
-| ACME | `useACME: true` + `domain` + `email` | Let's Encrypt via autocert |
+| ACME | `useACME: true` + `domain` + `email` | Let's Encrypt (HTTP-01 or DNS-01); HTTP on `httpPort`, HTTPS on `port` (ACME default `443` when empty) |
 
-When TLS is enabled, an additional HTTP listener on `httpPort` (default `:80`) redirects to HTTPS. Non-root users should set `httpPort: "8080"`.
+When TLS is enabled, an additional HTTP listener on `httpPort` (default `80`) is started for ACME challenge/redirect or manual dual-listen. Non-root users should set `httpPort: "8080"` (works for **all** TLS modes, including ACME).
 
 ---
 
@@ -129,13 +129,16 @@ Ensures deactivated users cannot authenticate even before first admin action in 
 
 ## ACME (Let's Encrypt)
 
-When `useACME: true` + `domain` set:
+When `useACME: true` + `domain` set (and no explicit cert files):
 
-1. HTTP-01 challenge server on `:80`
-2. HTTPS listener on `:443` via `autocert.Manager`
-3. Cert cache: `/var/lib/bedrud/certs`
+1. **HTTP-01** (default): challenge server on `server.httpPort` (default `80`) via `autocert.Manager.HTTPHandler`
+2. **DNS-01** (Cloudflare): certs via DNS; HTTP→HTTPS redirect on `server.httpPort` (no challenge on HTTP)
+3. HTTPS listener on `server.port` (ACME empty default `443`)
+4. Cert cache: `/var/lib/bedrud/certs`
 
-Falls back to manual TLS if `:443` bind fails.
+Falls back to manual TLS / plain HTTP if ACME HTTPS bind fails.
+
+**HTTP-01 public port:** Let's Encrypt validates on public port **80**. Setting `httpPort: "8080"` only changes the **local** bind — put a reverse proxy or DNAT `80 → httpPort`, grant `CAP_NET_BIND_SERVICE`, or use DNS-01.
 
 ## Graceful Shutdown
 

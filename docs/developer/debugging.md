@@ -55,7 +55,7 @@ SERVER_PORT=8091 CONFIG_PATH=config.local.yaml make dev-api
 
 ### Cannot bind port 80 (non-root)
 
-Set `server.httpPort: "8080"` in config or `SERVER_HTTP_PORT=8080`.
+Set `server.httpPort: "8080"` in config or `SERVER_HTTP_PORT=8080` (honored for manual TLS and ACME challenge/redirect).
 
 ---
 

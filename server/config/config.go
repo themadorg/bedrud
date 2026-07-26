@@ -165,6 +165,36 @@ func (s ServerConfig) ResolveCertPaths() (certFile, keyFile string) {
 	return certFile, keyFile
 }
 
+// ResolveHTTPPort returns the HTTP-side listen port used when TLS is enabled:
+// manual TLS dual-listen, ACME HTTP-01 challenge, and ACME DNS-01 redirect.
+// Empty → "80". SERVER_HTTP_PORT is applied in Load before this is called.
+func (s ServerConfig) ResolveHTTPPort() string {
+	if p := strings.TrimSpace(s.HTTPPort); p != "" {
+		return p
+	}
+	return "80"
+}
+
+// ResolveACMEHTTPSPort returns the HTTPS listen port for ACME mode.
+// Empty server.port → "443" (public LE default). Explicit port always wins.
+// Manual TLS uses Port as-is (no ACME default) via ListenTLS.
+func (s ServerConfig) ResolveACMEHTTPSPort() string {
+	if p := strings.TrimSpace(s.Port); p != "" {
+		return p
+	}
+	return "443"
+}
+
+// ListenAddr builds host:port for TCP listeners. Empty host binds all interfaces
+// (":port"), matching Go's ListenAndServe conventions.
+func (s ServerConfig) ListenAddr(port string) string {
+	host := strings.TrimSpace(s.Host)
+	if host == "" {
+		return ":" + port
+	}
+	return host + ":" + port
+}
+
 // TLSMode selects how HTTPS is served.
 //
 // Precedence (highest first):

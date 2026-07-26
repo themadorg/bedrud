@@ -146,17 +146,28 @@ func DNS01Config(ctx context.Context, cfg *config.Config) (*tls.Config, error) {
 	return tlsCfg, nil
 }
 
-// StartHTTPRedirect listens on :80 and redirects all traffic to HTTPS.
-// Used when DNS-01 is active (no HTTP-01 challenge handler needed on 80).
-func StartHTTPRedirect() {
+// HTTPRedirectHandler returns the HTTP→HTTPS redirect handler used by
+// StartHTTPRedirect (DNS-01 path).
+func HTTPRedirectHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		target := "https://" + r.Host + r.URL.RequestURI()
+		http.Redirect(w, r, target, http.StatusMovedPermanently)
+	})
+	return mux
+}
+
+// StartHTTPRedirect listens on addr (e.g. "0.0.0.0:8080" or ":80") and
+// redirects all traffic to HTTPS. Used when DNS-01 is active (no HTTP-01
+// challenge handler needed on the HTTP port). Callers should pass
+// server.ListenAddr(ResolveHTTPPort()).
+func StartHTTPRedirect(addr string) {
+	if strings.TrimSpace(addr) == "" {
+		addr = ":80"
+	}
 	go func() {
-		mux := http.NewServeMux()
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			target := "https://" + r.Host + r.URL.RequestURI()
-			http.Redirect(w, r, target, http.StatusMovedPermanently)
-		})
-		log.Info().Msg("➜ HTTP→HTTPS redirect on :80")
-		if err := http.ListenAndServe(":80", mux); err != nil {
+		log.Info().Msgf("➜ HTTP→HTTPS redirect on %s", addr)
+		if err := http.ListenAndServe(addr, HTTPRedirectHandler()); err != nil {
 			log.Error().Err(err).Msg("HTTP redirect server failed")
 		}
 	}()
