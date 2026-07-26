@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -662,113 +663,162 @@ func Run(configPath, version string) error {
 		return c.Status(http.StatusOK).Send(shellHTML)
 	})
 
+	// Listen in a goroutine so we can still handle SIGINT/SIGTERM. Fatal listen
+	// errors must stop the process — previously a failed ListenTLS left the
+	// process "running" with only the optional plain-HTTP dual-listen (or nothing).
+	listenErr := make(chan error, 1)
 	go func() {
-		// TLS mode: explicit cert files always win over ACME (see config.ServerConfig.TLSMode).
-		mode := cfg.Server.TLSMode()
-
-		if mode == config.TLSModeACME {
-			log.Info().Msgf("➜ Enabling Let's Encrypt for domain: %s", cfg.Server.Domain)
-
-			httpPort := cfg.Server.ResolveHTTPPort()
-			httpAddr := cfg.Server.ListenAddr(httpPort)
-			tlsPort := cfg.Server.ResolveACMEHTTPSPort()
-			tlsAddr := cfg.Server.ListenAddr(tlsPort)
-
-			var tlsConfig *tls.Config
-			if cfg.Server.ACME.UseDNS01() {
-				// DNS-01 (Cloudflare): free wildcards for WebXDC (*.domain).
-				cfgTLS, err := tlsacme.DNS01Config(context.Background(), cfg)
-				if err != nil {
-					log.Error().Err(err).Msg("ACME DNS-01 setup failed — falling back to plain HTTP/manual TLS")
-				} else {
-					tlsConfig = cfgTLS
-					tlsacme.StartHTTPRedirect(httpAddr)
-					log.Info().
-						Str("challenge", "dns-01").
-						Str("provider", cfg.Server.ACME.DNSProvider).
-						Msg("ACME DNS-01 ready (wildcard certs via Cloudflare)")
-				}
-			} else {
-				// HTTP-01: apex + per-host subdomains on first request (no true wildcard).
-				// Local bind uses httpPort; public LE still expects port 80 on the edge
-				// (or a reverse proxy mapping 80 → httpPort).
-				certManager := tlsacme.HTTP01Manager(cfg)
-				go func() {
-					log.Info().Msgf("➜ Starting ACME challenge server on %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, httpPort), httpAddr)
-					if err := http.ListenAndServe(httpAddr, certManager.HTTPHandler(nil)); err != nil {
-						log.Error().Err(err).Msg("ACME challenge server failed")
-					}
-				}()
-				tlsConfig = &tls.Config{
-					GetCertificate: certManager.GetCertificate,
-					MinVersion:     tls.VersionTLS12,
-				}
-			}
-
-			if tlsConfig != nil {
-				ln, err := tls.Listen("tcp", tlsAddr, tlsConfig)
-				if err != nil {
-					log.Error().Err(err).Str("addr", tlsAddr).Msg("Failed to listen for ACME HTTPS — falling back to plain HTTP/manual TLS")
-					// fall through
-				} else {
-					log.Info().Msgf("➜ Bedrud is running on HTTPS %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, tlsPort), tlsAddr)
-					if err := app.Listener(ln); err != nil {
-						log.Error().Err(err).Msg("ACME TLS listener failed")
-					}
-					return
-				}
-			}
-			// ACME failed — try manual cert files if present, else plain HTTP below.
-			if !cfg.Server.HasExplicitCertFiles() {
-				// fall through to HTTP if no manual certs
-				mode = config.TLSModeNone
-			} else {
-				mode = config.TLSModeManual
-			}
-		}
-
-		if mode == config.TLSModeManual {
-			certFile, keyFile := cfg.Server.ResolveCertPaths()
-			if abs, err := filepath.Abs(certFile); err == nil {
-				certFile = abs
-			}
-			if abs, err := filepath.Abs(keyFile); err == nil {
-				keyFile = abs
-			}
-			// Start HTTP dual-listen for bots/local use (same port knob as ACME HTTP side).
-			httpPort := cfg.Server.ResolveHTTPPort()
-			go func() {
-				httpAddr := cfg.Server.ListenAddr(httpPort)
-				log.Info().Msgf("➜ Also listening on HTTP %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, httpPort), httpAddr)
-				if err := app.Listen(httpAddr); err != nil {
-					log.Debug().Err(err).Msg("HTTP server failed")
-				}
-			}()
-			// HTTPS on primary port with operator-supplied (or install default) cert files.
-			tlsPort := cfg.Server.ResolveACMEHTTPSPort()
-			addr := cfg.Server.ListenAddr(tlsPort)
-			log.Info().
-				Str("certFile", certFile).
-				Str("keyFile", keyFile).
-				Msgf("➜ Bedrud is running on HTTPS %s (manual cert files)", utils.DisplayAddr(cfg.Server.Host, tlsPort))
-			if err := app.ListenTLS(addr, certFile, keyFile); err != nil {
-				log.Error().Err(err).Str("addr", addr).Str("certFile", certFile).Str("keyFile", keyFile).Msg("TLS listener failed")
-			}
-		} else {
-			port := strings.TrimSpace(cfg.Server.Port)
-			if port == "" {
-				port = "8080"
-			}
-			addr := cfg.Server.ListenAddr(port)
-			log.Info().Msgf("➜ Bedrud is running on HTTP %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, port), addr)
-			if err := app.Listen(addr); err != nil {
-				log.Error().Err(err).Str("addr", addr).Msg("HTTP listener failed")
-			}
-		}
+		listenErr <- serveListeners(app, cfg)
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	return app.Shutdown()
+	select {
+	case <-quit:
+		return app.Shutdown()
+	case err := <-listenErr:
+		if err != nil {
+			return err
+		}
+		// Listener returned without error (e.g. shutdown from elsewhere).
+		return app.Shutdown()
+	}
+}
+
+// serveListeners starts HTTP and/or HTTPS according to TLSMode.
+func serveListeners(app *fiber.App, cfg *config.Config) error {
+	// TLS mode: explicit cert files always win over ACME (see config.ServerConfig.TLSMode).
+	mode := cfg.Server.TLSMode()
+
+	if mode == config.TLSModeACME {
+		log.Info().Msgf("➜ Enabling Let's Encrypt for domain: %s", cfg.Server.Domain)
+
+		httpPort := cfg.Server.ResolveHTTPPort()
+		httpAddr := cfg.Server.ListenAddr(httpPort)
+		tlsPort := cfg.Server.ResolveACMEHTTPSPort()
+		tlsAddr := cfg.Server.ListenAddr(tlsPort)
+
+		var tlsConfig *tls.Config
+		if cfg.Server.ACME.UseDNS01() {
+			// DNS-01 (Cloudflare): free wildcards for WebXDC (*.domain).
+			cfgTLS, err := tlsacme.DNS01Config(context.Background(), cfg)
+			if err != nil {
+				log.Error().Err(err).Msg("ACME DNS-01 setup failed — falling back to plain HTTP/manual TLS")
+			} else {
+				tlsConfig = cfgTLS
+				tlsacme.StartHTTPRedirect(httpAddr)
+				log.Info().
+					Str("challenge", "dns-01").
+					Str("provider", cfg.Server.ACME.DNSProvider).
+					Msg("ACME DNS-01 ready (wildcard certs via Cloudflare)")
+			}
+		} else {
+			// HTTP-01: apex + per-host subdomains on first request (no true wildcard).
+			// Local bind uses httpPort; public LE still expects port 80 on the edge
+			// (or a reverse proxy mapping 80 → httpPort).
+			certManager := tlsacme.HTTP01Manager(cfg)
+			go func() {
+				log.Info().Msgf("➜ Starting ACME challenge server on %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, httpPort), httpAddr)
+				if err := http.ListenAndServe(httpAddr, certManager.HTTPHandler(nil)); err != nil {
+					log.Error().Err(err).Msg("ACME challenge server failed")
+				}
+			}()
+			tlsConfig = &tls.Config{
+				GetCertificate: certManager.GetCertificate,
+				MinVersion:     tls.VersionTLS12,
+			}
+		}
+
+		if tlsConfig != nil {
+			ln, err := tls.Listen("tcp", tlsAddr, tlsConfig)
+			if err != nil {
+				log.Error().Err(err).Str("addr", tlsAddr).Msg("Failed to listen for ACME HTTPS — falling back to plain HTTP/manual TLS")
+				// fall through
+			} else {
+				log.Info().Msgf("➜ Bedrud is running on HTTPS %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, tlsPort), tlsAddr)
+				return app.Listener(ln)
+			}
+		}
+		// ACME failed — try manual cert files if present, else plain HTTP below.
+		if !cfg.Server.HasExplicitCertFiles() {
+			mode = config.TLSModeNone
+		} else {
+			mode = config.TLSModeManual
+		}
+	}
+
+	if mode == config.TLSModeManual {
+		return serveManualTLS(app, cfg)
+	}
+
+	port := strings.TrimSpace(cfg.Server.Port)
+	if port == "" {
+		port = "8080"
+	}
+	addr := cfg.Server.ListenAddr(port)
+	log.Info().Msgf("➜ Bedrud is running on HTTP %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, port), addr)
+	if err := app.Listen(addr); err != nil {
+		return fmt.Errorf("HTTP listener failed on %s: %w", addr, err)
+	}
+	return nil
+}
+
+// serveManualTLS binds HTTPS with the configured PEM paths (never ACME cache).
+// Uses tls.Listen("tcp") so bind is dual-stack capable, and GetCertificate always
+// serves the operator-set certFile/keyFile (re-read on each handshake so rotated
+// PEMs apply without restart). Optional plain HTTP dual-listen uses httpPort.
+func serveManualTLS(app *fiber.App, cfg *config.Config) error {
+	certFile, keyFile := cfg.Server.ResolveCertPaths()
+	if abs, err := filepath.Abs(certFile); err == nil {
+		certFile = abs
+	}
+	if abs, err := filepath.Abs(keyFile); err == nil {
+		keyFile = abs
+	}
+
+	// Fail early with a clear error (Fiber ListenTLS can panic on bind failures).
+	if _, err := tls.LoadX509KeyPair(certFile, keyFile); err != nil {
+		return fmt.Errorf("cannot load TLS key pair certFile=%q keyFile=%q: %w", certFile, keyFile, err)
+	}
+
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+			c, err := tls.LoadX509KeyPair(certFile, keyFile)
+			if err != nil {
+				return nil, err
+			}
+			return &c, nil
+		},
+	}
+
+	tlsPort := cfg.Server.ResolveACMEHTTPSPort()
+	tlsAddr := cfg.Server.ListenAddr(tlsPort)
+	ln, err := tls.Listen("tcp", tlsAddr, tlsConfig)
+	if err != nil {
+		return fmt.Errorf("HTTPS listen failed on %s (certFile=%s keyFile=%s): %w", tlsAddr, certFile, keyFile, err)
+	}
+
+	// Optional plain HTTP on httpPort (proxy backends / local bots). Best-effort:
+	// HTTPS is the primary listener; HTTP bind failure is only a warning.
+	httpPort := cfg.Server.ResolveHTTPPort()
+	httpAddr := cfg.Server.ListenAddr(httpPort)
+	go func() {
+		httpLn, err := net.Listen("tcp", httpAddr)
+		if err != nil {
+			log.Warn().Err(err).Str("addr", httpAddr).Msg("optional HTTP dual-listen failed (HTTPS still active)")
+			return
+		}
+		log.Info().Msgf("➜ Also listening on HTTP %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, httpPort), httpAddr)
+		if err := app.Listener(httpLn); err != nil {
+			log.Debug().Err(err).Msg("HTTP dual-listen stopped")
+		}
+	}()
+
+	log.Info().
+		Str("certFile", certFile).
+		Str("keyFile", keyFile).
+		Str("addr", tlsAddr).
+		Msgf("➜ Bedrud is running on HTTPS %s (manual cert files)", utils.DisplayAddr(cfg.Server.Host, tlsPort))
+	return app.Listener(ln)
 }

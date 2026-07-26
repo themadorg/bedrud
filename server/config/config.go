@@ -192,14 +192,17 @@ func (s ServerConfig) ResolveACMEHTTPSPort() string {
 	return "443"
 }
 
-// ListenAddr builds host:port for TCP listeners. Empty host binds all interfaces
-// (":port"), matching Go's ListenAndServe conventions.
+// ListenAddr builds host:port for TCP listeners.
+// Empty host, 0.0.0.0, or :: bind all interfaces as ":port" so the kernel can
+// dual-stack (IPv4+IPv6). Explicit hostnames/IPs are left unchanged.
 func (s ServerConfig) ListenAddr(port string) string {
 	host := strings.TrimSpace(s.Host)
-	if host == "" {
+	switch host {
+	case "", "0.0.0.0", "::":
 		return ":" + port
+	default:
+		return host + ":" + port
 	}
-	return host + ":" + port
 }
 
 // TLSMode selects how HTTPS is served.

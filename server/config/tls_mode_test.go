@@ -155,7 +155,9 @@ func TestServerConfig_ListenAddr(t *testing.T) {
 		want string
 	}{
 		{"empty host", "", "80", ":80"},
-		{"all interfaces", "0.0.0.0", "8080", "0.0.0.0:8080"},
+		// 0.0.0.0 / :: → ":port" so tcp dual-stack works (not IPv4-only).
+		{"all interfaces ipv4 wildcard", "0.0.0.0", "8080", ":8080"},
+		{"all interfaces ipv6 wildcard", "::", "8443", ":8443"},
 		{"loopback", "127.0.0.1", "443", "127.0.0.1:443"},
 		{"trims host", " 127.0.0.1 ", "443", "127.0.0.1:443"},
 	}
@@ -191,8 +193,9 @@ func TestACMEListenAddrsFromConfig(t *testing.T) {
 				HTTPPort: "8080",
 				Port:     "8443",
 			},
-			wantHTTPAddr: "0.0.0.0:8080",
-			wantTLSAddr:  "0.0.0.0:8443",
+			// 0.0.0.0 normalizes to ":port" for dual-stack bind
+			wantHTTPAddr: ":8080",
+			wantTLSAddr:  ":8443",
 		},
 		{
 			name: "loopback only",
@@ -210,8 +213,8 @@ func TestACMEListenAddrsFromConfig(t *testing.T) {
 				Host:     "0.0.0.0",
 				HTTPPort: "8080",
 			},
-			wantHTTPAddr: "0.0.0.0:8080",
-			wantTLSAddr:  "0.0.0.0:443",
+			wantHTTPAddr: ":8080",
+			wantTLSAddr:  ":443",
 		},
 	}
 	for _, tt := range tests {
