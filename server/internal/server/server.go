@@ -673,6 +673,11 @@ func Run(configPath, version string) error {
 		if mode == config.TLSModeACME {
 			log.Info().Msgf("➜ Enabling Let's Encrypt for domain: %s", cfg.Server.Domain)
 
+			httpPort := cfg.Server.ResolveHTTPPort()
+			httpAddr := cfg.Server.ListenAddr(httpPort)
+			tlsPort := cfg.Server.ResolveACMEHTTPSPort()
+			tlsAddr := cfg.Server.ListenAddr(tlsPort)
+
 			var tlsConfig *tls.Config
 			if cfg.Server.ACME.UseDNS01() {
 				// DNS-01 (Cloudflare): free wildcards for WebXDC (*.domain).
@@ -681,7 +686,7 @@ func Run(configPath, version string) error {
 					log.Error().Err(err).Msg("ACME DNS-01 setup failed — falling back to plain HTTP/manual TLS")
 				} else {
 					tlsConfig = cfgTLS
-					tlsacme.StartHTTPRedirect()
+					tlsacme.StartHTTPRedirect(httpAddr)
 					log.Info().
 						Str("challenge", "dns-01").
 						Str("provider", cfg.Server.ACME.DNSProvider).
@@ -689,10 +694,12 @@ func Run(configPath, version string) error {
 				}
 			} else {
 				// HTTP-01: apex + per-host subdomains on first request (no true wildcard).
+				// Local bind uses httpPort; public LE still expects port 80 on the edge
+				// (or a reverse proxy mapping 80 → httpPort).
 				certManager := tlsacme.HTTP01Manager(cfg)
 				go func() {
-					log.Info().Msgf("➜ Starting ACME challenge server on %s (bound 0.0.0.0:80)", utils.DisplayAddr("0.0.0.0", "80"))
-					if err := http.ListenAndServe(":80", certManager.HTTPHandler(nil)); err != nil {
+					log.Info().Msgf("➜ Starting ACME challenge server on %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, httpPort), httpAddr)
+					if err := http.ListenAndServe(httpAddr, certManager.HTTPHandler(nil)); err != nil {
 						log.Error().Err(err).Msg("ACME challenge server failed")
 					}
 				}()
@@ -703,12 +710,12 @@ func Run(configPath, version string) error {
 			}
 
 			if tlsConfig != nil {
-				ln, err := tls.Listen("tcp", ":443", tlsConfig)
+				ln, err := tls.Listen("tcp", tlsAddr, tlsConfig)
 				if err != nil {
-					log.Error().Err(err).Msg("Failed to listen on :443 for ACME — falling back to plain HTTP/manual TLS")
+					log.Error().Err(err).Str("addr", tlsAddr).Msg("Failed to listen for ACME HTTPS — falling back to plain HTTP/manual TLS")
 					// fall through
 				} else {
-					log.Info().Msgf("➜ Bedrud is running on HTTPS %s (bound 0.0.0.0:443)", utils.DisplayAddr("0.0.0.0", "443"))
+					log.Info().Msgf("➜ Bedrud is running on HTTPS %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, tlsPort), tlsAddr)
 					if err := app.Listener(ln); err != nil {
 						log.Error().Err(err).Msg("ACME TLS listener failed")
 					}
@@ -733,13 +740,10 @@ func Run(configPath, version string) error {
 			if abs, err := filepath.Abs(keyFile); err == nil {
 				keyFile = abs
 			}
-			// Start HTTP redirect for bots/local use
-			httpPort := cfg.Server.HTTPPort
-			if httpPort == "" {
-				httpPort = "80"
-			}
+			// Start HTTP dual-listen for bots/local use (same port knob as ACME HTTP side).
+			httpPort := cfg.Server.ResolveHTTPPort()
 			go func() {
-				httpAddr := cfg.Server.Host + ":" + httpPort
+				httpAddr := cfg.Server.ListenAddr(httpPort)
 				log.Info().Msgf("➜ Also listening on HTTP %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, httpPort), httpAddr)
 				if err := app.Listen(httpAddr); err != nil {
 					log.Debug().Err(err).Msg("HTTP server failed")

@@ -181,10 +181,12 @@ See [Configuration](./configuration.md) for the full env var list.
 
 ## Privileged Ports
 
-Default `httpPort` is `:80`. Non-root cannot bind. Options:
+Default `httpPort` is `80` (manual TLS dual-listen, ACME HTTP-01 challenge, ACME DNS-01 redirect). ACME HTTPS defaults to `443` when `server.port` is empty. Non-root cannot bind privileged ports. Options:
 
-1. Set `httpPort: "8080"` in config
+1. Set `httpPort: "8080"` (and/or `port` for ACME HTTPS) in config / `SERVER_HTTP_PORT` / `SERVER_PORT` — honored for **all** TLS modes including ACME
 2. `sudo setcap 'cap_net_bind_service=+ep' $(which bedrud)` (re-run after each binary update)
+
+For ACME **HTTP-01**, public LE still requires port 80 on the edge (proxy-map `80 → httpPort`, or use DNS-01).
 
 ---
 

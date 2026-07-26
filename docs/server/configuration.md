@@ -56,8 +56,8 @@ HTTP listener, TLS, proxy, and capacity limits.
 
 | Field | Default | Env | Description |
 |-------|---------|-----|-------------|
-| `port` | `8090` | `SERVER_PORT` | Main listener port (HTTPS when TLS enabled) |
-| `httpPort` | `80` | `SERVER_HTTP_PORT` | HTTP redirect listener when TLS on. Use `8080` for non-root |
+| `port` | `8090` (manual/plain); ACME empty → `443` | `SERVER_PORT` | Main HTTPS/HTTP listener. In ACME mode, empty defaults to `443` |
+| `httpPort` | `80` | `SERVER_HTTP_PORT` | HTTP side when TLS is on: manual dual-listen, ACME HTTP-01 challenge, ACME DNS-01 redirect. Use `8080` for non-root. **HTTP-01:** public Let's Encrypt still hits port 80 on the edge — map `80 → httpPort` via reverse proxy, or use DNS-01 |
 | `host` | `0.0.0.0` | — | Bind address |
 | `readTimeout` | `30` | — | Read timeout (seconds) |
 | `writeTimeout` | `30` | — | Write timeout (seconds) |
