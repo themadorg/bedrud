@@ -50,13 +50,58 @@ func TestServerConfig_TLSMode_ManualDefaults(t *testing.T) {
 }
 
 func TestServerConfig_HasExplicitCertFiles(t *testing.T) {
-	s := ServerConfig{CertFile: "c.pem"}
+	s := ServerConfig{}
 	if s.HasExplicitCertFiles() {
-		t.Fatal("key missing")
+		t.Fatal("empty paths should not count as explicit")
 	}
-	s.KeyFile = "k.pem"
+	// Either path alone is operator intent (other half filled by ResolveCertPaths).
+	s = ServerConfig{CertFile: "c.pem"}
+	if !s.HasExplicitCertFiles() {
+		t.Fatal("certFile alone must count as explicit")
+	}
+	s = ServerConfig{KeyFile: "k.pem"}
+	if !s.HasExplicitCertFiles() {
+		t.Fatal("keyFile alone must count as explicit")
+	}
+	s = ServerConfig{CertFile: "c.pem", KeyFile: "k.pem"}
 	if !s.HasExplicitCertFiles() {
 		t.Fatal("both set")
+	}
+}
+
+// Operator-set certFile/keyFile must select manual TLS even when useACME is still true.
+func TestServerConfig_TLSMode_CertOnlyWinsOverACME(t *testing.T) {
+	s := ServerConfig{
+		EnableTLS: true,
+		UseACME:   true,
+		Domain:    "example.com",
+		CertFile:  "/etc/bedrud/cert_p.pem",
+	}
+	if got := s.TLSMode(); got != TLSModeManual {
+		t.Fatalf("TLSMode()=%q, want manual when certFile is set", got)
+	}
+	cert, key := s.ResolveCertPaths()
+	if cert != "/etc/bedrud/cert_p.pem" {
+		t.Fatalf("ResolveCertPaths cert=%q, want /etc/bedrud/cert_p.pem", cert)
+	}
+	if key != DefaultKeyFile {
+		t.Fatalf("ResolveCertPaths key=%q, want default %q", key, DefaultKeyFile)
+	}
+}
+
+func TestServerConfig_TLSMode_ManualWhenUseACMEFalseWithCerts(t *testing.T) {
+	s := ServerConfig{
+		EnableTLS: true,
+		UseACME:   false,
+		CertFile:  "/etc/bedrud/cert_p.pem",
+		KeyFile:   "/etc/bedrud/key_p.pem",
+	}
+	if got := s.TLSMode(); got != TLSModeManual {
+		t.Fatalf("TLSMode()=%q, want manual", got)
+	}
+	cert, key := s.ResolveCertPaths()
+	if cert != "/etc/bedrud/cert_p.pem" || key != "/etc/bedrud/key_p.pem" {
+		t.Fatalf("ResolveCertPaths=%q %q", cert, key)
 	}
 }
 

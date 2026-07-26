@@ -230,15 +230,7 @@ func runCertInfo(configPath string) error {
 }
 
 func resolveCertPaths(cfg *config.Config) (certFile, keyFile string) {
-	certFile = cfg.Server.CertFile
-	keyFile = cfg.Server.KeyFile
-	if certFile == "" {
-		certFile = "/etc/bedrud/cert.pem"
-	}
-	if keyFile == "" {
-		keyFile = "/etc/bedrud/key.pem"
-	}
-	return certFile, keyFile
+	return cfg.Server.ResolveCertPaths()
 }
 
 // buildCertSANHosts derives DNS/IP SANs for a self-signed cert from config.

@@ -143,17 +143,13 @@ func Run(configPath, version string) error {
 			)
 		}
 		certFile, keyFile := "", ""
-		if cfg.Server.EnableTLS && !cfg.Server.DisableTLS {
-			certFile = cfg.Server.CertFile
-			keyFile = cfg.Server.KeyFile
-			if certFile == "" {
-				certFile = "/etc/bedrud/cert.pem"
-			} else if abs, err := filepath.Abs(certFile); err == nil {
+		// File-based TLS only — ACME certs live in-memory and are not on disk.
+		if cfg.Server.TLSMode() == config.TLSModeManual {
+			certFile, keyFile = cfg.Server.ResolveCertPaths()
+			if abs, err := filepath.Abs(certFile); err == nil {
 				certFile = abs
 			}
-			if keyFile == "" {
-				keyFile = "/etc/bedrud/key.pem"
-			} else if abs, err := filepath.Abs(keyFile); err == nil {
+			if abs, err := filepath.Abs(keyFile); err == nil {
 				keyFile = abs
 			}
 		}
@@ -731,7 +727,6 @@ func Run(configPath, version string) error {
 			}
 		}
 
-		addr := cfg.Server.Host + ":" + cfg.Server.Port
 		if mode == config.TLSModeManual {
 			certFile, keyFile := cfg.Server.ResolveCertPaths()
 			if abs, err := filepath.Abs(certFile); err == nil {
@@ -749,16 +744,23 @@ func Run(configPath, version string) error {
 					log.Debug().Err(err).Msg("HTTP server failed")
 				}
 			}()
-			// Start HTTPS on primary port with operator-supplied (or install) cert files
+			// HTTPS on primary port with operator-supplied (or install default) cert files.
+			tlsPort := cfg.Server.ResolveACMEHTTPSPort()
+			addr := cfg.Server.ListenAddr(tlsPort)
 			log.Info().
 				Str("certFile", certFile).
 				Str("keyFile", keyFile).
-				Msgf("➜ Bedrud is running on HTTPS %s (manual cert files)", utils.DisplayAddr(cfg.Server.Host, cfg.Server.Port))
+				Msgf("➜ Bedrud is running on HTTPS %s (manual cert files)", utils.DisplayAddr(cfg.Server.Host, tlsPort))
 			if err := app.ListenTLS(addr, certFile, keyFile); err != nil {
 				log.Error().Err(err).Str("addr", addr).Str("certFile", certFile).Str("keyFile", keyFile).Msg("TLS listener failed")
 			}
 		} else {
-			log.Info().Msgf("➜ Bedrud is running on HTTP %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, cfg.Server.Port), addr)
+			port := strings.TrimSpace(cfg.Server.Port)
+			if port == "" {
+				port = "8080"
+			}
+			addr := cfg.Server.ListenAddr(port)
+			log.Info().Msgf("➜ Bedrud is running on HTTP %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, port), addr)
 			if err := app.Listen(addr); err != nil {
 				log.Error().Err(err).Str("addr", addr).Msg("HTTP listener failed")
 			}
