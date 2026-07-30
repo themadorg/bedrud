@@ -732,7 +732,7 @@ func serveListeners(app *fiber.App, cfg *config.Config) error {
 		if tlsConfig != nil {
 			ln, err := tls.Listen("tcp", tlsAddr, tlsConfig)
 			if err != nil {
-				log.Error().Err(err).Str("addr", tlsAddr).Msg("Failed to listen for ACME HTTPS — falling back to plain HTTP/manual TLS")
+				log.Error().Err(utils.BindError(tlsAddr, err)).Str("addr", tlsAddr).Msg("Failed to listen for ACME HTTPS — falling back to plain HTTP/manual TLS")
 				// fall through
 			} else {
 				log.Info().Msgf("➜ Bedrud is running on HTTPS %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, tlsPort), tlsAddr)
@@ -758,7 +758,7 @@ func serveListeners(app *fiber.App, cfg *config.Config) error {
 	addr := cfg.Server.ListenAddr(port)
 	log.Info().Msgf("➜ Bedrud is running on HTTP %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, port), addr)
 	if err := app.Listen(addr); err != nil {
-		return fmt.Errorf("HTTP listener failed on %s: %w", addr, err)
+		return fmt.Errorf("HTTP listener failed on %s: %w", addr, utils.BindError(addr, err))
 	}
 	return nil
 }
@@ -796,7 +796,7 @@ func serveManualTLS(app *fiber.App, cfg *config.Config) error {
 	tlsAddr := cfg.Server.ListenAddr(tlsPort)
 	ln, err := tls.Listen("tcp", tlsAddr, tlsConfig)
 	if err != nil {
-		return fmt.Errorf("HTTPS listen failed on %s (certFile=%s keyFile=%s): %w", tlsAddr, certFile, keyFile, err)
+		return fmt.Errorf("HTTPS listen failed on %s (certFile=%s keyFile=%s): %w", tlsAddr, certFile, keyFile, utils.BindError(tlsAddr, err))
 	}
 
 	// Optional plain HTTP on httpPort (proxy backends / local bots). Best-effort:
@@ -806,7 +806,7 @@ func serveManualTLS(app *fiber.App, cfg *config.Config) error {
 	go func() {
 		httpLn, err := net.Listen("tcp", httpAddr)
 		if err != nil {
-			log.Warn().Err(err).Str("addr", httpAddr).Msg("optional HTTP dual-listen failed (HTTPS still active)")
+			log.Warn().Err(utils.BindError(httpAddr, err)).Str("addr", httpAddr).Msg("optional HTTP dual-listen failed (HTTPS still active)")
 			return
 		}
 		log.Info().Msgf("➜ Also listening on HTTP %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, httpPort), httpAddr)

@@ -130,6 +130,7 @@ export function RoomSettingsDialog({ room, open, onOpenChange, onSave }: Props) 
             <div className="ml-auto flex items-center gap-2">
               <Users className="h-3.5 w-3.5 text-muted-foreground/50" />
               <Button
+                type="button"
                 variant="outline"
                 size="icon"
                 onClick={() => setMaxParticipants((p) => Math.max(2, p - 5))}
@@ -139,6 +140,7 @@ export function RoomSettingsDialog({ room, open, onOpenChange, onSave }: Props) 
               </Button>
               <span className="w-6 text-center font-mono text-xs font-medium">{maxParticipants}</span>
               <Button
+                type="button"
                 variant="outline"
                 size="icon"
                 onClick={() => setMaxParticipants((p) => Math.min(500, p + 5))}

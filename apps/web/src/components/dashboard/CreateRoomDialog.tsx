@@ -214,6 +214,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
               </div>
               <div className="flex items-center gap-1">
                 <Button
+                  type="button"
                   variant="outline"
                   size="icon"
                   onClick={() => setMaxParticipants((p) => Math.max(2, p - 5))}
@@ -225,6 +226,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
                   {maxParticipants}
                 </span>
                 <Button
+                  type="button"
                   variant="outline"
                   size="icon"
                   onClick={() => setMaxParticipants((p) => Math.min(500, p + 5))}

@@ -1247,6 +1247,26 @@ func (h *AuthHandler) saveSession(c *fiber.Ctx, sess *sessions.Session, req *htt
 	return nil
 }
 
+// webauthnCredParams lists the COSE algorithms the server can verify.
+// pubKeyCredParams is a REQUIRED member of PublicKeyCredentialCreationOptions —
+// omitting it makes navigator.credentials.create() throw in the browser.
+func webauthnCredParams() []fiber.Map {
+	return []fiber.Map{
+		{"type": "public-key", "alg": -7},   // ES256
+		{"type": "public-key", "alg": -257}, // RS256
+	}
+}
+
+// webauthnAuthenticatorSelection asks for a discoverable (resident) credential:
+// login/begin sends no allowCredentials, so the passkey must be discoverable.
+func webauthnAuthenticatorSelection() fiber.Map {
+	return fiber.Map{
+		"residentKey":        "required",
+		"requireResidentKey": true,
+		"userVerification":   "preferred",
+	}
+}
+
 // @Summary Begin passkey registration
 // @Description Start FIDO2/WebAuthn registration ceremony for the authenticated user.
 // @Tags auth
@@ -1274,6 +1294,8 @@ func (h *AuthHandler) PasskeyRegisterBegin(c *fiber.Ctx) error {
 			"id":   h.getRPID(c),
 			"name": h.getRPID(c),
 		},
+		"pubKeyCredParams":       webauthnCredParams(),
+		"authenticatorSelection": webauthnAuthenticatorSelection(),
 	})
 }
 
@@ -1535,6 +1557,8 @@ func (h *AuthHandler) PasskeySignupBegin(c *fiber.Ctx) error {
 			"id":   h.getRPID(c),
 			"name": h.getRPID(c),
 		},
+		"pubKeyCredParams":       webauthnCredParams(),
+		"authenticatorSelection": webauthnAuthenticatorSelection(),
 	})
 }
 
