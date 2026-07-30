@@ -19,7 +19,7 @@ export default {
     getStarted: "Loslegen",
   },
   hero: {
-    badge: "Open Source · Apache 2.0",
+    badge: "Open Source · AGPL-3.0",
     kicker: "Open-Source Zoom-Alternative. Läuft auf einem 5€-VPS.",
     headline: "Ihre Meetings. Ihr Server. Ihre Regeln.",
     subheadline:
@@ -39,7 +39,7 @@ export default {
     stars: "1.2k",
     starsLabel: "GitHub-Sterne",
     contributorsLabel: "Mitwirkende",
-    license: "Apache 2.0 lizenziert",
+    license: "AGPL-3.0 lizenziert",
   },
   journey: {
     title: "Von Null bis zur Besprechung in Minuten",
@@ -159,7 +159,7 @@ export default {
       maxUsersJitsi: "100+ mit Optimierung",
       maxUsersBbb: "300+ pro Raum",
       license: "Lizenz",
-      licenseBedrud: "Apache 2.0",
+      licenseBedrud: "AGPL-3.0",
       licenseJitsi: "Apache 2.0",
       licenseBbb: "LGPL 3.0",
       communitySize: "Community & Ökosystem",
@@ -257,8 +257,8 @@ export default {
   openSource: {
     title: "Lies den Quellcode. Übernimm die Kontrolle.",
     subtitle:
-      "Jede Codezeile ist öffentlich. Inspizieren, prüfen, beitragen oder forken. Apache 2.0 lizenziert - kommerziell oder anderweitig nutzbar.",
-    license: "Apache 2.0",
+      "Jede Codezeile ist öffentlich. Inspizieren, prüfen, beitragen oder forken. AGPL-3.0 lizenziert - kommerziell oder anderweitig nutzbar.",
+    license: "AGPL-3.0",
     github: "Auf GitHub ansehen",
     docs: "Dokumentation lesen",
   },
@@ -298,7 +298,7 @@ export default {
     pricing: {
       question: "Ist es wirklich kostenlos?",
       answer:
-        "Vollständig. Apache 2.0 lizenziert, keine Funktionsbeschränkungen, keine 'Kontakt Vertrieb'-Schaltflächen. Der Quellcode ist öffentlich. Hosten Sie selbst und zahlen Sie nur für Ihren Server — typischerweise $5/Monat.",
+        "Vollständig. AGPL-3.0 lizenziert, keine Funktionsbeschränkungen, keine 'Kontakt Vertrieb'-Schaltflächen. Der Quellcode ist öffentlich. Hosten Sie selbst und zahlen Sie nur für Ihren Server — typischerweise $5/Monat.",
     },
     mobile: {
       question: "Gibt es mobile Apps?",
@@ -386,12 +386,12 @@ export default {
     meta: {
       title: "Nutzungsbedingungen - Bedrud",
       description:
-        "Bedingungen für die Nutzung der Bedrud-Website und der öffentlichen Demo. Selbstgehostete Nutzer unterliegen der Apache 2.0 Lizenz.",
+        "Bedingungen für die Nutzung der Bedrud-Website und der öffentlichen Demo. Selbstgehostete Nutzer unterliegen der AGPL-3.0 Lizenz.",
     },
     title: "Nutzungsbedingungen",
     lastUpdated: "Zuletzt aktualisiert: 17. April 2026",
     intro:
-      "Diese Bedingungen decken die Website bedrud.org und die öffentliche Demo-Instanz unter bedrud.xyz ab. Wenn Sie Bedrud herunterladen und selbst hosten, gilt die Apache 2.0 Lizenz für Ihre Nutzung der Software.",
+      "Diese Bedingungen decken die Website bedrud.org und die öffentliche Demo-Instanz unter bedrud.xyz ab. Wenn Sie Bedrud herunterladen und selbst hosten, gilt die AGPL-3.0 Lizenz für Ihre Nutzung der Software.",
     acceptance: {
       title: "Bedrud zu nutzen bedeutet, Sie akzeptieren diese Bedingungen",
       content:
@@ -400,7 +400,7 @@ export default {
     services: {
       title: "Was Bedrud bietet",
       content:
-        "Wir bieten diese Website mit Dokumentation und Download-Links sowie eine öffentliche Demo-Instanz zur Evaluierung der Software. Die eigentliche Videokonferenz-Software ist Open Source unter der Apache 2.0 Lizenz. Laden Sie sie herunter, modifizieren Sie sie, betreiben Sie sie selbst.",
+        "Wir bieten diese Website mit Dokumentation und Download-Links sowie eine öffentliche Demo-Instanz zur Evaluierung der Software. Die eigentliche Videokonferenz-Software ist Open Source unter der AGPL-3.0 Lizenz. Laden Sie sie herunter, modifizieren Sie sie, betreiben Sie sie selbst.",
     },
     accounts: {
       title: "Accounts",
@@ -415,17 +415,17 @@ export default {
     intellectualProperty: {
       title: "Open-Source-Lizenz",
       content:
-        "Bedrud ist unter der Apache 2.0 Lizenz veröffentlicht. Sie können es nutzen, modifizieren und verbreiten - auch kommerziell. Der Bedrud-Name und das Logo sind Marken von theMadOrg. Sie dürfen sie nutzen, um auf die Software zu verweisen, aber nicht, um Ihre Beziehung zum Projekt falsch darzustellen.",
+        "Bedrud ist unter der AGPL-3.0 Lizenz veröffentlicht. Sie können es nutzen, modifizieren und verbreiten - auch kommerziell. Der Bedrud-Name und das Logo sind Marken von theMadOrg. Sie dürfen sie nutzen, um auf die Software zu verweisen, aber nicht, um Ihre Beziehung zum Projekt falsch darzustellen.",
     },
     termination: {
       title: "Zugang",
       content:
-        "Wir können den Zugang zur öffentlichen Demo bei Missbrauch jederzeit sperren. Wir können die Website bei Bedarf abschalten. Aber sobald Sie die Binary heruntergeladen haben, gehört sie Ihnen unter der Apache 2.0 Lizenz. Das können wir nicht widerrufen.",
+        "Wir können den Zugang zur öffentlichen Demo bei Missbrauch jederzeit sperren. Wir können die Website bei Bedarf abschalten. Aber sobald Sie die Binary heruntergeladen haben, gehört sie Ihnen unter der AGPL-3.0 Lizenz. Das können wir nicht widerrufen.",
     },
     liability: {
       title: "Keine Gewährleistung",
       content:
-        "Bedrud wird wie besehen bereitgestellt. Wir garantieren nicht, dass es in jeder Umgebung einwandfrei funktioniert. Wir haften nicht für Ausfallzeiten, Datenverlust oder Schäden aus der Nutzung der Software. Siehe die Apache 2.0 Lizenz für den vollständigen Rechtstext.",
+        "Bedrud wird wie besehen bereitgestellt. Wir garantieren nicht, dass es in jeder Umgebung einwandfrei funktioniert. Wir haften nicht für Ausfallzeiten, Datenverlust oder Schäden aus der Nutzung der Software. Siehe die AGPL-3.0 Lizenz für den vollständigen Rechtstext.",
     },
     governingLaw: {
       title: "Anwendbares Recht",
@@ -1110,7 +1110,7 @@ export default {
         openSource: {
           title: "Vollständig auditierbar",
           description:
-            "Jede Zeile der Verschlüsselungspipeline — von der Schlüsselgenerierung bis zur Frame-Transformation — ist unter Apache 2.0 Open Source.",
+            "Jede Zeile der Verschlüsselungspipeline — von der Schlüsselgenerierung bis zur Frame-Transformation — ist unter AGPL-3.0 Open Source.",
         },
       },
     },

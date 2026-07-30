@@ -785,8 +785,8 @@ info:
     url: https://bedrud.org/en/contact
   description: This is a Bedrud Backend API server.
   license:
-    name: Apache 2.0
-    url: http://www.apache.org/licenses/LICENSE-2.0.html
+    name: AGPL-3.0
+    url: https://github.com/themadorg/bedrud/blob/master/LICENSE
   termsOfService: https://bedrud.org/en/terms/
   title: Bedrud Backend API
   version: "1.0"

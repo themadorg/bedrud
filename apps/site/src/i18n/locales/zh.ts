@@ -19,7 +19,7 @@ export default {
     getStarted: "立即开始",
   },
   hero: {
-    badge: "开源 · Apache 2.0",
+    badge: "开源 · AGPL-3.0",
     kicker: "开源 Zoom 替代方案。$5 VPS 即可运行。",
     headline: "你的会议。你的服务器。你的规则。",
     subheadline:
@@ -39,7 +39,7 @@ export default {
     stars: "1.2k",
     starsLabel: "GitHub 星标",
     contributorsLabel: "贡献者",
-    license: "Apache 2.0 许可",
+    license: "AGPL-3.0 许可",
   },
   journey: {
     title: "从零到会议只需几分钟",
@@ -158,7 +158,7 @@ export default {
       maxUsersJitsi: "100+ 需调优",
       maxUsersBbb: "300+ 每房间",
       license: "许可证",
-      licenseBedrud: "Apache 2.0",
+      licenseBedrud: "AGPL-3.0",
       licenseJitsi: "Apache 2.0",
       licenseBbb: "LGPL 3.0",
       communitySize: "社区与生态",
@@ -255,8 +255,8 @@ export default {
   openSource: {
     title: "阅读源码。掌控一切。",
     subtitle:
-      "每一行代码都是公开的。审查、审计、贡献或 fork。Apache 2.0 许可--商业或个人使用皆可。",
-    license: "Apache 2.0",
+      "每一行代码都是公开的。审查、审计、贡献或 fork。AGPL-3.0 许可--商业或个人使用皆可。",
+    license: "AGPL-3.0",
     github: "在 GitHub 上查看",
     docs: "阅读文档",
   },
@@ -296,7 +296,7 @@ export default {
     pricing: {
       question: "真的免费吗？",
       answer:
-        "完全免费。Apache 2.0 许可证，没有功能限制，没有「联系销售」按钮。源代码公开。自己托管，只付服务器费用——通常每月 5 美元。",
+        "完全免费。AGPL-3.0 许可证，没有功能限制，没有「联系销售」按钮。源代码公开。自己托管，只付服务器费用——通常每月 5 美元。",
     },
     mobile: {
       question: "有移动应用吗？",
@@ -384,12 +384,12 @@ export default {
     meta: {
       title: "服务条款 - Bedrud",
       description:
-        "bedrud.org 网站和公共演示的使用条款。自托管用户受 Apache 2.0 许可证约束。",
+        "bedrud.org 网站和公共演示的使用条款。自托管用户受 AGPL-3.0 许可证约束。",
     },
     title: "服务条款",
     lastUpdated: "最后更新：2026 年 4 月 17 日",
     intro:
-      "本条款涵盖 bedrud.org 网站和 bedrud.xyz 上的公共演示实例。如果你下载并自托管 Bedrud，Apache 2.0 许可证适用于你对软件的使用。",
+      "本条款涵盖 bedrud.org 网站和 bedrud.xyz 上的公共演示实例。如果你下载并自托管 Bedrud，AGPL-3.0 许可证适用于你对软件的使用。",
     acceptance: {
       title: "使用 Bedrud 即表示你接受本条款",
       content:
@@ -398,7 +398,7 @@ export default {
     services: {
       title: "Bedrud 提供什么",
       content:
-        "我们提供此网站（含文档和下载链接）以及一个用于评估软件的公共演示实例。视频会议软件本身是在 Apache 2.0 许可证下的开源软件。你可以下载、修改并自行运行。",
+        "我们提供此网站（含文档和下载链接）以及一个用于评估软件的公共演示实例。视频会议软件本身是在 AGPL-3.0 许可证下的开源软件。你可以下载、修改并自行运行。",
     },
     accounts: {
       title: "账户",
@@ -413,17 +413,17 @@ export default {
     intellectualProperty: {
       title: "开源许可证",
       content:
-        "Bedrud 采用 Apache 2.0 许可证。你可以使用、修改和分发它--包括商业用途。Bedrud 名称和标志是 theMadOrg 的商标。你可以使用它们来指代该软件，但不能歪曲你与项目的关系。",
+        "Bedrud 采用 AGPL-3.0 许可证。你可以使用、修改和分发它--包括商业用途。Bedrud 名称和标志是 theMadOrg 的商标。你可以使用它们来指代该软件，但不能歪曲你与项目的关系。",
     },
     termination: {
       title: "访问权限",
       content:
-        "我们可以在任何时候因滥用行为撤销对公共演示的访问权限。必要时我们可以下线网站。但一旦你下载了二进制文件，它在 Apache 2.0 许可证下就属于你了。我们无法撤销这一点。",
+        "我们可以在任何时候因滥用行为撤销对公共演示的访问权限。必要时我们可以下线网站。但一旦你下载了二进制文件，它在 AGPL-3.0 许可证下就属于你了。我们无法撤销这一点。",
     },
     liability: {
       title: "不提供保证",
       content:
-        "Bedrud 按原样提供。我们不保证它在所有环境中都能完美运行。我们对停机、数据丢失或使用软件造成的任何损害不承担责任。请参阅 Apache 2.0 许可证获取完整的法律文本。",
+        "Bedrud 按原样提供。我们不保证它在所有环境中都能完美运行。我们对停机、数据丢失或使用软件造成的任何损害不承担责任。请参阅 AGPL-3.0 许可证获取完整的法律文本。",
     },
     governingLaw: {
       title: "适用法律",
@@ -1091,7 +1091,7 @@ export default {
         openSource: {
           title: "完全可审计",
           description:
-            "加密管线的每一行代码——从密钥生成到数据帧变换——均在 Apache 2.0 许可下开源。",
+            "加密管线的每一行代码——从密钥生成到数据帧变换——均在 AGPL-3.0 许可下开源。",
         },
       },
     },

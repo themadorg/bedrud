@@ -12,7 +12,7 @@ bedrud/                              # Monorepo root
 ├── CONTRIBUTING.md                  # Contribution process
 ├── DESIGN.md                        # Project-wide design system
 ├── Dockerfile                       # Multi-stage production container build
-├── LICENSE                          # Apache 2.0
+├── LICENSE                          # AGPL-3.0
 ├── Makefile                         # Build & dev orchestration (make help)
 ├── Cargo.toml                       # Rust workspace (desktop app)
 ├── Cargo.lock

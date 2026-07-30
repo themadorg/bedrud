@@ -15,7 +15,7 @@
   <url type="help">https://themadorg.github.io/bedrud/</url>
   <launchable type="desktop-id">ir.bedrud.Desktop.desktop</launchable>
   <metadata_license>MIT</metadata_license>
-  <project_license>Apache-2.0</project_license>
+  <project_license>AGPL-3.0-or-later</project_license>
   <categories>
     <category>Network</category>
     <category>VideoConference</category>
