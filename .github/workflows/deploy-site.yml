@@ -50,7 +50,7 @@ jobs:
           fi
 
           # Landing/docs deploy when public site, repo docs/, or server (swagger) change.
-          # Product trees (apps/web, android, desktop) do not force a site deploy.
+          # Product trees (apps/web, desktop) do not force a site deploy.
           if git diff --name-only "$BASE" "$HEAD" | grep -E '^(apps/site/|docs/|server/|\.github/workflows/(ci|deploy-site)\.yml)' >/dev/null; then
             echo "site=true" >> "$GITHUB_OUTPUT"
             echo "Relevant site/docs/server paths changed — deploy site"

@@ -27,7 +27,6 @@ jobs:
       server: ${{ steps.filter.outputs.server }}
       web: ${{ steps.filter.outputs.web }}
       site: ${{ steps.filter.outputs.site }}
-      android: ${{ steps.filter.outputs.android }}
       desktop: ${{ steps.filter.outputs.desktop }}
       ios: ${{ steps.filter.outputs.ios }}
     steps:
@@ -51,10 +50,6 @@ jobs:
               - 'server/**'
               - '.github/workflows/ci.yml'
               - '.github/workflows/deploy-site.yml'
-            android:
-              - 'apps/android'
-              - 'apps/android/**'
-              - '.github/workflows/ci.yml'
             desktop:
               - 'apps/desktop/**'
               - 'Cargo.toml'
@@ -123,68 +118,6 @@ jobs:
       - run: bun run check
       - run: bun run build
 
-  # ── Android ───────────────────────────────────────────────────
-  android:
-    name: Android – Lint & Test
-    needs: changes
-    if: needs.changes.outputs.android == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/android
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "17"
-      - uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: "9.5.0"
-
-      - name: Generate Gradle Wrapper jar
-        run: gradle wrapper --gradle-version 9.5.0
-
-      - run: ./gradlew lint
-      - run: ./gradlew testDebugUnitTest
-      - run: ./gradlew assembleDebug bundleDebug
-
-      - name: Upload universal APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: android-apk-universal
-          path: apps/android/app/build/outputs/apk/debug/app-universal-debug.apk
-          retention-days: 7
-
-      - name: Upload arm64-v8a APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: android-apk-arm64-v8a
-          path: apps/android/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
-          retention-days: 7
-
-      - name: Upload armeabi-v7a APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: android-apk-armeabi-v7a
-          path: apps/android/app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk
-          retention-days: 7
-
-      - name: Upload x86_64 APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: android-apk-x86_64
-          path: apps/android/app/build/outputs/apk/debug/app-x86_64-debug.apk
-          retention-days: 7
-
-      - name: Upload debug bundle (AAB)
-        uses: actions/upload-artifact@v7
-        with:
-          name: android-bundle-debug
-          path: apps/android/app/build/outputs/bundle/debug/app-debug.aab
-          retention-days: 7
 
   # ── iOS ───────────────────────────────────────────────────────
   ios:

@@ -170,58 +170,6 @@ jobs:
           name: server-deb-${{ matrix.deb_arch }}
           path: bedrud_${{ matrix.deb_arch }}.deb
 
-  # ── Android APK ──────────────────────────────────────────────
-  android:
-    name: Android APK
-    runs-on: ubuntu-latest
-    needs: prepare
-    defaults:
-      run:
-        working-directory: apps/android
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: "9.5.0"
-
-      - name: Generate Gradle Wrapper jar
-        run: gradle wrapper --gradle-version 9.5.0
-
-      - name: Build APKs and bundle
-        run: ./gradlew assembleDebug bundleDebug
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: android-apk-universal
-          path: apps/android/app/build/outputs/apk/debug/app-universal-debug.apk
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: android-apk-arm64-v8a
-          path: apps/android/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: android-apk-armeabi-v7a
-          path: apps/android/app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: android-apk-x86_64
-          path: apps/android/app/build/outputs/apk/debug/app-x86_64-debug.apk
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: android-bundle
-          path: apps/android/app/build/outputs/bundle/debug/app-debug.aab
 
   # ── Web bundle ───────────────────────────────────────────────
   web:
@@ -438,7 +386,7 @@ jobs:
   release:
     name: Publish Beta for PR #${{ github.event.pull_request.number }}
     runs-on: ubuntu-latest
-    needs: [prepare, server-binary, android, desktop, web]
+    needs: [prepare, server-binary, desktop, web]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -447,7 +395,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           path: artifacts
-          pattern: "{server-*,android-*,web-*,bedrud-desktop-*}"
+          pattern: "{server-*,web-*,bedrud-desktop-*}"
 
       - name: Collect release assets
         run: |
@@ -456,16 +404,7 @@ jobs:
           find artifacts/server-linux_* -name "*.tar.xz" -exec cp {} release-assets/ \; 2>/dev/null || true
           find artifacts/server-deb-* -name "*.deb" -exec cp {} release-assets/ \; 2>/dev/null || true
 
-          [ -f artifacts/android-apk-universal/app-universal-debug.apk ] && \
-            cp artifacts/android-apk-universal/app-universal-debug.apk release-assets/bedrud-android-universal.apk
-          [ -f artifacts/android-apk-arm64-v8a/app-arm64-v8a-debug.apk ] && \
-            cp artifacts/android-apk-arm64-v8a/app-arm64-v8a-debug.apk release-assets/bedrud-android-arm64-v8a.apk
-          [ -f artifacts/android-apk-armeabi-v7a/app-armeabi-v7a-debug.apk ] && \
-            cp artifacts/android-apk-armeabi-v7a/app-armeabi-v7a-debug.apk release-assets/bedrud-android-armeabi-v7a.apk
-          [ -f artifacts/android-apk-x86_64/app-x86_64-debug.apk ] && \
-            cp artifacts/android-apk-x86_64/app-x86_64-debug.apk release-assets/bedrud-android-x86_64.apk
-          [ -f artifacts/android-bundle/app-debug.aab ] && \
-            cp artifacts/android-bundle/app-debug.aab release-assets/bedrud-android.aab
+
 
           # Desktop binaries
           find artifacts/bedrud-desktop-* -type f -exec cp {} release-assets/ \; 2>/dev/null || true
@@ -509,11 +448,6 @@ jobs:
           |----------|-------|
           | Linux x86_64 | [bedrud_linux_amd64.tar.xz](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud_linux_amd64.tar.xz) |
           | Linux ARM64 | [bedrud_linux_arm64.tar.xz](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud_linux_arm64.tar.xz) |
-          | Android (universal) | [bedrud-android-universal.apk](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-android-universal.apk) |
-          | Android arm64-v8a | [bedrud-android-arm64-v8a.apk](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-android-arm64-v8a.apk) |
-          | Android armeabi-v7a | [bedrud-android-armeabi-v7a.apk](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-android-armeabi-v7a.apk) |
-          | Android x86\_64 | [bedrud-android-x86_64.apk](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-android-x86_64.apk) |
-          | Android bundle (AAB) | [bedrud-android.aab](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-android.aab) |
           | Desktop Linux x86_64 (AppImage) | [bedrud-desktop-linux-x86_64.AppImage](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-desktop-linux-x86_64.AppImage) |
           | Desktop Linux x86_64 (portable) | [bedrud-desktop-linux-x86_64.tar.xz](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-desktop-linux-x86_64.tar.xz) |
           | Desktop Linux x86_64 (.deb) | [bedrud-desktop-linux-x86_64.deb](https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/bedrud-desktop-linux-x86_64.deb) |
@@ -570,11 +504,6 @@ jobs:
               `|----------|-------|`,
               `| Linux x86_64 | ${asset('bedrud_linux_amd64.tar.xz')} |`,
               `| Linux ARM64 | ${asset('bedrud_linux_arm64.tar.xz')} |`,
-              `| Android (universal) | ${asset('bedrud-android-universal.apk')} |`,
-              `| Android arm64-v8a | ${asset('bedrud-android-arm64-v8a.apk')} |`,
-              `| Android armeabi-v7a | ${asset('bedrud-android-armeabi-v7a.apk')} |`,
-              `| Android x86_64 | ${asset('bedrud-android-x86_64.apk')} |`,
-              `| Android bundle (AAB) | ${asset('bedrud-android.aab')} |`,
               `| Desktop Linux x86_64 (AppImage) | ${asset('bedrud-desktop-linux-x86_64.AppImage')} |`,
               `| Desktop Linux x86_64 (portable) | ${asset('bedrud-desktop-linux-x86_64.tar.xz')} |`,
               `| Desktop Linux x86_64 (.deb) | ${asset('bedrud-desktop-linux-x86_64.deb')} |`,
@@ -648,11 +577,6 @@ jobs:
           • <a href="${BASE}/bedrud_linux_amd64.tar.xz">Linux x86_64</a>
           • <a href="${BASE}/bedrud_linux_arm64.tar.xz">Linux ARM64</a>
 
-          <b>🤖 Android (debug)</b>
-          • <a href="${BASE}/bedrud-android-universal.apk">Universal APK</a>
-          • <a href="${BASE}/bedrud-android-arm64-v8a.apk">arm64-v8a</a>
-          • <a href="${BASE}/bedrud-android-armeabi-v7a.apk">armeabi-v7a</a>
-          • <a href="${BASE}/bedrud-android-x86_64.apk">x86_64</a>
 
           <b>🪟 Desktop Windows (installer)</b>
           • <a href="${BASE}/bedrud-desktop-windows-x86_64-setup.exe">x86_64 Setup</a>
