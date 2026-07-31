@@ -49,6 +49,7 @@ type MockRoomService struct {
 // Use hooks to control specific method behavior.
 type MockEgress struct {
 	// Hooks — set before test to control behavior per-method
+	OnStartEgress               func(ctx context.Context, req *livekit.StartEgressRequest) (*livekit.EgressInfo, error)
 	OnStartRoomCompositeEgress  func(ctx context.Context, req *livekit.RoomCompositeEgressRequest) (*livekit.EgressInfo, error)
 	OnStartWebEgress            func(ctx context.Context, req *livekit.WebEgressRequest) (*livekit.EgressInfo, error)
 	OnStartParticipantEgress    func(ctx context.Context, req *livekit.ParticipantEgressRequest) (*livekit.EgressInfo, error)
@@ -60,6 +61,7 @@ type MockEgress struct {
 	OnStopEgress                func(ctx context.Context, req *livekit.StopEgressRequest) (*livekit.EgressInfo, error)
 
 	// CallCounts — incremented each time a method is called
+	StartEgressCalls               atomic.Int64
 	StartRoomCompositeEgressCalls  atomic.Int64
 	StartWebEgressCalls            atomic.Int64
 	StartParticipantEgressCalls    atomic.Int64
@@ -75,6 +77,15 @@ var _ livekit.Egress = (*MockEgress)(nil)
 
 func NewMockEgress() *MockEgress {
 	return &MockEgress{}
+}
+
+
+func (m *MockEgress) StartEgress(ctx context.Context, req *livekit.StartEgressRequest) (*livekit.EgressInfo, error) {
+	m.StartEgressCalls.Add(1)
+	if m.OnStartEgress != nil {
+		return m.OnStartEgress(ctx, req)
+	}
+	return &livekit.EgressInfo{EgressId: "mock-egress-id", Status: livekit.EgressStatus_EGRESS_ACTIVE}, nil
 }
 
 func (m *MockEgress) StartRoomCompositeEgress(ctx context.Context, req *livekit.RoomCompositeEgressRequest) (*livekit.EgressInfo, error) {

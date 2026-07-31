@@ -29,6 +29,17 @@ type mockEgressClient struct {
 	stopErr  error
 }
 
+
+func (m *mockEgressClient) StartEgress(_ context.Context, _ *livekit.StartEgressRequest) (*livekit.EgressInfo, error) {
+	if m.startErr != nil {
+		return nil, m.startErr
+	}
+	return &livekit.EgressInfo{
+		EgressId: uuid.NewString(),
+		Status:   livekit.EgressStatus_EGRESS_STARTING,
+	}, nil
+}
+
 func (m *mockEgressClient) StartRoomCompositeEgress(_ context.Context, req *livekit.RoomCompositeEgressRequest) (*livekit.EgressInfo, error) {
 	if m.startErr != nil {
 		return nil, m.startErr
