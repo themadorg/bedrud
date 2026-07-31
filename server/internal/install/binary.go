@@ -107,7 +107,23 @@ func installBinaryBytes(targetPath string, data []byte) error {
 	if err := os.WriteFile(targetPath, data, 0o755); err != nil {
 		return fmt.Errorf("failed to install binary to %s: %w", targetPath, err)
 	}
+	grantNetBindCapability(targetPath)
 	return nil
+}
+
+// grantNetBindCapability lets the unprivileged bedrud user bind ports below 1024
+// (80/443). systemd units get this via AmbientCapabilities; OpenRC/SysV and manual
+// runs rely on the file capability set here. Best-effort: no setcap (non-Linux,
+// or a filesystem without xattrs) just means low ports need root.
+func grantNetBindCapability(targetPath string) {
+	setcap, err := exec.LookPath("setcap")
+	if err != nil {
+		return
+	}
+	if out, err := exec.Command(setcap, "cap_net_bind_service=+ep", targetPath).CombinedOutput(); err != nil {
+		fmt.Printf("➜ Note: could not grant CAP_NET_BIND_SERVICE to %s (%v: %s)\n", targetPath, err, strings.TrimSpace(string(out)))
+		fmt.Println("  Ports below 1024 (80/443) will need root or a reverse proxy.")
+	}
 }
 
 // installBinaryFile copies srcPath to targetPath using ETXTBSY-safe replace.

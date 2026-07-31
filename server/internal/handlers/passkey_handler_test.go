@@ -89,6 +89,27 @@ func TestPasskeyRegisterBegin_Success(t *testing.T) {
 	if result["user"] == nil || result["rp"] == nil {
 		t.Fatalf("expected user+rp shape, got %#v", result)
 	}
+	assertCredParams(t, result)
+}
+
+// assertCredParams guards the required WebAuthn members: without pubKeyCredParams
+// navigator.credentials.create() throws "Required member is undefined" client-side.
+func assertCredParams(t *testing.T, result map[string]interface{}) {
+	t.Helper()
+	params, ok := result["pubKeyCredParams"].([]interface{})
+	if !ok || len(params) == 0 {
+		t.Fatalf("expected pubKeyCredParams, got %#v", result["pubKeyCredParams"])
+	}
+	for _, p := range params {
+		entry, ok := p.(map[string]interface{})
+		if !ok || entry["type"] != "public-key" || entry["alg"] == nil {
+			t.Fatalf("malformed pubKeyCredParams entry: %#v", p)
+		}
+	}
+	sel, ok := result["authenticatorSelection"].(map[string]interface{})
+	if !ok || sel["residentKey"] != "required" {
+		t.Fatalf("expected discoverable credential request, got %#v", result["authenticatorSelection"])
+	}
 }
 
 func TestPasskeyRegisterBegin_Unauthenticated(t *testing.T) {
@@ -184,6 +205,7 @@ func TestPasskeySignupBegin_Success(t *testing.T) {
 	if result["challenge"] == nil {
 		t.Fatalf("expected challenge, got %#v", result)
 	}
+	assertCredParams(t, result)
 }
 
 func TestPasskeySignupBegin_MissingFields(t *testing.T) {

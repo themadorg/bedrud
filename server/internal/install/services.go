@@ -71,6 +71,9 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=bedrud
 
+# Bedrud runs as an unprivileged user but must be able to bind 80/443.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

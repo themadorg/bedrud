@@ -10,6 +10,9 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import type { SystemSettings } from './types'
 
+/** Placeholder the API returns instead of a stored secret; sending it back means "unchanged". */
+export const MASKED_SECRET = '••••••••'
+
 export function Section({
   title,
   description,
@@ -246,8 +249,9 @@ export function validateLocalSettings(s: SystemSettings): Record<string, string>
     errors.recordingMaxFileSizeMB = 'Cannot be negative'
   }
 
-  // JWT secret length
-  if (s.jwtSecret !== '' && s.jwtSecret.length < 32) {
+  // JWT secret length — the API returns MASKED_SECRET for stored secrets and
+  // treats it as "unchanged" on save, so it must not be length-checked here.
+  if (s.jwtSecret !== '' && s.jwtSecret !== MASKED_SECRET && s.jwtSecret.length < 32) {
     errors.jwtSecret = 'Must be at least 32 characters'
   }
 
