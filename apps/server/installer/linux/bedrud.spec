@@ -2,6 +2,14 @@
 # (e.g. Ubuntu's rpm package lacks systemd-rpm-macros)
 %{!?_unitdir: %define _unitdir /usr/lib/systemd/system}
 
+# Pre-built static binary (often cross-compiled). Host strip/debuginfo cannot
+# process foreign-arch ELF (e.g. aarch64 binary on x86_64 CI runners).
+%global __strip /bin/true
+%global debug_package %{nil}
+
+# Ubuntu's rpm macros map _sharedstatedir to /usr/com; we want /var/lib.
+%define _sharedstatedir /var/lib
+
 Name:           bedrud
 Version:        VERSION_PLACEHOLDER
 Release:        1%{?dist}

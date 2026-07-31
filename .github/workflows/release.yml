@@ -20,6 +20,7 @@ jobs:
     name: Server – ${{ matrix.goos }}/${{ matrix.goarch }}
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - goos: linux
@@ -328,7 +329,9 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          pattern: server-linux_amd64
+          # Match both arches (same as Debian). A single-artifact pattern can
+          # land files flat under path/, so multi-match keeps the subdir layout.
+          pattern: server-linux_*
           path: docker-ctx
 
       - name: Prepare Docker context
@@ -410,7 +413,9 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          pattern: server-linux_amd64
+          # Match both arches (same as Debian). A single-artifact pattern can
+          # land files flat under path/, so multi-match keeps the subdir layout.
+          pattern: server-linux_*
           path: docker-ctx
 
       - name: Prepare Docker context

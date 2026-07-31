@@ -1,3 +1,7 @@
+# Pre-built binary packaging: skip host strip/debuginfo (safe for native and cross).
+%global __strip /bin/true
+%global debug_package %{nil}
+
 Name:           bedrud-desktop
 Version:        VERSION_PLACEHOLDER
 Release:        1%{?dist}
