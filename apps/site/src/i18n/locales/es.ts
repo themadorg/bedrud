@@ -19,7 +19,7 @@ export default {
     getStarted: "Comenzar",
   },
   hero: {
-    badge: "Código Abierto · Apache 2.0",
+    badge: "Código Abierto · AGPL-3.0",
     kicker: "Alternativa open source a Zoom. Funciona en un VPS de $5.",
     headline: "Tus reuniones. Tu servidor. Tus reglas.",
     subheadline:
@@ -40,7 +40,7 @@ export default {
     stars: "1.2k",
     starsLabel: "Estrellas en GitHub",
     contributorsLabel: "colaboradores",
-    license: "Licenciado Apache 2.0",
+    license: "Licenciado AGPL-3.0",
   },
   journey: {
     title: "De cero a reunir en minutos",
@@ -159,7 +159,7 @@ export default {
       maxUsersJitsi: "100+ con ajustes",
       maxUsersBbb: "300+ por sala",
       license: "Licencia",
-      licenseBedrud: "Apache 2.0",
+      licenseBedrud: "AGPL-3.0",
       licenseJitsi: "Apache 2.0",
       licenseBbb: "LGPL 3.0",
       communitySize: "Comunidad y Ecosistema",
@@ -257,8 +257,8 @@ export default {
   openSource: {
     title: "Lee el código fuente. Toma el control.",
     subtitle:
-      "Cada línea de código es pública. Inspecciona, audita, contribuye o haz un fork. Licencia Apache 2.0 - uso comercial o personal.",
-    license: "Apache 2.0",
+      "Cada línea de código es pública. Inspecciona, audita, contribuye o haz un fork. Licencia AGPL-3.0 - uso comercial o personal.",
+    license: "AGPL-3.0",
     github: "Ver en GitHub",
     docs: "Leer la documentación",
   },
@@ -298,7 +298,7 @@ export default {
     pricing: {
       question: "¿Es realmente gratis?",
       answer:
-        "Completamente. Licencia Apache 2.0, sin límites de funciones, sin botones de 'contactar ventas'. El código fuente es público. Aloja tú mismo y paga solo tu servidor — típicamente $5/mes.",
+        "Completamente. Licencia AGPL-3.0, sin límites de funciones, sin botones de 'contactar ventas'. El código fuente es público. Aloja tú mismo y paga solo tu servidor — típicamente $5/mes.",
     },
     mobile: {
       question: "¿Tienen apps móviles?",
@@ -387,12 +387,12 @@ export default {
     meta: {
       title: "Términos de servicio - Bedrud",
       description:
-        "Términos para el sitio bedrud.org y la demo pública. Los usuarios autoalojados se rigen por la licencia Apache 2.0.",
+        "Términos para el sitio bedrud.org y la demo pública. Los usuarios autoalojados se rigen por la licencia AGPL-3.0.",
     },
     title: "Términos de servicio",
     lastUpdated: "Última actualización: 17 de abril de 2026",
     intro:
-      "Estos términos cubren el sitio bedrud.org y la instancia de demo pública en bedrud.xyz. Si descargas y autoalojas Bedrud, la licencia Apache 2.0 rige tu uso del software.",
+      "Estos términos cubren el sitio bedrud.org y la instancia de demo pública en bedrud.xyz. Si descargas y autoalojas Bedrud, la licencia AGPL-3.0 rige tu uso del software.",
     acceptance: {
       title: "Usar Bedrud significa que aceptas estos términos",
       content:
@@ -401,7 +401,7 @@ export default {
     services: {
       title: "Qué ofrece Bedrud",
       content:
-        "Ofrecemos este sitio con documentación y enlaces de descarga, y una instancia de demo pública para evaluar el software. El software de videoconferencia propiamente dicho es de código abierto bajo la licencia Apache 2.0. Descárgalo, modíficalo, ejecútalo tú mismo.",
+        "Ofrecemos este sitio con documentación y enlaces de descarga, y una instancia de demo pública para evaluar el software. El software de videoconferencia propiamente dicho es de código abierto bajo la licencia AGPL-3.0. Descárgalo, modíficalo, ejecútalo tú mismo.",
     },
     accounts: {
       title: "Cuentas",
@@ -416,17 +416,17 @@ export default {
     intellectualProperty: {
       title: "Licencia de código abierto",
       content:
-        "Bedrud está bajo licencia Apache 2.0. Úsalo, modifícalo, distribúyelo - incluyendo comercialmente. El nombre y logo de Bedrud son marcas de theMadOrg. Puedes usarlos para referirte al software, pero no para tergiversar tu relación con el proyecto.",
+        "Bedrud está bajo licencia AGPL-3.0. Úsalo, modifícalo, distribúyelo - incluyendo comercialmente. El nombre y logo de Bedrud son marcas de theMadOrg. Puedes usarlos para referirte al software, pero no para tergiversar tu relación con el proyecto.",
     },
     termination: {
       title: "Acceso",
       content:
-        "Podemos revocar el acceso a la demo pública en cualquier momento por abuso. Podemos sacar el sitio si es necesario. Pero una vez descargado el binario, es tuyo bajo la licencia Apache 2.0. No podemos revocar eso.",
+        "Podemos revocar el acceso a la demo pública en cualquier momento por abuso. Podemos sacar el sitio si es necesario. Pero una vez descargado el binario, es tuyo bajo la licencia AGPL-3.0. No podemos revocar eso.",
     },
     liability: {
       title: "Sin garantía",
       content:
-        "Bedrud se proporciona tal cual. No garantizamos que funcione perfectamente en todos los entornos. No somos responsables de caídas, pérdida de datos o cualquier daño del uso del software. Consulta la licencia Apache 2.0 para el texto legal completo.",
+        "Bedrud se proporciona tal cual. No garantizamos que funcione perfectamente en todos los entornos. No somos responsables de caídas, pérdida de datos o cualquier daño del uso del software. Consulta la licencia AGPL-3.0 para el texto legal completo.",
     },
     governingLaw: {
       title: "Ley aplicable",
@@ -1075,7 +1075,7 @@ export default {
         openSource: {
           title: "Totalmente auditable",
           description:
-            "Cada línea del flujo de cifrado, desde la generación de claves hasta la transformación de tramas, es de código abierto bajo Apache 2.0.",
+            "Cada línea del flujo de cifrado, desde la generación de claves hasta la transformación de tramas, es de código abierto bajo AGPL-3.0.",
         },
       },
     },

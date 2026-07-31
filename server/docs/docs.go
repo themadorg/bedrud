@@ -16,8 +16,8 @@ const docTemplate = `{
             "email": "support@bedrud.org"
         },
         "license": {
-            "name": "Apache 2.0",
-            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+            "name": "AGPL-3.0",
+            "url": "https://github.com/themadorg/bedrud/blob/master/LICENSE"
         },
         "version": "{{.Version}}"
     },

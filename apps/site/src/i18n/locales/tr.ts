@@ -18,7 +18,7 @@ export default {
     blog: "Blog",
   },
   hero: {
-    badge: "Açık Kaynak · Apache 2.0",
+    badge: "Açık Kaynak · AGPL-3.0",
     kicker: "Açık kaynaklı Zoom alternatifi. $5 VPS'te çalışır.",
     headline: "Toplantılarınız. Sunucunuz. Kurallarınız.",
     subheadline:
@@ -39,7 +39,7 @@ export default {
     stars: "1.2k",
     starsLabel: "GitHub yıldızları",
     contributorsLabel: "katkıda bulunan",
-    license: "Apache 2.0 Lisanslı",
+    license: "AGPL-3.0 Lisanslı",
   },
   journey: {
     title: "Sıfırdan Dakikalar İçinde Toplantı",
@@ -160,7 +160,7 @@ export default {
       maxUsersJitsi: "100+ ayar ile",
       maxUsersBbb: "300+ oda başına",
       license: "Lisans",
-      licenseBedrud: "Apache 2.0",
+      licenseBedrud: "AGPL-3.0",
       licenseJitsi: "Apache 2.0",
       licenseBbb: "LGPL 3.0",
       communitySize: "Topluluk ve Ekosistem",
@@ -258,8 +258,8 @@ export default {
   openSource: {
     title: "Kaynak kodu oku. Kontrolü ele al.",
     subtitle:
-      "Her kod satırı kamu açık. İnceleyin, denetleyin, katkıda bulunun veya çatallayın. Apache 2.0 lisanslı - ticari veya başka şekilde kullanın.",
-    license: "Apache 2.0",
+      "Her kod satırı kamu açık. İnceleyin, denetleyin, katkıda bulunun veya çatallayın. AGPL-3.0 lisanslı - ticari veya başka şekilde kullanın.",
+    license: "AGPL-3.0",
     github: "GitHub'da Görüntüle",
     docs: "Belgeleri Oku",
   },
@@ -299,7 +299,7 @@ export default {
     pricing: {
       question: "Gerçekten ücretsiz mi?",
       answer:
-        "Tamamen. Apache 2.0 lisanslı, özellik sınırı yok, 'satışla iletişim' butonu yok. Kaynak kodu açık. Kendi sunucunuzda barındırın ve sadece sunucu ücreti ödeyin — genellikle $5/ay.",
+        "Tamamen. AGPL-3.0 lisanslı, özellik sınırı yok, 'satışla iletişim' butonu yok. Kaynak kodu açık. Kendi sunucunuzda barındırın ve sadece sunucu ücreti ödeyin — genellikle $5/ay.",
     },
     mobile: {
       question: "Mobil uygulamanız var mı?",
@@ -387,12 +387,12 @@ export default {
     meta: {
       title: "Hizmet Şartları - Bedrud",
       description:
-        "bedrud.org web sitesi ve genel demo için hizmet şartları. Kendi sunucunuzda barındıran kullanıcılar Apache 2.0 lisansına tabidir.",
+        "bedrud.org web sitesi ve genel demo için hizmet şartları. Kendi sunucunuzda barındıran kullanıcılar AGPL-3.0 lisansına tabidir.",
     },
     title: "Hizmet Şartları",
     lastUpdated: "Son güncelleme: 17 Nisan 2026",
     intro:
-      "Bu şartlar bedrud.org web sitesini ve bedrud.xyz adresindeki genel demo örneğini kapsar. Bedrud'u indirip kendi sunucunuzda barındırırsanız, Apache 2.0 lisansı yazılım kullanımınızı yönetir.",
+      "Bu şartlar bedrud.org web sitesini ve bedrud.xyz adresindeki genel demo örneğini kapsar. Bedrud'u indirip kendi sunucunuzda barındırırsanız, AGPL-3.0 lisansı yazılım kullanımınızı yönetir.",
     acceptance: {
       title: "Bedrud'u Kullanmak Bu Şartları Kabul Ettiğiniz Anlamına Gelir",
       content:
@@ -401,7 +401,7 @@ export default {
     services: {
       title: "Bedrud Ne Sunar",
       content:
-        "Belgeler ve indirme bağlantıları içeren bu web sitesini ve yazılımı değerlendirmek için bir genel demo örneği sunuyoruz. Video toplantı yazılımı Apache 2.0 lisansı altında açık kaynaktır. İndirin, değiştirin, kendiniz çalıştırın.",
+        "Belgeler ve indirme bağlantıları içeren bu web sitesini ve yazılımı değerlendirmek için bir genel demo örneği sunuyoruz. Video toplantı yazılımı AGPL-3.0 lisansı altında açık kaynaktır. İndirin, değiştirin, kendiniz çalıştırın.",
     },
     accounts: {
       title: "Hesaplar",
@@ -416,17 +416,17 @@ export default {
     intellectualProperty: {
       title: "Açık Kaynak Lisansı",
       content:
-        "Bedrud Apache 2.0 lisansı altındadır. Ticari dahil olmak üzere kullanabilir, değiştirebilir ve dağıtabilirsiniz. Bedrud adı ve logosu theMadOrg'un ticari markalarıdır. Yazılıma atıfta bulunmak için kullanabilirsiniz, ancak projedeki ilişkinizi yanlış temsil etmek için kullanamazsınız.",
+        "Bedrud AGPL-3.0 lisansı altındadır. Ticari dahil olmak üzere kullanabilir, değiştirebilir ve dağıtabilirsiniz. Bedrud adı ve logosu theMadOrg'un ticari markalarıdır. Yazılıma atıfta bulunmak için kullanabilirsiniz, ancak projedeki ilişkinizi yanlış temsil etmek için kullanamazsınız.",
     },
     termination: {
       title: "Erişim",
       content:
-        "Kötüye kullanım durumunda genel demoya erişimi istediğiniz zaman iptal edebiliriz. Gerekirse web sitesini kapatabiliriz. Ancak ikili dosyayı indirdiğinizde Apache 2.0 lisansı altında sizindir. Bunu iptal edemeyiz.",
+        "Kötüye kullanım durumunda genel demoya erişimi istediğiniz zaman iptal edebiliriz. Gerekirse web sitesini kapatabiliriz. Ancak ikili dosyayı indirdiğinizde AGPL-3.0 lisansı altında sizindir. Bunu iptal edemeyiz.",
     },
     liability: {
       title: "Garanti Yok",
       content:
-        "Bedrud olduğu gibi sağlanır. Her ortamda kusursuz çalışacağını garanti etmiyoruz. Kesinti, veri kaybı veya yazılım kullanımından kaynaklanan herhangi bir zarar için sorumlu değiliz. Tam yasal metin için Apache 2.0 lisansına bakın.",
+        "Bedrud olduğu gibi sağlanır. Her ortamda kusursuz çalışacağını garanti etmiyoruz. Kesinti, veri kaybı veya yazılım kullanımından kaynaklanan herhangi bir zarar için sorumlu değiliz. Tam yasal metin için AGPL-3.0 lisansına bakın.",
     },
     governingLaw: {
       title: "Geçerli Hukuk",
@@ -1109,7 +1109,7 @@ export default {
         openSource: {
           title: "Tamamen Denetlenebilir",
           description:
-            "Anahtar üretiminden kare dönüşümüne kadar şifreleme hattının her satırı Apache 2.0 lisansı altında açık kaynaktır.",
+            "Anahtar üretiminden kare dönüşümüne kadar şifreleme hattının her satırı AGPL-3.0 lisansı altında açık kaynaktır.",
         },
       },
     },

@@ -2,7 +2,7 @@ class BedrudDesktop < Formula
   desc "Native desktop client for the Bedrud self-hosted video meeting platform"
   homepage "https://bedrud.org"
   version "0.1.0"
-  license "Apache-2.0"
+  license "AGPL-3.0-or-later"
 
   if Hardware::CPU.arm?
     url "https://github.com/themadorg/bedrud/releases/download/v#{version}/bedrud-desktop-macos-arm64.tar.gz"

@@ -134,4 +134,4 @@ If you add a user-facing doc page, add a sidebar entry in `apps/site/src/content
 
 ## License
 
-Contributions are licensed under [Apache License 2.0](../../LICENSE).
+Contributions are licensed under [GNU Affero General Public License v3.0 (AGPL-3.0)](../../LICENSE).

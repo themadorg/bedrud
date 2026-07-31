@@ -6,7 +6,7 @@
 [![Release](https://github.com/themadorg/bedrud/actions/workflows/release.yml/badge.svg)](https://github.com/themadorg/bedrud/actions/workflows/release.yml)
 [![Latest Release](https://img.shields.io/github/v/release/themadorg/bedrud)](https://github.com/themadorg/bedrud/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/themadorg/bedrud/total)](https://github.com/themadorg/bedrud/releases/latest)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![Docker](https://img.shields.io/badge/Docker-ghcr.io-2496ED?logo=docker&logoColor=white)](https://github.com/themadorg/bedrud/pkgs/container/bedrud)
 [![Project Status](https://img.shields.io/badge/status-active--development-success)](https://github.com/themadorg/bedrud/commits/master)
@@ -598,6 +598,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and the online [Contributing Guide](https
 
 ## License
 
-[Apache-2.0](LICENSE)
+[AGPL-3.0](LICENSE)
 
-By contributing to Bedrud, you agree that your contributions will be licensed under the Apache License 2.0.
+By contributing to Bedrud, you agree that your contributions will be licensed under the GNU Affero General Public License v3.0.

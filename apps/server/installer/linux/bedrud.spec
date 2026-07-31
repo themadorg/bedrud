@@ -6,7 +6,7 @@ Name:           bedrud
 Version:        VERSION_PLACEHOLDER
 Release:        1%{?dist}
 Summary:        Self-hosted video meeting server
-License:        Apache-2.0
+License:        AGPL-3.0-or-later
 URL:            https://github.com/themadorg/bedrud
 Requires:       glibc
 

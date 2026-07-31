@@ -212,7 +212,7 @@ export function Footer({ lang }: { lang: Locale }) {
               rel="noreferrer"
               className="transition-colors hover:text-foreground"
             >
-              Apache 2.0
+              AGPL-3.0
             </a>
             <a
               href={`https://bedrud.org/sitemap-${lang}-0.xml`}

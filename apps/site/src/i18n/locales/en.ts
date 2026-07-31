@@ -2,7 +2,7 @@ export default {
   meta: {
     title: "Bedrud - Talk to people, not the platform",
     description:
-      "Self-hosted video meetings. Single binary. 512MB RAM. Open source under Apache 2.0.",
+      "Self-hosted video meetings. Single binary. 512MB RAM. Open source under AGPL-3.0.",
   },
   nav: {
     home: "Home",
@@ -19,7 +19,7 @@ export default {
     getStarted: "Get Started",
   },
   hero: {
-    badge: "Open Source · Apache 2.0",
+    badge: "Open Source · AGPL-3.0",
     kicker: "The self-hosted video platform. $5/month. 60-second deploy.",
     headline: "Own Your Meetings. Own Your Infrastructure. Own Your Data.",
     subheadline:
@@ -39,7 +39,7 @@ export default {
     stars: "1.2k",
     starsLabel: "GitHub stars",
     contributorsLabel: "contributors",
-    license: "Apache 2.0 Licensed",
+    license: "AGPL-3.0 Licensed",
   },
   journey: {
     title: "From Zero to Meeting in Minutes",
@@ -140,7 +140,7 @@ export default {
       maxUsersJitsi: "100+ with tuning",
       maxUsersBbb: "300+ per room",
       license: "License",
-      licenseBedrud: "Apache 2.0",
+      licenseBedrud: "AGPL-3.0",
       licenseJitsi: "Apache 2.0",
       licenseBbb: "LGPL 3.0",
       communitySize: "Community & Ecosystem",
@@ -238,8 +238,8 @@ export default {
   openSource: {
     title: "Read the Source. Run the Show.",
     subtitle:
-      "Every line of code is public. Inspect it, audit it, contribute to it, or fork it and build your own. Apache 2.0 licensed - use it commercially or otherwise.",
-    license: "Apache 2.0",
+      "Every line of code is public. Inspect it, audit it, contribute to it, or fork it and build your own. AGPL-3.0 licensed - use it commercially or otherwise.",
+    license: "AGPL-3.0",
     github: "View on GitHub",
     docs: "Read the Docs",
   },
@@ -279,7 +279,7 @@ export default {
     pricing: {
       question: "Is it really free?",
       answer:
-        "Completely. Apache 2.0 licensed, no feature gates, no 'contact sales' buttons. The source code is public. Host it yourself and pay only for your server — typically $5/month.",
+        "Completely. AGPL-3.0 licensed, no feature gates, no 'contact sales' buttons. The source code is public. Host it yourself and pay only for your server — typically $5/month.",
     },
     mobile: {
       question: "Do you have mobile apps?",
@@ -606,12 +606,12 @@ export default {
     meta: {
       title: "Terms of Service - Bedrud",
       description:
-        "Terms for using the Bedrud website and public demo. Self-hosted users are bound by the Apache 2.0 license.",
+        "Terms for using the Bedrud website and public demo. Self-hosted users are bound by the AGPL-3.0 license.",
     },
     title: "Terms of Service",
     lastUpdated: "Last updated: April 17, 2026",
     intro:
-      "These terms cover the bedrud.org website and the public demo instance at bedrud.xyz. If you download and self-host Bedrud, the Apache 2.0 license governs your use of the software.",
+      "These terms cover the bedrud.org website and the public demo instance at bedrud.xyz. If you download and self-host Bedrud, the AGPL-3.0 license governs your use of the software.",
     acceptance: {
       title: "Using Bedrud Means You Accept These Terms",
       content:
@@ -620,7 +620,7 @@ export default {
     services: {
       title: "What Bedrud Provides",
       content:
-        "We provide this website with documentation and download links, and a public demo instance for evaluating the software. The actual video meeting software is open-source under the Apache 2.0 license. Download it, modify it, run it yourself.",
+        "We provide this website with documentation and download links, and a public demo instance for evaluating the software. The actual video meeting software is open-source under the AGPL-3.0 license. Download it, modify it, run it yourself.",
     },
     accounts: {
       title: "Accounts",
@@ -635,17 +635,17 @@ export default {
     intellectualProperty: {
       title: "Open Source License",
       content:
-        "Bedrud is Apache 2.0 licensed. Use it, modify it, distribute it - including commercially. The Bedrud name and logo are trademarks of theMadOrg. You can use them to refer to the software, but not to misrepresent your relationship with the project.",
+        "Bedrud is AGPL-3.0 licensed. Use it, modify it, distribute it - including commercially. The Bedrud name and logo are trademarks of theMadOrg. You can use them to refer to the software, but not to misrepresent your relationship with the project.",
     },
     termination: {
       title: "Access",
       content:
-        "We can revoke access to the public demo for abuse. We can take down the website if needed. But once you've downloaded the binary, it's yours under the Apache 2.0 license. We can't revoke that.",
+        "We can revoke access to the public demo for abuse. We can take down the website if needed. But once you've downloaded the binary, it's yours under the AGPL-3.0 license. We can't revoke that.",
     },
     liability: {
       title: "No Warranty",
       content:
-        "Bedrud is provided as-is. We don't guarantee it works perfectly in every environment. We're not liable for downtime, data loss, or any damages from using the software. See the Apache 2.0 license for the full legal text.",
+        "Bedrud is provided as-is. We don't guarantee it works perfectly in every environment. We're not liable for downtime, data loss, or any damages from using the software. See the AGPL-3.0 license for the full legal text.",
     },
     governingLaw: {
       title: "Governing Law",
@@ -1110,7 +1110,7 @@ export default {
         openSource: {
           title: "Fully Auditable",
           description:
-            "Every line of the encryption pipeline — from key generation to frame transform — is open source under Apache 2.0.",
+            "Every line of the encryption pipeline — from key generation to frame transform — is open source under AGPL-3.0.",
         },
       },
     },
