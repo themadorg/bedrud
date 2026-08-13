@@ -6,6 +6,8 @@ order: 21
 
 The built-in installer configures a fresh Linux server for production use with a single command.
 
+Re-running `bedrud install` without `--fresh` does **not** overwrite `/etc/bedrud/config.yaml` or `livekit.yaml`. Use `bedrud update` to upgrade the binary, or `bedrud install --fresh` to wipe and regenerate config (destructive).
+
 <InstallerSteps />
 
 <SystemdServices />

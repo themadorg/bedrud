@@ -92,6 +92,11 @@ func LinuxInstall(cfg *InstallConfig) error {
 		return fmt.Errorf("only linux is supported")
 	}
 
+	existingConfig, err := fileExists(etcConfigPath)
+	if err != nil {
+		return fmt.Errorf("stat %s: %w", etcConfigPath, err)
+	}
+
 	isTerm := true
 	if stat, err := os.Stdin.Stat(); err != nil {
 		isTerm = false
@@ -99,7 +104,8 @@ func LinuxInstall(cfg *InstallConfig) error {
 		isTerm = false
 	}
 
-	if isTerm {
+	// Re-run without --fresh: keep existing config; do not re-prompt TLS/domain.
+	if isTerm && !existingConfig {
 		promptConfig(os.Stdin, os.Stdout, cfg)
 	}
 
@@ -295,14 +301,26 @@ func LinuxInstall(cfg *InstallConfig) error {
 		configYAML.Webxdc.Enabled = false
 	}
 
-	configData, err := yaml.Marshal(&configYAML)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config.yaml: %w", err)
+	if existingConfig {
+		fmt.Println("➜ Existing", etcConfigPath, "found — leaving it unchanged")
+		fmt.Println("  Use --fresh to replace config, secrets, and data.")
+		fmt.Println("  Use `bedrud update --self` to upgrade the binary in place.")
+		cfg.PreservedConfig = true
+	} else {
+		configData, err := yaml.Marshal(&configYAML)
+		if err != nil {
+			return fmt.Errorf("failed to marshal config.yaml: %w", err)
+		}
+		wrote, err := writeFileUnlessExists(etcConfigPath, configData, 0o600)
+		if err != nil {
+			return fmt.Errorf("failed to write config.yaml: %w", err)
+		}
+		if wrote {
+			_ = runChown("bedrud:bedrud", etcConfigPath)
+		} else {
+			cfg.PreservedConfig = true
+		}
 	}
-	if err := os.WriteFile(etcConfigPath, configData, 0o600); err != nil {
-		return fmt.Errorf("failed to write config.yaml: %w", err)
-	}
-	_ = runChown("bedrud:bedrud", etcConfigPath)
 
 	// 3. Create LiveKit Config
 	if !isExternalLK {
@@ -361,14 +379,33 @@ func LinuxInstall(cfg *InstallConfig) error {
 		lkYAML.Logging.JSON = true
 		lkYAML.Logging.Level = "debug"
 
-		lkData, err := yaml.Marshal(&lkYAML)
+		lkExists, err := fileExists(etcLivekitPath)
 		if err != nil {
-			return fmt.Errorf("failed to marshal livekit.yaml: %w", err)
+			return fmt.Errorf("stat %s: %w", etcLivekitPath, err)
 		}
-		if err := os.WriteFile(etcLivekitPath, lkData, 0o600); err != nil {
-			return fmt.Errorf("failed to write livekit.yaml: %w", err)
+		if lkExists {
+			fmt.Println("➜ Existing", etcLivekitPath, "found — leaving it unchanged")
+			cfg.PreservedLiveKit = true
+		} else if existingConfig {
+			// New livekit.yaml would get freshly generated keys that do not
+			// match the preserved config.yaml — skip rather than desync.
+			fmt.Println("➜ Skipping", etcLivekitPath, "(would not match preserved config secrets)")
+			cfg.PreservedLiveKit = true
+		} else {
+			lkData, err := yaml.Marshal(&lkYAML)
+			if err != nil {
+				return fmt.Errorf("failed to marshal livekit.yaml: %w", err)
+			}
+			wrote, err := writeFileUnlessExists(etcLivekitPath, lkData, 0o600)
+			if err != nil {
+				return fmt.Errorf("failed to write livekit.yaml: %w", err)
+			}
+			if wrote {
+				_ = runChown("bedrud:bedrud", etcLivekitPath)
+			} else {
+				cfg.PreservedLiveKit = true
+			}
 		}
-		_ = runChown("bedrud:bedrud", etcLivekitPath)
 	}
 
 	// Self-signed only when not using ACME (HTTP-01 or Cloudflare DNS-01 obtain certs at runtime).
@@ -419,8 +456,20 @@ func LinuxInstall(cfg *InstallConfig) error {
 
 	fmt.Println("\n✓ Installation complete!")
 	fmt.Println("--------------------------------------------------")
-	fmt.Println("Sensitive credentials were generated and written to configuration files.")
-	fmt.Println("For security, secrets are not displayed in console output.")
+	if cfg.PreservedConfig {
+		fmt.Println("Existing configuration was left unchanged.")
+		fmt.Println("  Config:  ", etcConfigPath, "(preserved)")
+		if !isExternalLK {
+			if cfg.PreservedLiveKit {
+				fmt.Println("  LiveKit: ", etcLivekitPath, "(preserved)")
+			}
+		}
+		fmt.Println("Replace everything with: sudo bedrud install --fresh")
+		fmt.Println("Upgrade in place with:   sudo bedrud update --self")
+	} else {
+		fmt.Println("Sensitive credentials were generated and written to configuration files.")
+		fmt.Println("For security, secrets are not displayed in console output.")
+	}
 	fmt.Println("--------------------------------------------------")
 
 	accessURL := fmt.Sprintf("%s://%s:%s", protocol, cfg.OverrideIP, cfg.Port)

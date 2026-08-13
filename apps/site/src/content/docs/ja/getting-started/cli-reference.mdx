@@ -105,7 +105,7 @@ bedrud install [flags]
 | `--lk-port`          | `"7880"`                        | Override LiveKit API/WebSocket port                                      |
 | `--lk-tcp-port`      | `"7881"`                        | Override LiveKit RTC TCP port                                            |
 | `--lk-udp-port`      | `"7882"`                        | Override LiveKit RTC UDP port                                            |
-| `--fresh`            | `false`                         | Remove existing installation before installing                           |
+| `--fresh`            | `false`                         | Wipe existing install (config, data, certs) then reinstall. Without this, existing `config.yaml` / `livekit.yaml` are left unchanged |
 | `--behind-proxy`     | `false`                         | Server is behind CDN/reverse-proxy (Cloudflare, nginx)                   |
 | `--external-livekit` | `""`                            | URL of fully external LiveKit server (different machine)                 |
 | `--livekit-domain`   | `""`                            | Separate domain for local LiveKit server (bypasses CDN)                  |
@@ -116,8 +116,8 @@ bedrud install [flags]
 2. Prompts for IP, domain, email, TLS mode (if non-interactive and flags not provided)
 3. Creates directories: `/etc/bedrud`, `/var/lib/bedrud`, `/var/lib/bedrud/certs`, `/var/log/bedrud`
 4. Copies binary to `/usr/local/bin/bedrud`
-5. Generates Bedrud server config at `/etc/bedrud/config.yaml`
-6. Generates LiveKit media server config at `/etc/bedrud/livekit.yaml`
+5. Writes `/etc/bedrud/config.yaml` only if it does not already exist (re-run without `--fresh` preserves it)
+6. Writes `/etc/bedrud/livekit.yaml` only if it does not already exist
 7. Generates self-signed certs at `/etc/bedrud/cert.pem` + `/etc/bedrud/key.pem` (if TLS enabled and no custom certs)
 8. Creates LiveKit init service (unless using external LiveKit)
 9. Creates Bedrud init service

@@ -60,10 +60,22 @@ Start the embedded LiveKit process (legacy/service unit entrypoint).
 .B install
 Create system user and directories, write
 .I /etc/bedrud
-configuration and LiveKit YAML when applicable, install init units, TLS
-material as requested, example configs under
+configuration and LiveKit YAML when those files do not already exist,
+install init units, TLS material as requested, example configs under
 .IR /usr/share/doc/bedrud/examples/ ,
 the manual page, and shell tab\-completion scripts.
+Re\-running
+.B install
+does not overwrite an existing
+.I config.yaml
+or
+.IR livekit.yaml .
+Use
+.B \-\-fresh
+to uninstall first and regenerate them (destroys config and data).
+Use
+.B update
+to replace the binary without touching config.
 .TP
 .B uninstall
 Stop services and remove installed files, configuration, and data

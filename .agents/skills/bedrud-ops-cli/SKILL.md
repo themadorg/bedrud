@@ -123,7 +123,7 @@ bedrud [--config PATH] [--json]
 | `--cert` / `--key` | Existing cert pair |
 | `--lk-port` / `--lk-tcp-port` / `--lk-udp-port` | LK ports (7880/7881/7882) |
 | `--lk-udp-range start-end` | WebRTC UDP range (default 50000-60000) |
-| `--fresh` | Uninstall first |
+| `--fresh` | Uninstall first (only way to replace existing config.yaml / livekit.yaml) |
 | `--behind-proxy` | CDN/reverse-proxy mode |
 | `--external-livekit URL` | External LK (no local livekit service) |
 | `--livekit-domain` | Separate domain for local LK |
@@ -156,6 +156,7 @@ Entry APIs: **`LinuxInstall` / `LinuxUninstall` / `LinuxUpdate`** (not Debian*).
 | File | Purpose |
 |------|---------|
 | `linux.go` | Install/uninstall flow, interactive prompt, binary copy, config write, user creation |
+| `files.go` | Write config files only when missing (re-run without `--fresh`) |
 | `update.go` | In-place upgrade: binary replace, version + DB migrations, service restart |
 | `version.go` | `/var/lib/bedrud/version` + ordered versioned install migrations |
 | `binary.go` | Self-binary copy, package-managed detection, chown helpers |
@@ -192,17 +193,16 @@ Defaults: port 443/8090, LK 7880/7881/7882, UDP range 50000–60000.
 
 ### `LinuxInstall(cfg)` flow
 
-1. Optional `--fresh` → `LinuxUninstall`
-2. Linux-only; interactive `promptConfig` when stdin is a TTY
+1. Optional `--fresh` → `LinuxUninstall` (wipes config, data, certs)
+2. Linux-only; interactive `promptConfig` when stdin is a TTY **and** no existing `config.yaml`
 3. `SetDefaults`; detect outbound IP if unset
 4. Mkdir `/etc/bedrud`, `/var/lib/bedrud{,/certs}`, `/var/log/bedrud`
 5. Create system user `bedrud` (nologin, home `/var/lib/bedrud`)
 6. Stop bedrud/livekit; copy self binary → `/usr/local/bin/bedrud`
-7. Generate secrets (LK apiKey/apiSecret, JWT, session)
-8. Write `/etc/bedrud/config.yaml` (sqlite at `/var/lib/bedrud/bedrud.db`)
-9. Write `/etc/bedrud/livekit.yaml` unless external LK (TURN, NodeIP, UDP range)
-10. Self-signed cert if TLS + no provided cert (`GenerateSelfSignedCertWithAlgo`)
-11. Detect init → write + enable + start services (skip in containers)
+7. If `/etc/bedrud/config.yaml` already exists: leave it unchanged (TLS + secrets preserved). Else generate secrets and write it.
+8. If `/etc/bedrud/livekit.yaml` already exists (or config was preserved): leave it unchanged. Else write it unless external LK.
+9. Self-signed cert if TLS + no provided cert **and** cert files are missing (`GenerateSelfSignedCertWithAlgo`)
+10. Detect init → write + enable + start services (skip in containers)
 
 Paths: binary `/usr/local/bin/bedrud`, config `/etc/bedrud/config.yaml`, LK yaml `/etc/bedrud/livekit.yaml`, certs `/etc/bedrud/cert.pem` + `key.pem`.
 

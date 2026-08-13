@@ -33,6 +33,10 @@ type InstallConfig struct {
 	PreferCloudflareACME bool
 	// Version is recorded to /var/lib/bedrud/version on successful install (from CLI ldflags).
 	Version string
+	// PreservedConfig / PreservedLiveKit are set by LinuxInstall when existing
+	// files were left unchanged (re-run without --fresh).
+	PreservedConfig  bool
+	PreservedLiveKit bool
 }
 
 // SetDefaults populates empty fields with their default values.

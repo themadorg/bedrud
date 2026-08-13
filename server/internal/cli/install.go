@@ -47,13 +47,15 @@ func newInstallCmd() *cobra.Command {
 				return fmt.Errorf("installation: %w", err)
 			}
 			return clioutput.Success("✓ Bedrud installed successfully", map[string]any{
-				"enableTls":        cfg.EnableTLS,
-				"selfSigned":       cfg.SelfSigned,
-				"disableTls":       cfg.DisableTLS,
-				"behindProxy":      cfg.BehindProxy,
-				"domain":           cfg.Domain,
-				"webxdc":           cfg.EnableWebxdc,
-				"cloudflareAcme":   cfg.PreferCloudflareACME,
+				"enableTls":         cfg.EnableTLS,
+				"selfSigned":        cfg.SelfSigned,
+				"disableTls":        cfg.DisableTLS,
+				"behindProxy":       cfg.BehindProxy,
+				"domain":            cfg.Domain,
+				"webxdc":            cfg.EnableWebxdc,
+				"cloudflareAcme":    cfg.PreferCloudflareACME,
+				"configPreserved":   cfg.PreservedConfig,
+				"livekitPreserved":  cfg.PreservedLiveKit,
 			})
 		},
 	}
@@ -71,7 +73,7 @@ func newInstallCmd() *cobra.Command {
 	f.StringVar(&cfg.LKPort, "lk-port", "", "Override LiveKit API port (default 7880)")
 	f.StringVar(&cfg.LKTcpPort, "lk-tcp-port", "", "Override LiveKit RTC TCP port (default 7881)")
 	f.StringVar(&cfg.LKUdpPort, "lk-udp-port", "", "Override LiveKit RTC UDP port (default 7882)")
-	f.BoolVar(&cfg.Fresh, "fresh", false, "Remove existing installation before installing")
+	f.BoolVar(&cfg.Fresh, "fresh", false, "Wipe existing install (config, data, certs) then reinstall; without this, existing config.yaml and livekit.yaml are left unchanged")
 	f.BoolVar(&cfg.BehindProxy, "behind-proxy", false, "Running behind a CDN/reverse-proxy")
 	f.StringVar(&cfg.ExternalLKURL, "external-livekit", "", "URL of a fully external LiveKit server")
 	f.StringVar(&cfg.LKDomain, "livekit-domain", "", "Separate domain for the local LiveKit server")

@@ -8,6 +8,14 @@ Requires root for typical paths (`/etc/bedrud`, `/usr/local/bin`).
 
 ---
 
+## Re-running install
+
+A second `bedrud install` **does not overwrite** existing `/etc/bedrud/config.yaml` or `/etc/bedrud/livekit.yaml`. TLS settings, ACME, and secrets stay as they are. The installer still refreshes the binary, init units, and docs.
+
+To wipe config, database, certs, and data, then write a new config, use `--fresh` (runs uninstall first). To upgrade the binary without touching config, use `bedrud update --self`.
+
+---
+
 ## Usage
 
 ```bash
@@ -35,7 +43,7 @@ sudo bedrud --json install --no-tls
 | `--lk-tcp-port` | LiveKit RTC TCP port |
 | `--lk-udp-port` | LiveKit RTC UDP port |
 | `--lk-udp-range` | WebRTC UDP range, e.g. `50000-60000` |
-| `--fresh` | Remove existing install before reinstalling |
+| `--fresh` | Wipe the existing install (config, database, certs) then reinstall. Without this flag, existing `/etc/bedrud/config.yaml` and `livekit.yaml` are **not** overwritten. |
 | `--behind-proxy` | CDN/reverse-proxy mode |
 | `--external-livekit` | External LiveKit URL |
 | `--livekit-domain` | Separate domain for local LiveKit |
@@ -72,7 +80,9 @@ Design: [WebXDC config & installer](../../plan/webxdc/10-config-and-installer.md
     "selfSigned": true,
     "disableTls": false,
     "behindProxy": false,
-    "domain": "meet.example.com"
+    "domain": "meet.example.com",
+    "configPreserved": false,
+    "livekitPreserved": false
   }
 }
 ```

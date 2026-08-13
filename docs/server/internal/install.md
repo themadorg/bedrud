@@ -9,11 +9,13 @@ Automated installation for Linux systems. Invoked via `bedrud install` and `bedr
 | File | Purpose |
 |------|---------|
 | `init.go` | Init system detection and dispatch |
-| `linux.go` | Debian/Ubuntu systemd installer |
+| `linux.go` | Linux installer (config write, TLS, services) |
+| `files.go` | Write config/LiveKit YAML only when the file is missing |
 | `openrc.go` | OpenRC init installer |
 | `sysv.go` | SysV init installer |
 | `config.go` | Installer config file generation |
 | `secrets.go` | Cryptographic secret generation |
+| `update.go` | In-place upgrade (preserves config) |
 
 ---
 
@@ -34,10 +36,10 @@ Automated installation for Linux systems. Invoked via `bedrud install` and `bedr
 Interactive installer that:
 
 1. Copies binary → `/usr/local/bin/bedrud`
-2. Writes `/etc/bedrud/config.yaml` + `/etc/bedrud/livekit.yaml`
+2. Writes `/etc/bedrud/config.yaml` and `/etc/bedrud/livekit.yaml` **only if they do not already exist**. A re-run without `--fresh` leaves TLS, ACME, and secrets unchanged. `--fresh` uninstalls first, then writes new files.
 3. Creates init service units (`bedrud.service`, optionally `livekit.service`)
-4. Generates secrets (JWT, session, LiveKit API key/secret)
-5. Configures TLS:
+4. Generates secrets (JWT, session, LiveKit API key/secret) only when writing a new `config.yaml`
+5. Configures TLS (first install / `--fresh` only):
    - ACME (Let's Encrypt) with `useACME` + `domain` + `email`
    - Self-signed (Ed25519 default)
    - Manual cert/key paths
@@ -70,7 +72,7 @@ sudo bedrud uninstall
 
 ## Generated Config
 
-Installer writes production-ready `config.yaml` with:
+On a **first** install (or after `--fresh`), the installer writes production-ready `config.yaml` with:
 
 - Generated JWT and session secrets
 - LiveKit API key/secret pair

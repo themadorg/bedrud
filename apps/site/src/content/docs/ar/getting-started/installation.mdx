@@ -338,7 +338,7 @@ Useful when the main domain is behind Cloudflare but WebRTC media needs a direct
 | `--lk-port` | `7880` | LiveKit API port |
 | `--lk-tcp-port` | `7881` | LiveKit RTC TCP port |
 | `--lk-udp-port` | `7882` | LiveKit RTC UDP port |
-| `--fresh` | `false` | Remove existing installation before installing |
+| `--fresh` | `false` | Wipe existing install (config, data, certs) then reinstall. Without this, existing config files are left unchanged |
 | `--behind-proxy` | `false` | Server is behind a reverse proxy / CDN |
 | `--external-livekit` | `""` | URL of an external LiveKit server |
 | `--livekit-domain` | `""` | Separate domain for LiveKit (bypass CDN) |
@@ -464,7 +464,7 @@ Services restart automatically after package upgrade.
 
 ### Binary Download
 
-Download the latest release and re-run install. The installer is safe to re-run - it overwrites the binary and config while preserving the database:
+Download the latest release and re-run install. Without `--fresh`, the installer refreshes the binary and services and **does not overwrite** existing `config.yaml` / `livekit.yaml`. For a binary-only upgrade prefer `bedrud update`. A clean wipe uses `--fresh`:
 
 ```bash
 curl -fsSL -o bedrud.tar.xz https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
