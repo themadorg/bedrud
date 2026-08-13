@@ -33,6 +33,15 @@ Documentation for the Bedrud monorepo. Use this index to find what you need.
 
 ---
 
+## Operator guides (`docs/guide/`)
+
+| Document | Description |
+|----------|-------------|
+| [Guides index](./guide/README.md) | Operator how-tos |
+| [nginx + Let's Encrypt](./guide/nginx-letsencrypt-behind-proxy.md) | TLS at nginx; Bedrud HTTP-only; LiveKit `wss` on 443 |
+
+---
+
 ## Server (Go backend)
 
 | Document | Description |
