@@ -13,46 +13,35 @@ fi
 
 mkdir -p "$DEST/gallery" "$DEST/avatars"
 
-GALLERY=(
-  meeting-grid__dark__desktop.png
-  meeting-grid__light__desktop.png
-  meeting-grid__dark__mobile.png
-  meeting-grid__light__mobile.png
-  meeting-welcome__dark__desktop.png
-  meeting-welcome__light__desktop.png
-  meeting-welcome__dark__mobile.png
-  meeting-welcome__light__mobile.png
-  meeting-participants__dark__desktop.png
-  meeting-participants__light__desktop.png
-  meeting-participants__dark__mobile.png
-  meeting-participants__light__mobile.png
-  meeting-screenshare__dark__desktop.png
-  meeting-screenshare__light__desktop.png
-  meeting-info__dark__desktop.png
-  meeting-info__light__desktop.png
-  meeting-chat__dark__desktop.png
-  meeting-chat__light__desktop.png
-  meeting-chat__dark__mobile.png
-  meeting-chat__light__mobile.png
-  landing__dark__desktop.png
-  landing__light__desktop.png
-  auth-login__dark__desktop.png
-  auth-login__light__desktop.png
-  dashboard__dark__desktop.png
-  dashboard__light__desktop.png
-  admin-overview__dark__desktop_1.png
-  admin-overview__light__desktop_1.png
-  admin-settings-auth__dark__desktop_1.png
-  admin-settings-auth__light__desktop_1.png
-)
+# Copy every captured PNG. Slice names (_1, _2) are only written when the page
+# is taller than the viewport; alias the first slice to the unsliced file too
+# so the gallery can request either name.
+shopt -s nullglob
+copied=0
+for png in "$OUT"/*.png; do
+  base="$(basename "$png")"
+  cp -f "$png" "$DEST/gallery/$base"
+  copied=$((copied + 1))
+done
+if [ "$copied" -eq 0 ]; then
+  echo "no PNG files in $OUT" >&2
+  exit 1
+fi
 
-missing=0
-for f in "${GALLERY[@]}"; do
-  if [ -f "$OUT/$f" ]; then
-    cp -f "$OUT/$f" "$DEST/gallery/$f"
-  else
-    echo "missing gallery shot: $f" >&2
-    missing=1
+# Gallery historically asked for *_1.png on long pages. If capture wrote a
+# single viewport shot, publish it under the _1 name as well.
+for png in "$OUT"/*.png; do
+  base="$(basename "$png")"
+  case "$base" in
+    *_*.png) ;;
+    *) continue ;;
+  esac
+  case "$base" in
+    *_1.png|*_2.png|*_3.png) continue ;;
+  esac
+  alias="${base%.png}_1.png"
+  if [ ! -f "$OUT/$alias" ]; then
+    cp -f "$png" "$DEST/gallery/$alias"
   fi
 done
 
@@ -68,8 +57,16 @@ if [ -d "$ROOT/tools/screenshots/avatars" ]; then
   done
 fi
 
-echo "published screenshots → $DEST"
-if [ "$missing" -ne 0 ]; then
-  echo "some gallery files were missing" >&2
-  exit 1
-fi
+echo "published $copied screenshots → $DEST"
+
+REQUIRED=(
+  meeting-grid__dark__desktop.png
+  meeting-chat__dark__mobile.png
+  meeting-chat__light__mobile.png
+)
+for f in "${REQUIRED[@]}"; do
+  if [ ! -f "$DEST/gallery/$f" ]; then
+    echo "missing required landing shot: $f" >&2
+    exit 1
+  fi
+done
