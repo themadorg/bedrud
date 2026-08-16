@@ -1,9 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "~/components/ui/dialog";
 import { cn } from "~/lib/utils";
 import { type Locale, t } from "../../i18n/utils";
 
@@ -20,32 +16,188 @@ interface Shot {
 }
 
 const SHOTS: Shot[] = [
-  { src: "/preview/gallery/meeting-grid__dark__desktop.png", title: "Meeting grid", category: "meeting", theme: "dark", device: "desktop" },
-  { src: "/preview/gallery/meeting-grid__light__desktop.png", title: "Meeting grid", category: "meeting", theme: "light", device: "desktop" },
-  { src: "/preview/gallery/meeting-grid__dark__mobile.png", title: "Meeting grid", category: "meeting", theme: "dark", device: "mobile" },
-  { src: "/preview/gallery/meeting-grid__light__mobile.png", title: "Meeting grid", category: "meeting", theme: "light", device: "mobile" },
-  { src: "/preview/gallery/meeting-welcome__dark__desktop.png", title: "Welcome screen", category: "meeting", theme: "dark", device: "desktop" },
-  { src: "/preview/gallery/meeting-welcome__light__desktop.png", title: "Welcome screen", category: "meeting", theme: "light", device: "desktop" },
-  { src: "/preview/gallery/meeting-participants__dark__desktop.png", title: "Participants", category: "meeting", theme: "dark", device: "desktop" },
-  { src: "/preview/gallery/meeting-participants__light__desktop.png", title: "Participants", category: "meeting", theme: "light", device: "desktop" },
-  { src: "/preview/gallery/meeting-screenshare__dark__desktop.png", title: "Screen share", category: "meeting", theme: "dark", device: "desktop" },
-  { src: "/preview/gallery/meeting-screenshare__light__desktop.png", title: "Screen share", category: "meeting", theme: "light", device: "desktop" },
-  { src: "/preview/gallery/meeting-info__dark__desktop.png", title: "Room info", category: "meeting", theme: "dark", device: "desktop" },
-  { src: "/preview/gallery/meeting-info__light__desktop.png", title: "Room info", category: "meeting", theme: "light", device: "desktop" },
-  { src: "/preview/gallery/meeting-chat__dark__desktop.png", title: "Meeting chat", category: "chat", theme: "dark", device: "desktop" },
-  { src: "/preview/gallery/meeting-chat__light__desktop.png", title: "Meeting chat", category: "chat", theme: "light", device: "desktop" },
-  { src: "/preview/gallery/meeting-chat__dark__mobile.png", title: "Meeting chat", category: "chat", theme: "dark", device: "mobile" },
-  { src: "/preview/gallery/meeting-chat__light__mobile.png", title: "Meeting chat", category: "chat", theme: "light", device: "mobile" },
-  { src: "/preview/gallery/landing__dark__desktop.png", title: "App landing", category: "auth", theme: "dark", device: "desktop" },
-  { src: "/preview/gallery/landing__light__desktop.png", title: "App landing", category: "auth", theme: "light", device: "desktop" },
-  { src: "/preview/gallery/auth-login__dark__desktop.png", title: "Sign in", category: "auth", theme: "dark", device: "desktop" },
-  { src: "/preview/gallery/auth-login__light__desktop.png", title: "Sign in", category: "auth", theme: "light", device: "desktop" },
-  { src: "/preview/gallery/dashboard__dark__desktop.png", title: "Dashboard", category: "admin", theme: "dark", device: "desktop" },
-  { src: "/preview/gallery/dashboard__light__desktop.png", title: "Dashboard", category: "admin", theme: "light", device: "desktop" },
-  { src: "/preview/gallery/admin-overview__dark__desktop_1.png", title: "Admin overview", category: "admin", theme: "dark", device: "desktop" },
-  { src: "/preview/gallery/admin-overview__light__desktop_1.png", title: "Admin overview", category: "admin", theme: "light", device: "desktop" },
-  { src: "/preview/gallery/admin-settings-auth__dark__desktop_1.png", title: "Admin settings", category: "admin", theme: "dark", device: "desktop" },
-  { src: "/preview/gallery/admin-settings-auth__light__desktop_1.png", title: "Admin settings", category: "admin", theme: "light", device: "desktop" },
+  {
+    src: "/preview/gallery/meeting-grid__dark__desktop.png",
+    title: "Meeting grid",
+    category: "meeting",
+    theme: "dark",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/meeting-grid__light__desktop.png",
+    title: "Meeting grid",
+    category: "meeting",
+    theme: "light",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/meeting-grid__dark__mobile.png",
+    title: "Meeting grid",
+    category: "meeting",
+    theme: "dark",
+    device: "mobile",
+  },
+  {
+    src: "/preview/gallery/meeting-grid__light__mobile.png",
+    title: "Meeting grid",
+    category: "meeting",
+    theme: "light",
+    device: "mobile",
+  },
+  {
+    src: "/preview/gallery/meeting-welcome__dark__desktop.png",
+    title: "Welcome screen",
+    category: "meeting",
+    theme: "dark",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/meeting-welcome__light__desktop.png",
+    title: "Welcome screen",
+    category: "meeting",
+    theme: "light",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/meeting-participants__dark__desktop.png",
+    title: "Participants",
+    category: "meeting",
+    theme: "dark",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/meeting-participants__light__desktop.png",
+    title: "Participants",
+    category: "meeting",
+    theme: "light",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/meeting-screenshare__dark__desktop.png",
+    title: "Screen share",
+    category: "meeting",
+    theme: "dark",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/meeting-screenshare__light__desktop.png",
+    title: "Screen share",
+    category: "meeting",
+    theme: "light",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/meeting-info__dark__desktop.png",
+    title: "Room info",
+    category: "meeting",
+    theme: "dark",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/meeting-info__light__desktop.png",
+    title: "Room info",
+    category: "meeting",
+    theme: "light",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/meeting-chat__dark__desktop.png",
+    title: "Meeting chat",
+    category: "chat",
+    theme: "dark",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/meeting-chat__light__desktop.png",
+    title: "Meeting chat",
+    category: "chat",
+    theme: "light",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/meeting-chat__dark__mobile.png",
+    title: "Meeting chat",
+    category: "chat",
+    theme: "dark",
+    device: "mobile",
+  },
+  {
+    src: "/preview/gallery/meeting-chat__light__mobile.png",
+    title: "Meeting chat",
+    category: "chat",
+    theme: "light",
+    device: "mobile",
+  },
+  {
+    src: "/preview/gallery/landing__dark__desktop.png",
+    title: "App landing",
+    category: "auth",
+    theme: "dark",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/landing__light__desktop.png",
+    title: "App landing",
+    category: "auth",
+    theme: "light",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/auth-login__dark__desktop.png",
+    title: "Sign in",
+    category: "auth",
+    theme: "dark",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/auth-login__light__desktop.png",
+    title: "Sign in",
+    category: "auth",
+    theme: "light",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/dashboard__dark__desktop.png",
+    title: "Dashboard",
+    category: "admin",
+    theme: "dark",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/dashboard__light__desktop.png",
+    title: "Dashboard",
+    category: "admin",
+    theme: "light",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/admin-overview__dark__desktop_1.png",
+    title: "Admin overview",
+    category: "admin",
+    theme: "dark",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/admin-overview__light__desktop_1.png",
+    title: "Admin overview",
+    category: "admin",
+    theme: "light",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/admin-settings-auth__dark__desktop_1.png",
+    title: "Admin settings",
+    category: "admin",
+    theme: "dark",
+    device: "desktop",
+  },
+  {
+    src: "/preview/gallery/admin-settings-auth__light__desktop_1.png",
+    title: "Admin settings",
+    category: "admin",
+    theme: "light",
+    device: "desktop",
+  },
 ];
 
 const CATEGORIES: { id: "all" | Category; key: string }[] = [
@@ -102,7 +254,11 @@ export function ScreenshotsGallery({ lang }: { lang: Locale }) {
     <div>
       <div className="flex flex-wrap items-center gap-2">
         {CATEGORIES.map((c) => (
-          <FilterChip key={c.id} active={category === c.id} onClick={() => setCategory(c.id)}>
+          <FilterChip
+            key={c.id}
+            active={category === c.id}
+            onClick={() => setCategory(c.id)}
+          >
             {t(lang, c.key)}
           </FilterChip>
         ))}
@@ -110,17 +266,26 @@ export function ScreenshotsGallery({ lang }: { lang: Locale }) {
         <FilterChip active={device === "all"} onClick={() => setDevice("all")}>
           {t(lang, "screenshotsPage.filterAll")}
         </FilterChip>
-        <FilterChip active={device === "desktop"} onClick={() => setDevice("desktop")}>
+        <FilterChip
+          active={device === "desktop"}
+          onClick={() => setDevice("desktop")}
+        >
           {t(lang, "screenshotsPage.filterDesktop")}
         </FilterChip>
-        <FilterChip active={device === "mobile"} onClick={() => setDevice("mobile")}>
+        <FilterChip
+          active={device === "mobile"}
+          onClick={() => setDevice("mobile")}
+        >
           {t(lang, "screenshotsPage.filterMobile")}
         </FilterChip>
         <span className="mx-1 hidden h-5 w-px bg-border sm:block" />
         <FilterChip active={theme === "all"} onClick={() => setTheme("all")}>
           {t(lang, "screenshotsPage.filterAll")}
         </FilterChip>
-        <FilterChip active={theme === "light"} onClick={() => setTheme("light")}>
+        <FilterChip
+          active={theme === "light"}
+          onClick={() => setTheme("light")}
+        >
           {t(lang, "screenshotsPage.filterLight")}
         </FilterChip>
         <FilterChip active={theme === "dark"} onClick={() => setTheme("dark")}>
@@ -147,7 +312,9 @@ export function ScreenshotsGallery({ lang }: { lang: Locale }) {
                   alt={shot.title}
                   className={cn(
                     "block",
-                    shot.device === "mobile" ? "h-[28rem] w-auto" : "h-auto w-full",
+                    shot.device === "mobile"
+                      ? "h-[28rem] w-auto"
+                      : "h-auto w-full",
                   )}
                   loading="lazy"
                 />
@@ -167,7 +334,11 @@ export function ScreenshotsGallery({ lang }: { lang: Locale }) {
         <DialogContent className="max-h-[92vh] max-w-[min(96vw,72rem)] overflow-auto rounded-none border-border p-0">
           <DialogTitle className="sr-only">{open?.title}</DialogTitle>
           {open && (
-            <img src={open.src} alt={open.title} className="mx-auto max-h-[90vh] w-auto max-w-full" />
+            <img
+              src={open.src}
+              alt={open.title}
+              className="mx-auto max-h-[90vh] w-auto max-w-full"
+            />
           )}
         </DialogContent>
       </Dialog>
