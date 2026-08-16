@@ -1,0 +1,37 @@
+---
+import { ScreenshotsGallery } from "~/components/landing/screenshots-gallery";
+import Landing from "~/layouts/Landing.astro";
+import { isValidLocale, type Locale, supportedLocales, t } from "../../i18n/utils";
+
+export function getStaticPaths() {
+  return supportedLocales.map((lang) => ({ params: { lang } }));
+}
+
+const { lang: rawLang } = Astro.params;
+const lang: Locale = isValidLocale(rawLang) ? rawLang : "en";
+---
+
+<Landing
+  lang={lang}
+  title={t(lang, "screenshotsPage.meta.title")}
+  description={t(lang, "screenshotsPage.meta.description")}
+>
+  <section class="border-b border-border/40 bg-muted/30 py-12 sm:py-16">
+    <div class="mx-auto max-w-4xl px-6 text-center">
+      <p class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {t(lang, "nav.screenshots")}
+      </p>
+      <h1 class="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
+        {t(lang, "screenshotsPage.title")}
+      </h1>
+      <p class="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
+        {t(lang, "screenshotsPage.subtitle")}
+      </p>
+    </div>
+  </section>
+  <section class="py-12 sm:py-16">
+    <div class="mx-auto max-w-6xl px-6">
+      <ScreenshotsGallery client:load lang={lang} />
+    </div>
+  </section>
+</Landing>

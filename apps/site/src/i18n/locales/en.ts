@@ -7,6 +7,7 @@ export default {
   nav: {
     home: "Home",
     features: "Features",
+    screenshots: "Screenshots",
     compare: "Feature",
     platforms: "Platforms",
     openSource: "Open Source",
@@ -312,6 +313,25 @@ export default {
       github: "GitHub",
       twitter: "X (Twitter)",
     },
+  },
+  screenshotsPage: {
+    meta: {
+      title: "Screenshots - Bedrud",
+      description:
+        "Product screenshots of Bedrud meetings, chat, admin, and auth — desktop and phone, light and dark.",
+    },
+    title: "See Bedrud",
+    subtitle:
+      "Real product screens. Meeting rooms with people, phone chat, admin, and sign-in.",
+    filterAll: "All",
+    filterMeeting: "Meeting",
+    filterChat: "Chat",
+    filterAdmin: "Admin",
+    filterAuth: "Auth",
+    filterDesktop: "Desktop",
+    filterMobile: "Phone",
+    filterLight: "Light",
+    filterDark: "Dark",
   },
   featuresPage: {
     meta: {

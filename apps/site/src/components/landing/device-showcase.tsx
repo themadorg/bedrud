@@ -2,13 +2,8 @@ import { MacbookScroll } from "~/components/ui/macbook-scroll";
 import { MobilePhoneScroll } from "~/components/ui/mobile-phone-scroll";
 import { AndroidMockup, IPhoneMockup } from "~/components/ui/phone-mockup";
 import type { Locale } from "../../i18n/utils";
-import { MeetingPreview } from "./meeting-preview";
-import {
-  AndroidMeetingPreview,
-  IPhoneMeetingPreview,
-} from "./phone-meeting-preview";
 
-export function DeviceShowcase({ lang }: { lang: Locale }) {
+export function DeviceShowcase({ lang: _lang }: { lang: Locale }) {
   return (
     <div className="relative pb-[6rem] md:pb-[32rem]">
       {/* Desktop: MacBook + flanking phones (md+) */}
@@ -16,7 +11,11 @@ export function DeviceShowcase({ lang }: { lang: Locale }) {
         <div className="pointer-events-none absolute inset-0 z-10 hidden items-end justify-center gap-0 lg:flex">
           <div className="w-32 shrink-0 xl:w-40">
             <IPhoneMockup>
-              <IPhoneMeetingPreview lang={lang} />
+              <img
+                src="/preview/meeting-phone.png"
+                alt=""
+                className="size-full object-cover object-center"
+              />
             </IPhoneMockup>
           </div>
 
@@ -24,21 +23,33 @@ export function DeviceShowcase({ lang }: { lang: Locale }) {
 
           <div className="w-32 shrink-0 xl:w-40">
             <AndroidMockup>
-              <AndroidMeetingPreview lang={lang} />
+              <img
+                src="/preview/meeting-phone-light.png"
+                alt=""
+                className="size-full object-cover object-center"
+              />
             </AndroidMockup>
           </div>
         </div>
 
         <MacbookScroll showGradient={false}>
-          <div className="size-full overflow-hidden">
-            <MeetingPreview lang={lang} />
+          <div className="size-full overflow-hidden bg-black">
+            <img
+              src="/preview/meeting-desktop.png"
+              alt="Bedrud meeting"
+              className="size-full object-cover object-center"
+            />
           </div>
         </MacbookScroll>
       </div>
 
       {/* Mobile: Phone with scroll animation (<md) */}
       <MobilePhoneScroll>
-        <IPhoneMeetingPreview lang={lang} />
+        <img
+          src="/preview/meeting-phone.png"
+          alt="Bedrud meeting on phone"
+          className="size-full object-cover object-center"
+        />
       </MobilePhoneScroll>
     </div>
   );

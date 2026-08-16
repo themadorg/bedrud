@@ -6,6 +6,12 @@ export const navLinks = [
     hash: "",
     icon: "git-compare",
   },
+  {
+    key: "nav.screenshots",
+    route: "screenshots",
+    hash: "",
+    icon: "images",
+  },
 ] as const;
 
 export const navRouteLinks = [

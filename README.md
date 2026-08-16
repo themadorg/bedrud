@@ -88,15 +88,27 @@ Open `http://localhost:8090`, create an account, and start a meeting.
 
 ## Screenshots
 
+More shots: [bedrud.org/en/screenshots](https://bedrud.org/en/screenshots)
+
 ### Web UI
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/web-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/web-light.svg">
-  <img alt="Bedrud Web Interface" src="docs/images/web-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="https://bedrud.org/preview/gallery/meeting-grid__dark__desktop.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://bedrud.org/preview/gallery/meeting-grid__light__desktop.png">
+  <img alt="Bedrud Web Interface" src="https://bedrud.org/preview/gallery/meeting-grid__light__desktop.png">
 </picture>
 
 *Web meeting room with video grid, chat sidebar, and controls.*
+
+### Phone chat
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://bedrud.org/preview/gallery/meeting-chat__dark__mobile.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://bedrud.org/preview/gallery/meeting-chat__light__mobile.png">
+  <img alt="Bedrud meeting chat on phone" src="https://bedrud.org/preview/gallery/meeting-chat__light__mobile.png">
+</picture>
+
+*Full-screen meeting chat on phone.*
 
 ### Desktop App (Windows / Linux / macOS)
 

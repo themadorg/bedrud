@@ -1,0 +1,12 @@
+{
+  "name": "bedrud-screenshots",
+  "private": true,
+  "type": "module",
+  "description": "Puppeteer screenshots of every Bedrud web section",
+  "scripts": {
+    "capture": "node screenshot.js"
+  },
+  "dependencies": {
+    "puppeteer": "^24.15.0"
+  }
+}

@@ -1,0 +1,22 @@
+# Run Puppeteer in Docker against a Bedrud stack on the host
+# (make dev-web + make dev-api + make dev-livekit). Host networking so
+# Vite's /api and /livekit proxies work the same as a local browser.
+# LiveKit is required for populated meeting screenshots.
+#
+#   make -C ../.. dev-web &
+#   make -C ../.. dev-api &
+#   docker compose -f tools/screenshots/docker-compose.yml up --build
+services:
+  screenshots:
+    build: .
+    image: bedrud-screenshots
+    network_mode: host
+    environment:
+      BEDRUD_BASE_URL: ${BEDRUD_BASE_URL:-http://127.0.0.1:7070}
+      BEDRUD_API_URL: ${BEDRUD_API_URL:-http://127.0.0.1:7071}
+      BEDRUD_SCREENSHOT_EMAIL: ${BEDRUD_SCREENSHOT_EMAIL:-}
+      BEDRUD_SCREENSHOT_PASSWORD: ${BEDRUD_SCREENSHOT_PASSWORD:-}
+      BEDRUD_SCREENSHOT_NO_START: "1"
+    volumes:
+      - ./output:/home/pptruser/app/output
+    init: true

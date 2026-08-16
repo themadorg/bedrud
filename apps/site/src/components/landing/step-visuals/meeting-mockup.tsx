@@ -21,37 +21,33 @@ interface Participant {
 
 const participants: Participant[] = [
   {
-    name: "Sarah Chen",
-    image:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=300&fit=crop&crop=face",
+    name: "Shahram Farhadi",
+    image: "/preview/avatars/athlete.png",
     muted: false,
     speaking: true,
   },
   {
-    name: "Alex Rivera",
-    image:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop&crop=face",
+    name: "Kiarash Rostami",
+    image: "/preview/avatars/bored.png",
     muted: false,
   },
   {
-    name: "Jordan Lee",
-    image:
-      "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=400&h=300&fit=crop&crop=face",
+    name: "Parsa Kaviani",
+    image: "/preview/avatars/cyborg.png",
     muted: true,
   },
   {
-    name: "Marcus Webb",
-    image:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=300&fit=crop&crop=face",
+    name: "Shirin Golestan",
+    image: "/preview/avatars/architect.png",
     muted: false,
   },
 ];
 
 const avatarThumbs = [
-  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=64&h=64&fit=crop&crop=face",
-  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop&crop=face",
-  "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=64&h=64&fit=crop&crop=face",
-  "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face",
+  "/preview/avatars/athlete.png",
+  "/preview/avatars/bored.png",
+  "/preview/avatars/cyborg.png",
+  "/preview/avatars/architect.png",
 ];
 
 function Tile({ participant }: { participant: Participant }) {
