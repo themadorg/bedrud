@@ -88,7 +88,12 @@ export function wrapMarkdownBold(
     }
   }
 
-  if (start >= 2 && end + 2 <= text.length && text.slice(start - 2, start) === '**' && text.slice(end, end + 2) === '**') {
+  if (
+    start >= 2 &&
+    end + 2 <= text.length &&
+    text.slice(start - 2, start) === '**' &&
+    text.slice(end, end + 2) === '**'
+  ) {
     return {
       text: text.slice(0, start - 2) + selected + text.slice(end + 2),
       selectionStart: start - 2,
