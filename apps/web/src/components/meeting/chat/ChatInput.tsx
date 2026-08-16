@@ -70,6 +70,39 @@ export interface ChatInputHandle {
   attachFile: (file: File) => void
 }
 
+export function wrapMarkdownBold(
+  text: string,
+  selectionStart: number,
+  selectionEnd: number,
+): { text: string; selectionStart: number; selectionEnd: number } {
+  const start = Math.min(selectionStart, selectionEnd)
+  const end = Math.max(selectionStart, selectionEnd)
+  const selected = text.slice(start, end)
+
+  if (selected.startsWith('**') && selected.endsWith('**') && selected.length >= 4) {
+    const inner = selected.slice(2, -2)
+    return {
+      text: text.slice(0, start) + inner + text.slice(end),
+      selectionStart: start,
+      selectionEnd: start + inner.length,
+    }
+  }
+
+  if (start >= 2 && end + 2 <= text.length && text.slice(start - 2, start) === '**' && text.slice(end, end + 2) === '**') {
+    return {
+      text: text.slice(0, start - 2) + selected + text.slice(end + 2),
+      selectionStart: start - 2,
+      selectionEnd: end - 2,
+    }
+  }
+
+  return {
+    text: `${text.slice(0, start)}**${selected}**${text.slice(end)}`,
+    selectionStart: start === end ? start + 2 : start,
+    selectionEnd: start === end ? start + 2 : end + 4,
+  }
+}
+
 function generateID(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
