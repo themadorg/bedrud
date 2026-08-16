@@ -13,6 +13,19 @@ export PATH="$HOME/.local/bin:$PATH"
 echo "➜ installing web + screenshot deps"
 (cd apps/web && bun install --frozen-lockfile)
 (cd tools/screenshots && bun install --frozen-lockfile)
+(cd server && go mod download)
+
+# Gitignored local configs — CI never has these unless we seed them.
+if [ ! -f server/config.yaml ]; then
+  cp server/config.local.yaml.example server/config.yaml
+  echo "➜ wrote server/config.yaml from config.local.yaml.example"
+fi
+if [ ! -f server/livekit.yaml ]; then
+  cp server/livekit.yaml.example server/livekit.yaml
+  echo "➜ wrote server/livekit.yaml from livekit.yaml.example"
+fi
+mkdir -p server/internal/livekit/bin
+touch server/internal/livekit/bin/livekit-server
 
 if ! command -v livekit-server >/dev/null 2>&1; then
   echo "➜ installing LiveKit server"
@@ -26,14 +39,19 @@ if ! command -v livekit-server >/dev/null 2>&1; then
 fi
 
 echo "➜ starting stack"
-make dev-web > /tmp/bedrud-web.log 2>&1 &
+# Bind IPv4 so curl 127.0.0.1 works (Vite 8 on GH runners often listens on ::1 only).
+(cd apps/web && bun run dev -- --host 127.0.0.1 --port 7070) > /tmp/bedrud-web.log 2>&1 &
 make dev-api > /tmp/bedrud-api.log 2>&1 &
 make dev-livekit > /tmp/bedrud-lk.log 2>&1 &
+
+http_up() {
+  curl -sf -o /dev/null "$1" || curl -sf -o /dev/null --connect-timeout 2 "${1/127.0.0.1/localhost}"
+}
 
 wait_port() {
   local url="$1"
   local n=0
-  until curl -sf -o /dev/null "$url" || [ "$n" -ge 90 ]; do
+  until http_up "$url" || [ "$n" -ge 90 ]; do
     n=$((n + 1))
     sleep 2
   done
@@ -47,7 +65,7 @@ wait_port() {
 wait_port "http://127.0.0.1:7070/"
 # API health
 n=0
-until curl -sf -o /dev/null "http://127.0.0.1:7071/api/health" || [ "$n" -ge 90 ]; do
+until http_up "http://127.0.0.1:7071/api/health" || [ "$n" -ge 90 ]; do
   n=$((n + 1))
   sleep 2
 done
