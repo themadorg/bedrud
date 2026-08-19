@@ -1,0 +1,127 @@
+name: Bump Android Pin
+
+# apps/android is a git submodule and nothing moves it on its own. Between
+# bedrud-android publishing a release and somebody remembering to run
+# `make pin-android-stable`, this repo keeps referencing whatever it was last pinned to -
+# which is how the pin sat at 1.2.0 while three further releases shipped. This job opens
+# the same PR a maintainer would have opened by hand. It never merges: the pin still only
+# moves under review.
+
+on:
+  schedule:
+    # 00:00 Saturday UTC - the start of the week, so a pending bump is waiting rather
+    # than sitting until the week is already underway.
+    - cron: "0 0 * * 6"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bump-android-pin
+  cancel-in-progress: false
+
+env:
+  UPSTREAM: themadorg/bedrud-android
+
+jobs:
+  bump:
+    name: Pin apps/android to the newest release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # Releases rather than tags, deliberately. Over in bedrud-android a tag is pushed
+      # first and release.yml is dispatched against it afterwards, gated on a reviewer
+      # approving the signing environment - so there is a window, minutes to days, where
+      # the tag exists with no build behind it. A release only exists once that build
+      # passed lint, tests and signing. Pre-releases count: a beta and a stable release
+      # of the same tag are the same commit, built and signed identically.
+      - name: Resolve the newest release
+        id: rel
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag=$(gh release list --repo "$UPSTREAM" --exclude-drafts --limit 1 \
+                --json tagName --jq '.[0].tagName // empty')
+          [ -n "$tag" ] || { echo "::error::no release found in $UPSTREAM"; exit 1; }
+
+          # An annotated tag has to be dereferenced to reach the commit it points at.
+          # The fallback covers a lightweight tag, which has no peeled ref to find.
+          url="https://github.com/$UPSTREAM.git"
+          want=$(git ls-remote "$url" "refs/tags/$tag^{}" | cut -f1)
+          [ -n "$want" ] || want=$(git ls-remote "$url" "refs/tags/$tag" | cut -f1)
+          [ -n "$want" ] || { echo "::error::cannot resolve $tag to a commit"; exit 1; }
+
+          have=$(git ls-tree HEAD apps/android | awk '{print $3}')
+
+          {
+            echo "tag=$tag"
+            echo "want=$want"
+            echo "have=$have"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$want" = "$have" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Already pinned to $tag ($have) - nothing to do."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Pin moves to $tag: $have -> $want"
+          fi
+
+      # A bump PR that is still open next Monday must not be duplicated, and must not be
+      # force-pushed out from under a review in progress.
+      - name: Look for an open bump PR
+        id: existing
+        if: steps.rel.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          branch="chore/pin-android-${{ steps.rel.outputs.tag }}"
+          open=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state open \
+                 --json number --jq 'length')
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "open=$open" >> "$GITHUB_OUTPUT"
+          [ "$open" = "0" ] || echo "A PR for $branch is already open - leaving it alone."
+
+      - name: Open the bump PR
+        if: steps.rel.outputs.changed == 'true' && steps.existing.outputs.open == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE: ${{ github.event.repository.default_branch }}
+          BRANCH: ${{ steps.existing.outputs.branch }}
+          TAG: ${{ steps.rel.outputs.tag }}
+          WANT: ${{ steps.rel.outputs.want }}
+          HAVE: ${{ steps.rel.outputs.have }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+
+          # Write the gitlink straight into the index. Only the 40-byte pointer changes,
+          # so there is no reason to clone bedrud-android onto the runner just to check
+          # out a commit and stage the same value.
+          git update-index --add --cacheinfo "160000,$WANT,apps/android"
+          git commit -m "chore(android): pin submodule to bedrud-android@$TAG"
+          git push origin "$BRANCH"
+
+          cat > /tmp/body.md <<EOF
+          Pins \`apps/android\` to [bedrud-android $TAG](https://github.com/$UPSTREAM/releases/tag/$TAG).
+
+          | | |
+          |---|---|
+          | from | \`$HAVE\` |
+          | to | \`$WANT\` |
+
+          Opened automatically because $UPSTREAM published a release newer than the pinned
+          commit. Nothing merges on its own - review the release notes linked above, then
+          merge if you want this repo to ship it.
+          EOF
+
+          gh pr create --base "$BASE" --head "$BRANCH" \
+            --title "chore(android): pin submodule to bedrud-android@$TAG" \
+            --body-file /tmp/body.md
