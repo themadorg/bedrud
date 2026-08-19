@@ -1,20 +1,29 @@
 package testutil
 
 import (
+	"os"
 	"testing"
 
 	"bedrud/internal/database"
-	"bedrud/internal/models"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
-// SetupTestDB creates an in-memory SQLite database for testing
-// with all required tables migrated
+// SetupTestDB creates an in-memory SQLite database for testing, built by the
+// same code path production uses (database.RunMigrations).
+//
+// Tests deliberately do not keep their own AutoMigrate list. A private list
+// drifts from RunMigrations silently, so a schema change can pass every test
+// while breaking a real deployment — and index/constraint work that lives only
+// in RunMigrations (such as idx_rooms_active_name) never gets exercised at all.
 func SetupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
+
+	if os.Getenv("BEDRUD_SKIP_MIGRATE") == "1" {
+		t.Fatal("BEDRUD_SKIP_MIGRATE=1 is set: test databases would be created with no schema. Unset it before running tests.")
+	}
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
@@ -23,40 +32,22 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to open test database: %v", err)
 	}
 
-	// Run migrations
-	err = db.AutoMigrate(
-		&models.User{},
-		&models.BlockedRefreshToken{},
-		&models.Room{},
-		&models.RoomParticipant{},
-		&models.RoomPermissions{},
-		&models.Passkey{},
-		&models.SystemSettings{},
-		&models.InviteToken{},
-		&models.UserPreferences{},
-		&models.VerificationEvent{},
-		&models.ChatUpload{},
-		&models.Job{},
-		&models.Webhook{},
-		&models.Recording{},
-		&models.WebxdcPackage{},
-		&models.WebxdcInstance{},
-		&models.WebxdcStatusUpdate{},
-	)
-	if err != nil {
-		t.Fatalf("failed to migrate test database: %v", err)
-	}
-
-	// SQLite :memory: is per-connection. Limit to 1 to prevent pool from
-	// opening a new connection that sees a fresh (empty) database.
+	// SQLite :memory: is per-connection. Limit the pool to 1 *before* migrating
+	// so the schema and every later query share one connection; otherwise the
+	// pool can hand out a fresh (empty) database.
 	sqlDB, err := db.DB()
 	if err != nil {
 		t.Fatalf("failed to get underlying sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
 
-	// Register as global database for handlers that call database.GetDB()
+	// Register as the global handle first: RunMigrations resolves its target
+	// through database.GetDB(), as do handlers under test.
 	database.SetForTest(db)
+
+	if err := database.RunMigrations(); err != nil {
+		t.Fatalf("failed to migrate test database: %v", err)
+	}
 
 	return db
 }
