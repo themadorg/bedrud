@@ -3,8 +3,10 @@ name: CI
 on:
   push:
     branches: [master]
+  # No `branches` filter: that one matches the *base*, so a pull request
+  # stacked on another branch got no CI at all — not a red tick, nothing.
+  # Every pull request is gated, whatever it targets.
   pull_request:
-    branches: [master]
 
 concurrency:
   group: ci-${{ github.ref }}
