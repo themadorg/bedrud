@@ -25,9 +25,7 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		t.Fatal("BEDRUD_SKIP_MIGRATE=1 is set: test databases would be created with no schema. Unset it before running tests.")
 	}
 
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
-	})
+	db, err := gorm.Open(sqlite.Open(":memory:"), database.GormConfig(logger.Silent))
 	if err != nil {
 		t.Fatalf("failed to open test database: %v", err)
 	}

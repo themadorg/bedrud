@@ -34,9 +34,7 @@ func dialects() []dialect {
 func newMemoryDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
-	})
+	db, err := gorm.Open(sqlite.Open(":memory:"), GormConfig(logger.Silent))
 	if err != nil {
 		t.Fatalf("open in-memory sqlite: %v", err)
 	}
@@ -65,9 +63,7 @@ func newPostgresDB(t *testing.T) *gorm.DB {
 		t.Skip("BEDRUD_TEST_POSTGRES_DSN not set — skipping Postgres dialect coverage")
 	}
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
-	})
+	db, err := gorm.Open(postgres.Open(dsn), GormConfig(logger.Silent))
 	if err != nil {
 		t.Fatalf("connect to test postgres: %v", err)
 	}
