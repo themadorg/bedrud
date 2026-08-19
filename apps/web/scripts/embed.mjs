@@ -40,7 +40,7 @@ const proc = spawn('bun', ['run', serverEntry], {
 proc.stderr.on('data', (d) => process.stderr.write(d))
 
 // ── 3. Wait for it to be ready, then capture the HTML shell ──────────────────
-const shell = await waitAndFetch(`http://localhost:${PORT}/`, 10_000)
+let shell = await waitAndFetch(`http://localhost:${PORT}/`, 10_000)
 proc.kill('SIGTERM')
 
 // ── 4. Copy dist/client/ → server/frontend/ ──────────────────────────────────
@@ -50,6 +50,7 @@ mkdirSync(targetDir, { recursive: true })
 cpSync(clientDir, targetDir, { recursive: true })
 
 // ── 5. Write index.html ───────────────────────────────────────────────────────
+shell = rewriteMissingStylesheets(shell, targetDir)
 writeFileSync(resolve(targetDir, 'index.html'), shell, 'utf8')
 
 // ── 6. Generate shell.html (no pre-rendered route content) ───────────────────
@@ -68,6 +69,20 @@ console.log('✅ server/frontend/ updated — restart `go run ./cmd/server` to p
  * scripts, and the theme-init snippet. The result is a minimal shell that
  * TanStack Router will hydrate against the actual URL.
  */
+/** Drop <link rel=stylesheet> whose file is not in the copied client assets. */
+function rewriteMissingStylesheets(html, root) {
+  return html.replace(/<link\b[^>]*rel=["']stylesheet["'][^>]*>/gi, (tag) => {
+    const href = tag.match(/href=["']([^"']+)["']/i)?.[1]
+    if (!href) return tag
+    const path = href.replace(/[?#].*$/, '')
+    if (!path.startsWith('/')) return tag
+    const file = resolve(root, path.replace(/^\//, ''))
+    if (existsSync(file)) return tag
+    console.warn(`▶ Stripping missing stylesheet from HTML shell: ${path}`)
+    return ''
+  })
+}
+
 function generateShell(html) {
   // Replace everything between <!--$--> and <!--/$--> (the SSR'd route markup)
   // with an empty container that won't flash any route-specific content.
