@@ -59,7 +59,7 @@ export function RoomCard({ room, onJoin, onDelete, onSettings }: Props) {
   const capacityLabel = room.maxParticipants > 0 ? `${room.maxParticipants}` : 'Open'
 
   return (
-    <Card className="group flex flex-col gap-2.5 p-3 transition-colors hover:border-primary/25">
+    <Card className="group relative flex flex-col gap-2.5 overflow-hidden p-3 transition-colors hover:border-primary/25">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1">
@@ -145,7 +145,7 @@ export function RoomCard({ room, onJoin, onDelete, onSettings }: Props) {
           </Button>
         )}
 
-        {onDelete && !confirmDelete && (
+        {onDelete && (
           <Button
             variant="outline"
             size="icon"
@@ -160,16 +160,21 @@ export function RoomCard({ room, onJoin, onDelete, onSettings }: Props) {
       </div>
 
       {confirmDelete && onDelete && (
-        <div className="flex items-center justify-between gap-2 border border-destructive/30 bg-destructive/10 px-2 py-2">
-          <p className="text-[11px] font-medium text-destructive">Delete room?</p>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setConfirmDelete(false)}>
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-card/95 px-3 backdrop-blur-[2px]">
+          <p className="text-center text-xs font-medium text-destructive">Delete room?</p>
+          <div className="flex w-full items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 flex-1 text-xs"
+              onClick={() => setConfirmDelete(false)}
+            >
               Cancel
             </Button>
             <Button
               variant="destructive"
               size="sm"
-              className="h-7 px-2 text-xs"
+              className="h-8 flex-1 text-xs"
               onClick={() => {
                 onDelete()
                 setConfirmDelete(false)
