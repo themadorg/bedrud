@@ -39,6 +39,10 @@ beforeEach(() => {
   document.cookie = 'csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT'
 
   replace.mockClear()
+  // Only `replace` survives the spread — jsdom exposes the rest of Location as
+  // prototype accessors. That is enough while api.ts calls nothing else on it,
+  // but a future guard such as `if (location.pathname !== '/auth')` would read
+  // undefined here and pass without meaning anything.
   Object.defineProperty(window, 'location', {
     configurable: true,
     value: { ...window.location, replace },

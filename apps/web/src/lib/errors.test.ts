@@ -39,7 +39,7 @@ describe('getErrorMessage', () => {
     expect(getErrorMessage({ unexpected: true }, fallback)).toBe(fallback)
   })
 
-  it('falls back when the JSON carries no human-readable field', () => {
+  it('returns the raw body when the JSON has no human-readable field', () => {
     // {"code":42} would otherwise surface to the user as raw JSON.
     expect(getErrorMessage(new Error('{"code":42}'), fallback)).toBe('{"code":42}')
   })
