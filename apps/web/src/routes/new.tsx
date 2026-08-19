@@ -1,7 +1,9 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { api } from '#/lib/api'
 import { useAuthStore } from '#/lib/auth.store'
+import { isGuestToken } from '#/lib/jwt-user'
 import { useRecentRoomsStore } from '#/lib/recent-rooms.store'
+import { isGuestUser, useUserStore } from '#/lib/user.store'
 import { ErrorPage } from '@/components/ErrorPage'
 import { MeetLoadingScreen } from '@/components/meeting/MeetLoadingScreen'
 
@@ -24,8 +26,12 @@ export const Route = createFileRoute('/new')({
   beforeLoad: async () => {
     if (typeof window === 'undefined') return
     await useAuthStore.getState().initialize()
-    if (!useAuthStore.getState().tokens) {
+    const tokens = useAuthStore.getState().tokens
+    if (!tokens) {
       throw redirect({ to: '/auth/login', search: { redirect: '/new' } })
+    }
+    if (isGuestToken(tokens.accessToken) || isGuestUser(useUserStore.getState().user)) {
+      throw redirect({ to: '/' })
     }
   },
   loader: async () => {

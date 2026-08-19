@@ -225,9 +225,12 @@ function RegisterPage() {
   return (
     <div className="space-y-7">
       {/* Header */}
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">Create an account</h1>
-        <p className="text-sm text-muted-foreground">Free forever. No credit card required.</p>
+      <div className="space-y-2">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Account</p>
+        <h1 className="min-h-8 text-2xl font-semibold tracking-tight">Create an account</h1>
+        <p className="min-h-10 text-sm text-muted-foreground">
+          Create your account to host rooms and manage your profile.
+        </p>
       </div>
 
       {/* Global error */}
@@ -364,20 +367,13 @@ function RegisterPage() {
         </>
       )}
 
-      <p className="text-center text-sm text-muted-foreground">
-        Already have an account?{' '}
-        <Link
-          to="/auth/login"
-          search={{ redirect: undefined }}
-          className="font-medium text-foreground underline-offset-4 hover:underline"
-        >
-          Sign in
-        </Link>
-        {' · '}
-        <Link to="/auth" className="font-medium text-foreground underline-offset-4 hover:underline">
-          Guest mode
-        </Link>
-      </p>
+      {settings?.guestLoginEnabled === false ? null : (
+        <p className="text-center text-sm text-muted-foreground">
+          <Link to="/auth" className="font-medium text-primary underline-offset-4 hover:underline">
+            Continue as guest
+          </Link>
+        </p>
+      )}
     </div>
   )
 }

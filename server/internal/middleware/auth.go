@@ -150,7 +150,7 @@ func RejectGuest() fiber.Handler {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
 		}
 		if claims.Provider == "guest" {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Not available for guest accounts"})
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Guests cannot create or manage rooms"})
 		}
 		return c.Next()
 	}

@@ -446,12 +446,13 @@ func Run(configPath, version string) error {
 	requireAuth := []fiber.Handler{middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo)}
 	requireAuthMut := []fiber.Handler{middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo)}
 
-	api.Post("/room/create", append(requireAuthMut, middleware.APIRateLimiter(cfg.RateLimit), roomHandler.CreateRoom)...)
+	api.Post("/room/create", append(requireAuthMut, middleware.RejectGuest(), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.CreateRoom)...)
 	api.Post("/room/join", append(requireAuthMut, roomHandler.JoinRoom)...)
 	api.Post("/room/guest-join", middleware.GuestRateLimiter(cfg.RateLimit), roomHandler.GuestJoinRoom)
+	api.Get("/room/check/:roomName", middleware.GuestRateLimiter(cfg.RateLimit), roomHandler.CheckRoom)
 	api.Post("/room/refresh-token", append(requireAuthMut, middleware.APIRateLimiter(cfg.RateLimit), roomHandler.RefreshLiveKitToken)...)
-	api.Get("/room/list", append(requireAuth, roomHandler.ListRooms)...)
-	api.Get("/room/archived", append(requireAuth, roomHandler.ListArchivedRooms)...)
+	api.Get("/room/list", append(requireAuth, middleware.RejectGuest(), roomHandler.ListRooms)...)
+	api.Get("/room/archived", append(requireAuth, middleware.RejectGuest(), roomHandler.ListArchivedRooms)...)
 	api.Post("/room/:roomId/kick/:identity", append(requireAuthMut, roomHandler.KickParticipant)...)
 	api.Post("/room/:roomId/mute/:identity", append(requireAuthMut, roomHandler.MuteParticipant)...)
 	api.Post("/room/:roomId/ban/:identity", append(requireAuthMut, roomHandler.BanParticipant)...)
@@ -469,8 +470,8 @@ func Run(configPath, version string) error {
 	api.Get("/room/:roomId/participant/:identity/profile", append(requireAuth, roomHandler.GetParticipantProfile)...)
 	api.Post("/room/:roomId/stage/:identity/bring", append(requireAuthMut, roomHandler.BringToStage)...)
 	api.Post("/room/:roomId/stage/:identity/remove", append(requireAuthMut, roomHandler.RemoveFromStage)...)
-	api.Put("/room/:roomId/settings", append(requireAuthMut, roomHandler.UpdateSettings)...)
-	api.Delete("/room/:roomId", append(requireAuthMut, roomHandler.DeleteRoom)...)
+	api.Put("/room/:roomId/settings", append(requireAuthMut, middleware.RejectGuest(), roomHandler.UpdateSettings)...)
+	api.Delete("/room/:roomId", append(requireAuthMut, middleware.RejectGuest(), roomHandler.DeleteRoom)...)
 	api.Post("/room/:roomId/chat/upload", append(requireAuthMut, middleware.APIRateLimiter(cfg.RateLimit), roomHandler.UploadChatImage)...)
 
 

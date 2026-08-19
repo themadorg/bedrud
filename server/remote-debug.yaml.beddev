@@ -1,0 +1,52 @@
+# Remote debug profile — copy to remote-debug.yaml and fill in your values.
+# NEVER commit remote-debug.yaml (hostnames, tunnel IPs, secrets).
+#
+# Architecture (beddev.a16.at):
+#
+#   ┌─────────────────────────────────────────────────────────────┐
+#   │  Debug server (SSH host from server/.env)                   │
+#   │    devcli agent (:7079)  Traefik (:80/:443)  LiveKit (:7072)│
+#   │                                                             │
+#   │    Traefik routes:                                          │
+#   │      Host(beddev.a16.at) /        → tunnel → local :7070    │
+#   │      Host(beddev.a16.at) /api/*   → tunnel → local :7071    │
+#   │      Host(beddev.a16.at) /livekit → 127.0.0.1:7072 (server) │
+#   └─────────────────────────────────────────────────────────────┘
+#                              ▲ outbound TCP mux (no VPN)
+#   ┌──────────────────────────┴──────────────────────────────────┐
+#   │  Your machine:  Vite :7070 + API :7071 (air, hot reload)      │
+#   └───────────────────────────────────────────────────────────────┘
+#
+# Workflow:
+#   make dev-remote-provision   # once per server
+#   make dev-remote             # daily
+#
+# SSH + secrets: server/.env (REMOTE_DEBUG_SSH_HOST, tunnel token, etc.)
+
+tunnel:
+  mode: devtunnel
+  devtunnel:
+    port: 7079
+
+urls:
+  publicHost: beddev.a16.at
+  publicBase: https://beddev.a16.at
+  livekitHost: wss://beddev.a16.at/livekit
+  # livekitInternal: http://127.0.0.1:17072 (devtunnel proxy → server :7072)
+
+local:
+  webPort: 7070
+  apiPort: 7071
+
+livekit:
+  apiKey: devkey
+  # apiSecret: from REMOTE_DEBUG_LIVEKIT_API_SECRET in server/.env
+
+traefik:
+  dynamicDir: /etc/traefik/dynamic/bedrud-debug
+  # entryPoint auto-set to websecure when provision.enableACME is true
+  livekitPort: 7072
+
+provision:
+  enableACME: true
+  acmeEmail: ops@a16.at

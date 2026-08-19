@@ -447,6 +447,40 @@ func TestRequireEmailVerified_AllowsVerified(t *testing.T) {
 	}
 }
 
+func TestRejectGuest_BlocksGuest(t *testing.T) {
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user", &auth.Claims{UserID: "guest-id", Provider: "guest"})
+		return c.Next()
+	})
+	app.Use(RejectGuest())
+	app.Get("/test", func(c *fiber.Ctx) error { return c.SendString("ok") })
+
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+	resp, _ := app.Test(req)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 for guest, got %d", resp.StatusCode)
+	}
+}
+
+func TestRejectGuest_AllowsNonGuest(t *testing.T) {
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user", &auth.Claims{UserID: "u1", Provider: "local"})
+		return c.Next()
+	})
+	app.Use(RejectGuest())
+	app.Get("/test", func(c *fiber.Ctx) error { return c.SendString("ok") })
+
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+	resp, _ := app.Test(req)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for non-guest, got %d", resp.StatusCode)
+	}
+}
+
 func TestRequireEmailVerified_ExemptsGuest(t *testing.T) {
 	cfg := getTestConfig()
 	cfg.Auth.RequireEmailVerification = true

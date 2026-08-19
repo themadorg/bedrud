@@ -82,7 +82,11 @@
   --input: #e5e5e5;
   --ring: #E11D48;
 
-  --radius: 0px;
+  --radius: 4px;
+
+  --scroll-track: transparent;
+  --scroll-thumb: color-mix(in oklab, var(--foreground) 16%, transparent);
+  --scroll-thumb-hover: color-mix(in oklab, var(--accent-500) 48%, transparent);
 
   /* ── Spotlight — soft ambient glow (teal/neutral, not rose wash) ─────── */
   --spotlight-a: #99f6e4;
@@ -134,6 +138,10 @@
   --border: #292524;
   --input: #292524;
   --ring: #FB7185;
+
+  --scroll-track: transparent;
+  --scroll-thumb: color-mix(in oklab, var(--foreground) 24%, transparent);
+  --scroll-thumb-hover: color-mix(in oklab, var(--accent-400) 52%, transparent);
 
   --spotlight-a: #F43F5E;
   --spotlight-b: #FB7185;

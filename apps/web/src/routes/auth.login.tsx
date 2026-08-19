@@ -8,6 +8,7 @@ import { getPublicSettings, type PublicSettings } from '#/lib/use-public-setting
 import { useUserStore } from '#/lib/user.store'
 import { OAuthButtons } from '@/components/auth/OAuthButtons'
 import { PasskeyButton } from '@/components/auth/PasskeyButton'
+import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -189,25 +190,17 @@ function LoginPage() {
   return (
     <div className="space-y-7">
       {/* Header */}
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">
+      <div className="space-y-2">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Account</p>
+        <h1 className="min-h-8 text-2xl font-semibold tracking-tight">
           <FormattedMessage id="auth.login.title" defaultMessage="Welcome back" />
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="min-h-10 text-sm text-muted-foreground">
           <FormattedMessage id="auth.login.subtitle" defaultMessage="Sign in to your account to continue." />
         </p>
       </div>
 
-      {/* Global error */}
-      {error && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          className="border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-        >
-          {error}
-        </div>
-      )}
+      {error ? <Alert type="error" message={error} /> : null}
 
       {/* Email/password form */}
       {/* method=post: never serialize password into the URL if JS fails to intercept */}
@@ -290,28 +283,15 @@ function LoginPage() {
       {/* Passkey */}
       {showPasskey && <PasskeyButton onSuccess={handleSuccess} />}
 
-      {/* OAuth */}
       <OAuthButtons availableProviders={oauthProviders} />
 
-      {/* Footer links */}
-      <p className="text-center text-sm text-muted-foreground">
-        No account?{' '}
-        {settings?.registrationEnabled === false ? (
-          <span className="text-muted-foreground/50">Registration (closed)</span>
-        ) : (
-          <Link to="/auth/register" className="font-medium text-foreground underline-offset-4 hover:underline">
-            Register
+      {settings?.guestLoginEnabled === false ? null : (
+        <p className="text-center text-sm text-muted-foreground">
+          <Link to="/auth" className="font-medium text-primary underline-offset-4 hover:underline">
+            Continue as guest
           </Link>
-        )}
-        {' · '}
-        {settings?.guestLoginEnabled === false ? (
-          <span className="text-muted-foreground/50">Guest (disabled)</span>
-        ) : (
-          <Link to="/auth" className="font-medium text-foreground underline-offset-4 hover:underline">
-            Guest mode
-          </Link>
-        )}
-      </p>
+        </p>
+      )}
     </div>
   )
 }

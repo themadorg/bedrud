@@ -50,10 +50,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --radius-xl: 0px;
+  --radius-sm: 4px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
 
   /* Primary scale (rose) */
   --color-primary-50: var(--primary-50);
@@ -90,7 +90,7 @@
 @layer base {
   * {
     border-color: var(--border);
-    border-radius: 0 !important;
+    border-radius: var(--radius, 4px) !important;
     box-sizing: border-box;
   }
   /*
@@ -175,6 +175,38 @@
   max-width: var(--app-width, 100svw);
   height: var(--app-height, 100svh);
   max-height: var(--app-height, 100svh);
+}
+
+.app-scroll,
+.app-scroll-y {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+
+.app-scroll-y {
+  scrollbar-gutter: stable;
+}
+
+.app-scroll::-webkit-scrollbar,
+.app-scroll-y::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.app-scroll::-webkit-scrollbar-track,
+.app-scroll-y::-webkit-scrollbar-track {
+  background: var(--scroll-track);
+}
+
+.app-scroll::-webkit-scrollbar-thumb,
+.app-scroll-y::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: var(--radius, 4px) !important;
+}
+
+.app-scroll::-webkit-scrollbar-thumb:hover,
+.app-scroll-y::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
 }
 
 /* ── Meeting Room ───────────────────────────────────────────────────────── */
@@ -332,6 +364,14 @@
 :focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+
+/* Join room field on home — form owns focus underline; input stays visually flat */
+.join-room-input:focus,
+.join-room-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border-color: transparent;
 }
 
 /* Skip link — ensure it is usable even with global zero-radius rule */

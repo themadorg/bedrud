@@ -18,5 +18,9 @@ export const meetingPanelScopeClass =
 
 export const settingsDialogScrollClass = 'meet-scroll'
 
+export const appScrollClass = 'app-scroll'
+
+export const appScrollYClass = 'app-scroll-y'
+
 export const settingsSidebarTabClass =
   'text-[var(--meet-fg-muted)] hover:bg-[var(--meet-control)] hover:text-[var(--meet-fg-strong)] data-[state=active]:!bg-[var(--meet-btn-muted-bg)] data-[state=active]:!text-[var(--meet-btn-muted-fg)] data-[state=active]:!shadow-none'

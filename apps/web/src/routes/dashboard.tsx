@@ -4,9 +4,10 @@ import { Activity, LayoutDashboard, LogOut, Menu, Radio, Settings, Shield, Users
 import { useEffect, useState } from 'react'
 import { api } from '#/lib/api'
 import { useAuthStore } from '#/lib/auth.store'
+import { isGuestToken } from '#/lib/jwt-user'
 import { useRecentRoomsStore } from '#/lib/recent-rooms.store'
 import type { User } from '#/lib/user.store'
-import { useUserStore } from '#/lib/user.store'
+import { isGuestUser, useUserStore } from '#/lib/user.store'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -24,17 +25,17 @@ export const Route = createFileRoute('/dashboard')({
   beforeLoad: async () => {
     if (typeof window === 'undefined') return
     await useAuthStore.getState().initialize()
-    if (!useAuthStore.getState().tokens) throw redirect({ to: '/auth' })
+    const tokens = useAuthStore.getState().tokens
+    if (!tokens) throw redirect({ to: '/auth' })
+    if (isGuestToken(tokens.accessToken)) throw redirect({ to: '/' })
+    const user = useUserStore.getState().user
+    if (isGuestUser(user)) throw redirect({ to: '/' })
   },
-  // Loader runs before the component renders, eliminating the empty-profile flash.
-  // staleTime: Infinity means TanStack Router won't refetch on every sub-route navigation.
   loader: async () => {
-    // Skip on SSR — no browser origin means relative URLs can't be resolved
     if (typeof window === 'undefined') return
-    // Skip fetch if user is already in memory (e.g. soft navigation back to /dashboard)
     if (useUserStore.getState().user) return
     const u = await api.get<User & { accesses?: string[] }>('/api/auth/me')
-    useUserStore.getState().setUser({
+    const mapped = {
       id: u.id,
       email: u.email,
       name: u.name,
@@ -43,7 +44,9 @@ export const Route = createFileRoute('/dashboard')({
       isAdmin: (u.accesses?.includes('admin') || u.accesses?.includes('superadmin')) ?? false,
       accesses: u.accesses ?? [],
       avatarUrl: u.avatarUrl,
-    })
+    }
+    useUserStore.getState().setUser(mapped)
+    if (isGuestUser(mapped)) throw redirect({ to: '/' })
   },
   staleTime: Infinity,
   component: DashboardLayout,

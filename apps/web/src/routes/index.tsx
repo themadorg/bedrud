@@ -1,14 +1,19 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { AlertCircle, ArrowRight, Radio } from 'lucide-react'
+import { AlertCircle, ArrowRight, Clock, LogOut, Settings, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '#/lib/api'
+import { formatJoinRoomError } from '#/lib/errors'
 import { useAuthStore } from '#/lib/auth.store'
+import { isGuestToken } from '#/lib/jwt-user'
+import { type RecentRoom, useRecentRoomsStore } from '#/lib/recent-rooms.store'
 import type { User } from '#/lib/user.store'
-import { useUserStore } from '#/lib/user.store'
+import { isGuestUser, useUserStore } from '#/lib/user.store'
+import { cn } from '#/lib/utils'
+import { HomeSettingsDialog } from '@/components/settings/HomeSettingsDialog'
+import { BedrudLogo } from '@/components/BedrudLogo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 
 interface AuthResponse {
@@ -43,6 +48,17 @@ export const Route = createFileRoute('/')({
   component: HomePage,
 })
 
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts
+  const mins = Math.floor(diff / 60_000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
 function JoinForm() {
   const navigate = useNavigate()
   const tokens = useAuthStore((s) => s.tokens)
@@ -62,51 +78,37 @@ function JoinForm() {
     const slug = code.trim().toLowerCase().replace(/\s+/g, '-')
     if (!slug) return
     setError(null)
-    if (tokens) {
-      navigate({ to: '/m/$meetId', params: { meetId: slug } })
-      return
-    }
     setChecking(true)
     try {
-      const guestName = `Guest-${Math.random().toString(36).slice(2, 6)}`
-      const res = await api.post<AuthResponse>('/api/auth/guest-login', { name: guestName })
-      setTokens(res.tokens, 'ephemeral')
-      setUser({
-        id: res.user.id,
-        email: res.user.email,
-        name: res.user.name,
-        provider: res.user.provider,
-        isSuperAdmin: false,
-        isAdmin: false,
-        accesses: res.user.accesses ?? [],
-        avatarUrl: res.user.avatarUrl,
-      })
+      await api.get<{ exists: boolean; name: string }>(`/api/room/check/${encodeURIComponent(slug)}`)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      const status = parseInt(msg.substring(0, 3), 10)
-      const jsonPart = msg.includes(':') ? msg.slice(msg.indexOf(':') + 1).trim() : ''
-      let parsed: { error?: string; message?: string } = {}
-      try {
-        parsed = JSON.parse(jsonPart)
-      } catch {
-        /* ignore */
-      }
-      switch (status) {
-        case 404:
-          setError(parsed.error ?? parsed.message ?? 'Room not found')
-          break
-        case 403:
-          setError(parsed.error?.includes('full') ? 'Room is full' : 'This room is private')
-          break
-        case 410:
-          setError('Room is no longer active')
-          break
-        default:
-          setError(parsed.error ?? parsed.message ?? 'Failed to join room')
-      }
+      setError(formatJoinRoomError(err))
       setChecking(false)
       return
     }
+
+    if (!tokens) {
+      try {
+        const guestName = `Guest-${Math.random().toString(36).slice(2, 6)}`
+        const res = await api.post<AuthResponse>('/api/auth/guest-login', { name: guestName })
+        setTokens(res.tokens, 'ephemeral')
+        setUser({
+          id: res.user.id,
+          email: res.user.email,
+          name: res.user.name,
+          provider: res.user.provider,
+          isSuperAdmin: false,
+          isAdmin: false,
+          accesses: res.user.accesses ?? [],
+          avatarUrl: res.user.avatarUrl,
+        })
+      } catch (err) {
+        setError(formatJoinRoomError(err))
+        setChecking(false)
+        return
+      }
+    }
+
     setChecking(false)
     navigate({ to: '/m/$meetId', params: { meetId: slug } })
   }
@@ -120,7 +122,7 @@ function JoinForm() {
         <span className="hidden font-mono text-sm text-muted-foreground/30 select-none whitespace-nowrap sm:block">
           {host}/m/
         </span>
-        <Input
+        <input
           value={code}
           onChange={(e) => {
             setCode(e.target.value)
@@ -129,7 +131,7 @@ function JoinForm() {
           placeholder="your-room"
           autoComplete="off"
           spellCheck={false}
-          className="h-10 flex-1 ps-2 pe-1 font-mono text-sm sm:ps-1 border-none focus-visible:ring-0"
+          className="join-room-input h-10 flex-1 border-none bg-transparent ps-2 pe-1 font-mono text-sm outline-none placeholder:text-muted-foreground/40 sm:ps-1"
         />
         <Button type="submit" size="sm" disabled={!code.trim() || checking} className="shrink-0 h-7 gap-1">
           {checking ? (
@@ -151,10 +153,18 @@ function JoinForm() {
   )
 }
 
-function HomeHeader() {
+function HomeHeader({
+  onOpenSettings,
+}: {
+  onOpenSettings: () => void
+}) {
+  const navigate = useNavigate()
   const tokens = useAuthStore((s) => s.tokens)
   const initialized = useAuthStore((s) => s.initialized)
   const user = useUserStore((s) => s.user)
+  const clearAuth = useAuthStore((s) => s.clear)
+  const clearUser = useUserStore((s) => s.clear)
+  const guest = isGuestUser(user) || isGuestToken(tokens?.accessToken)
   const initials = user?.name
     ? user.name
         .split(' ')
@@ -164,14 +174,22 @@ function HomeHeader() {
         .slice(0, 2)
     : '?'
 
+  async function handleLogout() {
+    try {
+      const refreshToken = useAuthStore.getState().tokens?.refreshToken
+      if (refreshToken) await api.post('/api/auth/logout', { refresh_token: refreshToken })
+    } catch {
+      /* ignore */
+    } finally {
+      clearAuth()
+      clearUser()
+      navigate({ to: '/' })
+    }
+  }
+
   return (
     <header className="relative z-10 flex items-center justify-between px-6 py-3 sm:px-10">
-      <div className="flex items-center gap-2">
-        <div className="flex h-6 w-6 items-center justify-center bg-primary">
-          <Radio className="h-3 w-3 text-primary-foreground" />
-        </div>
-        <span className="font-mono text-xs font-bold tracking-wider uppercase">bedrud</span>
-      </div>
+      <BedrudLogo />
       <div className="flex items-center gap-3">
         <ThemeToggle />
         <Separator orientation="vertical" className="hidden h-3 sm:block" />
@@ -186,12 +204,31 @@ function HomeHeader() {
               </Avatar>
               <span className="max-w-[140px] truncate text-sm text-muted-foreground">{user?.name ?? 'Account'}</span>
             </div>
-            <Link
-              to="/dashboard"
-              className="bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
-            >
-              Dashboard
-            </Link>
+            {guest ? (
+              <>
+                <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={onOpenSettings}>
+                  <Settings className="h-3.5 w-3.5" />
+                  Settings
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground"
+                  onClick={handleLogout}
+                  aria-label="Sign out"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </>
+            ) : (
+              <Link
+                to="/dashboard"
+                className="bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
+              >
+                Dashboard
+              </Link>
+            )}
           </>
         ) : initialized ? (
           <>
@@ -215,9 +252,24 @@ function HomeHeader() {
   )
 }
 
-function JoinHint() {
+function JoinHint({ guest }: { guest: boolean }) {
   const tokens = useAuthStore((s) => s.tokens)
   const user = useUserStore((s) => s.user)
+
+  if (tokens && guest) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Joined as {user?.name ?? 'guest'} ·{' '}
+        <Link
+          to="/auth/register"
+          className="underline underline-offset-4 transition-colors hover:text-foreground"
+        >
+          Create an account
+        </Link>{' '}
+        to host rooms
+      </p>
+    )
+  }
 
   if (tokens) {
     return (
@@ -251,51 +303,129 @@ function JoinHint() {
   )
 }
 
+function RecentMeetings({
+  rooms,
+  onJoin,
+  onRemove,
+  className,
+}: {
+  rooms: RecentRoom[]
+  onJoin: (name: string) => void
+  onRemove: (name: string) => void
+  className?: string
+}) {
+  if (rooms.length === 0) return null
+
+  return (
+    <div className={cn('w-full max-w-md space-y-3', className)}>
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Recent meetings</p>
+      <ul className="max-h-[min(50vh,360px)] space-y-2 overflow-y-auto">
+        {rooms.slice(0, 8).map((recent) => (
+          <li key={recent.name} className="group flex items-center justify-between gap-4 border border-border px-3 py-2.5">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
+              <button
+                type="button"
+                onClick={() => onJoin(recent.name)}
+                className="min-w-0 truncate text-left font-mono text-sm font-medium hover:underline"
+              >
+                {recent.name}
+              </button>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="hidden text-xs text-muted-foreground/50 sm:inline">{timeAgo(recent.joinedAt)}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                type="button"
+                onClick={() => onRemove(recent.name)}
+                className="h-7 w-7 opacity-100 hover:bg-destructive/10 hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100"
+                aria-label={`Remove ${recent.name} from recent`}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => onJoin(recent.name)}
+                className="h-7 gap-1 px-2.5 text-xs"
+              >
+                Join <ArrowRight className="h-3 w-3" />
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function HomePage() {
+  const navigate = useNavigate()
   const tokens = useAuthStore((s) => s.tokens)
   const user = useUserStore((s) => s.user)
+  const guest = isGuestUser(user) || isGuestToken(tokens?.accessToken)
+  const recentRooms = useRecentRoomsStore((s) => s.rooms)
+  const removeRecent = useRecentRoomsStore((s) => s.remove)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
     if (!tokens || user) return
     void loadUserIfNeeded()
   }, [tokens, user])
 
+  const showRecent = guest && recentRooms.length > 0
+
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
-      {/* Background glow — single radial per DESIGN.md rule */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <div
-          className="absolute -right-24 -top-24 h-[500px] w-[500px] rounded-full opacity-[0.12] dark:opacity-[0.06] blur-[100px]"
+          className="absolute right-[8%] top-[18%] h-[420px] w-[420px] rounded-full opacity-[0.12] dark:opacity-[0.06] blur-[100px]"
           style={{ background: 'var(--spotlight-a)' }}
         />
       </div>
 
-      <HomeHeader />
+      <HomeHeader onOpenSettings={() => setSettingsOpen(true)} />
 
-      {/* ── Main ─────────────────────────────────────────────────────────── */}
       <main className="relative z-10 flex flex-1 flex-col px-6 pb-12 pt-20 sm:px-10 sm:pt-28 lg:pt-36">
-        <div className="max-w-xl space-y-12">
-          {/* Headline */}
-          <div className="space-y-4">
-            <h1 className="text-3xl font-bold leading-tight tracking-tight sm:text-4xl md:text-5xl">
-              Talk to people,
-              <br />
-              <span className="text-primary">not the platform.</span>
-            </h1>
-            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-              Self-hosted voice rooms. Share a link, start talking. No account needed to join.
-            </p>
+        <div
+          className={cn(
+            'flex w-full flex-col gap-12',
+            showRecent &&
+              '[@media(max-height:820px)_and_(min-width:768px)]:flex-row [@media(max-height:820px)_and_(min-width:768px)]:items-start [@media(max-height:820px)_and_(min-width:768px)]:justify-between lg:flex-row lg:items-start lg:justify-between',
+            !showRecent && 'max-w-xl',
+          )}
+        >
+          <div className="max-w-xl flex-1 space-y-12">
+            <div className="space-y-4">
+              <h1 className="text-3xl font-bold leading-tight tracking-tight sm:text-4xl md:text-5xl">
+                Talk to people,
+                <br />
+                <span className="text-primary">not the platform.</span>
+              </h1>
+              <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+                Self-hosted voice rooms. Share a link, start talking. No account needed to join.
+              </p>
+            </div>
+
+            <div className="max-w-md space-y-3">
+              <JoinForm />
+              <JoinHint guest={guest} />
+            </div>
           </div>
 
-          {/* Join + links */}
-          <div className="max-w-md space-y-3">
-            <JoinForm />
-            <JoinHint />
-          </div>
+          {showRecent ? (
+            <RecentMeetings
+              rooms={recentRooms}
+              onJoin={(name) => navigate({ to: '/m/$meetId', params: { meetId: name } })}
+              onRemove={removeRecent}
+              className="w-full max-w-md shrink-0 lg:ms-auto lg:pt-2 [@media(max-height:820px)_and_(min-width:768px)]:ms-auto [@media(max-height:820px)_and_(min-width:768px)]:pt-2"
+            />
+          ) : null}
         </div>
       </main>
 
-      {/* ── Footer ───────────────────────────────────────────────────────── */}
       <footer className="relative z-10 flex items-center gap-4 border-t px-6 py-3 text-xs text-muted-foreground sm:px-10">
         <a
           href="https://github.com/themadorg"
@@ -324,6 +454,8 @@ function HomePage() {
           GitHub
         </a>
       </footer>
+
+      {guest ? <HomeSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} /> : null}
     </div>
   )
 }
