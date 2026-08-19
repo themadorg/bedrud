@@ -23,6 +23,7 @@ jobs:
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       server: ${{ steps.filter.outputs.server }}
       web: ${{ steps.filter.outputs.web }}
@@ -65,6 +66,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.server == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: server
@@ -84,6 +86,7 @@ jobs:
   server-test:
     name: Server – Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [changes, server]
     if: needs.changes.outputs.server == 'true'
     defaults:
@@ -106,6 +109,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: apps/web
@@ -125,6 +129,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.ios == 'true'
     runs-on: macos-15
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: apps/ios
@@ -200,6 +205,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: .
@@ -212,9 +218,11 @@ jobs:
         with:
           workspaces: ". -> target"
       - name: Install Slint dependencies (Linux)
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          apt_opts=(-o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo apt-get update "${apt_opts[@]}"
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_opts[@]}" \
             libfontconfig1-dev \
             libxkbcommon-dev \
             libxkbcommon-x11-dev \
@@ -237,6 +245,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.site == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: apps/site

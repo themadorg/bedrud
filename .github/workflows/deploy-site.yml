@@ -21,6 +21,7 @@ jobs:
   # They only need a rebuild when site content changes, or when server docs/swagger change.
   should-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     outputs:
       site: ${{ steps.decide.outputs.site }}
@@ -61,6 +62,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: should-deploy
     if: needs.should-deploy.outputs.site == 'true'
     steps:
@@ -104,12 +106,13 @@ jobs:
           bun-version: latest
       - name: Install Chrome OS libraries
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          apt_opts=(-o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo apt-get update "${apt_opts[@]}"
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_opts[@]}" --no-install-recommends \
             libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
             libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
             libgbm1 libpango-1.0-0 libcairo2 libasound2t64 || \
-          sudo apt-get install -y --no-install-recommends \
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_opts[@]}" --no-install-recommends \
             libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
             libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
             libgbm1 libpango-1.0-0 libcairo2 libasound2
@@ -127,6 +130,7 @@ jobs:
     needs: build
     if: needs.build.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
