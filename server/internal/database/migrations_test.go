@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -54,7 +55,7 @@ func newMemoryDB(t *testing.T) *gorm.DB {
 // can run in any order without seeing tables left by another.
 //
 // Skips when BEDRUD_TEST_POSTGRES_DSN is unset, so `go test ./...` still works
-// on a machine with no Postgres — unless BEDRUD_TEST_POSTGRES_REQUIRED is set,
+// on a machine with no Postgres — unless BEDRUD_TEST_POSTGRES_REQUIRED=1,
 // which CI does. Without that, losing the DSN from the workflow would drop the
 // whole Postgres dialect behind a green tick, since `go test` does not print
 // skipped subtests without -v.
@@ -76,8 +77,10 @@ func openPostgresSchema(t *testing.T, cfg *gorm.Config) *gorm.DB {
 
 	dsn := os.Getenv("BEDRUD_TEST_POSTGRES_DSN")
 	if dsn == "" {
-		if os.Getenv("BEDRUD_TEST_POSTGRES_REQUIRED") != "" {
-			t.Fatal("BEDRUD_TEST_POSTGRES_REQUIRED is set but BEDRUD_TEST_POSTGRES_DSN is empty: Postgres coverage would be skipped silently")
+		// Read as ==1 to match how BEDRUD_SKIP_MIGRATE is read in migrations.go,
+		// so REQUIRED=0 does not mean "required".
+		if os.Getenv("BEDRUD_TEST_POSTGRES_REQUIRED") == "1" {
+			t.Fatal("BEDRUD_TEST_POSTGRES_REQUIRED=1 but BEDRUD_TEST_POSTGRES_DSN is empty: Postgres coverage would be skipped silently")
 		}
 		t.Skip("BEDRUD_TEST_POSTGRES_DSN not set — skipping Postgres dialect coverage")
 	}
@@ -444,10 +447,14 @@ func TestRunMigrations_ForeignKeysAreExactlyTheHandWrittenSet(t *testing.T) {
 	if err := db.Raw(`
 		SELECT conname FROM pg_constraint
 		WHERE contype = 'f' AND connamespace = current_schema()::regnamespace
-		ORDER BY conname
 	`).Scan(&got).Error; err != nil {
 		t.Fatalf("read pg_constraint: %v", err)
 	}
+	// Sorted here rather than in SQL: ORDER BY would follow the database's
+	// collation, which is not ours to depend on. Both sides are sorted so the
+	// comparison is about the set, not the order either was written in.
+	sort.Strings(got)
+	sort.Strings(want)
 
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("foreign key set differs from the hand-written one in migrations.go\n got: %v\nwant: %v", got, want)
