@@ -11,7 +11,7 @@ flowchart TB
   push["push / PR → master"]
   tag["push tag v*"]
   cronQ["cron Mon 06:00 UTC"]
-  cronS["cron Sat 00:00 Iran"]
+  cronS["cron Sat 00:00 UTC"]
   relPub["release published"]
 
   push --> CI
@@ -214,7 +214,7 @@ usually already current; the manual route above is for a release cut mid-week.
 
 ## Bump Android Pin (`bump-android-pin.yml`)
 
-**When:** cron `30 20 * * 5` — 00:00 Saturday Iran time (UTC+03:30) — or manual dispatch.
+**When:** cron `0 0 * * 6` (00:00 Saturday UTC), or manual dispatch.
 
 `apps/android` is a submodule, and nothing else moves it — between bedrud-android
 publishing a release and somebody running `make pin-android-stable`, this repo keeps

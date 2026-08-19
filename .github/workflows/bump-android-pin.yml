@@ -9,9 +9,9 @@ name: Bump Android Pin
 
 on:
   schedule:
-    # 00:00 Saturday in Iran (UTC+03:30) — the start of the maintainer's week, so a
-    # pending bump is waiting first thing. GitHub cron is UTC only, hence Friday 20:30.
-    - cron: "30 20 * * 5"
+    # 00:00 Saturday UTC - the start of the week, so a pending bump is waiting rather
+    # than sitting until the week is already underway.
+    - cron: "0 0 * * 6"
   workflow_dispatch:
 
 permissions:
