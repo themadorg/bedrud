@@ -1,4 +1,4 @@
-import { useAuthStore } from './auth.store'
+import { currentRememberMode, useAuthStore } from './auth.store'
 
 // In dev, leave BASE_URL empty so requests go to /api/... and Vite's proxy
 // forwards them to localhost:7071 — no CORS. In production, set VITE_API_URL
@@ -60,10 +60,15 @@ async function doRefresh(): Promise<string | null> {
     })
     if (!res.ok) return null
     const data = (await res.json()) as { access_token: string; refresh_token: string }
-    useAuthStore.getState().setTokens({
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
-    })
+    // Preserve the storage the session already uses. Omitting this promotes a
+    // session-only login into localStorage on the first refresh.
+    useAuthStore.getState().setTokens(
+      {
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+      },
+      currentRememberMode(),
+    )
     return data.access_token
   } catch {
     return null

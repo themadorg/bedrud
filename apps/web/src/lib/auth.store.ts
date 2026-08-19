@@ -19,6 +19,23 @@ interface AuthStore {
 
 const BASE_URL = (import.meta.env['VITE_API_URL'] as string | undefined) ?? ''
 
+/**
+ * The storage mode the current session already uses.
+ *
+ * Token refreshes must pass this to setTokens. Letting `remember` fall back to
+ * its default would move a session-only login into localStorage, so a session
+ * the user deliberately kept ephemeral — a guest joining a meeting on a shared
+ * machine — would start surviving browser restarts.
+ *
+ * With no session on record there is nothing to preserve, so a first login is
+ * remembered, as it always has been.
+ */
+export function currentRememberMode(): boolean | 'ephemeral' {
+  if (localStorage.getItem(REMEMBER_KEY)) return true
+  if (sessionStorage.getItem(REMEMBER_KEY)) return 'ephemeral'
+  return true
+}
+
 const _init = { promise: null as Promise<void> | null }
 
 export const useAuthStore = create<AuthStore>()((set, get) => ({
@@ -78,7 +95,10 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
 
         if (res.ok) {
           const data = (await res.json()) as { access_token: string; refresh_token: string }
-          get().setTokens({ accessToken: data.access_token, refreshToken: data.refresh_token })
+          get().setTokens(
+            { accessToken: data.access_token, refreshToken: data.refresh_token },
+            currentRememberMode(),
+          )
           set({ initialized: true })
           return
         }
@@ -97,7 +117,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
               credentials: 'include',
             })
             if (meRes.ok) {
-              get().setTokens({ accessToken: persistedAT, refreshToken: null })
+              get().setTokens({ accessToken: persistedAT, refreshToken: null }, currentRememberMode())
               set({ initialized: true })
               return
             }
