@@ -89,6 +89,23 @@ jobs:
     defaults:
       run:
         working-directory: server
+    # RunMigrations branches on the SQL dialect, and the suite otherwise only
+    # ever sees SQLite. Tests needing this skip themselves when the DSN below
+    # is absent, so `go test ./...` still works locally with no server.
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+        env:
+          POSTGRES_USER: bedrud
+          POSTGRES_PASSWORD: bedrud
+          POSTGRES_DB: bedrud_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bedrud -d bedrud_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
@@ -99,6 +116,8 @@ jobs:
       - run: mkdir -p frontend && touch frontend/.gitkeep
       - run: mkdir -p internal/livekit/bin && touch internal/livekit/bin/livekit-server
       - run: go test -race -count=1 ./...
+        env:
+          BEDRUD_TEST_POSTGRES_DSN: host=localhost user=bedrud password=bedrud dbname=bedrud_test port=5432 sslmode=disable
 
   # ── Web (React meeting app — embedded in binary) ──────────────
   web:
