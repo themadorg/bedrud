@@ -103,7 +103,13 @@ cd server && go build ./...
 **Web:**
 ```bash
 cd apps/web && bun run check    # Biome lint + tsc
+cd apps/web && bun run test     # Vitest
 cd apps/web && bun run build    # Prod build
+```
+
+**devcli:**
+```bash
+cd apps/dev/devcli && go test -race -count=1 ./...
 ```
 
 **Desktop:**
@@ -119,7 +125,7 @@ cd apps/site && bun run typecheck:astro  # Astro type checking
 cd apps/site && bun run build            # Prod build
 ```
 
-**CI order:** Server: `go vet` → `go build` → `go test -race`. Web: `bun run check` → `bun run build`. Site: `bun run check` → `bun run typecheck:astro` → `bun run build`.
+**CI order:** Server: `go vet` → `go build` → `go test -race`. Web: `bun run check` → `bun run test` → `bun run build`. devcli: `go vet` → `go test -race`. Site: `bun run check` → `bun run typecheck:astro` → `bun run build`.
 
 ---
 
