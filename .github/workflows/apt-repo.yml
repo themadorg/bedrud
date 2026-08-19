@@ -24,6 +24,7 @@ jobs:
   check-secrets:
     name: Check secrets
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       has_gpg: ${{ steps.check.outputs.has_gpg }}
     steps:
@@ -43,6 +44,7 @@ jobs:
   update-apt-repo:
     name: Publish apt repository
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: check-secrets
     if: needs.check-secrets.outputs.has_gpg == 'true'
     environment:
@@ -57,7 +59,9 @@ jobs:
           fetch-depth: 0
 
       - name: Install apt-ftparchive and GPG tools
-        run: sudo apt-get install -y apt-utils dpkg-dev gnupg
+        run: |
+          apt_opts=(-o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_opts[@]}" apt-utils dpkg-dev gnupg
 
       - name: Import GPG signing key
         env:

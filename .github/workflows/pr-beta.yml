@@ -18,6 +18,7 @@ jobs:
   cleanup:
     name: Cleanup PR Beta
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.event.action == 'closed'
     steps:
       - name: Delete PR beta release
@@ -34,6 +35,7 @@ jobs:
   prepare:
     name: Prepare
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.event.action != 'closed'
     outputs:
       tag: ${{ steps.info.outputs.tag }}
@@ -56,6 +58,7 @@ jobs:
   server-binary:
     name: Server – ${{ matrix.goos }}/${{ matrix.goarch }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: prepare
     strategy:
       matrix:
@@ -175,6 +178,7 @@ jobs:
   web:
     name: Web Bundle
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: prepare
     defaults:
       run:
@@ -203,6 +207,7 @@ jobs:
   desktop:
     name: Desktop – ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     needs: prepare
     strategy:
       fail-fast: false
@@ -240,10 +245,12 @@ jobs:
         with:
           key: ${{ matrix.target }}
       - name: Install Slint dependencies (Linux)
+        timeout-minutes: 10
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          apt_opts=(-o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo apt-get update "${apt_opts[@]}"
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_opts[@]}" \
             libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-dev \
             libwayland-dev libgles2-mesa-dev libegl1-mesa-dev \
             libdbus-1-dev libsecret-1-dev \
@@ -386,6 +393,7 @@ jobs:
   release:
     name: Publish Beta for PR #${{ github.event.pull_request.number }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [prepare, server-binary, desktop, web]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -546,6 +554,7 @@ jobs:
   telegram:
     name: Notify Telegram
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [prepare, release]
     if: needs.release.result == 'success'
     steps:

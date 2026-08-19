@@ -19,6 +19,7 @@ jobs:
   server-binary:
     name: Server – ${{ matrix.goos }}/${{ matrix.goarch }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -188,7 +189,8 @@ jobs:
       - name: Package server (.rpm)
         if: matrix.goos == 'linux'
         run: |
-          sudo apt-get install -y rpm
+          apt_opts=(-o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_opts[@]}" rpm
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
           RPM_ARCH="${{ matrix.deb_arch == 'amd64' && 'x86_64' || 'aarch64' }}"
@@ -225,6 +227,7 @@ jobs:
   docker-debian:
     name: Docker (Debian)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: server-binary
     steps:
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
@@ -307,6 +310,7 @@ jobs:
   docker-alpine:
     name: Docker (Alpine)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: server-binary
     steps:
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
@@ -391,6 +395,7 @@ jobs:
   docker-distroless:
     name: Docker (Distroless)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: server-binary
     steps:
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
@@ -475,6 +480,7 @@ jobs:
   ios:
     name: iOS IPA
     runs-on: macos-15
+    timeout-minutes: 45
     continue-on-error: true
     defaults:
       run:
@@ -583,6 +589,7 @@ jobs:
   desktop:
     name: Desktop – ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -622,10 +629,12 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Install Slint dependencies (Linux)
+        timeout-minutes: 10
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          apt_opts=(-o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo apt-get update "${apt_opts[@]}"
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_opts[@]}" \
             libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-dev \
             libwayland-dev libgles2-mesa-dev libegl1-mesa-dev \
             libdbus-1-dev libsecret-1-dev \
@@ -718,7 +727,8 @@ jobs:
       - name: Package Linux (.rpm)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get install -y rpm
+          apt_opts=(-o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_opts[@]}" rpm
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
           RPM_ARCH="${{ matrix.deb_arch == 'amd64' && 'x86_64' || 'aarch64' }}"
@@ -875,6 +885,7 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [server-binary, docker-debian, docker-alpine, docker-distroless, desktop]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -1036,6 +1047,7 @@ jobs:
   check-secrets:
     name: Check available secrets
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: release
     if: needs.release.result == 'success'
     outputs:
@@ -1067,6 +1079,7 @@ jobs:
   telegram:
     name: Notify Telegram
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_telegram == 'true'
     steps:
@@ -1153,6 +1166,7 @@ jobs:
   aur-desktop:
     name: AUR – bedrud-desktop-bin
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_aur == 'true'
     steps:
@@ -1196,6 +1210,7 @@ jobs:
   aur-server:
     name: AUR – bedrud-bin
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_aur == 'true'
     steps:
@@ -1238,6 +1253,7 @@ jobs:
   snap-publish:
     name: Snap Store – bedrud-desktop
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_snap == 'true'
     steps:
@@ -1280,6 +1296,7 @@ jobs:
   flatpak-bundle:
     name: Flatpak Bundle
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: [release, check-secrets]
     if: needs.check-secrets.result == 'success'
     steps:
@@ -1287,8 +1304,9 @@ jobs:
 
       - name: Install Flatpak tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder python3-yaml
+          apt_opts=(-o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo apt-get update "${apt_opts[@]}"
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_opts[@]}" flatpak flatpak-builder python3-yaml
           sudo flatpak remote-add --if-not-exists flathub \
             https://flathub.org/repo/flathub.flatpakrepo
 
@@ -1370,6 +1388,7 @@ jobs:
   chocolatey-push:
     name: Chocolatey – bedrud-desktop
     runs-on: windows-latest
+    timeout-minutes: 20
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_choco == 'true'
     steps:
@@ -1420,6 +1439,7 @@ jobs:
   homebrew-update:
     name: Homebrew Tap – bedrud-desktop
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_homebrew == 'true'
     steps:
@@ -1474,6 +1494,7 @@ jobs:
   winget-submit:
     name: WinGet – Bedrud.BedrudDesktop
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_winget == 'true'
     steps:
