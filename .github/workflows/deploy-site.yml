@@ -25,7 +25,7 @@ jobs:
     outputs:
       site: ${{ steps.decide.outputs.site }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # Commit that triggered CI (or current for manual run)
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
@@ -64,7 +64,7 @@ jobs:
     needs: should-deploy
     if: needs.should-deploy.outputs.site == 'true'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Import and Export GPG public key
@@ -95,11 +95,11 @@ jobs:
           fi
       - name: Sync swagger.json from server
         run: mkdir -p apps/site/public && cp server/docs/swagger.json apps/site/public/swagger.json
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: "1.26"
           cache-dependency-path: server/go.sum
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: latest
       - name: Install Chrome OS libraries
@@ -118,7 +118,7 @@ jobs:
           BEDRUD_SCREENSHOT_EMAIL: screenshots@bedrud.local
           BEDRUD_SCREENSHOT_PASSWORD: Screenshot1!
         run: bash tools/screenshots/ci-capture.sh
-      - uses: withastro/action@v6
+      - uses: withastro/action@e84f40bd8d2caa9e768ec82ad30dd81f0b280853 # v6
         with:
           package-manager: bun@latest
           path: apps/site
@@ -132,4 +132,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
