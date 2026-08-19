@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from './api'
 import { useAuthStore } from './auth.store'
 
@@ -34,10 +34,6 @@ function refreshingFetch(newToken: string) {
 }
 
 beforeEach(() => {
-  // clear() rather than setState: initialize() dedupes through a module-level
-  // promise that it only nulls on the failure path, so a preceding successful
-  // initialize would otherwise make the next one return that stale promise
-  // without calling fetch at all. clear() resets it.
   useAuthStore.getState().clear()
   localStorage.clear()
   sessionStorage.clear()
@@ -45,6 +41,10 @@ beforeEach(() => {
     configurable: true,
     value: { ...window.location, replace: vi.fn() },
   })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('a 401 refresh keeps the session where it was', () => {
@@ -68,6 +68,21 @@ describe('a 401 refresh keeps the session where it was', () => {
     await api.get('/api/rooms')
 
     expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull()
+    expect(sessionStorage.getItem(ACCESS_TOKEN_KEY)).toBe('fresh')
+  })
+
+  it('is not fooled by keys left behind from an earlier remembered login', async () => {
+    // The guest-join path does not clear() first, so both storages can hold
+    // keys at once. currentRememberMode reads localStorage first, so a
+    // leftover remembered session would make this one look remembered.
+    useAuthStore.getState().setTokens({ accessToken: 'old', refreshToken: 'rt-0' })
+    useAuthStore.getState().setTokens({ accessToken: 'guest', refreshToken: 'rt-g' }, 'ephemeral')
+    vi.stubGlobal('fetch', refreshingFetch('fresh'))
+
+    await api.get('/api/rooms')
+
+    expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull()
+    expect(localStorage.getItem(REMEMBER_KEY)).toBeNull()
     expect(sessionStorage.getItem(ACCESS_TOKEN_KEY)).toBe('fresh')
   })
 
