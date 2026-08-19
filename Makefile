@@ -92,7 +92,7 @@ help:
 	@echo "  install-android      Install release APK on device"
 	@echo "  install-android-debug Install debug APK on device"
 	@echo "  release-android      Build + install release APK"
-	@echo "  pin-android-stable   Pin submodule to latest stable-v* tag (before cutting a release)"
+	@echo "  pin-android-stable   Pin submodule to latest release tag (before cutting a release)"
 	@echo ""
 	@echo "iOS:"
 	@echo "  build-ios            Build iOS archive (Release)"
@@ -510,14 +510,20 @@ install-android-debug:
 # Build + install Android release on device
 release-android: build-android install-android
 
-# Pin the apps/android submodule to the latest stable-v* tag from bedrud-android, ahead
+# Pin the apps/android submodule to the latest release tag from bedrud-android, ahead
 # of cutting an official bedrud release. Only checks it out - review and commit yourself,
 # so every release permanently records the exact android commit it shipped with.
+# bedrud-android tags plain semver (1.5.0) - the old stable-v*/beta-v* prefixes are gone,
+# so the glob below is the same TAG_GLOB that repo's own Makefile matches releases with.
+# The newest tag wins regardless of which channel it was released on. A beta and a stable
+# release of the same tag are the same build from the same commit, signed with the same
+# key, and both only exist after lint+test passed on that tag - so "stable" in this
+# target's name now means "a real release", not "not a pre-release".
 pin-android-stable:
 	git submodule update --init apps/android
 	cd apps/android && git fetch --tags origin && \
-		TAG=$$(git tag -l "stable-v*" --sort=-v:refname | head -1) && \
-		if [ -z "$$TAG" ]; then echo "No stable-v* tag found in bedrud-android" >&2; exit 1; fi && \
+		TAG=$$(git tag -l "[0-9]*.[0-9]*.[0-9]*" --sort=-v:refname | head -1) && \
+		if [ -z "$$TAG" ]; then echo "No release tag found in bedrud-android" >&2; exit 1; fi && \
 		git checkout "$$TAG" && \
 		echo "Pinned apps/android to $$TAG - now run:" && \
 		echo "  git add apps/android && git commit -m \"chore(android): pin submodule to bedrud-android@$$TAG\""
