@@ -9,8 +9,9 @@ name: Bump Android Pin
 
 on:
   schedule:
-    # Mondays, alongside the weekly dependabot run.
-    - cron: "0 6 * * 1"
+    # 00:00 Saturday in Iran (UTC+03:30) — the start of the maintainer's week, so a
+    # pending bump is waiting first thing. GitHub cron is UTC only, hence Friday 20:30.
+    - cron: "30 20 * * 5"
   workflow_dispatch:
 
 permissions:

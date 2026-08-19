@@ -11,6 +11,7 @@ flowchart TB
   push["push / PR → master"]
   tag["push tag v*"]
   cronQ["cron Mon 06:00 UTC"]
+  cronS["cron Sat 00:00 Iran"]
   relPub["release published"]
 
   push --> CI
@@ -19,7 +20,7 @@ flowchart TB
   relPub --> Apt
   relPub --> Dnf
   cronQ --> CodeQL
-  cronQ --> BumpAndroid
+  cronS --> BumpAndroid
   PR["PR to master"] --> CI
   PR --> PRBeta
 ```
@@ -35,9 +36,9 @@ flowchart TB
 | **Apt repo** | `apt-repo.yml` | release published | `.deb` apt index on Pages |
 | **DNF repo** | `dnf-repo.yml` | release published | `.rpm` dnf index |
 
-There is **no** auto SSH deploy to a production host (`deploy-server.yml` removed), and
-**no** nightly/dev pipeline (`dev-nightly.yml` removed) — Android, and every other client
-that used to be built on a schedule here, is built in its own repo now.
+There is **no** auto SSH deploy to a production host (`deploy-server.yml` removed) and
+**no** nightly or dev pipeline. Android is built, signed and released entirely in its own
+repo; this one only records which of those releases it sits alongside.
 
 ---
 
@@ -197,7 +198,7 @@ git add apps/android && git commit -m "chore(android): pin submodule to bedrud-a
 git tag vX.Y.Z && git push origin master vX.Y.Z
 ```
 
-`bump-android-pin.yml` proposes that same commit as a PR every Monday, so the pin is
+`bump-android-pin.yml` proposes that same commit as a PR every Saturday, so the pin is
 usually already current; the manual route above is for a release cut mid-week.
 
 ---
@@ -213,7 +214,7 @@ usually already current; the manual route above is for a release cut mid-week.
 
 ## Bump Android Pin (`bump-android-pin.yml`)
 
-**When:** cron `0 6 * * 1` (Mondays, with the weekly dependabot run), or manual dispatch.
+**When:** cron `30 20 * * 5` — 00:00 Saturday Iran time (UTC+03:30) — or manual dispatch.
 
 `apps/android` is a submodule, and nothing else moves it — between bedrud-android
 publishing a release and somebody running `make pin-android-stable`, this repo keeps
