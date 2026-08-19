@@ -10,18 +10,16 @@ Source of truth: `.github/workflows/`. This page summarizes **what each workflow
 flowchart TB
   push["push / PR → master"]
   tag["push tag v*"]
-  cronN["cron 00:00 UTC"]
   cronQ["cron Mon 06:00 UTC"]
   relPub["release published"]
 
   push --> CI
-  push --> Nightly
-  cronN --> Nightly
   CI -->|success + site paths| DeploySite
   tag --> Release
   relPub --> Apt
   relPub --> Dnf
   cronQ --> CodeQL
+  cronQ --> BumpAndroid
   PR["PR to master"] --> CI
   PR --> PRBeta
 ```
@@ -30,43 +28,45 @@ flowchart TB
 |----------|------|---------|---------|
 | **CI** | `ci.yml` | push/PR → `master` | Lint/test/build per app (path-filtered) |
 | **Deploy Site** | `deploy-site.yml` | after CI success on `master`, or manual | GitHub Pages (landing + docs) |
-| **Dev & Nightly** | `dev-nightly.yml` | push → `master`, or nightly cron | Pre-release artifacts + GHCR |
 | **Release** | `release.yml` | tag `v*` | Full production release |
 | **PR Beta** | `pr-beta.yml` | PR open/sync/reopen/close | Per-PR beta assets |
+| **Bump Android Pin** | `bump-android-pin.yml` | weekly, or manual | PR to move `apps/android` to bedrud-android's newest release |
 | **CodeQL** | `codeql.yml` | push/PR + weekly | Security analysis |
 | **Apt repo** | `apt-repo.yml` | release published | `.deb` apt index on Pages |
 | **DNF repo** | `dnf-repo.yml` | release published | `.rpm` dnf index |
 
-There is **no** auto SSH deploy to a production host (`deploy-server.yml` removed).
+There is **no** auto SSH deploy to a production host (`deploy-server.yml` removed), and
+**no** nightly/dev pipeline (`dev-nightly.yml` removed) — Android, and every other client
+that used to be built on a schedule here, is built in its own repo now.
 
 ---
 
 ## Path filters (what runs when)
 
-Used by **CI**, **Deploy Site**, and **Dev/Nightly**. Compare changed files to previous commit (or last `nightly-*` on schedule).
+Used by **CI** and **Deploy Site**. Compares changed files to the previous commit.
 
 | Flag / job group | Paths that enable it |
 |------------------|----------------------|
 | **server** | `server/**` |
 | **web** | `apps/web/**` (meeting UI; embedded in binary) |
 | **site** | `apps/site/**`, **`docs/**`**, `server/**` (swagger), related workflow files |
-| **android** | `apps/android` (submodule pointer), `apps/android/**` |
 | **desktop** | `apps/desktop/**`, `Cargo.toml`, `Cargo.lock` |
 | **ios** | `apps/ios/**` |
-| **docker** (nightly only) | `server/**`, `apps/web/**`, `Dockerfile` |
-| **product** (nightly publish) | server, web, android, desktop, Dockerfile — **not** `docs/` or `apps/site` alone |
 
-`apps/android` is a git submodule pointing at [bedrud-android](https://github.com/themadorg/bedrud-android) (source lives there now). The filter matches both the bare `apps/android` gitlink entry (so bumping the pinned commit triggers the job) and `apps/android/**` (belt-and-suspenders).
+`apps/android` has no filter and no job here. It is a git submodule pointing at
+[bedrud-android](https://github.com/themadorg/bedrud-android), which lints, tests and
+signs its own releases — moving the pinned commit in this repo builds nothing in this
+repo. See [Bump Android Pin](#bump-android-pin-bump-android-pinyml).
 
 **Important examples**
 
-| Change set | CI jobs | Nightly publish | Pages deploy |
-|------------|---------|-----------------|--------------|
-| Only `docs/**` | **site only** | **nothing product** | yes (if CI succeeded) |
-| Only `apps/site/**` | site only | nothing product | yes |
-| Only `apps/web/**` | web | server+web+docker (server binary needed for image) | no* |
-| Only `server/**` | server + site | server + docker | yes (swagger) |
-| Only `apps/android/**` | android | android (+ whatever else filtered) | no* |
+| Change set | CI jobs | Pages deploy |
+|------------|---------|--------------|
+| Only `docs/**` | **site only** | yes (if CI succeeded) |
+| Only `apps/site/**` | site only | yes |
+| Only `apps/web/**` | web | no* |
+| Only `server/**` | server + site | yes (swagger) |
+| Only `apps/android` (the pin) | **none** | no |
 
 \*Unless `server/` or `apps/site/` / `docs/` also changed.
 
@@ -88,7 +88,6 @@ flowchart LR
   C --> S[server]
   S --> ST[server-test]
   C --> W[web]
-  C --> A[android]
   C --> I[ios]
   C --> D[desktop]
   C --> Site[site]
@@ -98,7 +97,7 @@ Jobs run only if their path flag is true (except `changes`, always).
 
 ### `changes`
 
-- Checkout + `dorny/paths-filter` → outputs: `server`, `web`, `site`, `android`, `desktop`, `ios`
+- Checkout + `dorny/paths-filter` → outputs: `server`, `web`, `site`, `desktop`, `ios`
 
 ### `server` (if `server`)
 
@@ -117,13 +116,6 @@ Jobs run only if their path flag is true (except `changes`, always).
 - Bun install  
 - `bun run check`  
 - `bun run build`
-
-### `android` (if `android`)
-
-- Checkout with `submodules: recursive` (pulls the pinned bedrud-android commit)
-- Java 17 + Gradle 9.5  
-- `lint` → unit tests → `assembleDebug` / `bundleDebug`  
-- Upload APKs/AAB (7-day artifacts)
 
 ### `ios` (if `ios`) — `macos-15`
 
@@ -164,78 +156,6 @@ Manual dispatch always deploys.
 
 ---
 
-## Dev & Nightly (`dev-nightly.yml`)
-
-**When:** push to `master`, or cron `0 0 * * *` (UTC).
-
-**Channels**
-
-- Push → tag `dev-<sha7>`, Docker tag `dev`  
-- Schedule → tag `nightly-YYYYMMDD`, Docker tag `nightly`  
-- Nightly aborts in `prepare` if HEAD == last `nightly-*` tip (no new commits)
-
-```mermaid
-flowchart TB
-  P[prepare] --> Ch[changes]
-  Ch --> SB[server-binary]
-  Ch --> W[web]
-  Ch --> A[android]
-  Ch --> D[desktop]
-  SB --> DD[docker-debian]
-  SB --> DX[docker-distroless]
-  Ch --> DD
-  Ch --> DX
-  SB & W & A & D & DD & DX --> R[release]
-  R --> T[telegram]
-```
-
-### Job conditions
-
-| Job | Runs when |
-|-----|-----------|
-| `prepare` | always (on trigger) |
-| `changes` | after prepare |
-| `server-binary` | `server` **or** `docker` paths |
-| `web` | `web` paths |
-| `docker-*` | `docker` paths (needs server-binary) |
-| `android` / `desktop` | their paths |
-| `release` | `product == true` **and** at least one of server/web/android/desktop/docker succeeded; skipped jobs OK |
-| `telegram` | release succeeded |
-
-**docs-only / site-only push:** `product=false` → **no** server/web/docker/android/desktop/release.
-
-### `server-binary` (matrix: linux/amd64, linux/arm64, windows/amd64)
-
-- Embed frontend (`apps/web` build:embed)  
-- Download LiveKit, static link via Zig  
-- Package `.tar.xz` / `.deb` / Windows zip  
-
-### `docker-debian` / `docker-distroless`
-
-- Download linux server artifacts  
-- Multi-arch push to `ghcr.io/<repo>`  
-
-### `android` / `desktop`
-
-- Build + upload installers/APKs (desktop matrix: Linux/Windows/macOS arches)
-- `android` always runs on the nightly schedule (even if the path-filter sees no change here), and builds whatever bedrud-android has most recently tagged `beta-v*` — not the submodule commit pinned in this repo's index. No historical reproducibility needed for nightly, unlike `release.yml` below.
-
-### `web`
-
-- `bun run build` → `web.tar.xz` artifact  
-
-### `release`
-
-- Download artifacts that exist  
-- GitHub prerelease with dynamic asset list  
-- Only lists Android/Desktop/Docker if those jobs ran  
-
-### `telegram`
-
-- Notify if release succeeded (server/web always mentioned; optional clients noted as path-gated)
-
----
-
 ## Release (`release.yml`)
 
 **When:** push tag `v*`. **No path filters** — full matrix.
@@ -245,10 +165,9 @@ flowchart TB
   SB[server-binary] --> D1[docker-debian]
   SB --> D2[docker-alpine]
   SB --> D3[docker-distroless]
-  A[android]
   I[ios]
   Desk[desktop]
-  SB & D1 & D2 & D3 & A & Desk --> R[release]
+  SB & D1 & D2 & D3 & Desk --> R[release]
   R --> Sec[check-secrets]
   Sec --> Tel[telegram]
   Sec --> AUR[aur-desktop / aur-server]
@@ -261,22 +180,25 @@ flowchart TB
 
 - **server-binary:** multi-OS packages + deb/rpm  
 - **docker-\*:** push GHCR + offline `.tar.gz`  
-- **android / ios / desktop:** full client builds (signing when secrets present)  
+- **ios / desktop:** full client builds (signing when secrets present)  
 - **release:** GitHub Release with all artifacts  
 - **Downstream** (secret-gated): Telegram, AUR, Snap, Flatpak, Chocolatey, Homebrew, WinGet  
 
-**Android submodule pinning:** unlike nightly, an official release must permanently and
-reproducibly reference the exact bedrud-android commit it shipped with. So the submodule
-pointer is bumped and committed *before* tagging, not dynamically at build time:
+**Android is not built here.** `release.yml` produces no Android artifact and never checks
+out the submodule — bedrud-android builds and signs its own APKs in its own release
+workflow. This repo only records *which* of its releases a given bedrud release sits
+alongside, and that record is the submodule pointer.
+
+The pointer still wants to be current before tagging:
 
 ```
-make pin-android-stable   # checks out apps/android at the latest stable-v* tag
-git add apps/android && git commit -m "chore(android): pin submodule to bedrud-android@stable-vX.Y.Z"
+make pin-android-stable   # checks out apps/android at the newest bedrud-android release
+git add apps/android && git commit -m "chore(android): pin submodule to bedrud-android@X.Y.Z"
 git tag vX.Y.Z && git push origin master vX.Y.Z
 ```
 
-`release.yml` then just checks out the submodule at whatever commit is already pinned
-(`submodules: recursive`) — no dynamic tag resolution happens in CI for this workflow.
+`bump-android-pin.yml` proposes that same commit as a PR every Monday, so the pin is
+usually already current; the manual route above is for a release cut mid-week.
 
 ---
 
@@ -285,7 +207,28 @@ git tag vX.Y.Z && git push origin master vX.Y.Z
 **When:** PR to `master` (open/sync/reopen/close). **Not path-filtered.**
 
 - **closed:** delete PR beta release  
-- **else:** build server (linux), android, web, desktop → prerelease `pr-<n>-…` → PR comment → Telegram  
+- **else:** build server (linux), web, desktop → prerelease `pr-<n>-…` → PR comment → Telegram  
+
+---
+
+## Bump Android Pin (`bump-android-pin.yml`)
+
+**When:** cron `0 6 * * 1` (Mondays, with the weekly dependabot run), or manual dispatch.
+
+`apps/android` is a submodule, and nothing else moves it — between bedrud-android
+publishing a release and somebody running `make pin-android-stable`, this repo keeps
+referencing whatever it was last pinned to. This job closes that gap:
+
+- Resolve the newest **release** of bedrud-android (not the newest tag: a tag is pushed
+  before that repo's signed build is dispatched and approved, so a tag can exist for days
+  with nothing built behind it). Pre-releases count — beta and stable of one tag are the
+  same commit, built and signed identically.
+- Compare it to the commit currently pinned in the index; stop if they match.
+- Otherwise write the new gitlink and open `chore/pin-android-<tag>` as a PR.
+
+It never merges, and it never touches an open bump PR it already created. Because the PR
+is opened with `GITHUB_TOKEN`, GitHub does not run workflows on it — which costs nothing
+here, since no job in this repo builds Android anyway.
 
 ---
 
@@ -322,7 +265,8 @@ cd apps/site && bun run check && bun run typecheck:astro && bun run build
 # desktop
 cargo test -p bedrud-desktop
 
-# android (submodule — init it first if you cloned without --recurse-submodules)
+# android (submodule — init it first if you cloned without --recurse-submodules).
+# No job in this repo builds it; bedrud-android runs its own lint and tests.
 git submodule update --init apps/android
 cd apps/android && ./gradlew lint testDebugUnitTest
 
@@ -339,6 +283,5 @@ LiveKit embed placeholder (CI): `mkdir -p server/internal/livekit/bin && touch s
 1. Open the PR/push file list.  
 2. Match paths to the table under **Path filters**.  
 3. CI = only matching jobs.  
-4. Nightly/dev = product jobs only if `product` paths hit; Docker only if server/web hit.  
-5. Pages = after CI, only if site/docs/server paths hit (or manual).  
-6. Full production everything = `git tag vX.Y.Z && git push --tags`.  
+4. Pages = after CI, only if site/docs/server paths hit (or manual).  
+5. Full production everything = `git tag vX.Y.Z && git push --tags`.  
