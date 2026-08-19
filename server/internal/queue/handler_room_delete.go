@@ -43,7 +43,10 @@ func NewRoomDeleteHandler(
 			return cleanupSvc.CascadeDeleteRoom(ctx, room, opts)
 		}
 
-		// Archive: soft-delete room, preserve recordings
-		return cleanupSvc.ArchiveRoom(ctx, room)
+		// Archive: soft-delete room, preserve recordings; notify participants first
+		return cleanupSvc.ArchiveRoom(ctx, room, services.CascadeDeleteOptions{
+			SystemEvent:   payload.SystemEvent,
+			SystemMessage: payload.SystemMessage,
+		})
 	}
 }

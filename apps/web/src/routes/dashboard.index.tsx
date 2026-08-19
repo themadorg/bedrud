@@ -226,14 +226,13 @@ function DashboardPage() {
     onMutate: async (roomId) => {
       await queryClient.cancelQueries({ queryKey: ['rooms'] })
       const prev = queryClient.getQueryData<Room[]>(['rooms'])
-      queryClient.setQueryData<Room[]>(['rooms'], (old) =>
-        old?.map((r) => (r.id === roomId ? { ...r, isActive: false } : r)),
-      )
+      queryClient.setQueryData<Room[]>(['rooms'], (old) => old?.filter((r) => r.id !== roomId))
       return { prev }
     },
     onSuccess: () => {
-      toast.success('Room deletion queued — will complete shortly')
-      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['rooms'] }), 3000)
+      toast.success('Room deleted')
+      void queryClient.invalidateQueries({ queryKey: ['rooms'] })
+      void queryClient.invalidateQueries({ queryKey: ['archived-rooms'] })
     },
     onError: (err, _roomId, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(['rooms'], ctx.prev)

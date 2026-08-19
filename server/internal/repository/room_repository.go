@@ -895,7 +895,7 @@ func (r *RoomRepository) GetRoomsCreatedByUser(userID string) ([]models.Room, er
 // If multiple rooms share the same name, only the most recently created one is kept.
 func (r *RoomRepository) GetLatestRoomsCreatedByUser(userID string) ([]models.Room, error) {
 	var allRooms []models.Room
-	err := r.db.Where("created_by = ?", userID).Order("created_at desc").Find(&allRooms).Error
+	err := r.db.Where("created_by = ? AND deleted_at IS NULL", userID).Order("created_at desc").Find(&allRooms).Error
 	if err != nil {
 		return nil, err
 	}

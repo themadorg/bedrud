@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"bedrud/internal/lkutil"
 	"bedrud/internal/models"
@@ -82,6 +83,11 @@ func (s *RoomCleanupService) CascadeDeleteRoom(ctx context.Context, room *models
 		lkutil.SendSystemMessageWithDeletedIdentity(lkCtx, s.lkClient, room.Name, opts.SystemEvent, opts.SystemMessage, opts.DeletedIdentity)
 	} else {
 		lkutil.SendSystemMessage(lkCtx, s.lkClient, room.Name, opts.SystemEvent, opts.SystemMessage)
+	}
+	// Give clients a moment to receive the deletion event before the room is torn down.
+	select {
+	case <-ctx.Done():
+	case <-time.After(400 * time.Millisecond):
 	}
 
 	if _, err := s.lkClient.DeleteRoom(lkCtx, &livekit.DeleteRoomRequest{Room: room.Name}); err != nil {
@@ -225,7 +231,7 @@ func (s *RoomCleanupService) BulkCloseRooms(ctx context.Context, rooms []models.
 
 // ArchiveRoom soft-deletes a room and preserves recordings for retention period.
 // Called when user ends meeting. Recordings remain accessible in Archived view.
-func (s *RoomCleanupService) ArchiveRoom(ctx context.Context, room *models.Room) error {
+func (s *RoomCleanupService) ArchiveRoom(ctx context.Context, room *models.Room, opts CascadeDeleteOptions) error {
 	lkCtx := s.lkAuthContext(ctx)
 
 	// 1. Stop active recordings
@@ -235,8 +241,21 @@ func (s *RoomCleanupService) ArchiveRoom(ctx context.Context, room *models.Room)
 		}
 	}
 
-	// 2. Send system message via LiveKit
-	lkutil.SendSystemMessage(lkCtx, s.lkClient, room.Name, "room_archived", "This meeting has ended.")
+	event := opts.SystemEvent
+	if event == "" {
+		event = "room_archived"
+	}
+	message := opts.SystemMessage
+	if message == "" {
+		message = "This meeting has ended."
+	}
+
+	// 2. Notify participants before tearing down the LiveKit room
+	lkutil.SendSystemMessage(lkCtx, s.lkClient, room.Name, event, message)
+	select {
+	case <-ctx.Done():
+	case <-time.After(400 * time.Millisecond):
+	}
 
 	// 3. Delete LiveKit room (kill active connections)
 	if _, err := s.lkClient.DeleteRoom(lkCtx, &livekit.DeleteRoomRequest{Room: room.Name}); err != nil {

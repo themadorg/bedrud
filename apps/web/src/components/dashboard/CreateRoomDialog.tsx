@@ -1,6 +1,8 @@
 import {
   AlertCircle,
   ArrowRight,
+  ChevronDown,
+  Dices,
   Globe,
   Loader2,
   Lock,
@@ -50,7 +52,7 @@ interface Props {
 
 const DEFAULT_SETTINGS: RoomSettings = {
   allowChat: true,
-  allowVideo: false,
+  allowVideo: true,
   allowAudio: true,
   requireApproval: false,
   e2ee: false,
@@ -68,6 +70,13 @@ const FEATURES = [
   { key: 'isPersistent' as const, icon: Pin, label: 'Persistent', adminOnly: true },
 ]
 
+function randomRoomName(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz'
+  const part = (length: number) =>
+    Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+  return `${part(3)}-${part(4)}-${part(3)}`
+}
+
 export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Props) {
   const [isLoading, setIsLoading] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -76,6 +85,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
   const [isPublic, setIsPublic] = useState(false)
   const [settings, setSettings] = useState<RoomSettings>(DEFAULT_SETTINGS)
   const [roomHost, setRoomHost] = useState('localhost:7070')
+  const [showMore, setShowMore] = useState(false)
 
   useEffect(() => {
     setRoomHost(window.location.host)
@@ -92,6 +102,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
     setMaxParticipants(20)
     setIsPublic(false)
     setSettings(DEFAULT_SETTINGS)
+    setShowMore(false)
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -130,22 +141,35 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
             >
               Name
             </Label>
-            <Input
-              id="room-name"
-              value={name}
-              onChange={(e) => {
-                const v = e.target.value
-                  .toLowerCase()
-                  .replace(/\s+/g, '-')
-                  .replace(/[^a-z0-9-]/g, '')
-                setName(v)
-              }}
-              placeholder="my-room"
-              autoComplete="off"
-              spellCheck={false}
-              autoFocus
-              className="mt-2 font-mono text-xl font-semibold tracking-tight placeholder:text-muted-foreground/30 px-0"
-            />
+            <div className="mt-2 flex items-center gap-2">
+              <Input
+                id="room-name"
+                value={name}
+                onChange={(e) => {
+                  const v = e.target.value
+                    .toLowerCase()
+                    .replace(/\s+/g, '-')
+                    .replace(/[^a-z0-9-]/g, '')
+                  setName(v)
+                }}
+                placeholder="my-room"
+                autoComplete="off"
+                spellCheck={false}
+                autoFocus
+                className="min-w-0 flex-1 font-mono text-xl font-semibold tracking-tight placeholder:text-muted-foreground/30 px-0"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setName(randomRoomName())}
+                className="h-10 w-10 shrink-0"
+                aria-label="Generate random name"
+                title="Generate random name"
+              >
+                <Dices className="h-4 w-4" />
+              </Button>
+            </div>
             <p className="mt-1.5 font-mono text-[11px] text-muted-foreground/50">
               {roomHost}/m/{displaySlug}
             </p>
@@ -203,69 +227,85 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
             </div>
           </div>
 
-          {/* ── Capacity section ── */}
-          <div className="border-t px-6 py-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-[10px] tracking-widest uppercase font-semibold text-muted-foreground/50">
-                  Capacity
-                </span>
-                <p className="mt-0.5 text-[11px] text-muted-foreground/60">{maxParticipants} seats</p>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setMaxParticipants((p) => Math.max(2, p - 5))}
-                  className="h-9 w-9"
-                >
-                  <Minus className="h-3.5 w-3.5" />
-                </Button>
-                <span className="w-10 text-center font-mono text-base font-semibold tabular-nums">
-                  {maxParticipants}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setMaxParticipants((p) => Math.min(500, p + 5))}
-                  className="h-9 w-9"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
+          {/* ── More options ── */}
+          <div className="border-t px-6 py-3">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowMore((v) => !v)}
+              className="h-8 w-full justify-between px-0 text-xs font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+              aria-expanded={showMore}
+            >
+              More options
+              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showMore && 'rotate-180')} />
+            </Button>
           </div>
 
-          {/* ── Features section ── */}
-          <div className="border-t px-6 py-5">
-            <span className="text-[10px] tracking-widest uppercase font-semibold text-muted-foreground/50">
-              Features
-            </span>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {FEATURES.filter((f) => !f.adminOnly || isAdmin).map(({ key, icon: Icon, label }) => {
-                const active = settings[key]
-                return (
-                  <Button
-                    key={key}
-                    type="button"
-                    variant={active ? 'default' : 'outline'}
-                    onClick={() => toggle(key)}
-                    className={cn(
-                      'gap-2 px-3.5 py-2 text-xs font-medium',
-                      active
-                        ? 'border-primary/30 bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {label}
-                  </Button>
-                )
-              })}
-            </div>
-          </div>
+          {showMore && (
+            <>
+              <div className="border-t px-6 py-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] tracking-widest uppercase font-semibold text-muted-foreground/50">
+                      Capacity
+                    </span>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground/60">{maxParticipants} seats</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setMaxParticipants((p) => Math.max(2, p - 5))}
+                      className="h-9 w-9"
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </Button>
+                    <span className="w-10 text-center font-mono text-base font-semibold tabular-nums">
+                      {maxParticipants}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setMaxParticipants((p) => Math.min(500, p + 5))}
+                      className="h-9 w-9"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t px-6 py-5">
+                <span className="text-[10px] tracking-widest uppercase font-semibold text-muted-foreground/50">
+                  Features
+                </span>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {FEATURES.filter((f) => !f.adminOnly || isAdmin).map(({ key, icon: Icon, label }) => {
+                    const active = settings[key]
+                    return (
+                      <Button
+                        key={key}
+                        type="button"
+                        variant={active ? 'default' : 'outline'}
+                        onClick={() => toggle(key)}
+                        className={cn(
+                          'gap-2 px-3.5 py-2 text-xs font-medium',
+                          active
+                            ? 'border-primary/30 bg-primary/10 text-primary'
+                            : 'text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {label}
+                      </Button>
+                    )
+                  })}
+                </div>
+              </div>
+            </>
+          )}
 
           {/* ── Error ── */}
           {createError && (

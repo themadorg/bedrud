@@ -1746,6 +1746,8 @@ func (h *RoomHandler) DeleteRoom(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to queue deletion"})
 	}
 
+	h.deletionInFlight.Delete(roomID)
+
 	// Dispatch webhook: room.ended
 	h.dispatchRoomEvent(c.Context(), models.EventRoomEnded, roomID, room.Name, claims.UserID)
 
@@ -2306,6 +2308,8 @@ func (h *RoomHandler) AdminCloseRoom(c *fiber.Ctx) error {
 		log.Error().Err(err).Str("roomId", roomID).Msg("Failed to enqueue room deletion")
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to queue deletion"})
 	}
+
+	h.deletionInFlight.Delete(roomID)
 
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"message": "Room close queued"})
 }
