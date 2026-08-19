@@ -53,43 +53,67 @@ func newMemoryDB(t *testing.T) *gorm.DB {
 // newPostgresDB gives each test a private schema on a shared server, so tests
 // can run in any order without seeing tables left by another.
 //
-// Skips when BEDRUD_TEST_POSTGRES_DSN is unset so `go test ./...` still works
-// on a machine with no Postgres. CI sets it, and the skip is visible there.
+// Skips when BEDRUD_TEST_POSTGRES_DSN is unset, so `go test ./...` still works
+// on a machine with no Postgres — unless BEDRUD_TEST_POSTGRES_REQUIRED is set,
+// which CI does. Without that, losing the DSN from the workflow would drop the
+// whole Postgres dialect behind a green tick, since `go test` does not print
+// skipped subtests without -v.
 func newPostgresDB(t *testing.T) *gorm.DB {
+	t.Helper()
+
+	db := openPostgresSchema(t, GormConfig(logger.Silent))
+	SetForTest(db)
+	t.Cleanup(ResetForTest)
+	return db
+}
+
+// openPostgresSchema builds a handle pointed at a schema of its own. The
+// gorm.Config is a parameter because one test deliberately opens with a
+// configuration production never uses — see
+// TestModels_DeriveNoForeignKeysOfTheirOwn.
+func openPostgresSchema(t *testing.T, cfg *gorm.Config) *gorm.DB {
 	t.Helper()
 
 	dsn := os.Getenv("BEDRUD_TEST_POSTGRES_DSN")
 	if dsn == "" {
+		if os.Getenv("BEDRUD_TEST_POSTGRES_REQUIRED") != "" {
+			t.Fatal("BEDRUD_TEST_POSTGRES_REQUIRED is set but BEDRUD_TEST_POSTGRES_DSN is empty: Postgres coverage would be skipped silently")
+		}
 		t.Skip("BEDRUD_TEST_POSTGRES_DSN not set — skipping Postgres dialect coverage")
 	}
 
-	db, err := gorm.Open(postgres.Open(dsn), GormConfig(logger.Silent))
+	// The schema has to exist before any connection that selects it, so create
+	// it over the base DSN first, then hand every later connection a DSN that
+	// already points at it.
+	//
+	// Setting search_path on one connection and pinning the pool to a single
+	// connection is not enough: database/sql discards a connection on
+	// driver.ErrBadConn and silently opens a fresh one, which lands in public.
+	// Tables would leak into the shared schema and survive the DROP below.
+	admin, err := gorm.Open(postgres.Open(dsn), GormConfig(logger.Silent))
 	if err != nil {
 		t.Fatalf("connect to test postgres: %v", err)
 	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		t.Fatalf("underlying sql.DB: %v", err)
-	}
-	// search_path is per-connection; a single connection keeps every statement
-	// inside this test's schema.
-	sqlDB.SetMaxOpenConns(1)
-
 	schema := fmt.Sprintf("bedrud_test_%d", time.Now().UnixNano())
-	if err := db.Exec("CREATE SCHEMA " + schema).Error; err != nil {
+	if err := admin.Exec("CREATE SCHEMA " + schema).Error; err != nil {
 		t.Fatalf("create test schema: %v", err)
 	}
-	if err := db.Exec("SET search_path TO " + schema).Error; err != nil {
-		t.Fatalf("set search_path: %v", err)
+
+	db, err := gorm.Open(postgres.Open(dsn+" search_path="+schema), cfg)
+	if err != nil {
+		t.Fatalf("connect to test schema: %v", err)
 	}
 
-	SetForTest(db)
 	t.Cleanup(func() {
-		if err := db.Exec("DROP SCHEMA " + schema + " CASCADE").Error; err != nil {
+		if sqlDB, err := db.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+		if err := admin.Exec("DROP SCHEMA " + schema + " CASCADE").Error; err != nil {
 			t.Logf("drop test schema %s: %v", schema, err)
 		}
-		ResetForTest()
+		if sqlDB, err := admin.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
 	})
 	return db
 }
@@ -352,6 +376,112 @@ func TestRunMigrations_PartialIndexRejectsDuplicateActiveRoomNames(t *testing.T)
 			// The same name is fine once the holder is no longer active.
 			seedArchivedRoom(t, db, "standup-archived", "standup")
 		})
+	}
+}
+
+// The isolation the Postgres helper depends on: every connection in the pool
+// must land in the test's own schema, not just the first one. Opens a second
+// connection explicitly, because a connection that never ran SET search_path
+// is the one that would betray a per-session fix.
+func TestPostgresHelper_SchemaIsolationSurvivesNewConnections(t *testing.T) {
+	db := newPostgresDB(t)
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("underlying sql.DB: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(4)
+
+	// Hold one connection open inside a transaction so the next query is
+	// forced onto a different one.
+	tx, err := sqlDB.Begin()
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var held, fresh string
+	if err := tx.QueryRow("SELECT current_schema()").Scan(&held); err != nil {
+		t.Fatalf("current_schema on held connection: %v", err)
+	}
+	if err := sqlDB.QueryRow("SELECT current_schema()").Scan(&fresh); err != nil {
+		t.Fatalf("current_schema on second connection: %v", err)
+	}
+
+	if held == "public" || fresh == "public" {
+		t.Fatalf("connections fell back to public (held=%q fresh=%q): schema isolation is not in the DSN", held, fresh)
+	}
+	if held != fresh {
+		t.Fatalf("connections disagree on schema: held=%q fresh=%q", held, fresh)
+	}
+}
+
+// The FK set is written entirely by hand in migrations.go. Asserting it exactly
+// catches two things nothing else does: a relationship-derived constraint
+// reappearing from a model tag — which the test helpers can no longer see now
+// that they run with FK derivation off — and a hand-written ALTER that failed
+// and was swallowed by log.Warn, since RunMigrations returns nil either way.
+func TestRunMigrations_ForeignKeysAreExactlyTheHandWrittenSet(t *testing.T) {
+	db := newPostgresDB(t)
+
+	if err := RunMigrations(); err != nil {
+		t.Fatalf("RunMigrations: %v", err)
+	}
+
+	want := []string{
+		"fk_blocked_tokens_user",
+		"fk_chat_uploads_room",
+		"fk_invite_tokens_created_by",
+		"fk_passkeys_user",
+		"fk_room_participants_room",
+		"fk_room_participants_user",
+		"fk_room_permissions_participant",
+		"fk_rooms_admin_id",
+		"fk_rooms_created_by",
+	}
+
+	var got []string
+	if err := db.Raw(`
+		SELECT conname FROM pg_constraint
+		WHERE contype = 'f' AND connamespace = current_schema()::regnamespace
+		ORDER BY conname
+	`).Scan(&got).Error; err != nil {
+		t.Fatalf("read pg_constraint: %v", err)
+	}
+
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("foreign key set differs from the hand-written one in migrations.go\n got: %v\nwant: %v", got, want)
+	}
+}
+
+// Guards against a model regaining an ambiguous foreignKey/references pair —
+// one where the named fields exist on both structs, so GORM picks a direction
+// and can pick the wrong one.
+//
+// This is the only test that opens with foreign-key derivation left ON, which
+// production never does (Initialize sets DisableForeignKeyConstraintWhenMigrating
+// and so does GormConfig). That is exactly why the guard is needed: with
+// derivation off, a mis-resolved association produces no DDL at all, so neither
+// the idempotency test nor the pg_constraint check above can see it. Verified
+// by re-adding the association this branch's parent commit removed — both of
+// those still passed, and only this test failed.
+//
+// Two runs, because the first survives on ordering: GORM cannot build a
+// constraint against a table that does not exist yet.
+func TestModels_DeriveNoForeignKeysOfTheirOwn(t *testing.T) {
+	db := openPostgresSchema(t, &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+		// DisableForeignKeyConstraintWhenMigrating deliberately left false.
+	})
+	SetForTest(db)
+	t.Cleanup(ResetForTest)
+
+	if err := RunMigrations(); err != nil {
+		t.Fatalf("first RunMigrations with FK derivation on: %v", err)
+	}
+	if err := RunMigrations(); err != nil {
+		t.Fatalf("a model derives a foreign key GORM cannot create — check for a "+
+			"foreignKey/references pair naming fields that exist on both structs: %v", err)
 	}
 }
 

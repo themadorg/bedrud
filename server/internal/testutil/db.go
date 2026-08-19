@@ -43,6 +43,11 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	// through database.GetDB(), as do handlers under test.
 	database.SetForTest(db)
 
+	// Without this the global handle outlives the test, pointing at a closed
+	// database, so a later test that forgets to set one up fails obscurely
+	// instead of at the point of the mistake.
+	t.Cleanup(database.ResetForTest)
+
 	if err := database.RunMigrations(); err != nil {
 		t.Fatalf("failed to migrate test database: %v", err)
 	}

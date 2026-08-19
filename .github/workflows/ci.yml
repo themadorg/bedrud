@@ -118,6 +118,10 @@ jobs:
       - run: go test -race -count=1 ./...
         env:
           BEDRUD_TEST_POSTGRES_DSN: host=localhost user=bedrud password=bedrud dbname=bedrud_test port=5432 sslmode=disable
+          # Turns a missing DSN into a failure instead of a silent skip. Without
+          # it, dropping the line above would take the Postgres dialect with it
+          # and still show green, since `go test` hides skipped subtests.
+          BEDRUD_TEST_POSTGRES_REQUIRED: "1"
 
   # ── Web (React meeting app — embedded in binary) ──────────────
   web:
