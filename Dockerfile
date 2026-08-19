@@ -36,7 +36,7 @@ RUN apk add --no-cache curl && \
     chmod +x /out/livekit-server
 
 # ── Stage 3: Server binary (native cross-compilation via xx) ────────────────
-FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS backend
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS backend
 COPY --from=xx / /
 ARG TARGETPLATFORM
 ARG VERSION=dev

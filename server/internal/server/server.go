@@ -62,6 +62,20 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// isStaticAssetPath is true for hashed build files that must never fall back to SPA HTML.
+func isStaticAssetPath(path string) bool {
+	if strings.HasPrefix(path, "/assets/") {
+		return true
+	}
+	lower := strings.ToLower(path)
+	for _, ext := range []string{".css", ".js", ".map", ".woff", ".woff2", ".ttf", ".ico", ".png", ".jpg", ".jpeg", ".svg", ".webp"} {
+		if strings.HasSuffix(lower, ext) {
+			return true
+		}
+	}
+	return false
+}
+
 func Run(configPath, version string) error {
 	cfg, err := config.Load(configPath)
 	if err != nil {
@@ -656,6 +670,10 @@ func Run(configPath, version string) error {
 	app.Get("*", func(c *fiber.Ctx) error {
 		if strings.HasPrefix(c.Path(), "/api") {
 			return c.Next()
+		}
+		// Missing hashed assets must 404, not the SPA HTML (browsers reject CSS served as text/html).
+		if isStaticAssetPath(c.Path()) {
+			return c.Status(http.StatusNotFound).SendString("Not Found")
 		}
 		c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
 		if c.Path() == "/" {

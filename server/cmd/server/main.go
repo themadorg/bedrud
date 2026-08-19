@@ -593,6 +593,15 @@ func run() error {
 		if strings.HasPrefix(path, "/api") || strings.HasPrefix(path, "/static") {
 			return c.Next()
 		}
+		if strings.HasPrefix(path, "/assets/") {
+			return c.Status(http.StatusNotFound).SendString("Not Found")
+		}
+		lower := strings.ToLower(path)
+		for _, ext := range []string{".css", ".js", ".map", ".woff", ".woff2", ".ttf", ".ico", ".png", ".jpg", ".jpeg", ".svg", ".webp"} {
+			if strings.HasSuffix(lower, ext) {
+				return c.Status(http.StatusNotFound).SendString("Not Found")
+			}
+		}
 		// Serve index.html from embedded files
 		file, err := root.UI.ReadFile("frontend/index.html")
 		if err != nil {

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -543,6 +544,69 @@ func TestGuestJoinRoom_Success(t *testing.T) {
 	}
 	if tokens, _ := payload["tokens"].(map[string]interface{}); tokens == nil || tokens["accessToken"] == "" {
 		t.Fatalf("expected tokens.accessToken, got %#v", payload["tokens"])
+	}
+}
+
+func TestGuestJoinRoom_CreatesGuestUserBeforeParticipant(t *testing.T) {
+	claims := &auth.Claims{
+		UserID:   "owner",
+		Email:    "owner@ex.com",
+		Name:     "Owner",
+		Accesses: []string{"user"},
+	}
+	config.SetForTest(&config.Config{
+		Auth: config.AuthConfig{JWTSecret: "guest-join-test-secret-key-32bytes!", TokenDuration: 1},
+	})
+	app, roomRepo := setupJoinTestApp(t, claims)
+
+	room, err := roomRepo.CreateRoom("owner", "public-guest-room", true, "standard", 0, &models.RoomSettings{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"roomName":  "public-guest-room",
+		"guestName": "Ada",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/rooms/guest-join", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	parts, err := roomRepo.GetActiveParticipants(room.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var guestUserID string
+	for _, p := range parts {
+		if strings.HasPrefix(p.UserID, "guest-") {
+			guestUserID = p.UserID
+			break
+		}
+	}
+	if guestUserID == "" {
+		t.Fatalf("expected a guest-* participant, got %+v", parts)
+	}
+
+	user, err := roomRepo.GetUserByID(guestUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user == nil {
+		t.Fatal("expected guest users row to exist before participant insert")
+	}
+	if user.Provider != models.ProviderGuest {
+		t.Fatalf("provider = %q, want guest", user.Provider)
+	}
+	if user.Name != "Ada" {
+		t.Fatalf("name = %q, want Ada", user.Name)
 	}
 }
 

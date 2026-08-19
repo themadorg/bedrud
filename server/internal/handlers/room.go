@@ -583,6 +583,15 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 	// Stable guest identity via signed HttpOnly cookie (enables ban stickiness).
 	guestID := h.resolveGuestIdentity(c)
 
+	// Persist a users row before room_participants — Postgres FK fk_room_participants_user
+	// requires users.id to exist. This is the guest "account" used for API JWTs too.
+	if h.userRepo != nil {
+		if _, err := h.ensureGuestUser(guestID, req.GuestName); err != nil {
+			log.Error().Err(err).Str("guestID", guestID).Msg("guest-join: failed to create guest user")
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to join room"})
+		}
+	}
+
 	// Enforce ban for returning guests before capacity enrollment.
 	if banned, bErr := h.roomRepo.IsParticipantBanned(room.ID, guestID); bErr == nil && banned {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "you are banned from this room"})
@@ -650,28 +659,27 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
-// ensureGuestAPIAuth creates/updates a guest user row and returns JWT access+refresh.
-// UserID matches LiveKit identity (guest-*) so room participant checks align.
-func (h *RoomHandler) ensureGuestAPIAuth(guestID, displayName string) (accessToken, refreshToken string, err error) {
+// ensureGuestUser creates or updates the users row for a guest LiveKit identity.
+// Must run before inserting room_participants (FK to users.id).
+func (h *RoomHandler) ensureGuestUser(guestID, displayName string) (*models.User, error) {
 	if h.userRepo == nil || guestID == "" {
-		return "", "", errors.New("guest API auth unavailable")
-	}
-	cfg := config.GetSafe()
-	if cfg == nil || cfg.Auth.JWTSecret == "" {
-		return "", "", errors.New("auth not configured")
+		return nil, errors.New("guest API auth unavailable")
 	}
 	displayName = strings.TrimSpace(displayName)
 	if displayName == "" {
 		displayName = "Guest"
 	}
 	user, gerr := h.userRepo.GetUserByID(guestID)
-	if gerr != nil || user == nil {
+	if gerr != nil {
+		return nil, gerr
+	}
+	if user == nil {
 		user = &models.User{
 			ID:        guestID,
 			Email:     guestID + "@bedrud.guest",
 			Name:      displayName,
-			Provider:  "guest",
-			Accesses:  models.StringArray{"guest"},
+			Provider:  models.ProviderGuest,
+			Accesses:  models.StringArray{string(models.AccessGuest)},
 			IsActive:  true,
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
@@ -680,12 +688,28 @@ func (h *RoomHandler) ensureGuestAPIAuth(guestID, displayName string) (accessTok
 			// Race: another join created the same id — re-fetch.
 			user, gerr = h.userRepo.GetUserByID(guestID)
 			if gerr != nil || user == nil {
-				return "", "", cerr
+				return nil, cerr
 			}
 		}
-	} else if displayName != "" && user.Name != displayName {
+		return user, nil
+	}
+	if displayName != "" && user.Name != displayName {
 		user.Name = displayName
 		_ = h.userRepo.UpdateUser(user)
+	}
+	return user, nil
+}
+
+// ensureGuestAPIAuth creates/updates a guest user row and returns JWT access+refresh.
+// UserID matches LiveKit identity (guest-*) so room participant checks align.
+func (h *RoomHandler) ensureGuestAPIAuth(guestID, displayName string) (accessToken, refreshToken string, err error) {
+	user, err := h.ensureGuestUser(guestID, displayName)
+	if err != nil {
+		return "", "", err
+	}
+	cfg := config.GetSafe()
+	if cfg == nil || cfg.Auth.JWTSecret == "" {
+		return "", "", errors.New("auth not configured")
 	}
 
 	accessToken, refreshToken, err = auth.GenerateTokenPair(
