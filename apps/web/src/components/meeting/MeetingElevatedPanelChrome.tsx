@@ -34,7 +34,7 @@ export function useMeetingElapsedClock() {
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [isConnected])
+  }, [])
 
   return { elapsed, clock }
 }

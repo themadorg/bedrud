@@ -13,6 +13,7 @@ import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
 import { useAuthStore } from '#/lib/auth.store'
 import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
 import { useInterfacePreferencesStore } from '#/lib/interface-preferences.store'
+import { isGuestToken } from '#/lib/jwt-user'
 import {
   getLiveKitPublishDiagnostics,
   installLiveKitPublisherPromiseFix,
@@ -29,9 +30,8 @@ import {
 } from '#/lib/meeting-debug-log'
 import { readMeetingDeviceId } from '#/lib/meeting-device-storage'
 import { useRecentRoomsStore } from '#/lib/recent-rooms.store'
-import { isGuestToken } from '#/lib/jwt-user'
-import { isGuestUser, useUserStore } from '#/lib/user.store'
 import { usePinnedParticipants } from '#/lib/usePinnedParticipants'
+import { isGuestUser, useUserStore } from '#/lib/user.store'
 import { useVideoPreferencesStore } from '#/lib/video-preferences.store'
 import { ErrorPage } from '@/components/ErrorPage'
 import { AskActionBanner } from '@/components/meeting/AskActionBanner'
@@ -254,8 +254,7 @@ function MeetingPage() {
   const handleRoomDeleted = useCallback(() => {
     setWasRoomDeleted(true)
     const isUserDeleted = deletionTypeRef.current === 'user_deleted'
-    const guest =
-      isGuestUser(useUserStore.getState().user) || isGuestToken(useAuthStore.getState().tokens?.accessToken)
+    const guest = isGuestUser(useUserStore.getState().user) || isGuestToken(useAuthStore.getState().tokens?.accessToken)
     const home = guest ? '/' : '/dashboard'
 
     if (isUserDeleted) {

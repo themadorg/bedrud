@@ -110,6 +110,7 @@ function RegisterPage() {
           startCooldown(120)
           return
         }
+        if (!('user' in res) || !('tokens' in res)) return
         handleAuthSuccess(res)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Passkey signup failed')
@@ -399,8 +400,7 @@ function RegisterPage() {
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? (
             <>
-              <Loader2 className="me-2 h-4 w-4 animate-spin" />{' '}
-              {usePasskey ? 'Setting up…' : 'Creating account…'}
+              <Loader2 className="me-2 h-4 w-4 animate-spin" /> {usePasskey ? 'Setting up…' : 'Creating account…'}
             </>
           ) : usePasskey ? (
             <>

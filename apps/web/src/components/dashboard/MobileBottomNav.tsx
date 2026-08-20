@@ -1,15 +1,15 @@
-import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { Plus, Settings, User, Video } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '#/lib/api'
 import { useRecentRoomsStore } from '#/lib/recent-rooms.store'
 import { useUserStore } from '#/lib/user.store'
-import { CreateRoomDialog, type CreateRoomData } from '@/components/dashboard/CreateRoomDialog'
+import { type CreateRoomData, CreateRoomDialog } from '@/components/dashboard/CreateRoomDialog'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 import { getErrorMessage } from '@/lib/errors'
+import { cn } from '@/lib/utils'
 
 export function MobileBottomNav() {
   const navigate = useNavigate()

@@ -135,7 +135,7 @@ function GuestPage() {
         title="Guest login disabled"
         message="This instance does not allow guest access."
         detail="The administrator has disabled guest login."
-        allowRegister={settings.registrationEnabled !== false}
+        allowRegister
       />
     )
   }
@@ -145,7 +145,9 @@ function GuestPage() {
       <div className="space-y-2">
         <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Guest</p>
         <h1 className="text-2xl font-semibold tracking-tight">Join without an account</h1>
-        <p className="text-sm text-muted-foreground">Pick a display name. You can register later if you want rooms of your own.</p>
+        <p className="text-sm text-muted-foreground">
+          Pick a display name. You can register later if you want rooms of your own.
+        </p>
       </div>
 
       <form method="post" action="#" onSubmit={handleSubmit} className="space-y-4">

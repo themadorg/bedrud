@@ -211,12 +211,7 @@ const KNOWN_SYSTEM_EVENTS = new Set([
   'stage',
 ])
 
-const ROOM_DELETION_EVENTS: Set<string> = new Set([
-  'room_deleted',
-  'room_ended',
-  'room_closed',
-  'room_archived',
-])
+const ROOM_DELETION_EVENTS: Set<string> = new Set(['room_deleted', 'room_ended', 'room_closed', 'room_archived'])
 
 // ── Room context (static / slow-changing metadata) ──────────────────────────
 

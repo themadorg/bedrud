@@ -1,14 +1,8 @@
 import { useNavigate } from '@tanstack/react-router'
-import { useEffect, useState, type ReactNode } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { MobileBottomNav } from '@/components/dashboard/MobileBottomNav'
 
-export function MobileOnlyGate({
-  desktopTo = '/dashboard',
-  children,
-}: {
-  desktopTo?: string
-  children: ReactNode
-}) {
+export function MobileOnlyGate({ desktopTo = '/dashboard', children }: { desktopTo?: string; children: ReactNode }) {
   const navigate = useNavigate()
   const [ready, setReady] = useState(false)
 
@@ -24,10 +18,7 @@ export function MobileOnlyGate({
 
   return (
     <div className="min-h-screen bg-background lg:hidden">
-      <main
-        id="main-content"
-        className="p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]"
-      >
+      <main id="main-content" className="p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">
         {children}
       </main>
       <MobileBottomNav />
