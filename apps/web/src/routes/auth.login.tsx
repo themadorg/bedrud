@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { Eye, EyeOff, Loader2, MailCheck } from 'lucide-react'
+import { Eye, EyeOff, Fingerprint, Loader2, MailCheck } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { FormattedMessage } from 'react-intl'
 import { ApiError, api } from '#/lib/api'
@@ -7,7 +7,7 @@ import { useAuthStore } from '#/lib/auth.store'
 import { getPublicSettings, type PublicSettings } from '#/lib/use-public-settings'
 import { useUserStore } from '#/lib/user.store'
 import { OAuthButtons } from '@/components/auth/OAuthButtons'
-import { PasskeyButton } from '@/components/auth/PasskeyButton'
+import { loginWithPasskey } from '@/components/auth/PasskeyButton'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,7 +37,9 @@ function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({})
   const [error, setError] = useState('')
+  const [email, setEmail] = useState('')
   const [settings, setSettings] = useState<PublicSettings | null>(null)
+  const [passkeyLoading, setPasskeyLoading] = useState(false)
 
   // Email verification state
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
@@ -59,7 +61,6 @@ function LoginPage() {
 
   const showPasskey = settings?.passkeysEnabled !== false
   const oauthProviders = settings?.oauthProviders ?? []
-  const hasAltAuth = showPasskey || oauthProviders.length > 0
 
   function startCooldown(seconds: number) {
     setResendCooldown(seconds)
@@ -93,7 +94,7 @@ function LoginPage() {
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
-    const email = (fd.get('email') as string).trim()
+    const email = ((fd.get('username') as string) || '').trim()
     const password = fd.get('password') as string
     const errs: typeof fieldErrors = {}
     if (!email || !/\S+@\S+\.\S+/.test(email)) errs.email = 'Enter a valid email'
@@ -134,6 +135,26 @@ function LoginPage() {
       }
     } finally {
       setResending(false)
+    }
+  }
+
+  async function handlePasskeyLogin() {
+    const trimmed = email.trim()
+    if (!trimmed || !/\S+@\S+\.\S+/.test(trimmed)) {
+      setFieldErrors({ email: 'Enter your email to sign in with passkey' })
+      setError('')
+      return
+    }
+    setPasskeyLoading(true)
+    setError('')
+    setFieldErrors({})
+    try {
+      const res = await loginWithPasskey(trimmed)
+      handleSuccess(res)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Passkey login failed')
+    } finally {
+      setPasskeyLoading(false)
     }
   }
 
@@ -189,7 +210,6 @@ function LoginPage() {
 
   return (
     <div className="space-y-7">
-      {/* Header */}
       <div className="space-y-2">
         <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Account</p>
         <h1 className="min-h-8 text-2xl font-semibold tracking-tight">
@@ -202,28 +222,45 @@ function LoginPage() {
 
       {error ? <Alert type="error" message={error} /> : null}
 
-      {/* Email/password form */}
-      {/* method=post: never serialize password into the URL if JS fails to intercept */}
-      <form method="post" action="#" onSubmit={handleSubmit} className="space-y-4" noValidate>
+      <form method="post" action="#" onSubmit={handleSubmit} className="space-y-4" autoComplete="on" noValidate>
         <div className="space-y-1.5">
-          <Label htmlFor="email">
+          <Label htmlFor="username">
             <FormattedMessage id="auth.login.email" defaultMessage="Email" />
           </Label>
           <Input
-            id="email"
-            name="email"
+            id="username"
+            name="username"
             type="email"
+            inputMode="email"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              setFieldErrors((p) => ({ ...p, email: undefined }))
+            }}
             placeholder="you@example.com"
-            autoComplete="email"
+            autoComplete="username webauthn"
             autoFocus
-            onChange={() => setFieldErrors((p) => ({ ...p, email: undefined }))}
+            required
           />
           {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
         </div>
 
+        {showPasskey && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void handlePasskeyLogin()}
+            disabled={passkeyLoading || isLoading}
+            className="h-10 w-full gap-2 text-sm"
+          >
+            {passkeyLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Fingerprint className="h-4 w-4" />}
+            {passkeyLoading ? 'Authenticating…' : 'Use passkey'}
+          </Button>
+        )}
+
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">
+            <Label htmlFor="current-password">
               <FormattedMessage id="auth.login.password" defaultMessage="Password" />
             </Label>
             <Link
@@ -235,12 +272,13 @@ function LoginPage() {
           </div>
           <div className="relative">
             <Input
-              id="password"
+              id="current-password"
               name="password"
               type={showPassword ? 'text' : 'password'}
               placeholder="••••••••"
               autoComplete="current-password"
               className="pe-10"
+              required
               onChange={() => setFieldErrors((p) => ({ ...p, password: undefined }))}
             />
             <Button
@@ -258,7 +296,7 @@ function LoginPage() {
           {fieldErrors.password && <p className="text-xs text-destructive">{fieldErrors.password}</p>}
         </div>
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button type="submit" className="w-full" disabled={isLoading || passkeyLoading}>
           {isLoading ? (
             <>
               <Loader2 className="me-2 h-4 w-4 animate-spin" />{' '}
@@ -270,20 +308,17 @@ function LoginPage() {
         </Button>
       </form>
 
-      {/* Divider — only if alt auth methods exist */}
-      {hasAltAuth && (
-        <div className="relative">
-          <Separator />
-          <span className="absolute inset-0 flex items-center justify-center">
-            <span className="bg-background px-3 text-xs text-muted-foreground">or continue with</span>
-          </span>
-        </div>
+      {oauthProviders.length > 0 && (
+        <>
+          <div className="relative">
+            <Separator />
+            <span className="absolute inset-0 flex items-center justify-center">
+              <span className="bg-background px-3 text-xs text-muted-foreground">or continue with</span>
+            </span>
+          </div>
+          <OAuthButtons availableProviders={oauthProviders} />
+        </>
       )}
-
-      {/* Passkey */}
-      {showPasskey && <PasskeyButton onSuccess={handleSuccess} />}
-
-      <OAuthButtons availableProviders={oauthProviders} />
 
       {settings?.guestLoginEnabled === false ? null : (
         <p className="text-center text-sm text-muted-foreground">

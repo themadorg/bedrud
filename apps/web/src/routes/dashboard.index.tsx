@@ -277,8 +277,7 @@ function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
-      {/* Header */}
-      <div>
+      <div className="hidden md:block">
         <h1 className="text-lg font-semibold tracking-tight">{firstName ? `${firstName}'s rooms` : 'Rooms'}</h1>
         <p className="text-sm text-muted-foreground">Create, join, or manage your meeting rooms.</p>
       </div>

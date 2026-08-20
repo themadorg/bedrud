@@ -35,15 +35,24 @@ func (r *PasskeyRepository) GetPasskeysByUserID(userID string) ([]models.Passkey
 	return passkeys, err
 }
 
-func (r *PasskeyRepository) UpdatePasskeyCounter(credentialID []byte, counter uint32) error {
+// UpdatePasskeyCounter applies WebAuthn signature-counter rules.
+// Both zero: authenticator does not support counters — accept with no DB write.
+// Otherwise require next > previous (clone detection when next <= previous).
+func (r *PasskeyRepository) UpdatePasskeyCounter(credentialID []byte, previous, next uint32) error {
+	if previous == 0 && next == 0 {
+		return nil
+	}
+	if next <= previous {
+		return fmt.Errorf("possible cloned authenticator (signature counter did not advance)")
+	}
 	result := r.db.Model(&models.Passkey{}).
-		Where("credential_id = ? AND counter < ?", credentialID, counter).
-		Update("counter", counter)
+		Where("credential_id = ? AND counter = ?", credentialID, previous).
+		Update("counter", next)
 	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("passkey counter not updated: credential not found or possible cloned authenticator (counter not advancing)")
+		return fmt.Errorf("passkey credential not found")
 	}
 	return nil
 }

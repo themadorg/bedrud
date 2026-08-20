@@ -113,7 +113,7 @@ func TestPasskeyRepository_UpdatePasskeyCounter(t *testing.T) {
 		Name:         "Counter Key",
 	})
 
-	err := repo.UpdatePasskeyCounter(credID, 5)
+	err := repo.UpdatePasskeyCounter(credID, 0, 5)
 	if err != nil {
 		t.Fatalf("failed to update counter: %v", err)
 	}
@@ -121,6 +121,13 @@ func TestPasskeyRepository_UpdatePasskeyCounter(t *testing.T) {
 	found, _ := repo.GetPasskeyByCredentialID(credID)
 	if found.Counter != 5 {
 		t.Fatalf("expected counter 5, got %d", found.Counter)
+	}
+
+	if err := repo.UpdatePasskeyCounter(credID, 5, 5); err == nil {
+		t.Fatal("expected error when counter does not advance")
+	}
+	if err := repo.UpdatePasskeyCounter(credID, 0, 0); err != nil {
+		t.Fatalf("zero counters should be accepted: %v", err)
 	}
 }
 

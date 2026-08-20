@@ -5,7 +5,8 @@ import { ApiError, api } from '#/lib/api'
 import type { AuthResponse } from '#/lib/handle-auth-success'
 import { useHandleAuthSuccess } from '#/lib/handle-auth-success'
 import { getPublicSettings, type PublicSettings } from '#/lib/use-public-settings'
-import { PasskeyButton } from '@/components/auth/PasskeyButton'
+import { cn } from '#/lib/utils'
+import { signupWithPasskey } from '@/components/auth/PasskeyButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -28,8 +29,10 @@ function RegisterPage() {
     inviteToken?: string
   }>({})
   const [settings, setSettings] = useState<PublicSettings | null>(null)
+  const [usePasskey, setUsePasskey] = useState(false)
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
 
-  // Email verification state
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
   const [resendCooldown, setResendCooldown] = useState(0)
   const [resending, setResending] = useState(false)
@@ -82,15 +85,40 @@ function RegisterPage() {
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
-    const name = (fd.get('name') as string).trim()
-    const email = (fd.get('email') as string).trim()
+    const trimmedName = name.trim()
+    const trimmedEmail = email.trim()
     const password = fd.get('password') as string
     const confirm = fd.get('confirm') as string
     const inviteToken = ((fd.get('inviteToken') as string) ?? '').trim()
 
     const errs: typeof fieldErrors = {}
-    if (name.length < 2) errs.name = 'At least 2 characters'
-    if (!email || !/\S+@\S+\.\S+/.test(email)) errs.email = 'Enter a valid email'
+    if (trimmedName.length < 2) errs.name = 'At least 2 characters'
+    if (!trimmedEmail || !/\S+@\S+\.\S+/.test(trimmedEmail)) errs.email = 'Enter a valid email'
+
+    if (usePasskey) {
+      if (Object.keys(errs).length) {
+        setFieldErrors(errs)
+        return
+      }
+      setFieldErrors({})
+      setError('')
+      setIsLoading(true)
+      try {
+        const res = await signupWithPasskey(trimmedName, trimmedEmail)
+        if ('requiresVerification' in res && res.requiresVerification) {
+          setRegisteredEmail(res.email)
+          startCooldown(120)
+          return
+        }
+        handleAuthSuccess(res)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Passkey signup failed')
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
     if (password.length < 12) errs.password = 'At least 12 characters'
     if (password !== confirm) errs.confirm = 'Passwords do not match'
     if (requiresToken && !inviteToken) errs.inviteToken = 'Invite token is required'
@@ -103,21 +131,19 @@ function RegisterPage() {
     setError('')
     setIsLoading(true)
     try {
-      const body: Record<string, string> = { name, email, password }
+      const body: Record<string, string> = { name: trimmedName, email: trimmedEmail, password }
       if (inviteToken) body.inviteToken = inviteToken
       const res = await api.post<AuthResponse | { requiresVerification: boolean; message: string; email: string }>(
         '/api/auth/register',
         body as any,
       )
 
-      // Handle email verification flow
       if ('requiresVerification' in res && res.requiresVerification) {
         setRegisteredEmail((res as any).email)
-        startCooldown(120) // 2 min default cooldown
+        startCooldown(120)
         return
       }
 
-      // Normal login flow
       handleAuthSuccess(res as AuthResponse)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
@@ -224,7 +250,6 @@ function RegisterPage() {
 
   return (
     <div className="space-y-7">
-      {/* Header */}
       <div className="space-y-2">
         <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Account</p>
         <h1 className="min-h-8 text-2xl font-semibold tracking-tight">Create an account</h1>
@@ -233,7 +258,6 @@ function RegisterPage() {
         </p>
       </div>
 
-      {/* Global error */}
       {error && (
         <div
           role="alert"
@@ -244,128 +268,149 @@ function RegisterPage() {
         </div>
       )}
 
-      {/* method=post: never serialize password into the URL if JS fails to intercept */}
-      <form method="post" action="#" onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {/* Name */}
+      <form method="post" action="#" onSubmit={handleSubmit} className="space-y-4" autoComplete="on" noValidate>
         <div className="space-y-1.5">
           <Label htmlFor="reg-name">Full name</Label>
           <Input
             id="reg-name"
             name="name"
+            value={name}
             placeholder="Jane Smith"
             autoComplete="name"
             autoFocus
-            onChange={() => clearField('name')}
+            required
+            onChange={(e) => {
+              setName(e.target.value)
+              clearField('name')
+            }}
           />
           {fieldErrors.name && <p className="text-xs text-destructive">{fieldErrors.name}</p>}
         </div>
 
-        {/* Email */}
         <div className="space-y-1.5">
-          <Label htmlFor="reg-email">Email</Label>
+          <Label htmlFor="reg-username">Email</Label>
           <Input
-            id="reg-email"
-            name="email"
+            id="reg-username"
+            name="username"
             type="email"
+            inputMode="email"
+            value={email}
             placeholder="you@example.com"
-            autoComplete="email"
-            onChange={() => clearField('email')}
+            autoComplete="username webauthn"
+            required
+            onChange={(e) => {
+              setEmail(e.target.value)
+              clearField('email')
+            }}
           />
           {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
         </div>
 
-        {/* Password */}
-        <div className="space-y-1.5">
-          <Label htmlFor="reg-password">Password</Label>
-          <div className="relative">
-            <Input
-              id="reg-password"
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              placeholder="At least 12 characters"
-              autoComplete="new-password"
-              className="pe-10"
-              onChange={() => clearField('password')}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute end-1 top-1/2 -translate-y-1/2 h-8 w-8"
-              tabIndex={-1}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </Button>
-          </div>
-          {fieldErrors.password && <p className="text-xs text-destructive">{fieldErrors.password}</p>}
-        </div>
+        {settings?.passkeysEnabled !== false && (
+          <Button
+            type="button"
+            variant={usePasskey ? 'default' : 'outline'}
+            onClick={() => {
+              setUsePasskey((v) => !v)
+              setError('')
+              setFieldErrors((p) => ({
+                ...p,
+                password: undefined,
+                confirm: undefined,
+                inviteToken: undefined,
+              }))
+            }}
+            aria-pressed={usePasskey}
+            className={cn(
+              'h-10 w-full gap-2 text-sm',
+              usePasskey && 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary',
+            )}
+          >
+            <Fingerprint className="h-4 w-4" />
+            {usePasskey ? 'Using passkey' : 'Use passkey'}
+          </Button>
+        )}
 
-        {/* Confirm */}
-        <div className="space-y-1.5">
-          <Label htmlFor="reg-confirm">Confirm password</Label>
-          <Input
-            id="reg-confirm"
-            name="confirm"
-            type={showPassword ? 'text' : 'password'}
-            placeholder="••••••••"
-            autoComplete="new-password"
-            onChange={() => clearField('confirm')}
-          />
-          {fieldErrors.confirm && <p className="text-xs text-destructive">{fieldErrors.confirm}</p>}
-        </div>
+        {!usePasskey && (
+          <>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-password">Password</Label>
+              <div className="relative">
+                <Input
+                  id="new-password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="At least 12 characters"
+                  autoComplete="new-password"
+                  className="pe-10"
+                  required
+                  onChange={() => clearField('password')}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute end-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              {fieldErrors.password && <p className="text-xs text-destructive">{fieldErrors.password}</p>}
+            </div>
 
-        {/* Invite token — only shown when required by admin settings */}
-        {requiresToken && (
-          <div className="space-y-1.5">
-            <Label htmlFor="reg-invite" className="flex items-center gap-1.5">
-              <KeyRound className="h-3.5 w-3.5" style={{ color: 'var(--accent-500)' }} />
-              Invite token <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="reg-invite"
-              name="inviteToken"
-              placeholder="Paste your invite token…"
-              autoComplete="off"
-              spellCheck={false}
-              onChange={() => clearField('inviteToken')}
-            />
-            {fieldErrors.inviteToken && <p className="text-xs text-destructive">{fieldErrors.inviteToken}</p>}
-            <p className="text-xs text-muted-foreground">Registration on this instance requires an invite token.</p>
-          </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-password-confirm">Confirm password</Label>
+              <Input
+                id="new-password-confirm"
+                name="confirm"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                required
+                onChange={() => clearField('confirm')}
+              />
+              {fieldErrors.confirm && <p className="text-xs text-destructive">{fieldErrors.confirm}</p>}
+            </div>
+
+            {requiresToken && (
+              <div className="space-y-1.5">
+                <Label htmlFor="reg-invite" className="flex items-center gap-1.5">
+                  <KeyRound className="h-3.5 w-3.5" style={{ color: 'var(--accent-500)' }} />
+                  Invite token <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="reg-invite"
+                  name="inviteToken"
+                  placeholder="Paste your invite token…"
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={() => clearField('inviteToken')}
+                />
+                {fieldErrors.inviteToken && <p className="text-xs text-destructive">{fieldErrors.inviteToken}</p>}
+                <p className="text-xs text-muted-foreground">Registration on this instance requires an invite token.</p>
+              </div>
+            )}
+          </>
         )}
 
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? (
             <>
-              <Loader2 className="me-2 h-4 w-4 animate-spin" /> Creating account…
+              <Loader2 className="me-2 h-4 w-4 animate-spin" />{' '}
+              {usePasskey ? 'Setting up…' : 'Creating account…'}
+            </>
+          ) : usePasskey ? (
+            <>
+              <Fingerprint className="me-2 h-4 w-4" /> Create account with Passkey
             </>
           ) : (
             'Create account'
           )}
         </Button>
       </form>
-
-      {settings?.passkeysEnabled !== false && (
-        <>
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground flex items-center gap-1.5">
-                <Fingerprint className="h-3.5 w-3.5" />
-                Passkey
-              </span>
-            </div>
-          </div>
-
-          <div className="flex justify-center">
-            <PasskeyButton onSuccess={handleAuthSuccess} />
-          </div>
-        </>
-      )}
 
       {settings?.guestLoginEnabled === false ? null : (
         <p className="text-center text-sm text-muted-foreground">
