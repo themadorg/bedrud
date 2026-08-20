@@ -15,7 +15,7 @@ import {
   UserCheck,
   Video,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -86,10 +86,18 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
   const [settings, setSettings] = useState<RoomSettings>(DEFAULT_SETTINGS)
   const [roomHost, setRoomHost] = useState('localhost:7070')
   const [showMore, setShowMore] = useState(false)
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setRoomHost(window.location.host)
   }, [])
+
+  useEffect(() => {
+    if (!open) return
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      setName(randomRoomName())
+    }
+  }, [open])
 
   function toggle(key: keyof RoomSettings) {
     setSettings((s) => ({ ...s, [key]: !s[key] }))
@@ -108,6 +116,15 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) resetForm()
     onOpenChange(nextOpen)
+  }
+
+  function handleOpenAutoFocus(e: Event) {
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      e.preventDefault()
+      return
+    }
+    e.preventDefault()
+    nameInputRef.current?.focus()
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -129,7 +146,10 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="gap-0 overflow-hidden border p-0 max-w-[calc(var(--app-width,100svw)-2rem)] sm:max-w-md">
+      <DialogContent
+        className="gap-0 overflow-hidden border p-0 max-w-[calc(var(--app-width,100svw)-2rem)] sm:max-w-md"
+        onOpenAutoFocus={handleOpenAutoFocus}
+      >
         <DialogTitle className="sr-only">Create Room</DialogTitle>
         <DialogDescription className="sr-only">Configure and create a new room</DialogDescription>
         <form onSubmit={handleSubmit}>
@@ -143,6 +163,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
             </Label>
             <div className="mt-2 flex items-center gap-2">
               <Input
+                ref={nameInputRef}
                 id="room-name"
                 value={name}
                 onChange={(e) => {
@@ -155,7 +176,6 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
                 placeholder="my-room"
                 autoComplete="off"
                 spellCheck={false}
-                autoFocus
                 className="min-w-0 flex-1 font-mono text-xl font-semibold tracking-tight placeholder:text-muted-foreground/30 px-0"
               />
               <Button

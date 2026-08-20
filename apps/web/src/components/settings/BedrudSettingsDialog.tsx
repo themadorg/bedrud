@@ -40,7 +40,7 @@ function MeetingVideoSettingsPanel() {
   )
 }
 
-function SettingsPanelBody({ tab }: { tab: TabId }) {
+function SettingsPanelBody({ tab, inMeeting }: { tab: TabId; inMeeting: boolean }) {
   switch (tab) {
     case 'profile':
       return <ProfileSettingsPanel tone="meeting" />
@@ -51,7 +51,7 @@ function SettingsPanelBody({ tab }: { tab: TabId }) {
     case 'audio':
       return <AudioSettingsPanel tone="meeting" />
     case 'video':
-      return <MeetingVideoSettingsPanel />
+      return inMeeting ? <MeetingVideoSettingsPanel /> : <VideoSettingsPanel tone="meeting" />
     case 'experimental':
       return <ExperimentalSettingsPanel tone="meeting" />
     default:
@@ -59,21 +59,24 @@ function SettingsPanelBody({ tab }: { tab: TabId }) {
   }
 }
 
-/** List → drill-down nav (mobile dialog + elevated WebXDC overlay). */
 function SettingsListNav({
   page,
   navDir,
+  tabs,
+  inMeeting,
   onOpenSubPage,
   onBack,
   onClose,
 }: {
   page: TabId | null
   navDir: 'forward' | 'back'
+  tabs: readonly (typeof TABS)[number][]
+  inMeeting: boolean
   onOpenSubPage: (id: TabId) => void
   onBack: () => void
   onClose: () => void
 }) {
-  const activeTabMeta = page ? TABS.find((t) => t.id === page) : null
+  const activeTabMeta = page ? tabs.find((t) => t.id === page) : null
   const pageAnimClass =
     navDir === 'forward'
       ? 'animate-in fade-in-0 slide-in-from-right duration-200 ease-out'
@@ -117,7 +120,7 @@ function SettingsListNav({
           {page === null ? (
             <nav className="p-3" aria-label="Settings categories">
               <ul className="m-0 list-none overflow-hidden rounded-xl border border-[var(--meet-border)] bg-[var(--meet-surface-muted)] p-0">
-                {TABS.map(({ id, label, icon: Icon, description }, index) => (
+                {tabs.map(({ id, label, icon: Icon, description }, index) => (
                   <li key={id} className={cn(index > 0 && 'border-t border-[var(--meet-border)]')}>
                     <button
                       type="button"
@@ -139,7 +142,7 @@ function SettingsListNav({
             </nav>
           ) : (
             <div className="p-4">
-              <SettingsPanelBody tab={page} />
+              <SettingsPanelBody tab={page} inMeeting={inMeeting} />
             </div>
           )}
         </div>
@@ -156,22 +159,42 @@ interface Props {
    * instead of a centered dialog — does not collapse the mini-app.
    */
   elevated?: boolean
+  /** LiveKit room device switching. False outside meetings. */
+  inMeeting?: boolean
+  includeSecurity?: boolean
+  /** Desktop sidebar tab when dialog opens. */
+  initialTab?: TabId
+  /** Mobile drill-down page when dialog opens (`null` = category list). */
+  initialMobilePage?: TabId | null
+  /** Leave bottom clearance for dashboard mobile nav. */
+  dockAboveMobileNav?: boolean
 }
 
-export function BedrudSettingsDialog({ open, onOpenChange, elevated = false }: Props) {
-  const [tab, setTab] = useState<TabId>('audio')
-  /** Mobile drill-down: null = root list (like a settings app). */
+export function BedrudSettingsDialog({
+  open,
+  onOpenChange,
+  elevated = false,
+  inMeeting = true,
+  includeSecurity = true,
+  initialTab,
+  initialMobilePage = null,
+  dockAboveMobileNav = false,
+}: Props) {
+  const tabs = includeSecurity ? TABS : TABS.filter((t) => t.id !== 'security')
+  const [tab, setTab] = useState<TabId>(initialTab ?? (inMeeting ? 'audio' : 'profile'))
   const [mobilePage, setMobilePage] = useState<TabId | null>(null)
-  /** Slide direction for root ↔ sub-page transitions. */
   const [navDir, setNavDir] = useState<'forward' | 'back'>('forward')
 
-  // Reset mobile stack when dialog closes so next open starts at root.
   useEffect(() => {
     if (!open) {
       setMobilePage(null)
       setNavDir('forward')
+      return
     }
-  }, [open])
+    setTab(initialTab ?? (inMeeting ? 'audio' : 'profile'))
+    setMobilePage(initialMobilePage)
+    setNavDir('forward')
+  }, [open, initialTab, initialMobilePage, inMeeting])
 
   const openSubPage = (id: TabId) => {
     setNavDir('forward')
@@ -189,13 +212,14 @@ export function BedrudSettingsDialog({ open, onOpenChange, elevated = false }: P
     <SettingsListNav
       page={mobilePage}
       navDir={navDir}
+      tabs={tabs}
+      inMeeting={inMeeting}
       onOpenSubPage={openSubPage}
       onBack={goBackToRoot}
       onClose={close}
     />
   )
 
-  // Elevated overlay: same shared left dock as chat / room info.
   if (elevated) {
     if (!open) return null
     return (
@@ -208,20 +232,22 @@ export function BedrudSettingsDialog({ open, onOpenChange, elevated = false }: P
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        overlayClassName={
+          dockAboveMobileNav
+            ? 'max-sm:h-[calc(var(--app-height,100svh)-4.5rem-env(safe-area-inset-bottom,0px))]'
+            : undefined
+        }
         className={cn(
           'meet-dialog flex flex-col gap-0 overflow-hidden p-0 shadow-2xl',
-          // Desktop: centered card with sidebar
           'sm:h-[min(90vh,720px)] sm:w-[min(760px,calc(var(--app-width,100svw)-2rem))] sm:max-w-[min(760px,calc(var(--app-width,100svw)-2rem))]',
-          // Mobile full-screen: visual viewport width+height (not layout 100vw/100vh)
-          'max-sm:fixed max-sm:left-[var(--app-offset-left,0px)] max-sm:top-[var(--app-offset-top,0px)] max-sm:h-[var(--app-height,100svh)] max-sm:max-h-[var(--app-height,100svh)] max-sm:w-[var(--app-width,100svw)] max-sm:max-w-[var(--app-width,100svw)] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0',
-          // Hide default Dialog X on mobile (we render nav chrome ourselves).
+          dockAboveMobileNav
+            ? 'max-sm:fixed max-sm:left-[var(--app-offset-left,0px)] max-sm:top-[var(--app-offset-top,0px)] max-sm:h-[calc(var(--app-height,100svh)-4.5rem-env(safe-area-inset-bottom,0px))] max-sm:max-h-[calc(var(--app-height,100svh)-4.5rem-env(safe-area-inset-bottom,0px))] max-sm:w-[var(--app-width,100svw)] max-sm:max-w-[var(--app-width,100svw)] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0 max-sm:border-b max-sm:border-[var(--meet-border)]'
+            : 'max-sm:fixed max-sm:left-[var(--app-offset-left,0px)] max-sm:top-[var(--app-offset-top,0px)] max-sm:h-[var(--app-height,100svh)] max-sm:max-h-[var(--app-height,100svh)] max-sm:w-[var(--app-width,100svw)] max-sm:max-w-[var(--app-width,100svw)] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0',
           'max-sm:[&>button.absolute]:hidden',
         )}
       >
-        {/* Mobile / narrow: list → drill-down */}
         <div className="flex min-h-0 flex-1 flex-col sm:hidden">{listBody}</div>
 
-        {/* Desktop dialog: sidebar tabs */}
         <div className="hidden min-h-0 flex-1 flex-col sm:flex">
           <DialogHeader className="shrink-0 border-b border-[var(--meet-border)] px-4 py-3">
             <DialogTitle className="text-[15px] font-semibold text-[var(--meet-fg)]">Settings</DialogTitle>
@@ -235,7 +261,7 @@ export function BedrudSettingsDialog({ open, onOpenChange, elevated = false }: P
           >
             <div className="flex w-[148px] shrink-0 flex-col border-r border-[var(--meet-border)] bg-[var(--meet-surface-muted)] px-2 py-3">
               <TabsList className="flex h-auto w-full flex-col items-stretch gap-0.5 bg-transparent p-0 text-[var(--meet-fg-muted)]">
-                {TABS.map(({ id, label, icon: Icon }) => (
+                {tabs.map(({ id, label, icon: Icon }) => (
                   <TabsTrigger
                     key={id}
                     value={id}
@@ -264,14 +290,16 @@ export function BedrudSettingsDialog({ open, onOpenChange, elevated = false }: P
               <TabsContent value="appearance" className="mt-0 outline-none">
                 <AppearanceSettingsPanel tone="meeting" />
               </TabsContent>
-              <TabsContent value="security" className="mt-0 outline-none">
-                <SecuritySettingsPanel />
-              </TabsContent>
+              {includeSecurity ? (
+                <TabsContent value="security" className="mt-0 outline-none">
+                  <SecuritySettingsPanel />
+                </TabsContent>
+              ) : null}
               <TabsContent value="audio" className="mt-0 outline-none">
                 <AudioSettingsPanel tone="meeting" />
               </TabsContent>
               <TabsContent value="video" className="mt-0 outline-none">
-                <MeetingVideoSettingsPanel />
+                {inMeeting ? <MeetingVideoSettingsPanel /> : <VideoSettingsPanel tone="meeting" />}
               </TabsContent>
               <TabsContent value="experimental" className="mt-0 outline-none">
                 <ExperimentalSettingsPanel tone="meeting" />
