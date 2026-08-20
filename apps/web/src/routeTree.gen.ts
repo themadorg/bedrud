@@ -9,6 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -16,6 +18,11 @@ import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as AuthIndexRouteImport } from './routes/auth.index'
+import { Route as SettingsVideoRouteImport } from './routes/settings.video'
+import { Route as SettingsSecurityRouteImport } from './routes/settings.security'
+import { Route as SettingsExperimentalRouteImport } from './routes/settings.experimental'
+import { Route as SettingsAudioRouteImport } from './routes/settings.audio'
+import { Route as SettingsAppearanceRouteImport } from './routes/settings.appearance'
 import { Route as MMeetIdRouteImport } from './routes/m.$meetId'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard/settings'
 import { Route as DashboardAdminRouteImport } from './routes/dashboard/admin'
@@ -42,6 +49,16 @@ import { Route as DashboardAdminSettingsAudioRouteImport } from './routes/dashbo
 import { Route as DashboardAdminRoomsEventsRouteImport } from './routes/dashboard/admin/rooms_.events'
 import { Route as DashboardAdminRoomsRoomIdRouteImport } from './routes/dashboard/admin/rooms_.$roomId'
 
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const NewRoute = NewRouteImport.update({
   id: '/new',
   path: '/new',
@@ -76,6 +93,31 @@ const AuthIndexRoute = AuthIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthRoute,
+} as any)
+const SettingsVideoRoute = SettingsVideoRouteImport.update({
+  id: '/video',
+  path: '/video',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsSecurityRoute = SettingsSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsExperimentalRoute = SettingsExperimentalRouteImport.update({
+  id: '/experimental',
+  path: '/experimental',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsAudioRoute = SettingsAudioRouteImport.update({
+  id: '/audio',
+  path: '/audio',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsAppearanceRoute = SettingsAppearanceRouteImport.update({
+  id: '/appearance',
+  path: '/appearance',
+  getParentRoute: () => SettingsRoute,
 } as any)
 const MMeetIdRoute = MMeetIdRouteImport.update({
   id: '/m/$meetId',
@@ -216,6 +258,8 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRouteWithChildren
   '/dashboard': typeof DashboardRouteWithChildren
   '/new': typeof NewRoute
+  '/profile': typeof ProfileRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
@@ -225,6 +269,11 @@ export interface FileRoutesByFullPath {
   '/dashboard/admin': typeof DashboardAdminRouteWithChildren
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
   '/m/$meetId': typeof MMeetIdRoute
+  '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/audio': typeof SettingsAudioRoute
+  '/settings/experimental': typeof SettingsExperimentalRoute
+  '/settings/security': typeof SettingsSecurityRoute
+  '/settings/video': typeof SettingsVideoRoute
   '/auth/': typeof AuthIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/admin/queue': typeof DashboardAdminQueueRoute
@@ -248,6 +297,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/new': typeof NewRoute
+  '/profile': typeof ProfileRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
@@ -255,6 +306,11 @@ export interface FileRoutesByTo {
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/verify': typeof AuthVerifyRoute
   '/m/$meetId': typeof MMeetIdRoute
+  '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/audio': typeof SettingsAudioRoute
+  '/settings/experimental': typeof SettingsExperimentalRoute
+  '/settings/security': typeof SettingsSecurityRoute
+  '/settings/video': typeof SettingsVideoRoute
   '/auth': typeof AuthIndexRoute
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/admin/queue': typeof DashboardAdminQueueRoute
@@ -281,6 +337,8 @@ export interface FileRoutesById {
   '/auth': typeof AuthRouteWithChildren
   '/dashboard': typeof DashboardRouteWithChildren
   '/new': typeof NewRoute
+  '/profile': typeof ProfileRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
@@ -290,6 +348,11 @@ export interface FileRoutesById {
   '/dashboard/admin': typeof DashboardAdminRouteWithChildren
   '/dashboard/settings': typeof DashboardSettingsRouteWithChildren
   '/m/$meetId': typeof MMeetIdRoute
+  '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/audio': typeof SettingsAudioRoute
+  '/settings/experimental': typeof SettingsExperimentalRoute
+  '/settings/security': typeof SettingsSecurityRoute
+  '/settings/video': typeof SettingsVideoRoute
   '/auth/': typeof AuthIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/admin/queue': typeof DashboardAdminQueueRoute
@@ -317,6 +380,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/new'
+    | '/profile'
+    | '/settings'
     | '/auth/callback'
     | '/auth/forgot-password'
     | '/auth/login'
@@ -326,6 +391,11 @@ export interface FileRouteTypes {
     | '/dashboard/admin'
     | '/dashboard/settings'
     | '/m/$meetId'
+    | '/settings/appearance'
+    | '/settings/audio'
+    | '/settings/experimental'
+    | '/settings/security'
+    | '/settings/video'
     | '/auth/'
     | '/dashboard/'
     | '/dashboard/admin/queue'
@@ -349,6 +419,8 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/new'
+    | '/profile'
+    | '/settings'
     | '/auth/callback'
     | '/auth/forgot-password'
     | '/auth/login'
@@ -356,6 +428,11 @@ export interface FileRouteTypes {
     | '/auth/reset-password'
     | '/auth/verify'
     | '/m/$meetId'
+    | '/settings/appearance'
+    | '/settings/audio'
+    | '/settings/experimental'
+    | '/settings/security'
+    | '/settings/video'
     | '/auth'
     | '/dashboard'
     | '/dashboard/admin/queue'
@@ -381,6 +458,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/new'
+    | '/profile'
+    | '/settings'
     | '/auth/callback'
     | '/auth/forgot-password'
     | '/auth/login'
@@ -390,6 +469,11 @@ export interface FileRouteTypes {
     | '/dashboard/admin'
     | '/dashboard/settings'
     | '/m/$meetId'
+    | '/settings/appearance'
+    | '/settings/audio'
+    | '/settings/experimental'
+    | '/settings/security'
+    | '/settings/video'
     | '/auth/'
     | '/dashboard/'
     | '/dashboard/admin/queue'
@@ -416,11 +500,27 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   DashboardRoute: typeof DashboardRouteWithChildren
   NewRoute: typeof NewRoute
+  ProfileRoute: typeof ProfileRoute
+  SettingsRoute: typeof SettingsRouteWithChildren
   MMeetIdRoute: typeof MMeetIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/new': {
       id: '/new'
       path: '/new'
@@ -469,6 +569,41 @@ declare module '@tanstack/react-router' {
       fullPath: '/auth/'
       preLoaderRoute: typeof AuthIndexRouteImport
       parentRoute: typeof AuthRoute
+    }
+    '/settings/video': {
+      id: '/settings/video'
+      path: '/video'
+      fullPath: '/settings/video'
+      preLoaderRoute: typeof SettingsVideoRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/security': {
+      id: '/settings/security'
+      path: '/security'
+      fullPath: '/settings/security'
+      preLoaderRoute: typeof SettingsSecurityRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/experimental': {
+      id: '/settings/experimental'
+      path: '/experimental'
+      fullPath: '/settings/experimental'
+      preLoaderRoute: typeof SettingsExperimentalRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/audio': {
+      id: '/settings/audio'
+      path: '/audio'
+      fullPath: '/settings/audio'
+      preLoaderRoute: typeof SettingsAudioRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/appearance': {
+      id: '/settings/appearance'
+      path: '/appearance'
+      fullPath: '/settings/appearance'
+      preLoaderRoute: typeof SettingsAppearanceRouteImport
+      parentRoute: typeof SettingsRoute
     }
     '/m/$meetId': {
       id: '/m/$meetId'
@@ -737,12 +872,34 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
   DashboardRouteChildren,
 )
 
+interface SettingsRouteChildren {
+  SettingsAppearanceRoute: typeof SettingsAppearanceRoute
+  SettingsAudioRoute: typeof SettingsAudioRoute
+  SettingsExperimentalRoute: typeof SettingsExperimentalRoute
+  SettingsSecurityRoute: typeof SettingsSecurityRoute
+  SettingsVideoRoute: typeof SettingsVideoRoute
+}
+
+const SettingsRouteChildren: SettingsRouteChildren = {
+  SettingsAppearanceRoute: SettingsAppearanceRoute,
+  SettingsAudioRoute: SettingsAudioRoute,
+  SettingsExperimentalRoute: SettingsExperimentalRoute,
+  SettingsSecurityRoute: SettingsSecurityRoute,
+  SettingsVideoRoute: SettingsVideoRoute,
+}
+
+const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
+  SettingsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   AuthRoute: AuthRouteWithChildren,
   DashboardRoute: DashboardRouteWithChildren,
   NewRoute: NewRoute,
+  ProfileRoute: ProfileRoute,
+  SettingsRoute: SettingsRouteWithChildren,
   MMeetIdRoute: MMeetIdRoute,
 }
 export const routeTree = rootRouteImport

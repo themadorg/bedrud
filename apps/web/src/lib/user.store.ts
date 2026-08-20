@@ -11,6 +11,11 @@ export interface User {
   avatarUrl?: string
 }
 
+export function isGuestUser(user: User | null | undefined): boolean {
+  if (!user) return false
+  return user.provider === 'guest' || (user.accesses?.includes('guest') ?? false)
+}
+
 interface UserStore {
   user: User | null
   setUser: (user: User) => void

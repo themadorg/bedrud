@@ -57,6 +57,7 @@ export type SystemEventName =
   | 'room_deleted'
   | 'room_ended'
   | 'room_closed'
+  | 'room_archived'
   /** Stage share (YouTube / whiteboard / screenshare / WebXDC) — chat event line, not a bubble. */
   | 'stage'
 
@@ -71,7 +72,10 @@ export interface SystemMessage {
   ts: number
 }
 
-export type RoomDeletionEvent = Extract<SystemEventName, 'room_deleted' | 'room_ended' | 'room_closed'>
+export type RoomDeletionEvent = Extract<
+  SystemEventName,
+  'room_deleted' | 'room_ended' | 'room_closed' | 'room_archived'
+>
 
 /** Chat media attachment — images (gallery) or generic files (WebXDC sendToChat, etc.). */
 export type ChatAttachment =
@@ -203,10 +207,16 @@ const KNOWN_SYSTEM_EVENTS = new Set([
   'room_deleted',
   'room_ended',
   'room_closed',
+  'room_archived',
   'stage',
 ])
 
-const ROOM_DELETION_EVENTS: Set<string> = new Set(['room_deleted', 'room_ended', 'room_closed'])
+const ROOM_DELETION_EVENTS: Set<string> = new Set([
+  'room_deleted',
+  'room_ended',
+  'room_closed',
+  'room_archived',
+])
 
 // ── Room context (static / slow-changing metadata) ──────────────────────────
 

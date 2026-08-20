@@ -29,6 +29,8 @@ import {
 } from '#/lib/meeting-debug-log'
 import { readMeetingDeviceId } from '#/lib/meeting-device-storage'
 import { useRecentRoomsStore } from '#/lib/recent-rooms.store'
+import { isGuestToken } from '#/lib/jwt-user'
+import { isGuestUser, useUserStore } from '#/lib/user.store'
 import { usePinnedParticipants } from '#/lib/usePinnedParticipants'
 import { useVideoPreferencesStore } from '#/lib/video-preferences.store'
 import { ErrorPage } from '@/components/ErrorPage'
@@ -252,6 +254,9 @@ function MeetingPage() {
   const handleRoomDeleted = useCallback(() => {
     setWasRoomDeleted(true)
     const isUserDeleted = deletionTypeRef.current === 'user_deleted'
+    const guest =
+      isGuestUser(useUserStore.getState().user) || isGuestToken(useAuthStore.getState().tokens?.accessToken)
+    const home = guest ? '/' : '/dashboard'
 
     if (isUserDeleted) {
       const toastId = toast.loading('Verifying your account...')
@@ -259,7 +264,7 @@ function MeetingPage() {
         if (cancelledRef.current) return
         if (exists) {
           toast.success('Room closed', { id: toastId, description: 'This room is no longer available.' })
-          navigate({ to: '/dashboard' })
+          navigate({ to: home })
         } else {
           toast.error('Account deleted', { id: toastId, description: 'Your account has been deleted.' })
           useAuthStore.getState().clear()
@@ -270,9 +275,7 @@ function MeetingPage() {
       })
     } else {
       toast.error('Room closed', { description: 'This room is no longer available.' })
-      setTimeout(() => {
-        if (!cancelledRef.current) navigate({ to: '/dashboard' })
-      }, 5000)
+      navigate({ to: home })
     }
   }, [navigate])
 
@@ -282,13 +285,19 @@ function MeetingPage() {
         deletionTypeRef.current = 'user_deleted'
         redirectTargetRef.current = { to: '/auth/login', search: { redirect: undefined } }
         toast.error('Account deleted', { description: message || 'Your account has been deleted.' })
-      } else {
-        deletionTypeRef.current = 'room_closed'
-        redirectTargetRef.current = { to: '/dashboard', search: { redirect: undefined } }
-        toast.error('Room closed', { description: message || 'This room has been closed.' })
+        return
       }
+
+      deletionTypeRef.current = 'room_closed'
+      const guest =
+        isGuestUser(useUserStore.getState().user) || isGuestToken(useAuthStore.getState().tokens?.accessToken)
+      const home = guest ? '/' : '/dashboard'
+      redirectTargetRef.current = { to: home, search: { redirect: undefined } }
+      setWasRoomDeleted(true)
+      toast.error('Room closed', { description: message || 'This room has been closed.' })
+      navigate({ to: home })
     },
-    [],
+    [navigate],
   )
 
   // Set initial guestName only after mount (client-side), where tokens are available.

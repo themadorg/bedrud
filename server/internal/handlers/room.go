@@ -333,6 +333,9 @@ func (h *RoomHandler) CreateRoom(c *fiber.Ctx) error {
 	}
 
 	claims := c.Locals("user").(*auth.Claims)
+	if claims.Provider == "guest" {
+		return c.Status(403).JSON(fiber.Map{"error": "Guests cannot create or manage rooms"})
+	}
 	isSuperAdmin := false
 	for _, a := range claims.Accesses {
 		if a == string(models.AccessSuperAdmin) {
@@ -504,6 +507,56 @@ func (h *RoomHandler) JoinRoom(c *fiber.Ctx) error {
 		"settings": room.Settings, settingLiveKitHost: h.clientLiveKitHost(c), "mode": room.Mode,
 		"activeRecordingId": activeRecordingID,
 	})
+}
+
+// CheckRoom validates that a public room exists and can be joined without enrolling a participant.
+// GET /api/room/check/:roomName
+//
+// @Summary Check room availability
+// @Description Read-only lookup for whether a room exists and is joinable.
+// @Tags rooms
+// @Produce json
+// @Param roomName path string true "Room name"
+// @Success 200 {object} map[string]interface{} "{exists, name}"
+// @Failure 400 {object} ErrorResponse "Invalid room name"
+// @Failure 403 {object} ErrorResponse "Private or full"
+// @Failure 404 {object} ErrorResponse "Room not found"
+// @Failure 410 {object} ErrorResponse "Room inactive"
+// @Router /room/check/{roomName} [get]
+func (h *RoomHandler) CheckRoom(c *fiber.Ctx) error {
+	roomName := strings.ToLower(strings.TrimSpace(c.Params("roomName")))
+	if roomName == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Room name is required"})
+	}
+	if err := models.ValidateRoomName(roomName); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	room, err := h.roomRepo.GetRoomByName(roomName)
+	if err != nil {
+		log.Error().Err(err).Str("room", roomName).Msg("Failed to look up room")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to look up room"})
+	}
+	if room == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Room not found"})
+	}
+	if !room.IsActive {
+		return c.Status(fiber.StatusGone).JSON(fiber.Map{"error": "room is no longer active"})
+	}
+	if !room.IsPublic {
+		return c.Status(403).JSON(fiber.Map{"error": "This room is private"})
+	}
+
+	count, err := h.roomRepo.GetParticipantCount(room.ID)
+	if err != nil {
+		log.Error().Err(err).Str("roomID", room.ID).Msg("Failed to count participants")
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to look up room"})
+	}
+	if count >= room.MaxParticipants {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "room is full"})
+	}
+
+	return c.JSON(fiber.Map{"exists": true, "name": room.Name})
 }
 
 type GuestJoinRoomRequest struct {
@@ -1693,6 +1746,8 @@ func (h *RoomHandler) DeleteRoom(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to queue deletion"})
 	}
 
+	h.deletionInFlight.Delete(roomID)
+
 	// Dispatch webhook: room.ended
 	h.dispatchRoomEvent(c.Context(), models.EventRoomEnded, roomID, room.Name, claims.UserID)
 
@@ -2253,6 +2308,8 @@ func (h *RoomHandler) AdminCloseRoom(c *fiber.Ctx) error {
 		log.Error().Err(err).Str("roomId", roomID).Msg("Failed to enqueue room deletion")
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to queue deletion"})
 	}
+
+	h.deletionInFlight.Delete(roomID)
 
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"message": "Room close queued"})
 }

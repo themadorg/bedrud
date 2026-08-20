@@ -32,6 +32,7 @@ interface MeetingPanelsProps {
   onToggleInfo: () => void
   participantsOpen: boolean
   onToggleParticipants: () => void
+  onOpenParticipantsFromChat: () => void
   onCloseParticipants: () => void
 }
 
@@ -53,6 +54,7 @@ export function MeetingPanels({
   onToggleInfo,
   participantsOpen,
   onToggleParticipants,
+  onOpenParticipantsFromChat,
   onCloseParticipants,
 }: MeetingPanelsProps) {
   const { stage } = useMeetingStage()
@@ -114,9 +116,6 @@ export function MeetingPanels({
 
       <RoomAccessDialog open={accessDialogOpen} onOpenChange={setAccessDialogOpen} />
 
-      {participantsOpen && !infoOpen && (!chatOpen || chatStuck) && (
-        <ParticipantsList adminId={adminId} onClose={onCloseParticipants} />
-      )}
       {chatOpen && (
         <ChatPanel
           key={chatElevated ? `chat-elevated-${chatSurfaceKey}` : 'chat-default'}
@@ -133,7 +132,13 @@ export function MeetingPanels({
           onStuckChange={setChatStuck}
           side={chatSide}
           elevated={chatElevated}
+          participantsOpen={participantsOpen}
+          onOpenParticipantsFromChat={onOpenParticipantsFromChat}
+          onCloseParticipants={onCloseParticipants}
         />
+      )}
+      {participantsOpen && !infoOpen && (
+        <ParticipantsList adminId={adminId} onClose={onCloseParticipants} />
       )}
       <RoomInfoPanel
         open={infoOpen}

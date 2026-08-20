@@ -1,50 +1,32 @@
 // TODO oncoming feature
-import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouterState } from '@tanstack/react-router'
-import { Activity, LayoutDashboard, LogOut, Menu, Radio, Settings, Shield, Users, Video } from 'lucide-react'
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
+import {
+  Activity,
+  LayoutDashboard,
+  LogOut,
+  Radio,
+  Settings,
+  Shield,
+  Users,
+  Video,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '#/lib/api'
 import { useAuthStore } from '#/lib/auth.store'
 import { useRecentRoomsStore } from '#/lib/recent-rooms.store'
-import type { User } from '#/lib/user.store'
+import type { User as BedrudUser } from '#/lib/user.store'
 import { useUserStore } from '#/lib/user.store'
+import { loadRegisteredUser, requireRegisteredUser } from '#/lib/require-registered-user'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { MobileBottomNav } from '@/components/dashboard/MobileBottomNav'
+import { HomeSettingsDialog } from '@/components/settings/HomeSettingsDialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/dashboard')({
-  beforeLoad: async () => {
-    if (typeof window === 'undefined') return
-    await useAuthStore.getState().initialize()
-    if (!useAuthStore.getState().tokens) throw redirect({ to: '/auth' })
-  },
-  // Loader runs before the component renders, eliminating the empty-profile flash.
-  // staleTime: Infinity means TanStack Router won't refetch on every sub-route navigation.
-  loader: async () => {
-    // Skip on SSR — no browser origin means relative URLs can't be resolved
-    if (typeof window === 'undefined') return
-    // Skip fetch if user is already in memory (e.g. soft navigation back to /dashboard)
-    if (useUserStore.getState().user) return
-    const u = await api.get<User & { accesses?: string[] }>('/api/auth/me')
-    useUserStore.getState().setUser({
-      id: u.id,
-      email: u.email,
-      name: u.name,
-      provider: u.provider,
-      isSuperAdmin: u.accesses?.includes('superadmin') ?? false,
-      isAdmin: (u.accesses?.includes('admin') || u.accesses?.includes('superadmin')) ?? false,
-      accesses: u.accesses ?? [],
-      avatarUrl: u.avatarUrl,
-    })
-  },
+  beforeLoad: requireRegisteredUser,
+  loader: loadRegisteredUser,
   staleTime: Infinity,
   component: DashboardLayout,
 })
@@ -100,7 +82,7 @@ function SidebarContent({
   onLogout,
   onNavClick,
 }: {
-  user: User | null
+  user: BedrudUser | null
   onLogout: () => void
   onNavClick?: () => void
 }) {
@@ -164,7 +146,7 @@ function SidebarContent({
   )
 }
 
-function Sidebar({ user, onLogout }: { user: User | null; onLogout: () => void }) {
+function Sidebar({ user, onLogout }: { user: BedrudUser | null; onLogout: () => void }) {
   return (
     <aside className="hidden lg:flex fixed inset-y-0 start-0 z-50 w-52 flex-col border-e bg-card">
       <div className="flex h-11 shrink-0 items-center gap-2 border-b px-4">
@@ -178,38 +160,8 @@ function Sidebar({ user, onLogout }: { user: User | null; onLogout: () => void }
   )
 }
 
-function MobileNav({ user, onLogout }: { user: User | null; onLogout: () => void }) {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <>
-      <Button
-        variant="ghost"
-        size="icon"
-        type="button"
-        onClick={() => setOpen(true)}
-        className="lg:hidden"
-        aria-label="Open navigation"
-      >
-        <Menu className="h-4 w-4" />
-      </Button>
-
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="left" className="w-52 p-0 flex flex-col">
-          <SheetHeader className="flex h-11 shrink-0 flex-row items-center gap-2 border-b px-4 space-y-0">
-            <div className="flex h-6 w-6 items-center justify-center bg-primary">
-              <Radio className="h-3 w-3 text-primary-foreground" />
-            </div>
-            <SheetTitle className="font-mono text-xs font-semibold tracking-tight">bedrud</SheetTitle>
-          </SheetHeader>
-          <SidebarContent user={user} onLogout={onLogout} onNavClick={() => setOpen(false)} />
-        </SheetContent>
-      </Sheet>
-    </>
-  )
-}
-
-function TopBar({ user, onLogout }: { user: User | null; onLogout: () => void }) {
+function TopBar({ user }: { user: BedrudUser | null }) {
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const initials = user?.name
     ? user.name
         .split(' ')
@@ -220,61 +172,29 @@ function TopBar({ user, onLogout }: { user: User | null; onLogout: () => void })
     : '?'
 
   return (
-    <header className="sticky top-0 z-40 flex h-11 items-center gap-2 border-b bg-background/90 px-4 backdrop-blur-sm lg:ps-52">
-      <MobileNav user={user} onLogout={onLogout} />
-
-      <Link to="/dashboard" className="flex items-center gap-2 lg:hidden">
-        <div className="flex h-6 w-6 items-center justify-center bg-primary">
-          <Radio className="h-3 w-3 text-primary-foreground" />
+    <>
+      <header className="sticky top-0 z-40 hidden h-11 items-center gap-2 border-b bg-background/90 px-4 backdrop-blur-sm lg:flex lg:ps-52">
+        <div className="ms-auto flex items-center gap-1.5">
+          <ThemeToggle />
+          <Button
+            variant="ghost"
+            size="icon"
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="h-auto w-auto rounded-full p-0"
+            aria-label="Open settings"
+          >
+            <Avatar className="h-6 w-6">
+              {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
+              <AvatarFallback className="bg-primary text-[9px] font-semibold text-primary-foreground">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+          </Button>
         </div>
-        <span className="font-mono text-xs font-semibold">bedrud</span>
-      </Link>
-
-      <div className="ms-auto flex items-center gap-1.5">
-        <ThemeToggle />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" type="button" className="rounded-full h-auto w-auto p-0">
-              <Avatar className="h-6 w-6">
-                {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
-                <AvatarFallback className="bg-primary text-[9px] font-semibold text-primary-foreground">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <div className="px-2 py-1.5">
-              <p className="truncate text-xs font-semibold">{user?.name ?? '…'}</p>
-              <p className="truncate text-[10px] text-muted-foreground">{user?.email ?? ''}</p>
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to="/dashboard/settings" className="flex cursor-pointer items-center gap-2 text-xs">
-                <Settings className="h-3.5 w-3.5" /> Settings
-              </Link>
-            </DropdownMenuItem>
-            {user?.isAdmin && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/dashboard/admin" className="flex cursor-pointer items-center gap-2 text-xs">
-                    <Shield className="h-3.5 w-3.5" /> Admin panel
-                  </Link>
-                </DropdownMenuItem>
-              </>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="cursor-pointer gap-2 text-xs text-destructive focus:text-destructive"
-              onClick={onLogout}
-            >
-              <LogOut className="h-3.5 w-3.5" /> Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </header>
+      </header>
+      <HomeSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} includeSecurity />
+    </>
   )
 }
 
@@ -320,8 +240,13 @@ function DashboardLayout() {
   return (
     <div className="min-h-screen bg-background">
       <Sidebar user={user} onLogout={handleLogout} />
-      <TopBar user={user} onLogout={handleLogout} />
-      <main id="main-content" className="p-4 lg:ps-52 lg:p-6">
+      <TopBar user={user} />
+      <MobileBottomNav />
+      <main
+        id="main-content"
+        className="p-4 pb-[calc(8rem+env(safe-area-inset-bottom,0px))] lg:ps-52 lg:p-6 lg:pb-6"
+      >
+        <p className="mb-6 pt-3 font-mono text-3xl font-semibold leading-tight tracking-tight lg:hidden">bedrud</p>
         <Outlet />
       </main>
     </div>

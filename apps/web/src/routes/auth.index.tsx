@@ -1,20 +1,62 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { ArrowRight, Loader2, UserRound } from 'lucide-react'
+import { ArrowRight, Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '#/lib/api'
 import { useAuthStore } from '#/lib/auth.store'
+import { getErrorMessage } from '#/lib/errors'
 import { getPublicSettings, type PublicSettings } from '#/lib/use-public-settings'
 import { useUserStore } from '#/lib/user.store'
+import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
 
 export const Route = createFileRoute('/auth/')({ component: GuestPage })
 
 interface AuthResponse {
   user: { id: string; email: string; name: string; provider: string; accesses: string[] | null; avatarUrl?: string }
   tokens: { accessToken: string; refreshToken: string }
+}
+
+function ClosedState({
+  title,
+  message,
+  detail,
+  allowRegister,
+}: {
+  title: string
+  message: string
+  detail: string
+  allowRegister?: boolean
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Guest</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <p className="text-sm text-muted-foreground">{message}</p>
+      </div>
+      <Alert type="error" message={detail} />
+      <p className="text-sm text-muted-foreground">
+        Already have an account?{' '}
+        <Link
+          to="/auth/login"
+          search={{ redirect: undefined }}
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
+          Sign in
+        </Link>
+        {allowRegister ? (
+          <>
+            {' · '}
+            <Link to="/auth/register" className="font-medium text-primary underline-offset-4 hover:underline">
+              Register
+            </Link>
+          </>
+        ) : null}
+      </p>
+    </div>
+  )
 }
 
 function GuestPage() {
@@ -42,7 +84,6 @@ function GuestPage() {
           chatMessageTTLHours: 2160,
           chatUploadMaxBytes: 10485760,
           chatUploadMaxDimension: 8192,
-          // TODO oncoming feature
           recordingsEnabled: true,
         }),
       )
@@ -70,9 +111,9 @@ function GuestPage() {
         accesses: res.user.accesses ?? [],
         avatarUrl: res.user.avatarUrl,
       })
-      navigate({ to: '/dashboard' })
+      navigate({ to: '/' })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+      setError(getErrorMessage(err, 'Something went wrong'))
     } finally {
       setIsLoading(false)
     }
@@ -80,67 +121,33 @@ function GuestPage() {
 
   if (settings?.registrationEnabled === false) {
     return (
-      <div className="space-y-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">Registration closed</h1>
-          <p className="text-sm text-muted-foreground">This instance is not accepting new accounts.</p>
-        </div>
-        <div className="border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          The administrator has disabled new registrations.
-        </div>
-        <p className="text-center text-sm text-muted-foreground">
-          Already have an account?{' '}
-          <Link
-            to="/auth/login"
-            search={{ redirect: undefined }}
-            className="font-medium text-foreground underline-offset-4 hover:underline"
-          >
-            Sign in
-          </Link>
-        </p>
-      </div>
+      <ClosedState
+        title="Registration closed"
+        message="This instance is not accepting new accounts."
+        detail="The administrator has disabled new registrations."
+      />
     )
   }
 
   if (settings?.guestLoginEnabled === false) {
     return (
-      <div className="space-y-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">Guest login disabled</h1>
-          <p className="text-sm text-muted-foreground">This instance does not allow guest access.</p>
-        </div>
-        <div className="border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          The administrator has disabled guest login.
-        </div>
-        <p className="text-center text-sm text-muted-foreground">
-          <Link
-            to="/auth/login"
-            search={{ redirect: undefined }}
-            className="font-medium text-foreground underline-offset-4 hover:underline"
-          >
-            Sign in
-          </Link>
-          {' · '}
-          <Link to="/auth/register" className="font-medium text-foreground underline-offset-4 hover:underline">
-            Register
-          </Link>
-        </p>
-      </div>
+      <ClosedState
+        title="Guest login disabled"
+        message="This instance does not allow guest access."
+        detail="The administrator has disabled guest login."
+        allowRegister={settings.registrationEnabled !== false}
+      />
     )
   }
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="space-y-1">
-        <div className="mb-4 inline-flex h-11 w-11 items-center justify-center bg-accent text-accent-foreground">
-          <UserRound className="h-5 w-5" />
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight">Join as guest</h1>
-        <p className="text-sm text-muted-foreground">No account needed — just pick a name and you're in.</p>
+      <div className="space-y-2">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Guest</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Join without an account</h1>
+        <p className="text-sm text-muted-foreground">Pick a display name. You can register later if you want rooms of your own.</p>
       </div>
 
-      {/* Form */}
       <form method="post" action="#" onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="guest-name">Display name</Label>
@@ -155,8 +162,9 @@ function GuestPage() {
             autoFocus
             autoComplete="nickname"
           />
-          {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
+
+        {error ? <Alert type="error" message={error} /> : null}
 
         <Button type="submit" className="w-full gap-2" disabled={isLoading}>
           {isLoading ? (
@@ -165,34 +173,11 @@ function GuestPage() {
             </>
           ) : (
             <>
-              {' '}
               Continue as guest <ArrowRight className="h-4 w-4" />
             </>
           )}
         </Button>
       </form>
-
-      {/* Divider */}
-      <div className="relative">
-        <Separator />
-        <span className="absolute inset-0 flex items-center justify-center">
-          <span className="bg-background px-3 text-xs text-muted-foreground">have an account?</span>
-        </span>
-      </div>
-
-      {/* Auth links */}
-      <div className="grid grid-cols-2 gap-3">
-        <Link to="/auth/login" search={{ redirect: undefined }}>
-          <Button variant="outline" className="w-full">
-            Sign in
-          </Button>
-        </Link>
-        <Link to="/auth/register">
-          <Button variant="outline" className="w-full">
-            Register
-          </Button>
-        </Link>
-      </div>
     </div>
   )
 }

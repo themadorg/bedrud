@@ -40,10 +40,13 @@ const DialogContent = React.forwardRef<
     elevated?: boolean
     /** Stack above elevated left dock (z-250). */
     aboveElevatedDock?: boolean
+    overlayClassName?: string
   }
->(({ className, children, elevated = false, aboveElevatedDock = false, ...props }, ref) => (
+>(({ className, children, elevated = false, aboveElevatedDock = false, overlayClassName, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay className={aboveElevatedDock ? 'z-[259]' : elevated ? 'z-[219]' : undefined} />
+    <DialogOverlay
+      className={cn(aboveElevatedDock ? 'z-[259]' : elevated ? 'z-[219]' : undefined, overlayClassName)}
+    />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
@@ -52,7 +55,6 @@ const DialogContent = React.forwardRef<
         'left-[calc(var(--app-offset-left,0px)+var(--app-width,100svw)/2)]',
         'top-[calc(var(--app-offset-top,0px)+var(--app-height,100svh)/2)]',
         '-translate-x-1/2 -translate-y-1/2',
-        // Width: never use bare 100% / 100vw of the layout viewport.
         'w-[min(32rem,calc(var(--app-width,100svw)-2rem))] max-w-[calc(var(--app-width,100svw)-2rem)]',
         'max-h-[calc(var(--app-height,100svh)-1.5rem)] overflow-y-auto overflow-x-hidden',
         'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -61,7 +63,6 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      {/* 44×44pt minimum touch target (Apple HIG) */}
       <DialogPrimitive.Close
         className={cn(
           'absolute end-2 top-2 z-10 flex h-11 w-11 items-center justify-center opacity-70 ring-offset-background transition-opacity',

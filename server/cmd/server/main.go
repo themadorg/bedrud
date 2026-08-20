@@ -18,6 +18,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
@@ -35,6 +36,7 @@ import (
 	"bedrud/internal/lkutil"
 	"bedrud/internal/middleware"
 	"bedrud/internal/models"
+	"bedrud/internal/queue"
 	"bedrud/internal/repository"
 	"bedrud/internal/scheduler"
 	"bedrud/internal/services"
@@ -361,15 +363,46 @@ func run() error {
 		log.Info().Str("baseDomain", cfg.Webxdc.BaseDomain).Msg("WebXDC experimental subsystem enabled")
 	}
 	webxdcHandler := handlers.NewWebxdcHandler(cfg, webxdcRepo, roomRepo).WithSettings(settingsRepo)
+
+	recordingStore := storage.NewRecordingStore(&cfg.Recording, &cfg.Chat.Uploads.S3)
+	queueConcurrency := cfg.Queue.Concurrency
+	if queueConcurrency <= 0 {
+		queueConcurrency = 1
+	}
+	if (cfg.Database.Type == database.DBTypeSQLite || cfg.Database.Type == "sqlite") && queueConcurrency > 1 {
+		log.Warn().Int("configured", queueConcurrency).Msg("SQLite queue concurrency forced to 1 (single-writer claim)")
+		queueConcurrency = 1
+	}
+	pollInterval := time.Duration(cfg.Queue.PollInterval.Int64()) * time.Millisecond
+	if pollInterval <= 0 {
+		pollInterval = 500 * time.Millisecond
+	}
+	queueWorker := queue.NewWorker(database.GetDB(), map[string]queue.Handler{
+		"user_delete":       queue.NewUserDeleteHandler(cleanupSvc, userRepo, passkeyRepo, prefsRepo, roomRepo),
+		"room_delete":       queue.NewRoomDeleteHandler(cleanupSvc, roomRepo),
+		"room_suspend":      queue.NewRoomSuspendHandler(cleanupSvc, roomRepo),
+		"chat_upload_s3":    queue.NewChatUploadS3Handler(storage.NewChatUploadStore(&cfg.Chat.Uploads), uploadTracker),
+		"send_email":        queue.NewSendEmailHandler(&cfg.Email),
+		"dispatch_webhook":  queue.NewDispatchWebhookHandler(),
+		"process_recording": queue.NewProcessRecordingHandler(recordingRepo, webhookRepo, cfg.LiveKit.Host, cfg.LiveKit.InternalHost, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, recordingStore),
+		"recording_delete":  queue.NewRecordingDeleteHandler(recordingRepo),
+	}, queue.WorkerOptions{
+		Interval:    pollInterval,
+		Concurrency: queueConcurrency,
+	})
+	queueWorker.Start(context.Background())
+	defer queueWorker.Stop()
+
 	roomHandler := handlers.NewRoomHandler(lkClient, &cfg.LiveKit, &cfg.Chat, roomRepo, userRepo, recordingRepo, settingsRepo, webhookRepo, uploadTracker, cleanupSvc)
 
 	// Room routes
-	api.Post("/room/create", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.CreateRoom)
+	api.Post("/room/create", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.RejectGuest(), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.CreateRoom)
 	api.Post("/room/join", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.JoinRoom)
 	api.Post("/room/guest-join", middleware.GuestRateLimiter(cfg.RateLimit), roomHandler.GuestJoinRoom)
+	api.Get("/room/check/:roomName", middleware.GuestRateLimiter(cfg.RateLimit), roomHandler.CheckRoom)
 	api.Post("/room/refresh-token", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.RefreshLiveKitToken)
-	api.Get("/room/list", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.ListRooms)
-	api.Get("/room/archived", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.ListArchivedRooms)
+	api.Get("/room/list", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.RejectGuest(), roomHandler.ListRooms)
+	api.Get("/room/archived", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.RejectGuest(), roomHandler.ListArchivedRooms)
 	api.Post("/room/:roomId/kick/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.KickParticipant)
 	api.Post("/room/:roomId/mute/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.MuteParticipant)
 	api.Post("/room/:roomId/ban/:identity", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.BanParticipant)
@@ -388,8 +421,8 @@ func run() error {
 	api.Get("/room/:roomId/participant/:identity/profile", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.GetParticipantProfile)
 	api.Post("/room/:roomId/stage/:identity/bring", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.BringToStage)
 	api.Post("/room/:roomId/stage/:identity/remove", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.RemoveFromStage)
-	api.Put("/room/:roomId/settings", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.UpdateSettings)
-	api.Delete("/room/:roomId", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), roomHandler.DeleteRoom)
+	api.Put("/room/:roomId/settings", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.RejectGuest(), roomHandler.UpdateSettings)
+	api.Delete("/room/:roomId", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.RejectGuest(), roomHandler.DeleteRoom)
 	api.Post("/room/:roomId/chat/upload", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), middleware.APIRateLimiter(cfg.RateLimit), roomHandler.UploadChatImage)
 
 	// Experimental WebXDC

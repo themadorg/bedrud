@@ -1212,25 +1212,50 @@ func (h *AuthHandler) getSession(c *fiber.Ctx) (*sessions.Session, *http.Request
 }
 
 func (h *AuthHandler) getRPID(c *fiber.Ctx) string {
-	rpid := h.config.Server.Domain
-	if rpid == "" {
-		rpid = c.Hostname()
+	if rpid := strings.TrimSpace(h.config.Server.Domain); rpid != "" {
+		return stripHostPort(rpid)
 	}
-	return rpid
+	if fu := strings.TrimSpace(h.config.Auth.FrontendURL); fu != "" {
+		if u, err := url.Parse(fu); err == nil && u.Hostname() != "" {
+			return u.Hostname()
+		}
+	}
+	return stripHostPort(c.Hostname())
 }
 
 func (h *AuthHandler) getOrigin(c *fiber.Ctx) string {
-	origin := h.config.Auth.FrontendURL
-	if origin == "" {
-		host := string(c.Context().Host())
-		proto := c.Protocol()
-		// Try to respect X-Forwarded-Proto if available
-		if forwardedProto := c.Get("X-Forwarded-Proto"); forwardedProto != "" {
-			proto = forwardedProto
-		}
-		origin = proto + "://" + host
+	origin := strings.TrimSpace(h.config.Auth.FrontendURL)
+	if origin != "" {
+		return strings.TrimRight(origin, "/")
 	}
-	return origin
+	host := string(c.Context().Host())
+	proto := c.Protocol()
+	if forwardedProto := c.Get("X-Forwarded-Proto"); forwardedProto != "" {
+		proto = forwardedProto
+	}
+	return proto + "://" + host
+}
+
+func stripHostPort(host string) string {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return host
+	}
+	// Bracketed IPv6 with optional port: [2001:db8::1]:443
+	if strings.HasPrefix(host, "[") {
+		if end := strings.IndexByte(host, ']'); end > 0 {
+			return host[1:end]
+		}
+		return host
+	}
+	// host:port — only strip when the suffix is all digits
+	if i := strings.LastIndexByte(host, ':'); i > 0 {
+		port := host[i+1:]
+		if port != "" && strings.Trim(port, "0123456789") == "" {
+			return host[:i]
+		}
+	}
+	return host
 }
 
 func (h *AuthHandler) saveSession(c *fiber.Ctx, sess *sessions.Session, req *http.Request) error {
@@ -1350,6 +1375,11 @@ func (h *AuthHandler) PasskeyRegisterFinish(c *fiber.Ctx) error {
 // @Failure 500 {object} auth.ErrorResponse
 // @Router /auth/passkey/login/begin [post]
 func (h *AuthHandler) PasskeyLoginBegin(c *fiber.Ctx) error {
+	var input struct {
+		Email string `json:"email"`
+	}
+	_ = c.BodyParser(&input)
+
 	challenge, err := h.authService.BeginLoginPasskey()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(internalError(err))
@@ -1373,10 +1403,30 @@ func (h *AuthHandler) PasskeyLoginBegin(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save session"})
 	}
 
-	return c.JSON(fiber.Map{
-		"challenge": challenge,
-		"rpId":      h.getRPID(c),
-	})
+	out := fiber.Map{
+		"challenge":        challenge,
+		"rpId":             h.getRPID(c),
+		"userVerification": "preferred",
+	}
+
+	email := auth.CanonicalizeEmail(input.Email)
+	if email != "" {
+		credIDs, err := h.authService.ListPasskeyCredentialIDsByEmail(email)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to list passkeys for login")
+			return c.Status(fiber.StatusInternalServerError).JSON(internalError(err))
+		}
+		allow := make([]fiber.Map, 0, len(credIDs))
+		for _, credID := range credIDs {
+			allow = append(allow, fiber.Map{
+				"type": "public-key",
+				"id":   base64.RawURLEncoding.EncodeToString(credID),
+			})
+		}
+		out["allowCredentials"] = allow
+	}
+
+	return c.JSON(out)
 }
 
 // @Summary Finish passkey login

@@ -699,6 +699,33 @@ func (s *AuthService) BeginLoginPasskey() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(challenge), nil
 }
 
+// ListPasskeyCredentialIDsByEmail returns credential IDs for passkey login allowCredentials.
+// Unknown emails return an empty list (no account enumeration).
+func (s *AuthService) ListPasskeyCredentialIDsByEmail(email string) ([][]byte, error) {
+	email = CanonicalizeEmail(email)
+	if email == "" {
+		return nil, nil
+	}
+	user, err := s.GetUserByEmail(email)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil || !user.IsActive {
+		return nil, nil
+	}
+	passkeys, err := s.passkeyRepo.GetPasskeysByUserID(user.ID)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([][]byte, 0, len(passkeys))
+	for i := range passkeys {
+		if len(passkeys[i].CredentialID) > 0 {
+			ids = append(ids, passkeys[i].CredentialID)
+		}
+	}
+	return ids, nil
+}
+
 func (s *AuthService) FinishLoginPasskey(challengeStr string, credentialID, clientDataJSON, authenticatorData, signature []byte, rpID, origin string) (*LoginResponse, error) {
 	challenge, err := base64.RawURLEncoding.DecodeString(challengeStr)
 	if err != nil {
@@ -728,8 +755,7 @@ func (s *AuthService) FinishLoginPasskey(challengeStr string, credentialID, clie
 		return nil, err
 	}
 
-	// Update counter to prevent replay attacks
-	if err := s.passkeyRepo.UpdatePasskeyCounter(credentialID, assertion.Counter); err != nil {
+	if err := s.passkeyRepo.UpdatePasskeyCounter(credentialID, passkey.Counter, assertion.Counter); err != nil {
 		return nil, fmt.Errorf("authentication verification failed: %w", err)
 	}
 

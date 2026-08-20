@@ -1,4 +1,4 @@
-import { Check, Loader2, Shield, Trash2, Upload } from 'lucide-react'
+import { Check, Loader2, Pencil, Shield, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '#/lib/api'
 import { useAuthStore } from '#/lib/auth.store'
@@ -213,8 +213,18 @@ export function ProfileSettingsPanel({ tone = 'default' }: { tone?: SettingsPane
 
   return (
     <div className={panelSurfaceClass(tone)}>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        className="hidden"
+        onChange={(e) => {
+          void handleAvatarSelected(e.target.files?.[0])
+          e.target.value = ''
+        }}
+      />
       <div className={cn('flex items-center gap-4 border-b px-5 py-5', sectionBorderClass(meeting))}>
-        <div className="relative shrink-0">
+        <div className="group relative h-16 w-16 shrink-0">
           <Avatar className={cn('h-16 w-16 ring-2', meeting ? 'ring-white/10' : 'ring-border')}>
             {displayedAvatarUrl ? (
               <AvatarImage
@@ -229,9 +239,43 @@ export function ProfileSettingsPanel({ tone = 'default' }: { tone?: SettingsPane
             </AvatarFallback>
           </Avatar>
           {(avatarUploading || avatarRemoving) && (
-            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/45">
+            <div className="absolute inset-0 flex size-full items-center justify-center rounded-full bg-black/45">
               <Loader2 className="h-5 w-5 animate-spin text-white" />
             </div>
+          )}
+          {!avatarUploading && !avatarRemoving && (
+            <>
+              <button
+                type="button"
+                disabled={isHydrating}
+                aria-label="Change profile photo"
+                title="Stored on the server and shown to others in meetings"
+                className={cn(
+                  'absolute inset-0 z-[1] flex size-full cursor-pointer items-center justify-center rounded-full border-none bg-black/50 p-0 opacity-0 transition-opacity',
+                  'group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                )}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Pencil className="h-4 w-4 text-white" />
+              </button>
+              {hasCustomAvatar && (
+                <button
+                  type="button"
+                  disabled={isHydrating}
+                  aria-label="Remove profile photo"
+                  className={cn(
+                    'absolute -bottom-0.5 -right-0.5 z-[2] flex h-5 w-5 items-center justify-center rounded-full border border-background bg-destructive p-0 text-destructive-foreground opacity-0 transition-opacity',
+                    'group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100',
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void handleRemoveAvatar()
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              )}
+            </>
           )}
         </div>
         <div className="min-w-0 flex-1">
@@ -248,54 +292,6 @@ export function ProfileSettingsPanel({ tone = 'default' }: { tone?: SettingsPane
             {(role === 'Superadmin' || role === 'Admin' || role === 'Moderator') && <Shield className="h-3 w-3" />}
             {role}
           </span>
-        </div>
-      </div>
-
-      <div className={cn('space-y-3 border-b px-5 py-4', sectionBorderClass(meeting))}>
-        <div>
-          <p className="text-sm font-medium">Profile photo</p>
-          <p className={cn('mt-0.5 text-xs', meeting ? 'text-white/50' : 'text-muted-foreground')}>
-            Stored on the server and shown to others in meetings
-          </p>
-        </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          className="hidden"
-          onChange={(e) => {
-            void handleAvatarSelected(e.target.files?.[0])
-            e.target.value = ''
-          }}
-        />
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={avatarUploading || avatarRemoving || isHydrating}
-            className={cn('gap-1.5', meeting && 'border-white/10 bg-white/[0.04] text-white/90 hover:bg-white/[0.08]')}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="h-3 w-3" />
-            Change photo
-          </Button>
-          {hasCustomAvatar && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={avatarUploading || avatarRemoving || isHydrating}
-              className={cn(
-                'gap-1.5',
-                meeting && 'border-white/10 bg-white/[0.04] text-white/90 hover:bg-white/[0.08]',
-              )}
-              onClick={() => void handleRemoveAvatar()}
-            >
-              <Trash2 className="h-3 w-3" />
-              Remove
-            </Button>
-          )}
         </div>
       </div>
 
