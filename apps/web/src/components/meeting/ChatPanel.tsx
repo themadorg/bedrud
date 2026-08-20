@@ -1,16 +1,20 @@
-import { Pin, X } from 'lucide-react'
+import { useLocalParticipant, useParticipants } from '@livekit/components-react'
+import { Mic, MicOff, Pin, Users, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { DeafenHeadphonesIcon } from '@/components/meeting/DeafenHeadphonesIcon'
 import {
   type ChatAttachment,
   type ChatMessage,
   type ChatPoll,
   normalizeChatAttachment,
   type SystemMessage,
+  useMeetingRoomContext,
 } from '@/components/meeting/MeetingContext'
 import { MeetingElevatedLeftDock } from '@/components/meeting/MeetingElevatedLeftDock'
 import { MeetingElevatedPanelBody, MeetingElevatedPanelHeader } from '@/components/meeting/MeetingElevatedPanelChrome'
 import { useMeetingExpandChromeHandlers } from '@/components/meeting/meeting-expand-chrome-context'
+import { useMeetingMicKeyboard } from '@/components/meeting/useMeetingMicKeyboard'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { ChatInput, type ChatInputHandle } from './chat/ChatInput'
@@ -42,6 +46,9 @@ interface Props {
   side?: 'left' | 'right'
   /** Stack above expanded WebXDC (z-200) — must portal to body. */
   elevated?: boolean
+  participantsOpen?: boolean
+  onOpenParticipantsFromChat?: () => void
+  onCloseParticipants?: () => void
 }
 
 const headerBtnClass = (active = false) =>
@@ -80,17 +87,24 @@ export function ChatPanel({
   onStuckChange,
   side = 'right',
   elevated = false,
+  participantsOpen = false,
+  onOpenParticipantsFromChat,
+  onCloseParticipants,
 }: Props) {
   const inputRef = useRef<ChatInputHandle>(null)
   const noop = useCallback(() => {}, [])
   const isMobile = useIsMobileChat()
   const { closeChat: closeElevatedChat } = useMeetingExpandChromeHandlers()
   const handleClose = elevated ? closeElevatedChat : onClose
-  // Mobile is always a full-screen modal — never dock/stick.
   const isDocked = stuck && !isMobile
   const fromLeft = side === 'left' && !isMobile
-  // Unpinned (or mobile): overlay stage content. Elevated: expand-mode left dock.
   const isOverlay = !isDocked
+
+  const { localParticipant, isMicrophoneEnabled: micEnabled } = useLocalParticipant()
+  const { isSelfDeafened, toggleSelfDeafen } = useMeetingRoomContext()
+  const { micUiEnabled, micTip, toggleMic } = useMeetingMicKeyboard(localParticipant, isSelfDeafened, micEnabled)
+  const participants = useParticipants()
+  const micOff = isSelfDeafened || !micUiEnabled
 
   useEffect(() => {
     markRead()
@@ -98,7 +112,6 @@ export function ChatPanel({
     return () => clearTimeout(t)
   }, [markRead])
 
-  // Clear pin/dock when entering mobile so desktop stick state does not leak.
   useEffect(() => {
     if (isMobile && stuck) onStuckChange?.(false)
   }, [isMobile, stuck, onStuckChange])
@@ -115,8 +128,7 @@ export function ChatPanel({
     [roomId],
   )
 
-  // Modal / overlay / elevated: trap focus. Docked desktop sidebar: leave focus free.
-  const trapRef = useFocusTrap({ enabled: isOverlay || elevated, onClose: handleClose })
+  const trapRef = useFocusTrap({ enabled: (isOverlay || elevated) && !participantsOpen, onClose: handleClose })
 
   const chatBody = (
     <>
@@ -134,6 +146,66 @@ export function ChatPanel({
       />
       <ChatInput ref={inputRef} onSend={sendChat} onUpload={uploadAndSend} elevated={elevated} />
     </>
+  )
+
+  const mobileMeetingBar = isMobile && !elevated && (
+    <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-[var(--meet-border-subtle)] bg-[var(--meet-control)] px-3">
+      <div className="flex items-center gap-0.5">
+        <button
+          type="button"
+          title={micTip}
+          onClick={() => {
+            if (isSelfDeafened) {
+              toggleSelfDeafen()
+              return
+            }
+            toggleMic()
+          }}
+          className={cn(
+            'flex h-9 w-9 items-center justify-center border-none cursor-pointer transition-[background,color] duration-150',
+            micOff
+              ? 'bg-[color-mix(in_oklab,var(--destructive)_18%,transparent)] text-[var(--destructive)]'
+              : 'bg-transparent text-[var(--meet-fg-muted)] hover:bg-[var(--meet-control-hover)] hover:text-[var(--meet-fg-strong)]',
+          )}
+          aria-label={micOff ? 'Unmute' : 'Mute'}
+          aria-pressed={micOff}
+        >
+          {micOff ? <MicOff size={16} /> : <Mic size={16} />}
+        </button>
+        <button
+          type="button"
+          onClick={toggleSelfDeafen}
+          className={cn(
+            'flex h-9 w-9 items-center justify-center border-none cursor-pointer transition-[background,color] duration-150',
+            isSelfDeafened
+              ? 'bg-[color-mix(in_oklab,var(--destructive)_18%,transparent)] text-[var(--destructive)]'
+              : 'bg-transparent text-[var(--meet-fg-muted)] hover:bg-[var(--meet-control-hover)] hover:text-[var(--meet-fg-strong)]',
+          )}
+          aria-label={isSelfDeafened ? 'Undeafen' : 'Deafen'}
+          aria-pressed={isSelfDeafened}
+        >
+          <DeafenHeadphonesIcon size={16} off={isSelfDeafened} />
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          if (participantsOpen) onCloseParticipants?.()
+          else onOpenParticipantsFromChat?.()
+        }}
+        className={cn(
+          'flex h-11 items-center gap-1.5 border-none px-3 cursor-pointer transition-[background,color] duration-150',
+          participantsOpen
+            ? 'bg-[var(--meet-btn-muted-bg)] text-[var(--meet-btn-muted-fg)]'
+            : 'bg-transparent text-[var(--meet-fg-muted)] hover:bg-[var(--meet-control-hover)] hover:text-[var(--meet-fg-strong)]',
+        )}
+        aria-label={participantsOpen ? 'Close participants' : `Show participants (${participants.length})`}
+        aria-pressed={participantsOpen}
+      >
+        <Users size={16} />
+        <span className="text-[13px] font-semibold tabular-nums">{participants.length}</span>
+      </button>
+    </div>
   )
 
   const body = (
@@ -162,6 +234,7 @@ export function ChatPanel({
           </button>
         </div>
       </div>
+      {mobileMeetingBar}
       {chatBody}
     </>
   )
