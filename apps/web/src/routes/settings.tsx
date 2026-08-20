@@ -58,10 +58,7 @@ function SettingsLayout() {
         </div>
       ) : (
         <div className="space-y-3">
-          <Link
-            to="/settings"
-            className="inline-flex h-11 items-center gap-0.5 text-[15px] text-primary"
-          >
+          <Link to="/settings" className="inline-flex h-11 items-center gap-0.5 text-[15px] text-primary">
             <ChevronLeft size={22} className="shrink-0" />
             Settings
           </Link>

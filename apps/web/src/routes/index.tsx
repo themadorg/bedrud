@@ -2,15 +2,15 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { AlertCircle, ArrowRight, Clock, LogOut, Settings, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '#/lib/api'
-import { formatJoinRoomError } from '#/lib/errors'
 import { useAuthStore } from '#/lib/auth.store'
+import { formatJoinRoomError } from '#/lib/errors'
 import { isGuestToken } from '#/lib/jwt-user'
 import { type RecentRoom, useRecentRoomsStore } from '#/lib/recent-rooms.store'
 import type { User } from '#/lib/user.store'
 import { isGuestUser, useUserStore } from '#/lib/user.store'
 import { cn } from '#/lib/utils'
-import { HomeSettingsDialog } from '@/components/settings/HomeSettingsDialog'
 import { BedrudLogo } from '@/components/BedrudLogo'
+import { HomeSettingsDialog } from '@/components/settings/HomeSettingsDialog'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -153,11 +153,7 @@ function JoinForm() {
   )
 }
 
-function HomeHeader({
-  onOpenSettings,
-}: {
-  onOpenSettings: () => void
-}) {
+function HomeHeader({ onOpenSettings }: { onOpenSettings: () => void }) {
   const navigate = useNavigate()
   const tokens = useAuthStore((s) => s.tokens)
   const initialized = useAuthStore((s) => s.initialized)
@@ -260,10 +256,7 @@ function JoinHint({ guest }: { guest: boolean }) {
     return (
       <p className="text-xs text-muted-foreground">
         Joined as {user?.name ?? 'guest'} ·{' '}
-        <Link
-          to="/auth/register"
-          className="underline underline-offset-4 transition-colors hover:text-foreground"
-        >
+        <Link to="/auth/register" className="underline underline-offset-4 transition-colors hover:text-foreground">
           Create an account
         </Link>{' '}
         to host rooms
@@ -321,7 +314,10 @@ function RecentMeetings({
       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Recent meetings</p>
       <ul className="max-h-[min(50vh,360px)] space-y-2 overflow-y-auto">
         {rooms.slice(0, 8).map((recent) => (
-          <li key={recent.name} className="group flex items-center justify-between gap-4 border border-border px-3 py-2.5">
+          <li
+            key={recent.name}
+            className="group flex items-center justify-between gap-4 border border-border px-3 py-2.5"
+          >
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
               <button

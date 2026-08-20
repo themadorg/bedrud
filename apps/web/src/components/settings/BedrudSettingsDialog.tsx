@@ -99,7 +99,9 @@ function SettingsListNav({
     ? 'border border-border bg-muted/40'
     : 'border border-[var(--meet-border)] bg-[var(--meet-surface-muted)]'
   const listItemBorder = isApp ? 'border-border' : 'border-[var(--meet-border)]'
-  const listHover = isApp ? 'active:bg-muted hover:bg-muted' : 'active:bg-[var(--meet-control)] hover:bg-[var(--meet-control)]'
+  const listHover = isApp
+    ? 'active:bg-muted hover:bg-muted'
+    : 'active:bg-[var(--meet-control)] hover:bg-[var(--meet-control)]'
   const iconChip = isApp
     ? 'bg-primary/10 text-primary'
     : 'bg-[var(--meet-btn-muted-bg)] text-[var(--meet-btn-muted-fg)]'
@@ -134,7 +136,12 @@ function SettingsListNav({
           }
         />
       ) : page ? (
-        <div className={cn('flex shrink-0 items-center gap-1 border-b', isApp ? 'border-border' : 'border-[var(--meet-border)]')}>
+        <div
+          className={cn(
+            'flex shrink-0 items-center gap-1 border-b',
+            isApp ? 'border-border' : 'border-[var(--meet-border)]',
+          )}
+        >
           <button
             type="button"
             onClick={onBack}

@@ -137,9 +137,7 @@ export function MeetingPanels({
           onCloseParticipants={onCloseParticipants}
         />
       )}
-      {participantsOpen && !infoOpen && (
-        <ParticipantsList adminId={adminId} onClose={onCloseParticipants} />
-      )}
+      {participantsOpen && !infoOpen && <ParticipantsList adminId={adminId} onClose={onCloseParticipants} />}
       <RoomInfoPanel
         open={infoOpen}
         onOpenChange={(open) => !open && onCloseInfo()}

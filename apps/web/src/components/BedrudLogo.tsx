@@ -18,7 +18,8 @@ function BedrudMark({ className, iconClassName }: { className?: string; iconClas
         strokeLinecap="round"
         strokeLinejoin="round"
         className={cn('text-primary-foreground', iconClassName)}
-        aria-hidden
+        role="img"
+        aria-label="Bedrud"
       >
         <path d="M16.247 7.761a6 6 0 0 1 0 8.478" />
         <path d="M19.075 4.933a10 10 0 0 1 0 14.134" />
@@ -44,9 +45,7 @@ export function BedrudLogo({ className, showWordmark = true, size = 'sm' }: Bedr
       className={cn('flex items-center gap-2 text-foreground transition-opacity hover:opacity-90', className)}
     >
       <BedrudMark className={cn(s.box, 'rounded-[4px]')} iconClassName={s.icon} />
-      {showWordmark ? (
-        <span className={cn('font-mono font-bold tracking-wider uppercase', s.text)}>bedrud</span>
-      ) : null}
+      {showWordmark ? <span className={cn('font-mono font-bold tracking-wider uppercase', s.text)}>bedrud</span> : null}
     </Link>
   )
 }

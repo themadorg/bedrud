@@ -163,12 +163,7 @@ export function RoomCard({ room, onJoin, onDelete, onSettings }: Props) {
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-card/95 px-3 backdrop-blur-[2px]">
           <p className="text-center text-xs font-medium text-destructive">Delete room?</p>
           <div className="flex w-full items-center gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 flex-1 text-xs"
-              onClick={() => setConfirmDelete(false)}
-            >
+            <Button variant="outline" size="sm" className="h-8 flex-1 text-xs" onClick={() => setConfirmDelete(false)}>
               Cancel
             </Button>
             <Button

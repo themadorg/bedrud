@@ -1,25 +1,16 @@
 // TODO oncoming feature
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
-import {
-  Activity,
-  LayoutDashboard,
-  LogOut,
-  Radio,
-  Settings,
-  Shield,
-  Users,
-  Video,
-} from 'lucide-react'
+import { Activity, LayoutDashboard, LogOut, Radio, Settings, Shield, Users, Video } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '#/lib/api'
 import { useAuthStore } from '#/lib/auth.store'
 import { useRecentRoomsStore } from '#/lib/recent-rooms.store'
+import { loadRegisteredUser, requireRegisteredUser } from '#/lib/require-registered-user'
 import type { User as BedrudUser } from '#/lib/user.store'
 import { useUserStore } from '#/lib/user.store'
-import { loadRegisteredUser, requireRegisteredUser } from '#/lib/require-registered-user'
-import { ThemeToggle } from '@/components/ThemeToggle'
 import { MobileBottomNav } from '@/components/dashboard/MobileBottomNav'
 import { HomeSettingsDialog } from '@/components/settings/HomeSettingsDialog'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -242,10 +233,7 @@ function DashboardLayout() {
       <Sidebar user={user} onLogout={handleLogout} />
       <TopBar user={user} />
       <MobileBottomNav />
-      <main
-        id="main-content"
-        className="p-4 pb-[calc(8rem+env(safe-area-inset-bottom,0px))] lg:ps-52 lg:p-6 lg:pb-6"
-      >
+      <main id="main-content" className="p-4 pb-[calc(8rem+env(safe-area-inset-bottom,0px))] lg:ps-52 lg:p-6 lg:pb-6">
         <p className="mb-6 pt-3 font-mono text-3xl font-semibold leading-tight tracking-tight lg:hidden">bedrud</p>
         <Outlet />
       </main>

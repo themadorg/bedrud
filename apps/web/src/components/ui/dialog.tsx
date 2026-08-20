@@ -44,9 +44,7 @@ const DialogContent = React.forwardRef<
   }
 >(({ className, children, elevated = false, aboveElevatedDock = false, overlayClassName, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay
-      className={cn(aboveElevatedDock ? 'z-[259]' : elevated ? 'z-[219]' : undefined, overlayClassName)}
-    />
+    <DialogOverlay className={cn(aboveElevatedDock ? 'z-[259]' : elevated ? 'z-[219]' : undefined, overlayClassName)} />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
