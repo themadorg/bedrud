@@ -129,17 +129,16 @@ type RoomParticipant struct {
 
 // RoomPermissions represents the permissions a participant has in a room
 type RoomPermissions struct {
-	ID              string           `json:"id" gorm:"primaryKey;type:varchar(36)"`
-	RoomID          string           `json:"roomId" gorm:"type:varchar(36);not null;index"`
-	UserID          string           `json:"userId" gorm:"type:varchar(36);not null;index"`
-	IsAdmin         bool             `json:"isAdmin" gorm:"not null;default:false"`
-	CanKick         bool             `json:"canKick" gorm:"not null;default:false"`
-	CanMuteAudio    bool             `json:"canMuteAudio" gorm:"not null;default:false"`
-	CanDisableVideo bool             `json:"canDisableVideo" gorm:"not null;default:false"`
-	CanChat         bool             `json:"canChat" gorm:"not null;default:true"`
-	CreatedAt       time.Time        `json:"createdAt" gorm:"autoCreateTime;not null"`
-	UpdatedAt       time.Time        `json:"updatedAt" gorm:"autoUpdateTime;not null"`
-	RoomParticipant *RoomParticipant `json:"-" gorm:"foreignKey:RoomID,UserID;references:RoomID,UserID"`
+	ID              string    `json:"id" gorm:"primaryKey;type:varchar(36)"`
+	RoomID          string    `json:"roomId" gorm:"type:varchar(36);not null;index"`
+	UserID          string    `json:"userId" gorm:"type:varchar(36);not null;index"`
+	IsAdmin         bool      `json:"isAdmin" gorm:"not null;default:false"`
+	CanKick         bool      `json:"canKick" gorm:"not null;default:false"`
+	CanMuteAudio    bool      `json:"canMuteAudio" gorm:"not null;default:false"`
+	CanDisableVideo bool      `json:"canDisableVideo" gorm:"not null;default:false"`
+	CanChat         bool      `json:"canChat" gorm:"not null;default:true"`
+	CreatedAt       time.Time `json:"createdAt" gorm:"autoCreateTime;not null"`
+	UpdatedAt       time.Time `json:"updatedAt" gorm:"autoUpdateTime;not null"`
 }
 
 // TableName specifies the table names for GORM

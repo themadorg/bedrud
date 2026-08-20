@@ -18,6 +18,7 @@ jobs:
   cleanup:
     name: Cleanup PR Beta
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.event.action == 'closed'
     steps:
       - name: Delete PR beta release
@@ -34,13 +35,14 @@ jobs:
   prepare:
     name: Prepare
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.event.action != 'closed'
     outputs:
       tag: ${{ steps.info.outputs.tag }}
       title: ${{ steps.info.outputs.title }}
       sha_short: ${{ steps.info.outputs.sha_short }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set release info
         id: info
@@ -56,6 +58,7 @@ jobs:
   server-binary:
     name: Server – ${{ matrix.goos }}/${{ matrix.goarch }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: prepare
     strategy:
       matrix:
@@ -75,17 +78,17 @@ jobs:
             cc: zig cc -target aarch64-linux-musl
             lk_arch: arm64
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: mlugg/setup-zig@v2
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
         with:
           version: 0.14.0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: latest
 
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: "1.26"
           cache-dependency-path: server/go.sum
@@ -97,7 +100,7 @@ jobs:
           bun run build:embed
 
       - name: Cache LiveKit binary
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: /tmp/livekit-cache
           key: livekit-1.10.1-${{ matrix.goos }}-${{ matrix.goarch }}
@@ -158,14 +161,14 @@ jobs:
           tar -cJf bedrud_${{ matrix.suffix }}.tar.xz bedrud
           rm bedrud
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: server-${{ matrix.suffix }}
           path: |
             dist/bedrud_${{ matrix.suffix }}.tar.xz
             dist/bedrud_${{ matrix.suffix }}
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: server-deb-${{ matrix.deb_arch }}
           path: bedrud_${{ matrix.deb_arch }}.deb
@@ -175,14 +178,15 @@ jobs:
   web:
     name: Web Bundle
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: prepare
     defaults:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: latest
 
@@ -194,7 +198,7 @@ jobs:
           mkdir -p ../../dist
           tar -cJf ../../dist/web.tar.xz -C dist .
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: web-bundle
           path: dist/web.tar.xz
@@ -203,6 +207,7 @@ jobs:
   desktop:
     name: Desktop – ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     needs: prepare
     strategy:
       fail-fast: false
@@ -231,19 +236,21 @@ jobs:
             target: aarch64-apple-darwin
             name: macos-arm64
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
         with:
           toolchain: stable
           targets: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           key: ${{ matrix.target }}
       - name: Install Slint dependencies (Linux)
+        timeout-minutes: 10
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          apt_opts=(-o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo apt-get update "${apt_opts[@]}"
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_opts[@]}" \
             libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-dev \
             libwayland-dev libgles2-mesa-dev libegl1-mesa-dev \
             libdbus-1-dev libsecret-1-dev \
@@ -310,19 +317,19 @@ jobs:
           ARCH="${ARCH_TOOL}" APPIMAGE_EXTRACT_AND_RUN=1 \
             ./appimagetool AppDir "bedrud-desktop-${{ matrix.name }}.AppImage"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: runner.os == 'Linux'
         with:
           name: bedrud-desktop-${{ matrix.name }}-portable
           path: bedrud-desktop-${{ matrix.name }}.tar.xz
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: runner.os == 'Linux'
         with:
           name: bedrud-desktop-${{ matrix.name }}-deb
           path: bedrud-desktop-${{ matrix.name }}.deb
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: runner.os == 'Linux'
         with:
           name: bedrud-desktop-${{ matrix.name }}-appimage
@@ -346,13 +353,13 @@ jobs:
           makensis /DARCH=${{ matrix.nsis_arch }} bedrud.nsi
           Move-Item "bedrud-desktop-setup-${{ matrix.nsis_arch }}.exe" "${{ github.workspace }}\bedrud-desktop-${{ matrix.name }}-setup.exe"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: runner.os == 'Windows'
         with:
           name: bedrud-desktop-${{ matrix.name }}-portable
           path: bedrud-desktop-${{ matrix.name }}.zip
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: runner.os == 'Windows'
         with:
           name: bedrud-desktop-${{ matrix.name }}-setup
@@ -370,13 +377,13 @@ jobs:
           hdiutil create -volname "Bedrud Desktop" -srcfolder dmg-staging -ov -format UDZO \
             "bedrud-desktop-${{ matrix.name }}.dmg"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: runner.os == 'macOS'
         with:
           name: bedrud-desktop-${{ matrix.name }}-portable
           path: bedrud-desktop-${{ matrix.name }}.tar.gz
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: runner.os == 'macOS'
         with:
           name: bedrud-desktop-${{ matrix.name }}-dmg
@@ -386,13 +393,14 @@ jobs:
   release:
     name: Publish Beta for PR #${{ github.event.pull_request.number }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [prepare, server-binary, desktop, web]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: artifacts
           pattern: "{server-*,web-*,bedrud-desktop-*}"
@@ -478,7 +486,7 @@ jobs:
           echo "release_url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
 
       - name: Post or update PR comment
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           RELEASE_URL: ${{ steps.create_release.outputs.release_url }}
           SHA_SHORT: ${{ needs.prepare.outputs.sha_short }}
@@ -546,6 +554,7 @@ jobs:
   telegram:
     name: Notify Telegram
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [prepare, release]
     if: needs.release.result == 'success'
     steps:

@@ -19,6 +19,7 @@ jobs:
   server-binary:
     name: Server – ${{ matrix.goos }}/${{ matrix.goarch }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -43,17 +44,17 @@ jobs:
             cgo: "1"
             cc: zig cc -target x86_64-windows-gnu
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: mlugg/setup-zig@v2
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
         with:
           version: 0.14.0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: latest
 
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: "1.26"
           cache-dependency-path: server/go.sum
@@ -66,7 +67,7 @@ jobs:
 
       - name: Cache LiveKit binary
         id: lk-cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: /tmp/livekit-cache
           key: livekit-${{ env.LIVEKIT_VERSION }}-${{ matrix.goos }}-${{ matrix.goarch }}
@@ -163,7 +164,7 @@ jobs:
 
           dpkg-deb --build deb bedrud_${{ matrix.deb_arch }}.deb
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: matrix.goos == 'linux'
         with:
           name: server-${{ matrix.suffix }}
@@ -171,7 +172,7 @@ jobs:
             dist/bedrud_${{ matrix.suffix }}.tar.xz
             dist/bedrud_${{ matrix.suffix }}
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: matrix.goos == 'windows'
         with:
           name: server-${{ matrix.suffix }}
@@ -179,7 +180,7 @@ jobs:
             dist/bedrud_${{ matrix.suffix }}.zip
             dist/bedrud_${{ matrix.suffix }}.exe
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: matrix.goos == 'linux'
         with:
           name: server-deb-${{ matrix.deb_arch }}
@@ -188,7 +189,8 @@ jobs:
       - name: Package server (.rpm)
         if: matrix.goos == 'linux'
         run: |
-          sudo apt-get install -y rpm
+          apt_opts=(-o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_opts[@]}" rpm
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
           RPM_ARCH="${{ matrix.deb_arch == 'amd64' && 'x86_64' || 'aarch64' }}"
@@ -216,7 +218,7 @@ jobs:
           find rpmbuild/RPMS -name "*.rpm" -exec cp {} \
             bedrud-${VERSION}-1.${RPM_ARCH}.rpm \;
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: server-rpm-${{ matrix.deb_arch }}
           path: bedrud-*.rpm
@@ -225,11 +227,12 @@ jobs:
   docker-debian:
     name: Docker (Debian)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: server-binary
     steps:
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
-      - uses: docker/login-action@v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -237,7 +240,7 @@ jobs:
 
       - name: Extract version
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -245,7 +248,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: server-linux_*
           path: docker-ctx
@@ -268,7 +271,7 @@ jobs:
           CMD ["run"]
           DOCKERFILE
 
-      - uses: docker/build-push-action@v7
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: docker-ctx
           file: docker-ctx/Dockerfile
@@ -293,12 +296,12 @@ jobs:
             gzip "bedrud-docker-debian-${arch}.tar"
           done
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: docker-debian-amd64
           path: bedrud-docker-debian-amd64.tar.gz
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: docker-debian-arm64
           path: bedrud-docker-debian-arm64.tar.gz
@@ -307,11 +310,12 @@ jobs:
   docker-alpine:
     name: Docker (Alpine)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: server-binary
     steps:
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
-      - uses: docker/login-action@v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -319,7 +323,7 @@ jobs:
 
       - name: Extract version
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -327,7 +331,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}-alpine
             type=raw,value=latest-alpine
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           # Match both arches (same as Debian). A single-artifact pattern can
           # land files flat under path/, so multi-match keeps the subdir layout.
@@ -352,7 +356,7 @@ jobs:
           CMD ["run"]
           DOCKERFILE
 
-      - uses: docker/build-push-action@v7
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: docker-ctx
           file: docker-ctx/Dockerfile
@@ -377,12 +381,12 @@ jobs:
             gzip "bedrud-docker-alpine-${arch}.tar"
           done
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: docker-alpine-amd64
           path: bedrud-docker-alpine-amd64.tar.gz
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: docker-alpine-arm64
           path: bedrud-docker-alpine-arm64.tar.gz
@@ -391,11 +395,12 @@ jobs:
   docker-distroless:
     name: Docker (Distroless)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: server-binary
     steps:
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
-      - uses: docker/login-action@v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -403,7 +408,7 @@ jobs:
 
       - name: Extract version
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -411,7 +416,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}-distroless
             type=raw,value=latest-distroless
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           # Match both arches (same as Debian). A single-artifact pattern can
           # land files flat under path/, so multi-match keeps the subdir layout.
@@ -435,7 +440,7 @@ jobs:
           CMD ["run"]
           DOCKERFILE
 
-      - uses: docker/build-push-action@v7
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: docker-ctx
           file: docker-ctx/Dockerfile
@@ -460,12 +465,12 @@ jobs:
             gzip "bedrud-docker-distroless-${arch}.tar"
           done
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: docker-distroless-amd64
           path: bedrud-docker-distroless-amd64.tar.gz
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: docker-distroless-arm64
           path: bedrud-docker-distroless-arm64.tar.gz
@@ -475,12 +480,13 @@ jobs:
   ios:
     name: iOS IPA
     runs-on: macos-15
+    timeout-minutes: 45
     continue-on-error: true
     defaults:
       run:
         working-directory: apps/ios
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Apple certificate and provisioning profile
         env:
@@ -510,7 +516,7 @@ jobs:
           fi
 
       - name: Cache Swift packages
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: apps/ios/.spm-cache
           key: ios-spm-${{ hashFiles('apps/ios/Bedrud.xcodeproj/project.pbxproj') }}
@@ -565,7 +571,7 @@ jobs:
             echo "⚠ Skipping IPA export — no signing certificate configured"
           fi
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: ${{ hashFiles('apps/ios/build/export/Bedrud.ipa') != '' }}
         with:
           name: ios-ipa
@@ -583,6 +589,7 @@ jobs:
   desktop:
     name: Desktop – ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -610,22 +617,24 @@ jobs:
             target: aarch64-apple-darwin
             name: macos-arm64
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
         with:
           toolchain: stable
           targets: ${{ matrix.target }}
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           key: ${{ matrix.target }}
 
       - name: Install Slint dependencies (Linux)
+        timeout-minutes: 10
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          apt_opts=(-o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo apt-get update "${apt_opts[@]}"
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_opts[@]}" \
             libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-dev \
             libwayland-dev libgles2-mesa-dev libegl1-mesa-dev \
             libdbus-1-dev libsecret-1-dev \
@@ -697,19 +706,19 @@ jobs:
           ARCH="${ARCH_TOOL}" APPIMAGE_EXTRACT_AND_RUN=1 \
             ./appimagetool AppDir "bedrud-desktop-${{ matrix.name }}.AppImage"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: runner.os == 'Linux'
         with:
           name: bedrud-desktop-${{ matrix.name }}-portable
           path: bedrud-desktop-${{ matrix.name }}.tar.xz
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: runner.os == 'Linux'
         with:
           name: bedrud-desktop-${{ matrix.name }}-deb
           path: bedrud-desktop-${{ matrix.name }}.deb
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: runner.os == 'Linux'
         with:
           name: bedrud-desktop-${{ matrix.name }}-appimage
@@ -718,7 +727,8 @@ jobs:
       - name: Package Linux (.rpm)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get install -y rpm
+          apt_opts=(-o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_opts[@]}" rpm
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
           RPM_ARCH="${{ matrix.deb_arch == 'amd64' && 'x86_64' || 'aarch64' }}"
@@ -748,7 +758,7 @@ jobs:
           find rpmbuild/RPMS -name "*.rpm" -exec cp {} \
             bedrud-desktop-${VERSION}-1.${RPM_ARCH}.rpm \;
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: runner.os == 'Linux'
         with:
           name: bedrud-desktop-${{ matrix.name }}-rpm
@@ -772,13 +782,13 @@ jobs:
           makensis /DARCH=${{ matrix.nsis_arch }} bedrud.nsi
           Move-Item "bedrud-desktop-setup-${{ matrix.nsis_arch }}.exe" "${{ github.workspace }}\bedrud-desktop-${{ matrix.name }}-setup.exe"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: runner.os == 'Windows'
         with:
           name: bedrud-desktop-${{ matrix.name }}-portable
           path: bedrud-desktop-${{ matrix.name }}.zip
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: runner.os == 'Windows'
         with:
           name: bedrud-desktop-${{ matrix.name }}-setup
@@ -859,13 +869,13 @@ jobs:
           KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
           [ -f "$KEYCHAIN_PATH" ] && security delete-keychain "$KEYCHAIN_PATH" || true
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: runner.os == 'macOS'
         with:
           name: bedrud-desktop-${{ matrix.name }}-portable
           path: bedrud-desktop-${{ matrix.name }}.tar.gz
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: runner.os == 'macOS'
         with:
           name: bedrud-desktop-${{ matrix.name }}-dmg
@@ -875,11 +885,12 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [server-binary, docker-debian, docker-alpine, docker-distroless, desktop]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: artifacts
           pattern: "{server-*,ios-*,bedrud-desktop-*,docker-*}"
@@ -1026,7 +1037,7 @@ jobs:
           BODY
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           body_path: release-body.md
           generate_release_notes: true
@@ -1036,6 +1047,7 @@ jobs:
   check-secrets:
     name: Check available secrets
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: release
     if: needs.release.result == 'success'
     outputs:
@@ -1067,6 +1079,7 @@ jobs:
   telegram:
     name: Notify Telegram
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_telegram == 'true'
     steps:
@@ -1153,10 +1166,11 @@ jobs:
   aur-desktop:
     name: AUR – bedrud-desktop-bin
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_aur == 'true'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Update PKGBUILD checksums
         env:
@@ -1182,7 +1196,7 @@ jobs:
           sed -i "s/sha256sums_aarch64 = .*/sha256sums_aarch64 = ${ARM_SHA}/" packages/aur/.SRCINFO
 
       - name: Push to AUR
-        uses: KSXGitHub/github-actions-deploy-aur@v3
+        uses: KSXGitHub/github-actions-deploy-aur@a97f56a8425a7a7f3b8c58607f769c69b089cadb # v3
         with:
           pkgname: bedrud-desktop-bin
           pkgbuild: packages/aur/PKGBUILD
@@ -1196,10 +1210,11 @@ jobs:
   aur-server:
     name: AUR – bedrud-bin
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_aur == 'true'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Update PKGBUILD checksums
         env:
@@ -1224,7 +1239,7 @@ jobs:
           sed -i "s|source_aarch64 = .*tar.xz.*|source_aarch64 = bedrud-bin-${PKGVER}-aarch64.tar.xz::${ARM_URL}|" packages/aur/bedrud-server/.SRCINFO
 
       - name: Push to AUR
-        uses: KSXGitHub/github-actions-deploy-aur@v3
+        uses: KSXGitHub/github-actions-deploy-aur@a97f56a8425a7a7f3b8c58607f769c69b089cadb # v3
         with:
           pkgname: bedrud-bin
           pkgbuild: packages/aur/bedrud-server/PKGBUILD
@@ -1238,12 +1253,13 @@ jobs:
   snap-publish:
     name: Snap Store – bedrud-desktop
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_snap == 'true'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: bedrud-desktop-linux-x86_64-portable
           path: snap-staging
@@ -1264,7 +1280,7 @@ jobs:
           sed -i "s/^version: .*/version: '${VERSION#v}'/" \
             snap-staging/snap/snapcraft.yaml
 
-      - uses: snapcore/action-build@v1
+      - uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1
         id: build
         with:
           path: snap-staging
@@ -1280,15 +1296,17 @@ jobs:
   flatpak-bundle:
     name: Flatpak Bundle
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: [release, check-secrets]
     if: needs.check-secrets.result == 'success'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Flatpak tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder python3-yaml
+          apt_opts=(-o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo apt-get update "${apt_opts[@]}"
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_opts[@]}" flatpak flatpak-builder python3-yaml
           sudo flatpak remote-add --if-not-exists flathub \
             https://flathub.org/repo/flathub.flatpakrepo
 
@@ -1298,7 +1316,7 @@ jobs:
             org.freedesktop.Platform//23.08 \
             org.freedesktop.Sdk//23.08
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: bedrud-desktop-linux-x86_64-portable
           path: flatpak-src
@@ -1350,7 +1368,7 @@ jobs:
           flatpak build-bundle flatpak-repo \
             bedrud-desktop-linux-x86_64.flatpak orgbedrud.Desktop
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: bedrud-desktop-linux-x86_64-flatpak
           path: bedrud-desktop-linux-x86_64.flatpak
@@ -1370,10 +1388,11 @@ jobs:
   chocolatey-push:
     name: Chocolatey – bedrud-desktop
     runs-on: windows-latest
+    timeout-minutes: 20
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_choco == 'true'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Update nuspec version and checksums
         env:
@@ -1420,10 +1439,11 @@ jobs:
   homebrew-update:
     name: Homebrew Tap – bedrud-desktop
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_homebrew == 'true'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Compute macOS tarball checksums
         env:
@@ -1474,13 +1494,14 @@ jobs:
   winget-submit:
     name: WinGet – Bedrud.BedrudDesktop
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [release, check-secrets]
     if: needs.check-secrets.outputs.has_winget == 'true'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Submit WinGet manifests
-        uses: vedantmgoyal9/winget-releaser@v2
+        uses: vedantmgoyal9/winget-releaser@4ffc7888bffd451b357355dc214d43bb9f23917e # v2
         with:
           identifier: Bedrud.BedrudDesktop
           release-tag: ${{ github.ref_name }}
