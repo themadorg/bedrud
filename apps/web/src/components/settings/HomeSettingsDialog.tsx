@@ -9,6 +9,8 @@ interface Props {
   initialTab?: SettingsTab
   initialMobilePage?: SettingsTab | null
   dockAboveMobileNav?: boolean
+  showMobileHeader?: boolean
+  variant?: 'meeting' | 'app'
 }
 
 export function HomeSettingsDialog({
@@ -18,6 +20,8 @@ export function HomeSettingsDialog({
   initialTab,
   initialMobilePage = null,
   dockAboveMobileNav = false,
+  showMobileHeader = true,
+  variant = 'meeting',
 }: Props) {
   return (
     <BedrudSettingsDialog
@@ -28,6 +32,8 @@ export function HomeSettingsDialog({
       initialTab={initialTab}
       initialMobilePage={initialMobilePage}
       dockAboveMobileNav={dockAboveMobileNav}
+      showMobileHeader={showMobileHeader}
+      variant={variant}
     />
   )
 }
