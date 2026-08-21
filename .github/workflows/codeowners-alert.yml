@@ -27,4 +27,4 @@ jobs:
           message: |
             ⚠️ This PR modifies `.github/CODEOWNERS` — the file that controls who is required to review changes, including to this file itself.
 
-            @narseh-ir @omidz4t — flagging you by name, separately from the ordinary Code Owners review request, because this file defines the review requirements for the whole `.github/` directory. Please check that nobody has added or removed a reviewer without a stated reason.
+            @narseh-ir @omidz4t @mamaru-a — flagging you by name, separately from the ordinary Code Owners review request, because this file defines the review requirements for the whole `.github/` directory. Please check that nobody has added or removed a reviewer without a stated reason.
