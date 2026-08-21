@@ -38,12 +38,24 @@ describe('setTokens', () => {
   })
 
   it('does not leave a stale token in localStorage when a remembered session is replaced by a session-only one', () => {
+    // Deliberately no clear() in between: one storage owns the session, so
+    // switching modes has to empty the other by itself. Callers do not
+    // reliably clear first — the guest join path does not.
     useAuthStore.getState().setTokens(tokens)
-    useAuthStore.getState().clear()
     useAuthStore.getState().setTokens({ accessToken: 'at-2', refreshToken: null }, false)
 
     expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull()
+    expect(localStorage.getItem(REMEMBER_KEY)).toBeNull()
     expect(sessionStorage.getItem(ACCESS_TOKEN_KEY)).toBe('at-2')
+  })
+
+  it('empties sessionStorage when a session-only login is replaced by a remembered one', () => {
+    useAuthStore.getState().setTokens(tokens, 'ephemeral')
+    useAuthStore.getState().setTokens({ accessToken: 'at-2', refreshToken: null })
+
+    expect(sessionStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull()
+    expect(sessionStorage.getItem(REMEMBER_KEY)).toBeNull()
+    expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBe('at-2')
   })
 })
 
