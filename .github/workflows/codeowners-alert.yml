@@ -1,0 +1,30 @@
+name: CODEOWNERS Change Alert
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/CODEOWNERS"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  alert:
+    name: Flag CODEOWNERS change
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Separate from the review request CODEOWNERS already triggers, which is easy to
+      # miss among the other reviewers on a large pull request. This file decides who
+      # must review changes — including changes to itself — so someone could otherwise
+      # add or remove a reviewer without anyone looking twice.
+      - name: Comment on the PR
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3
+        with:
+          header: codeowners-alert
+          message: |
+            ⚠️ This PR modifies `.github/CODEOWNERS` — the file that controls who is required to review changes, including to this file itself.
+
+            @narseh-ir @omidz4t — flagging you by name, separately from the ordinary Code Owners review request, because this file defines the review requirements for the whole `.github/` directory. Please check that nobody has added or removed a reviewer without a stated reason.
