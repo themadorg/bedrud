@@ -1,6 +1,9 @@
 name: PR Beta Release
 
 on:
+  # Kept filtered to master, unlike ci.yml and codeql.yml. This publishes beta
+  # binaries and comments on the pull request; doing that for every branch in a
+  # stack would ship artifacts for changes that are not going to master yet.
   pull_request:
     branches: [master]
     types: [opened, synchronize, reopened, closed]
