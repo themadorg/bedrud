@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"bedrud/config"
@@ -21,13 +21,12 @@ import (
 )
 
 type UsersHandler struct {
-	userRepo         *repository.UserRepository
-	roomRepo         *repository.RoomRepository
-	passkeyRepo      *repository.PasskeyRepository
-	prefsRepo        *repository.UserPreferencesRepository
-	cleanupSvc       *services.RoomCleanupService
-	verifEventRepo   *repository.VerificationEventRepository
-	deletionInFlight sync.Map
+	userRepo       *repository.UserRepository
+	roomRepo       *repository.RoomRepository
+	passkeyRepo    *repository.PasskeyRepository
+	prefsRepo      *repository.UserPreferencesRepository
+	cleanupSvc     *services.RoomCleanupService
+	verifEventRepo *repository.VerificationEventRepository
 }
 
 type UserListResponse struct {
@@ -391,14 +390,8 @@ func (h *UsersHandler) DeleteUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Idempotency guard — prevent concurrent deletions of the same user
-	if _, loaded := h.deletionInFlight.LoadOrStore(userID, true); loaded {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Deletion already in progress"})
-	}
-
 	// Immediately deactivate the user to prevent further actions
 	if err := h.userRepo.UpdateUserStatusAndClearToken(userID, false); err != nil {
-		h.deletionInFlight.Delete(userID)
 		if err == gorm.ErrRecordNotFound {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
 		}
@@ -408,7 +401,6 @@ func (h *UsersHandler) DeleteUser(c *fiber.Ctx) error {
 
 	user, err := h.userRepo.GetUserByID(userID)
 	if err != nil || user == nil {
-		h.deletionInFlight.Delete(userID)
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
 	}
 
@@ -416,18 +408,15 @@ func (h *UsersHandler) DeleteUser(c *fiber.Ctx) error {
 	if containsAccess(user.Accesses, string(models.AccessSuperAdmin)) {
 		superadmins, err := h.userRepo.GetUsersByAccess(models.AccessSuperAdmin)
 		if err != nil {
-			h.deletionInFlight.Delete(userID)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to verify superadmin count"})
 		}
 		if len(superadmins) <= 1 {
-			h.deletionInFlight.Delete(userID)
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Cannot delete the last superadmin"})
 		}
 	}
 
 	rooms, err := h.roomRepo.GetRoomsCreatedByUser(userID)
 	if err != nil {
-		h.deletionInFlight.Delete(userID)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch user rooms"})
 	}
 	if rooms == nil {
@@ -439,9 +428,13 @@ func (h *UsersHandler) DeleteUser(c *fiber.Ctx) error {
 		Email:   user.Email,
 		RoomIDs: roomIDsToStrings(rooms),
 	}
+	// The queue rejects a second deletion while one is still unfinished, which
+	// is what makes repeat requests idempotent rather than duplicating work.
 	if err := queue.Enqueue(context.Background(), database.GetDB(), "user_delete", payload,
-		queue.WithPriority(1), queue.WithMaxAttempts(3)); err != nil {
-		h.deletionInFlight.Delete(userID)
+		queue.WithPriority(1), queue.WithMaxAttempts(3), queue.WithDedupeKey(userID)); err != nil {
+		if errors.Is(err, queue.ErrDuplicateJob) {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Deletion already in progress"})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to queue deletion"})
 	}
 
@@ -884,8 +877,11 @@ func (h *UsersHandler) BulkDeleteUsers(c *fiber.Ctx) error {
 			Email:   user.Email,
 			RoomIDs: roomIDsToStrings(rooms),
 		}
+		// A user already queued for deletion is skipped rather than logged as a
+		// failure — bulk delete overlapping a single delete is expected.
 		if err := queue.Enqueue(context.Background(), database.GetDB(), "user_delete", payload,
-			queue.WithPriority(1), queue.WithMaxAttempts(3)); err != nil {
+			queue.WithPriority(1), queue.WithMaxAttempts(3), queue.WithDedupeKey(id)); err != nil &&
+			!errors.Is(err, queue.ErrDuplicateJob) {
 			log.Error().Err(err).Str("userID", id).Msg("BulkDelete: failed to enqueue deletion")
 		}
 	}

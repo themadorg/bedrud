@@ -638,7 +638,7 @@ func TestModeration_LiveKitFailure_Kick(t *testing.T) {
 
 // ─── 2.8 room delete 202 / concurrent 409 ─────────────────────────────────
 
-func TestDeleteRoom_202AndConcurrent409(t *testing.T) {
+func TestDeleteRoom_202ThenRepeat409(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	database.SetForTest(db)
 	roomRepo := repository.NewRoomRepository(db)
@@ -665,7 +665,7 @@ func TestDeleteRoom_202AndConcurrent409(t *testing.T) {
 	if len(jobs) < 1 {
 		t.Fatal("expected room_delete job")
 	}
-	// concurrent in-flight
+	// a repeat request while the first delete is still unfinished
 	req2 := httptest.NewRequest(http.MethodDelete, "/room/"+room.ID, http.NoBody)
 	resp2, _ := app.Test(req2, -1)
 	defer resp2.Body.Close()

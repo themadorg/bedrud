@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,11 +17,17 @@ import (
 // Handler processes a single claimed job. Return error to trigger retry, nil for success.
 type Handler func(ctx context.Context, db *gorm.DB, job *models.Job) error
 
+// ErrDuplicateJob means an unfinished job with the same type and dedupe key is
+// already queued, so this one was not inserted. Callers that surface it to a
+// user typically map it to 409.
+var ErrDuplicateJob = errors.New("a job for this target is already queued")
+
 // EnqueueOptions carries optional parameters for Enqueue.
 type EnqueueOptions struct {
 	Priority    int
 	MaxAttempts int
 	RunAt       time.Time // zero = immediate
+	DedupeKey   string    // empty = no deduplication
 }
 
 // EnqueueOption is a functional option for Enqueue.
@@ -39,6 +46,33 @@ func WithMaxAttempts(n int) EnqueueOption {
 // WithRunAt schedules the job for a future time (zero = immediate).
 func WithRunAt(t time.Time) EnqueueOption {
 	return func(o *EnqueueOptions) { o.RunAt = t }
+}
+
+// WithDedupeKey refuses the enqueue while an unfinished job of the same type
+// carries the same key, returning ErrDuplicateJob.
+//
+// Key on the identity of the *operation*, not merely of its target: include
+// whatever the job will do whenever one job type covers several outcomes.
+// Keying on the target alone makes a queued job absorb a later request that
+// would have done something different — and the caller is told it succeeded.
+// See roomDeleteDedupeKey in internal/handlers for the worked example: an
+// archive and a purge share the room_delete type, so the key carries which one.
+func WithDedupeKey(key string) EnqueueOption {
+	return func(o *EnqueueOptions) { o.DedupeKey = key }
+}
+
+// unfinished is the set of statuses that still hold a target: a job in either
+// state may yet act, so a second job for the same target would duplicate it.
+var unfinished = []models.JobStatus{models.JobPending, models.JobActive}
+
+// hasUnfinishedJob reports whether a job of this type is already queued or
+// running for the given dedupe key.
+func hasUnfinishedJob(ctx context.Context, db *gorm.DB, jobType, dedupeKey string) (bool, error) {
+	var count int64
+	err := db.WithContext(ctx).Model(&models.Job{}).
+		Where("type = ? AND dedupe_key = ? AND status IN ?", jobType, dedupeKey, unfinished).
+		Count(&count).Error
+	return count > 0, err
 }
 
 func defaultOptions() *EnqueueOptions {
@@ -83,6 +117,16 @@ func Enqueue(ctx context.Context, db *gorm.DB, jobType string, payload interface
 		runAt = time.Now()
 	}
 
+	if cfg.DedupeKey != "" {
+		dup, err := hasUnfinishedJob(ctx, db, jobType, cfg.DedupeKey)
+		if err != nil {
+			return fmt.Errorf("dedupe check: %w", err)
+		}
+		if dup {
+			return ErrDuplicateJob
+		}
+	}
+
 	job := &models.Job{
 		ID:          uuid.New().String(),
 		Type:        jobType,
@@ -92,9 +136,26 @@ func Enqueue(ctx context.Context, db *gorm.DB, jobType string, payload interface
 		Status:      models.JobPending,
 		Attempts:    0,
 		MaxAttempts: cfg.MaxAttempts,
+		DedupeKey:   cfg.DedupeKey,
 	}
 
-	return db.WithContext(ctx).Create(job).Error
+	if err := db.WithContext(ctx).Create(job).Error; err != nil {
+		// The check above loses to a concurrent enqueue often enough to matter;
+		// idx_jobs_active_dedupe is what actually decides. Ask the database
+		// which case this was rather than parsing a driver-specific message.
+		if cfg.DedupeKey != "" {
+			if dup, qErr := hasUnfinishedJob(ctx, db, jobType, cfg.DedupeKey); qErr == nil && dup {
+				// Keep the original error visible: an insert that failed for an
+				// unrelated reason while a duplicate happened to exist would
+				// otherwise be reported as a plain duplicate and lost.
+				log.Warn().Err(err).Str("type", jobType).Str("dedupeKey", cfg.DedupeKey).
+					Msg("queue: insert failed and a duplicate exists — reporting as duplicate")
+				return ErrDuplicateJob
+			}
+		}
+		return err
+	}
+	return nil
 }
 
 // WorkerOptions configures the queue worker.
