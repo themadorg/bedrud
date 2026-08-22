@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 
 	"bedrud/config"
@@ -58,6 +60,39 @@ func roomDeleteJobs(t *testing.T, db *gorm.DB) []models.Job {
 		t.Fatalf("read room_delete jobs: %v", err)
 	}
 	return jobs
+}
+
+// jobByDedupeKey finds a queued job by its key rather than by position, so a
+// failure names which job is missing instead of reporting an index mismatch.
+func jobByDedupeKey(t *testing.T, jobs []models.Job, key string) models.Job {
+	t.Helper()
+
+	for _, j := range jobs {
+		if j.DedupeKey == key {
+			return j
+		}
+	}
+
+	got := make([]string, 0, len(jobs))
+	for _, j := range jobs {
+		got = append(got, strconv.Quote(j.DedupeKey))
+	}
+	t.Fatalf("no room_delete job with dedupe key %q; keys present: %s", key, strings.Join(got, ", "))
+	return models.Job{}
+}
+
+// purgeFlag reads the Purge flag out of a job payload: the right key on the
+// wrong payload would still queue the wrong operation.
+func purgeFlag(t *testing.T, job models.Job) bool {
+	t.Helper()
+
+	var payload struct {
+		Purge bool `json:"purge"`
+	}
+	if err := json.Unmarshal([]byte(job.Payload), &payload); err != nil {
+		t.Fatalf("unmarshal payload of job %s: %v", job.ID, err)
+	}
+	return payload.Purge
 }
 
 func bulkClose(t *testing.T, app *fiber.App, ids ...string) BulkResult {
@@ -117,28 +152,17 @@ func TestBulkCloseRooms_PurgeSurvivesAQueuedArchive(t *testing.T) {
 		t.Fatalf("want an archive job and a purge job, got %d", len(jobs))
 	}
 
-	// Pin the key shape itself. Collapsing these to one key is the regression
-	// this test exists to catch, and it is invisible from job counts alone.
-	if jobs[0].DedupeKey != room.ID {
-		t.Errorf("archive key = %q, want the bare room id %q", jobs[0].DedupeKey, room.ID)
-	}
-	if want := room.ID + ":purge"; jobs[1].DedupeKey != want {
-		t.Errorf("purge key = %q, want %q", jobs[1].DedupeKey, want)
-	}
+	// Pin the key shapes themselves. Collapsing these to one key is the
+	// regression this test exists to catch, and it is invisible from job counts
+	// alone. Looked up by key rather than by position, so a failure says which
+	// job is missing.
+	archive := jobByDedupeKey(t, jobs, room.ID)
+	purge := jobByDedupeKey(t, jobs, room.ID+":purge")
 
-	var archive, purge struct {
-		Purge bool `json:"purge"`
-	}
-	if err := json.Unmarshal([]byte(jobs[0].Payload), &archive); err != nil {
-		t.Fatalf("unmarshal archive payload: %v", err)
-	}
-	if err := json.Unmarshal([]byte(jobs[1].Payload), &purge); err != nil {
-		t.Fatalf("unmarshal purge payload: %v", err)
-	}
-	if archive.Purge {
+	if purgeFlag(t, archive) {
 		t.Error("the creator's delete should archive, not purge")
 	}
-	if !purge.Purge {
+	if !purgeFlag(t, purge) {
 		t.Error("the admin's bulk close should purge, not archive")
 	}
 }

@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -139,42 +140,55 @@ func TestEnqueue_ConcurrentCallersCollapseToOneJob(t *testing.T) {
 	ctx := context.Background()
 
 	const callers = 16
-	var wg sync.WaitGroup
-	start := make(chan struct{})
-	errs := make([]error, callers)
 
-	for i := 0; i < callers; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			<-start
-			errs[i] = enqueueRoomDelete(ctx, db, "room-1")
-		}(i)
-	}
-	close(start) // release them together
-	wg.Wait()
+	// Repeated over several keys on purpose. Whether any caller actually reaches
+	// the fallback is up to the scheduler: measured against a build with the
+	// fallback deleted, a single burst left it untouched roughly one run in five,
+	// and the assertions below hold either way — so one burst would be an 80%
+	// regression guard that looks like a 100% one. Rounds are independent, so the
+	// chance of never reaching it falls off geometrically.
+	for round := 0; round < 5; round++ {
+		key := fmt.Sprintf("room-%d", round)
 
-	var accepted, duplicate int
-	for _, err := range errs {
-		switch {
-		case err == nil:
-			accepted++
-		case errors.Is(err, ErrDuplicateJob):
-			duplicate++
-		default:
-			// A raw driver error here means the violation was not translated,
-			// which surfaces to the caller as a 500 instead of a 409.
-			t.Errorf("caller got neither nil nor ErrDuplicateJob: %v", err)
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		errs := make([]error, callers)
+
+		for i := 0; i < callers; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				<-start
+				errs[i] = enqueueRoomDelete(ctx, db, key)
+			}(i)
+		}
+		close(start) // release them together
+		wg.Wait()
+
+		var accepted, duplicate int
+		for _, err := range errs {
+			switch {
+			case err == nil:
+				accepted++
+			case errors.Is(err, ErrDuplicateJob):
+				duplicate++
+			default:
+				// A raw driver error here means the violation was not translated,
+				// which surfaces to the caller as a 500 instead of a 409.
+				t.Errorf("%s: caller got neither nil nor ErrDuplicateJob: %v", key, err)
+			}
+		}
+
+		if accepted != 1 {
+			t.Errorf("%s: want exactly 1 accepted enqueue, got %d", key, accepted)
+		}
+		if duplicate != callers-1 {
+			t.Errorf("%s: want %d callers refused as duplicates, got %d", key, callers-1, duplicate)
 		}
 	}
 
-	if accepted != 1 {
-		t.Errorf("want exactly 1 accepted enqueue, got %d", accepted)
-	}
-	if duplicate != callers-1 {
-		t.Errorf("want %d callers refused as duplicates, got %d", callers-1, duplicate)
-	}
-	if n := countJobs(t, db, "room_delete"); n != 1 {
-		t.Errorf("want 1 job row, got %d", n)
+	// One row per key, so every burst collapsed rather than only the last.
+	if n := countJobs(t, db, "room_delete"); n != 5 {
+		t.Errorf("want 1 job row per key, got %d", n)
 	}
 }
