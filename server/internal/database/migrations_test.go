@@ -269,11 +269,14 @@ func TestRunMigrations_FreshDatabaseCreatesFullSchema(t *testing.T) {
 				}
 			}
 
-			// Created by RunMigrations alone — no model tag produces it, so a
+			// Created by RunMigrations alone — no model tag produces these, so a
 			// test database built from a private AutoMigrate list would not
-			// have it.
+			// have them.
 			if !db.Migrator().HasIndex(&models.Room{}, "idx_rooms_active_name") {
 				t.Error("idx_rooms_active_name missing: active room name uniqueness is not enforced at the database level")
+			}
+			if !db.Migrator().HasIndex(&models.Job{}, "idx_jobs_active_dedupe") {
+				t.Error("idx_jobs_active_dedupe missing: nothing stops a second job for a target already queued")
 			}
 		})
 	}
@@ -294,6 +297,9 @@ func TestRunMigrations_IsIdempotent(t *testing.T) {
 
 			if !db.Migrator().HasIndex(&models.Room{}, "idx_rooms_active_name") {
 				t.Error("idx_rooms_active_name lost on the second run")
+			}
+			if !db.Migrator().HasIndex(&models.Job{}, "idx_jobs_active_dedupe") {
+				t.Error("idx_jobs_active_dedupe lost on the second run")
 			}
 			if roomNameIndexIsUnique(t, db) {
 				t.Error("idx_rooms_name became UNIQUE on the second run")
@@ -489,6 +495,53 @@ func TestModels_DeriveNoForeignKeysOfTheirOwn(t *testing.T) {
 	if err := RunMigrations(); err != nil {
 		t.Fatalf("a model derives a foreign key GORM cannot create — check for a "+
 			"foreignKey/references pair naming fields that exist on both structs: %v", err)
+	}
+}
+
+// idx_jobs_active_dedupe is what actually stops a duplicate job; the queue's
+// own pre-check loses to a concurrent enqueue. Asserted at the database level
+// on both engines, since the partial-index predicate is the part most likely
+// to behave differently between them.
+func TestRunMigrations_JobDedupeIndexRejectsDuplicates(t *testing.T) {
+	for _, d := range dialects() {
+		t.Run(d.name, func(t *testing.T) {
+			db := d.open(t)
+
+			if err := RunMigrations(); err != nil {
+				t.Fatalf("RunMigrations: %v", err)
+			}
+
+			job := func(id, key string, status models.JobStatus) *models.Job {
+				return &models.Job{
+					ID: id, Type: "room_delete", Payload: "{}", DedupeKey: key,
+					RunAt: time.Now(), Status: status, MaxAttempts: 3,
+				}
+			}
+
+			if err := db.Create(job("j1", "room-1", models.JobPending)).Error; err != nil {
+				t.Fatalf("first job: %v", err)
+			}
+			if err := db.Create(job("j2", "room-1", models.JobActive)).Error; err == nil {
+				t.Error("a second unfinished job for the same target was accepted")
+			}
+
+			// Finished rows sit outside the index, so the target frees up.
+			if err := db.Model(&models.Job{}).Where("id = ?", "j1").Update("status", models.JobDone).Error; err != nil {
+				t.Fatalf("finish j1: %v", err)
+			}
+			if err := db.Create(job("j3", "room-1", models.JobPending)).Error; err != nil {
+				t.Fatalf("a finished job should not block a later one: %v", err)
+			}
+
+			// Empty keys are exempt, or job types that never deduplicate would
+			// collide with each other.
+			if err := db.Create(job("j4", "", models.JobPending)).Error; err != nil {
+				t.Fatalf("first empty-key job: %v", err)
+			}
+			if err := db.Create(job("j5", "", models.JobPending)).Error; err != nil {
+				t.Fatalf("empty keys must not be deduplicated: %v", err)
+			}
+		})
 	}
 }
 

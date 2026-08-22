@@ -17,7 +17,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
 
@@ -75,21 +74,36 @@ const livekitTokenTTL = 2 * time.Hour
 
 func boolPtr(b bool) *bool { return &b }
 
+// roomDeleteDedupeKey keys a room_delete job by what it will actually do, not
+// merely by which room it targets. An archive and a purge are different
+// operations sharing one job type; keying on the room alone would let a queued
+// archive absorb an admin's purge, so recordings would survive a wipe the admin
+// explicitly ordered and the request would still report success.
+//
+// Both orderings still reach the purge: run first, it hard-deletes the room and
+// the archive job then no-ops on a missing row; run second, GetRoom does not
+// filter deleted_at, so it still finds the archived room and wipes it.
+func roomDeleteDedupeKey(roomID string, purge bool) string {
+	if purge {
+		return roomID + ":purge"
+	}
+	return roomID
+}
+
 type RoomHandler struct {
-	roomRepo         *repository.RoomRepository
-	userRepo         *repository.UserRepository
-	recordingRepo    *repository.RecordingRepository
-	webhookRepo      *repository.WebhookRepository
-	livekitHost      string
-	apiKey           string
-	apiSecret        string
-	client           livekit.RoomService
-	uploadStore      storage.ChatUploadStore
-	uploadMax        int64
-	uploadTracker    *storage.ChatUploadTracker
-	cleanupSvc       *services.RoomCleanupService
-	settingsRepo     *repository.SettingsRepository
-	deletionInFlight sync.Map
+	roomRepo      *repository.RoomRepository
+	userRepo      *repository.UserRepository
+	recordingRepo *repository.RecordingRepository
+	webhookRepo   *repository.WebhookRepository
+	livekitHost   string
+	apiKey        string
+	apiSecret     string
+	client        livekit.RoomService
+	uploadStore   storage.ChatUploadStore
+	uploadMax     int64
+	uploadTracker *storage.ChatUploadTracker
+	cleanupSvc    *services.RoomCleanupService
+	settingsRepo  *repository.SettingsRepository
 	// guestIDSecret signs stable guest identity cookies (session secret).
 	guestIDSecret string
 	secureCookies bool
@@ -1729,24 +1743,23 @@ func (h *RoomHandler) DeleteRoom(c *fiber.Ctx) error {
 		return c.Status(403).JSON(fiber.Map{"error": "Only the room creator can delete this room"})
 	}
 
-	if _, loaded := h.deletionInFlight.LoadOrStore(roomID, true); loaded {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Deletion already in progress"})
-	}
-
 	payload := queue.RoomDeletePayload{
 		RoomID:        roomID,
 		SystemEvent:   "room_ended",
 		SystemMessage: "The meeting has been ended by the creator",
 		Purge:         false, // archive — recordings preserved
 	}
+	// The queue itself rejects a second delete while one is still unfinished,
+	// so a double click cannot end the meeting twice or fire the webhook twice.
 	if err := queue.Enqueue(context.Background(), database.GetDB(), "room_delete", payload,
-		queue.WithPriority(1), queue.WithMaxAttempts(3)); err != nil {
-		h.deletionInFlight.Delete(roomID)
+		queue.WithPriority(1), queue.WithMaxAttempts(3),
+		queue.WithDedupeKey(roomDeleteDedupeKey(roomID, false))); err != nil {
+		if errors.Is(err, queue.ErrDuplicateJob) {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Deletion already in progress"})
+		}
 		log.Error().Err(err).Str("roomId", roomID).Msg("Failed to enqueue room deletion")
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to queue deletion"})
 	}
-
-	h.deletionInFlight.Delete(roomID)
 
 	// Dispatch webhook: room.ended
 	h.dispatchRoomEvent(c.Context(), models.EventRoomEnded, roomID, room.Name, claims.UserID)
@@ -2292,10 +2305,6 @@ func (h *RoomHandler) AdminCloseRoom(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "Room not found"})
 	}
 
-	if _, loaded := h.deletionInFlight.LoadOrStore(roomID, true); loaded {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Deletion already in progress"})
-	}
-
 	payload := queue.RoomDeletePayload{
 		RoomID:        roomID,
 		SystemEvent:   "room_closed",
@@ -2303,13 +2312,14 @@ func (h *RoomHandler) AdminCloseRoom(c *fiber.Ctx) error {
 		Purge:         true, // admin close = full wipe
 	}
 	if err := queue.Enqueue(context.Background(), database.GetDB(), "room_delete", payload,
-		queue.WithPriority(1), queue.WithMaxAttempts(3)); err != nil {
-		h.deletionInFlight.Delete(roomID)
+		queue.WithPriority(1), queue.WithMaxAttempts(3),
+		queue.WithDedupeKey(roomDeleteDedupeKey(roomID, true))); err != nil {
+		if errors.Is(err, queue.ErrDuplicateJob) {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Deletion already in progress"})
+		}
 		log.Error().Err(err).Str("roomId", roomID).Msg("Failed to enqueue room deletion")
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to queue deletion"})
 	}
-
-	h.deletionInFlight.Delete(roomID)
 
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"message": "Room close queued"})
 }
@@ -3089,7 +3099,15 @@ func (h *RoomHandler) BulkCloseRooms(c *fiber.Ctx) error {
 			Purge:         true, // admin bulk close = full wipe
 		}
 		if err := queue.Enqueue(context.Background(), database.GetDB(), "room_delete", payload,
-			queue.WithPriority(1), queue.WithMaxAttempts(3)); err != nil {
+			queue.WithPriority(1), queue.WithMaxAttempts(3),
+			queue.WithDedupeKey(roomDeleteDedupeKey(r.ID, true))); err != nil {
+			if errors.Is(err, queue.ErrDuplicateJob) {
+				// A purge for this room is already queued, which is the end
+				// state the request asked for — report it as done, not failed.
+				results[id] = BulkItemResult{Success: true, Name: r.Name}
+				processed++
+				continue
+			}
 			results[id] = BulkItemResult{Success: false, Name: r.Name, Error: err.Error()}
 			failed++
 		} else {
