@@ -49,8 +49,14 @@ func WithRunAt(t time.Time) EnqueueOption {
 }
 
 // WithDedupeKey refuses the enqueue while an unfinished job of the same type
-// carries the same key, returning ErrDuplicateJob. Use the identity of whatever
-// the job acts on — a room or user id — so repeat requests collapse into one.
+// carries the same key, returning ErrDuplicateJob.
+//
+// Key on the identity of the *operation*, not merely of its target: include
+// whatever the job will do whenever one job type covers several outcomes.
+// Keying on the target alone makes a queued job absorb a later request that
+// would have done something different — and the caller is told it succeeded.
+// See roomDeleteDedupeKey in internal/handlers for the worked example: an
+// archive and a purge share the room_delete type, so the key carries which one.
 func WithDedupeKey(key string) EnqueueOption {
 	return func(o *EnqueueOptions) { o.DedupeKey = key }
 }
@@ -139,6 +145,11 @@ func Enqueue(ctx context.Context, db *gorm.DB, jobType string, payload interface
 		// which case this was rather than parsing a driver-specific message.
 		if cfg.DedupeKey != "" {
 			if dup, qErr := hasUnfinishedJob(ctx, db, jobType, cfg.DedupeKey); qErr == nil && dup {
+				// Keep the original error visible: an insert that failed for an
+				// unrelated reason while a duplicate happened to exist would
+				// otherwise be reported as a plain duplicate and lost.
+				log.Warn().Err(err).Str("type", jobType).Str("dedupeKey", cfg.DedupeKey).
+					Msg("queue: insert failed and a duplicate exists — reporting as duplicate")
 				return ErrDuplicateJob
 			}
 		}

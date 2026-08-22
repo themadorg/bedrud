@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"bedrud/internal/models"
@@ -77,31 +78,29 @@ func TestEnqueue_SameKeyDifferentTypesDoNotCollide(t *testing.T) {
 }
 
 func TestEnqueue_FinishedJobStopsBlocking(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	ctx := context.Background()
-
-	if err := enqueueRoomDelete(ctx, db, "room-1"); err != nil {
-		t.Fatalf("first enqueue: %v", err)
-	}
-
 	for _, status := range []models.JobStatus{models.JobDone, models.JobFailed} {
-		if err := db.Model(&models.Job{}).
-			Where("type = ? AND dedupe_key = ?", "room_delete", "room-1").
-			Update("status", status).Error; err != nil {
-			t.Fatalf("mark %s: %v", status, err)
-		}
+		t.Run(string(status), func(t *testing.T) {
+			db := testutil.SetupTestDB(t)
+			ctx := context.Background()
 
-		// The whole point of a partial index: a finished job must not hold the
-		// target forever, which is what an in-memory marker did.
-		if err := enqueueRoomDelete(ctx, db, "room-1"); err != nil {
-			t.Fatalf("enqueue after the previous job reached %s: %v", status, err)
-		}
-		if err := db.Where("type = ?", "room_delete").Delete(&models.Job{}).Error; err != nil {
-			t.Fatalf("reset: %v", err)
-		}
-		if err := enqueueRoomDelete(ctx, db, "room-1"); err != nil {
-			t.Fatalf("reseed: %v", err)
-		}
+			if err := enqueueRoomDelete(ctx, db, "room-1"); err != nil {
+				t.Fatalf("first enqueue: %v", err)
+			}
+			if err := db.Model(&models.Job{}).
+				Where("type = ? AND dedupe_key = ?", "room_delete", "room-1").
+				Update("status", status).Error; err != nil {
+				t.Fatalf("mark %s: %v", status, err)
+			}
+
+			// The whole point of a partial index: a finished job must not hold
+			// the target forever, which is what an in-memory marker did.
+			if err := enqueueRoomDelete(ctx, db, "room-1"); err != nil {
+				t.Fatalf("enqueue after the previous job reached %s: %v", status, err)
+			}
+			if n := countJobs(t, db, "room_delete"); n != 2 {
+				t.Errorf("want the finished job plus a fresh one, got %d rows", n)
+			}
+		})
 	}
 }
 
@@ -119,5 +118,63 @@ func TestEnqueue_WithoutAKeyNothingIsDeduplicated(t *testing.T) {
 
 	if n := countJobs(t, db, "send_email"); n != 3 {
 		t.Errorf("want 3 jobs, got %d — empty keys were treated as duplicates", n)
+	}
+}
+
+// The pre-check in Enqueue loses to a concurrent enqueue: both callers can read
+// "no unfinished job" before either inserts. What actually decides the winner is
+// idx_jobs_active_dedupe, and the branch that translates its violation back into
+// ErrDuplicateJob is the only reason the loser gets a 409 rather than a 500.
+// Nothing else in the suite reaches that branch — the sequential tests above are
+// all caught by the pre-check first.
+//
+// SQLite only, deliberately. The race is reachable here even though the test
+// pool is pinned to one connection, because the pre-check and the Create are
+// separate statements and goroutines interleave between them. On Postgres the
+// network round-trip is slower than goroutine scheduling, so the first insert
+// commits before any other caller runs its pre-check and the fallback is never
+// exercised — a Postgres subtest would pass green while asserting nothing.
+func TestEnqueue_ConcurrentCallersCollapseToOneJob(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	ctx := context.Background()
+
+	const callers = 16
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	errs := make([]error, callers)
+
+	for i := 0; i < callers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			errs[i] = enqueueRoomDelete(ctx, db, "room-1")
+		}(i)
+	}
+	close(start) // release them together
+	wg.Wait()
+
+	var accepted, duplicate int
+	for _, err := range errs {
+		switch {
+		case err == nil:
+			accepted++
+		case errors.Is(err, ErrDuplicateJob):
+			duplicate++
+		default:
+			// A raw driver error here means the violation was not translated,
+			// which surfaces to the caller as a 500 instead of a 409.
+			t.Errorf("caller got neither nil nor ErrDuplicateJob: %v", err)
+		}
+	}
+
+	if accepted != 1 {
+		t.Errorf("want exactly 1 accepted enqueue, got %d", accepted)
+	}
+	if duplicate != callers-1 {
+		t.Errorf("want %d callers refused as duplicates, got %d", callers-1, duplicate)
+	}
+	if n := countJobs(t, db, "room_delete"); n != 1 {
+		t.Errorf("want 1 job row, got %d", n)
 	}
 }

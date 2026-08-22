@@ -74,6 +74,22 @@ const livekitTokenTTL = 2 * time.Hour
 
 func boolPtr(b bool) *bool { return &b }
 
+// roomDeleteDedupeKey keys a room_delete job by what it will actually do, not
+// merely by which room it targets. An archive and a purge are different
+// operations sharing one job type; keying on the room alone would let a queued
+// archive absorb an admin's purge, so recordings would survive a wipe the admin
+// explicitly ordered and the request would still report success.
+//
+// Both orderings still reach the purge: run first, it hard-deletes the room and
+// the archive job then no-ops on a missing row; run second, GetRoom does not
+// filter deleted_at, so it still finds the archived room and wipes it.
+func roomDeleteDedupeKey(roomID string, purge bool) string {
+	if purge {
+		return roomID + ":purge"
+	}
+	return roomID
+}
+
 type RoomHandler struct {
 	roomRepo      *repository.RoomRepository
 	userRepo      *repository.UserRepository
@@ -1736,7 +1752,8 @@ func (h *RoomHandler) DeleteRoom(c *fiber.Ctx) error {
 	// The queue itself rejects a second delete while one is still unfinished,
 	// so a double click cannot end the meeting twice or fire the webhook twice.
 	if err := queue.Enqueue(context.Background(), database.GetDB(), "room_delete", payload,
-		queue.WithPriority(1), queue.WithMaxAttempts(3), queue.WithDedupeKey(roomID)); err != nil {
+		queue.WithPriority(1), queue.WithMaxAttempts(3),
+		queue.WithDedupeKey(roomDeleteDedupeKey(roomID, false))); err != nil {
 		if errors.Is(err, queue.ErrDuplicateJob) {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Deletion already in progress"})
 		}
@@ -2295,7 +2312,8 @@ func (h *RoomHandler) AdminCloseRoom(c *fiber.Ctx) error {
 		Purge:         true, // admin close = full wipe
 	}
 	if err := queue.Enqueue(context.Background(), database.GetDB(), "room_delete", payload,
-		queue.WithPriority(1), queue.WithMaxAttempts(3), queue.WithDedupeKey(roomID)); err != nil {
+		queue.WithPriority(1), queue.WithMaxAttempts(3),
+		queue.WithDedupeKey(roomDeleteDedupeKey(roomID, true))); err != nil {
 		if errors.Is(err, queue.ErrDuplicateJob) {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Deletion already in progress"})
 		}
@@ -3081,7 +3099,15 @@ func (h *RoomHandler) BulkCloseRooms(c *fiber.Ctx) error {
 			Purge:         true, // admin bulk close = full wipe
 		}
 		if err := queue.Enqueue(context.Background(), database.GetDB(), "room_delete", payload,
-			queue.WithPriority(1), queue.WithMaxAttempts(3)); err != nil {
+			queue.WithPriority(1), queue.WithMaxAttempts(3),
+			queue.WithDedupeKey(roomDeleteDedupeKey(r.ID, true))); err != nil {
+			if errors.Is(err, queue.ErrDuplicateJob) {
+				// A purge for this room is already queued, which is the end
+				// state the request asked for — report it as done, not failed.
+				results[id] = BulkItemResult{Success: true, Name: r.Name}
+				processed++
+				continue
+			}
 			results[id] = BulkItemResult{Success: false, Name: r.Name, Error: err.Error()}
 			failed++
 		} else {
