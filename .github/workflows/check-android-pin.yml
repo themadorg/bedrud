@@ -1,0 +1,186 @@
+name: Check Android Pin
+
+# apps/android is a git submodule and nothing moves it on its own. Between bedrud-android
+# publishing a release and somebody remembering to run `make pin-android-stable`, this repo
+# keeps referencing whatever it was last pinned to - which is how the pin sat at 1.2.0 while
+# three further releases shipped.
+#
+# This job only reports. It opens one tracking issue when the pin falls behind, keeps that
+# issue current as further releases land, and closes it once the pin catches up. It moves
+# nothing and pushes nothing.
+#
+# It deliberately does not open a pull request. GITHUB_TOKEN cannot create one unless
+# "Allow GitHub Actions to create and approve pull requests" is enabled, and that switch is
+# not scoped to this workflow: it also lets every other workflow in the repo *approve* pull
+# requests, pr-beta.yml included, which builds unreviewed code off a pull request branch
+# with pull-requests: write. A bot approval satisfies required_approving_review_count, and
+# CODEOWNERS only covers /.github/, so for the rest of the tree that would be a clean bypass
+# of review. Reporting needs issues: write and nothing else, so the switch stays off.
+
+on:
+  schedule:
+    # 00:00 Saturday UTC - the start of the week, so a pending bump is waiting rather
+    # than sitting until the week is already underway.
+    - cron: "0 0 * * 6"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-android-pin
+  cancel-in-progress: false
+
+env:
+  UPSTREAM: themadorg/bedrud-android
+  # The open issue is found by this label, not by title, so the title is free to carry the
+  # version without a second issue appearing every time a new release lands.
+  TRACKER_LABEL: android-pin
+
+jobs:
+  check:
+    name: Check apps/android against the newest release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # No submodules: the gitlink in the tree is the whole input, and cloning
+      # bedrud-android to read a 40-byte pointer would be waste.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # Releases rather than tags, deliberately. Over in bedrud-android a tag is pushed
+      # first and release.yml is dispatched against it afterwards, gated on a reviewer
+      # approving the signing environment - so there is a window, minutes to days, where
+      # the tag exists with no build behind it. A release only exists once that build
+      # passed lint, tests and signing. Pre-releases count: a beta and a stable release
+      # of the same tag are the same commit, built and signed identically.
+      - name: Resolve the newest release
+        id: rel
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag=$(gh release list --repo "$UPSTREAM" --exclude-drafts --limit 1 \
+                --json tagName --jq '.[0].tagName // empty')
+          [ -n "$tag" ] || { echo "::error::no release found in $UPSTREAM"; exit 1; }
+
+          # An annotated tag has to be dereferenced to reach the commit it points at.
+          # The fallback covers a lightweight tag, which has no peeled ref to find.
+          url="https://github.com/$UPSTREAM.git"
+          want=$(git ls-remote "$url" "refs/tags/$tag^{}" | cut -f1)
+          [ -n "$want" ] || want=$(git ls-remote "$url" "refs/tags/$tag" | cut -f1)
+          [ -n "$want" ] || { echo "::error::cannot resolve $tag to a commit"; exit 1; }
+
+          have=$(git ls-tree HEAD apps/android | awk '{print $3}')
+
+          {
+            echo "tag=$tag"
+            echo "want=$want"
+            echo "have=$have"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$want" = "$have" ]; then
+            echo "behind=false" >> "$GITHUB_OUTPUT"
+            echo "Already pinned to $tag ($have) - nothing to do."
+          else
+            echo "behind=true" >> "$GITHUB_OUTPUT"
+            echo "Pin is behind: $have -> $want ($tag)"
+          fi
+
+      # At most one open tracking issue exists at a time. Looking it up before deciding what
+      # to do is what keeps this workflow from stacking a fresh issue every Saturday.
+      - name: Look for the tracking issue
+        id: tracker
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The label does not exist until the first issue is filed, and gh reports an
+          # unknown label as an error rather than an empty list - hence the guard.
+          num=$(gh issue list --repo "$GITHUB_REPOSITORY" --label "$TRACKER_LABEL" \
+                --state open --limit 1 --json number --jq '.[0].number // empty' \
+                2>/dev/null || true)
+          echo "number=$num" >> "$GITHUB_OUTPUT"
+          if [ -n "$num" ]; then
+            echo "Tracking issue is #$num"
+          else
+            echo "No open tracking issue."
+          fi
+
+      - name: Open or refresh the tracking issue
+        if: steps.rel.outputs.behind == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUM: ${{ steps.tracker.outputs.number }}
+          TAG: ${{ steps.rel.outputs.tag }}
+          WANT: ${{ steps.rel.outputs.want }}
+          HAVE: ${{ steps.rel.outputs.have }}
+        run: |
+          title="apps/android is behind bedrud-android $TAG"
+
+          # Indented code block rather than a fenced one: this heredoc is unquoted so the
+          # variables expand, which makes a run of backticks more trouble than it is worth.
+          cat > /tmp/body.md <<EOF
+          \`apps/android\` is pinned to a commit older than the newest release of
+          [bedrud-android](https://github.com/$UPSTREAM).
+
+          | | |
+          |---|---|
+          | pinned | \`$HAVE\` |
+          | newest release | [$TAG](https://github.com/$UPSTREAM/releases/tag/$TAG) - \`$WANT\` |
+
+          To move the pin:
+
+              make pin-android-stable
+              git add apps/android
+              git commit -m "chore(android): pin submodule to bedrud-android@$TAG"
+
+          Then open a pull request. Read the release notes linked above first - nothing here
+          moves the pin on its own, and a new release is not automatically one this repo
+          wants to ship.
+
+          <sub>Kept current by \`.github/workflows/check-android-pin.yml\`, which closes this
+          issue once the pin catches up.</sub>
+          EOF
+
+          if [ -z "$NUM" ]; then
+            # --force so a deleted label repairs itself instead of failing the run.
+            gh label create "$TRACKER_LABEL" --repo "$GITHUB_REPOSITORY" --force \
+              --color A2EEEF \
+              --description "The apps/android submodule pin is behind bedrud-android" >/dev/null
+
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+              --body-file /tmp/body.md \
+              --label "$TRACKER_LABEL" --label android --label dependencies
+            exit 0
+          fi
+
+          # An issue that already names this release is left completely alone. Rewriting it
+          # every Saturday for a bump nobody has got to yet would train everyone to ignore
+          # it, which is the one failure mode a reminder cannot survive.
+          current=$(gh issue view "$NUM" --repo "$GITHUB_REPOSITORY" --json title --jq .title)
+          if [ "$current" = "$title" ]; then
+            echo "#$NUM already tracks $TAG - leaving it alone."
+            exit 0
+          fi
+
+          gh issue edit "$NUM" --repo "$GITHUB_REPOSITORY" \
+            --title "$title" --body-file /tmp/body.md
+
+          # A comment, unlike an edit, actually reaches whoever is subscribed - and a newer
+          # release landing on top of an unactioned one is worth being told about.
+          gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body \
+            "A newer release has landed: [**$TAG**](https://github.com/$UPSTREAM/releases/tag/$TAG) (\`$WANT\`). The description above now targets it."
+          echo "Updated #$NUM to $TAG"
+
+      - name: Close the tracking issue
+        if: steps.rel.outputs.behind == 'false' && steps.tracker.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUM: ${{ steps.tracker.outputs.number }}
+          TAG: ${{ steps.rel.outputs.tag }}
+          WANT: ${{ steps.rel.outputs.want }}
+        run: |
+          gh issue close "$NUM" --repo "$GITHUB_REPOSITORY" \
+            --comment "\`apps/android\` is now pinned to $TAG (\`$WANT\`) - closing."
