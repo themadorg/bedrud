@@ -12,10 +12,12 @@ flowchart TB
   tag["push tag v*"]
   cronQ["cron Mon 06:00 UTC"]
   cronS["cron Sat 00:00 UTC"]
+  cronCI["cron daily 03:37 UTC"]
   relPub["release published"]
 
   push --> CI
-  CI -->|success + site paths| DeploySite
+  cronCI -->|no path filters| CI
+  CI -->|push + success + site paths| DeploySite
   tag --> Release
   relPub --> Apt
   relPub --> Dnf
@@ -27,8 +29,8 @@ flowchart TB
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| **CI** | `ci.yml` | push/PR → `master` | Lint/test/build per app (path-filtered) |
-| **Deploy Site** | `deploy-site.yml` | after CI success on `master`, or manual | GitHub Pages (landing + docs) |
+| **CI** | `ci.yml` | push → `master`, every PR, daily cron, manual | Lint/test/build per app (path-filtered, except on cron/manual) |
+| **Deploy Site** | `deploy-site.yml` | after a **push**-triggered CI success on `master`, or manual | GitHub Pages (landing + docs) |
 | **Release** | `release.yml` | tag `v*` | Full production release |
 | **PR Beta** | `pr-beta.yml` | PR open/sync/reopen/close | Per-PR beta assets |
 | **Bump Android Pin** | `bump-android-pin.yml` | weekly, or manual | PR to move `apps/android` to bedrud-android's newest release |
@@ -36,15 +38,23 @@ flowchart TB
 | **Apt repo** | `apt-repo.yml` | release published | `.deb` apt index on Pages |
 | **DNF repo** | `dnf-repo.yml` | release published | `.rpm` dnf index |
 
-There is **no** auto SSH deploy to a production host (`deploy-server.yml` removed) and
-**no** nightly or dev pipeline. Android is built, signed and released entirely in its own
-repo; this one only records which of those releases it sits alongside.
+There is **no** auto SSH deploy to a production host (`deploy-server.yml` removed) and **no**
+nightly or dev **build** pipeline — nothing is published on a schedule. The daily CI cron below
+only re-runs the existing checks; it produces no artifacts and deploys nothing. Android is built,
+signed and released entirely in its own repo; this one only records which of those releases it
+sits alongside.
 
 ---
 
 ## Path filters (what runs when)
 
 Used by **CI** and **Deploy Site**. Compares changed files to the previous commit.
+
+**The daily cron and a manual `workflow_dispatch` skip the filters entirely** and run every job.
+A push only ever answers "what did this commit touch", so a job no path routes to is a job nobody
+hears from while the commit still shows green. The unfiltered run is what bounds how long that
+can last, and it is the only run proving `master` passes from scratch rather than from whichever
+commit last happened to touch the right tree.
 
 | Flag / job group | Paths that enable it |
 |------------------|----------------------|
@@ -81,7 +91,20 @@ repo. See [Bump Android Pin](#bump-android-pin-bump-android-pinyml).
 
 ## CI (`ci.yml`)
 
-**When:** push or PR to `master`.
+**When:** push to `master`; every pull request, whatever branch it targets; daily at 03:37 UTC;
+and on manual `workflow_dispatch`. The last two run unfiltered — see
+[Path filters](#path-filters-what-runs-when).
+
+**Concurrency:** a pull request groups by ref, so a new push supersedes the run before it. Every
+other event groups by **commit**, so it shares a group with nothing and is never superseded.
+Grouping master by ref is how a merge landing on top of another cancelled the first one's tests,
+leaving that commit with no result at all — and `cancel-in-progress: false` does not fix it,
+because a third run arriving cancels the *pending* second one.
+
+**Failure reporting:** the `Scheduled – report` job runs only on the cron. It keeps a single open
+issue labelled `scheduled-ci` while `master` is failing, refreshing its body each run and closing
+it once a scheduled run passes. A push or a pull request already shows a red tick to somebody who
+is looking, so it stays out of those.
 
 ```mermaid
 flowchart LR
@@ -140,7 +163,11 @@ Jobs run only if their path flag is true (except `changes`, always).
 
 ## Deploy Site (`deploy-site.yml`)
 
-**When:** CI completed on `master`, or manual `workflow_dispatch`.
+**When:** a **push**-triggered CI run succeeded on `master`, or manual `workflow_dispatch`.
+
+The event matters. CI also runs on a schedule, and a scheduled run carries `master` as its head
+branch, so without checking `workflow_run.event` every cron would republish identical content and
+file a fresh Pages deployment.
 
 ```mermaid
 flowchart LR
@@ -149,7 +176,7 @@ flowchart LR
   B --> D[deploy Pages]
 ```
 
-- **should-deploy:** if CI success (or manual); path check includes `apps/site/`, `docs/`, `server/`, deploy/ci workflow files  
+- **should-deploy:** if a push-triggered CI run succeeded (or manual); path check includes `apps/site/`, `docs/`, `server/`, deploy/ci workflow files  
 - **build** (if site needed): GPG key export (optional secrets) → sync swagger → Astro build  
 - **deploy:** `actions/deploy-pages`  
 
@@ -283,6 +310,7 @@ LiveKit embed placeholder (CI): `mkdir -p server/internal/livekit/bin && touch s
 
 1. Open the PR/push file list.  
 2. Match paths to the table under **Path filters**.  
-3. CI = only matching jobs.  
-4. Pages = after CI, only if site/docs/server paths hit (or manual).  
+3. CI = only matching jobs — on a push or a pull request. The daily cron and a manual
+   `workflow_dispatch` ignore the table and run everything.  
+4. Pages = after a **push**-triggered CI run, only if site/docs/server paths hit (or manual).  
 5. Full production everything = `git tag vX.Y.Z && git push --tags`.  
