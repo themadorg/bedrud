@@ -19,7 +19,7 @@ on:
   schedule:
     - cron: "37 3 * * *"
   # The same unfiltered run, on demand — for confirming a fix without waiting
-  # for tonight, or after changing the filters themselves.
+  # for the next scheduled one, or after changing the filters themselves.
   workflow_dispatch:
 
 concurrency:
@@ -371,8 +371,9 @@ jobs:
   # broke master.
   #
   # So the same shape as check-android-pin.yml: one open tracking issue at a
-  # time, found by label rather than title so the title can carry the run
-  # number, refreshed while master stays broken, closed once a night passes.
+  # time, found by label rather than by title so the lookup keeps working
+  # however the title is worded, its body refreshed while master stays broken,
+  # closed once a scheduled run passes again.
   # It reports only — nothing here reverts, reruns or pushes.
   #
   # Deliberately not on pull_request or push: those already show a red tick on
@@ -388,6 +389,11 @@ jobs:
     permissions:
       contents: read
       issues: write
+      # Declaring any permissions block zeroes the rest, and the step below
+      # reads GET /actions/runs/{id}/jobs, which is documented as actions: read.
+      # A public repo may serve it unauthenticated, but that is a thin thing to
+      # rely on in the one step that only ever runs when master is broken.
+      actions: read
     env:
       TRACKER_LABEL: scheduled-ci
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -402,7 +408,7 @@ jobs:
         run: |
           names=$(gh run view "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs \
                   --jq '[.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled")
-                         | "- **\(.name)** — \(.conclusion)"] | join("\n")')
+                         | "- **\(.name)** — \(.conclusion)"] | join("\n")') || names=""
           {
             echo "list<<EOF"
             echo "${names:-- (no individual job reported a conclusion)}"
@@ -452,15 +458,23 @@ jobs:
             gh label create "$TRACKER_LABEL" --repo "$GITHUB_REPOSITORY" --force \
               --color B60205 --description "The scheduled unfiltered CI run is failing on master" >/dev/null
 
+            # github_actions rather than a ci label: gh rejects an unknown label
+            # outright, and filing this issue is the one thing that must not
+            # fail when master breaks. github_actions already exists in
+            # this repo; a made-up second label would have to be created here
+            # too, for no gain.
             gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
-              --body-file /tmp/body.md --label "$TRACKER_LABEL" --label ci
+              --body-file /tmp/body.md --label "$TRACKER_LABEL" --label github_actions
             exit 0
           fi
 
-          # Edited rather than commented on each night. A comment every 24 hours
-          # on a break somebody is already working through is how a reminder
-          # trains people to mute it.
-          gh issue edit "$NUM" --repo "$GITHUB_REPOSITORY" --title "$title" --body-file /tmp/body.md
+          # Only the body is refreshed: the title is fixed, and the run number,
+          # commit and failing jobs it would otherwise carry all live in the body.
+          #
+          # Edited rather than commented on. A comment every 24 hours about a
+          # break somebody is already working through is how a reminder trains
+          # people to mute it.
+          gh issue edit "$NUM" --repo "$GITHUB_REPOSITORY" --body-file /tmp/body.md
           echo "Refreshed #$NUM"
 
       - name: Close the tracking issue
