@@ -19,6 +19,26 @@ interface AuthStore {
 
 const BASE_URL = (import.meta.env['VITE_API_URL'] as string | undefined) ?? ''
 
+/**
+ * The storage mode the current session already uses.
+ *
+ * Token refreshes must pass this to setTokens. Letting `remember` fall back to
+ * its default would move a session-only login into localStorage, so a session
+ * the user deliberately kept ephemeral — a guest joining a meeting on a shared
+ * machine — would start surviving browser restarts.
+ *
+ * A session created with `false` reads back as `'ephemeral'`. No information is
+ * lost: setTokens stores both in sessionStorage and treats them identically.
+ *
+ * With no session on record there is nothing to preserve, so a first login is
+ * remembered, as it always has been.
+ */
+export function currentRememberMode(): boolean | 'ephemeral' {
+  if (localStorage.getItem(REMEMBER_KEY)) return true
+  if (sessionStorage.getItem(REMEMBER_KEY)) return 'ephemeral'
+  return true
+}
+
 const _init = { promise: null as Promise<void> | null }
 
 export const useAuthStore = create<AuthStore>()((set, get) => ({
@@ -27,18 +47,19 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
 
   setTokens: (tokens, remember = true) => {
     set({ tokens })
-    if (remember === 'ephemeral') {
-      sessionStorage.setItem(REMEMBER_KEY, '1')
-      sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken)
-      return
-    }
-    if (remember) {
-      localStorage.setItem(REMEMBER_KEY, '1')
-      localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken)
-    } else {
-      sessionStorage.setItem(REMEMBER_KEY, '1')
-      sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken)
-    }
+
+    // Exactly one storage owns the session. Writing one without clearing the
+    // other leaves keys from a previous login behind, and currentRememberMode
+    // reads localStorage first — so a leftover remembered session would make a
+    // later ephemeral one read back as remembered and get promoted on its first
+    // refresh. Callers do not reliably clear() in between; the guest join path
+    // does not.
+    const [owner, other] = remember === true ? [localStorage, sessionStorage] : [sessionStorage, localStorage]
+
+    other.removeItem(REMEMBER_KEY)
+    other.removeItem(ACCESS_TOKEN_KEY)
+    owner.setItem(REMEMBER_KEY, '1')
+    owner.setItem(ACCESS_TOKEN_KEY, tokens.accessToken)
   },
 
   updateAccessToken: (accessToken) => {
@@ -78,7 +99,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
 
         if (res.ok) {
           const data = (await res.json()) as { access_token: string; refresh_token: string }
-          get().setTokens({ accessToken: data.access_token, refreshToken: data.refresh_token })
+          get().setTokens({ accessToken: data.access_token, refreshToken: data.refresh_token }, currentRememberMode())
           set({ initialized: true })
           return
         }
@@ -97,7 +118,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
               credentials: 'include',
             })
             if (meRes.ok) {
-              get().setTokens({ accessToken: persistedAT, refreshToken: null })
+              get().setTokens({ accessToken: persistedAT, refreshToken: null }, currentRememberMode())
               set({ initialized: true })
               return
             }
@@ -110,8 +131,13 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
       // Both paths failed — clear session
       get().clear()
       set({ initialized: true })
+    })().finally(() => {
+      // Released on every outcome, not just failure. The `initialized` guard
+      // above already stops a second run, so holding a settled promise here
+      // only means that resetting `initialized` without clear() would make
+      // initialize() a silent no-op.
       _init.promise = null
-    })()
+    })
 
     return _init.promise
   },

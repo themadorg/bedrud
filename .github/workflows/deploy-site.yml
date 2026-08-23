@@ -22,7 +22,18 @@ jobs:
   should-deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    # Only a push to master deploys. CI also runs on a schedule and on
+    # workflow_dispatch, and both carry `master` as their head branch, so
+    # without this guard every scheduled run would republish identical content:
+    # the diff below compares the run's head against its parent, and master's
+    # tip is a merge commit whose diff almost always touches server/ or
+    # apps/web/. That would file a fresh github-pages deployment on every run and
+    # queue it in the `pages` concurrency group ahead of real ones.
+    #
+    # A pull request run cannot reach here anyway — `branches: [master]` above
+    # matches the run's head branch, which for a pull request is the source
+    # branch — but naming the event keeps that from depending on the filter.
+    if: ${{ (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') || github.event_name == 'workflow_dispatch' }}
     outputs:
       site: ${{ steps.decide.outputs.site }}
     steps:

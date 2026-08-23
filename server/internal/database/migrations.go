@@ -121,6 +121,22 @@ func runMigrations(quiet bool) error {
 	if err := db.AutoMigrate(&models.Job{}); err != nil {
 		return err
 	}
+
+	// Deduplicate unfinished jobs per target: one pending-or-active job for a
+	// given (type, dedupe_key). Rows with an empty key are exempt, so job types
+	// that do not deduplicate are unaffected, and finished rows are outside the
+	// index so a completed job never blocks a later one for the same target.
+	//
+	// Unlike idx_rooms_active_name this needs no dialect branch: SQLite and
+	// Postgres accept the same partial-index syntax here, since the predicate
+	// compares strings rather than a boolean.
+	if !db.Migrator().HasIndex(&models.Job{}, "idx_jobs_active_dedupe") {
+		if err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_active_dedupe
+			ON jobs(type, dedupe_key)
+			WHERE dedupe_key <> '' AND status IN ('pending', 'active')`).Error; err != nil {
+			log.Warn().Err(err).Msg("Failed to create partial unique index for job deduplication")
+		}
+	}
 	if err := db.AutoMigrate(&models.VerificationEvent{}); err != nil {
 		return err
 	}

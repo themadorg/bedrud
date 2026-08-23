@@ -53,10 +53,7 @@ func initialize(cfg *config.DatabaseConfig, quiet bool) error {
 	}
 
 	// Configure GORM
-	gormConfig := &gorm.Config{
-		Logger:                                   logger.Default.LogMode(gormLogLevel),
-		DisableForeignKeyConstraintWhenMigrating: true,
-	}
+	gormConfig := GormConfig(gormLogLevel)
 
 	// Determine database type and prepare dialector
 	dbType := cfg.Type
@@ -165,8 +162,25 @@ func gormLogLevelFromZerolog(level zerolog.Level) logger.LogLevel {
 	}
 }
 
+// GormConfig returns the GORM configuration the server runs with.
+//
+// Anything that opens a handle must use this, tests included. The settings
+// here change what migrations do, not just how they are logged:
+// DisableForeignKeyConstraintWhenMigrating decides whether GORM derives
+// foreign keys from model associations at all. Every foreign key this project
+// wants is written by hand in RunMigrations, so that generation stays off — a
+// handle opened without it gets constraints production never has, and
+// migration behaviour under test stops matching deployment.
+func GormConfig(logLevel logger.LogLevel) *gorm.Config {
+	return &gorm.Config{
+		Logger:                                   logger.Default.LogMode(logLevel),
+		DisableForeignKeyConstraintWhenMigrating: true,
+	}
+}
+
 // SetForTest sets the global database connection for testing.
-// This bypasses Initialize and should only be used in tests.
+// This bypasses Initialize, so the handle must already be built with
+// GormConfig — see the note there.
 func SetForTest(testDB *gorm.DB) {
 	db = testDB
 }
