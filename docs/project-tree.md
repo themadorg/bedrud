@@ -268,7 +268,7 @@ Do not edit manually; produced by `make build-site`.
 │   ├── release.yml                  # Full release on v* tags
 │   ├── deploy-site.yml              # GitHub Pages (landing/docs; path-gated)
 │   ├── codeql.yml                   # Security scanning
-│   ├── bump-android-pin.yml         # Weekly PR moving the apps/android pin
+│   ├── check-android-pin.yml        # Weekly issue when the apps/android pin is stale
 │   └── …                            # apt-repo, dnf-repo, pr-beta
 # See docs/developer/ci.md for pipeline details
 ├── ISSUE_TEMPLATE/                  # Bug, feature, security, etc.

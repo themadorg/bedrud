@@ -7,10 +7,37 @@ on:
   # stacked on another branch got no CI at all — not a red tick, nothing.
   # Every pull request is gated, whatever it targets.
   pull_request:
+  # A daily run with every path filter off. A push only ever answers "what did this
+  # commit touch", so a job nothing routed to is a job nobody heard from — and
+  # `Server – Tests` staying silent for two days is how a queue regression
+  # reached master. This bounds that to a day, and it is the only run that
+  # proves master still builds and passes from scratch rather than from the
+  # last commit that happened to touch the right tree.
+  #
+  # 00:00 UTC, the same convention as check-android-pin.yml. GitHub queues
+  # on-the-hour crons behind everyone else's and may start this tens of minutes
+  # late; a daily health check is not time-sensitive to that degree.
+  schedule:
+    - cron: "0 0 * * *"
+  # The same unfiltered run, on demand — for confirming a fix without waiting
+  # for the next scheduled one, or after changing the filters themselves.
+  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # A pull request groups by ref, so a new push supersedes the run before it —
+  # only the newest commit on a branch is worth an answer.
+  #
+  # Everything else groups by commit, which means it never shares a group and is
+  # therefore never superseded at all. That is the other half of how a queue
+  # regression stayed hidden for two days: `ci-${{ github.ref }}` put every push
+  # to master in one group, so a merge landing on top of another cancelled the
+  # first one's tests and no commit ever reported on them. Grouping by ref with
+  # `cancel-in-progress: false` would not have fixed it either — a third run
+  # arriving cancels the *pending* second one, and that commit still ends up
+  # with no result. Per-commit is the only grouping where every commit on master
+  # keeps its own answer.
+  group: ci-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # ── Path filters: only run jobs when their trees change ──
@@ -26,17 +53,38 @@ jobs:
     name: Detect changes
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Each output is "did this tree change" OR "we are not filtering at all".
+    # The second half is what makes the scheduled and workflow_dispatch runs whole:
+    # every job runs, whatever the diff says.
     outputs:
-      server: ${{ steps.filter.outputs.server }}
-      web: ${{ steps.filter.outputs.web }}
-      site: ${{ steps.filter.outputs.site }}
-      desktop: ${{ steps.filter.outputs.desktop }}
-      ios: ${{ steps.filter.outputs.ios }}
-      devcli: ${{ steps.filter.outputs.devcli }}
+      server: ${{ steps.mode.outputs.unfiltered == 'true' || steps.filter.outputs.server == 'true' }}
+      web: ${{ steps.mode.outputs.unfiltered == 'true' || steps.filter.outputs.web == 'true' }}
+      site: ${{ steps.mode.outputs.unfiltered == 'true' || steps.filter.outputs.site == 'true' }}
+      desktop: ${{ steps.mode.outputs.unfiltered == 'true' || steps.filter.outputs.desktop == 'true' }}
+      ios: ${{ steps.mode.outputs.unfiltered == 'true' || steps.filter.outputs.ios == 'true' }}
+      devcli: ${{ steps.mode.outputs.unfiltered == 'true' || steps.filter.outputs.devcli == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # A scheduled or dispatched run has no "before" commit to diff against, so
+      # the filter below would have nothing to answer even if we wanted it to.
+      # Skipping it outright says why in one place rather than leaving an empty
+      # result to be interpreted downstream.
+      - name: Decide whether to filter at all
+        id: mode
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          case "$EVENT" in
+            schedule|workflow_dispatch) unfiltered=true ;;
+            *)                          unfiltered=false ;;
+          esac
+          echo "unfiltered=$unfiltered" >> "$GITHUB_OUTPUT"
+          echo "event=$EVENT unfiltered=$unfiltered"
+
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: filter
+        if: steps.mode.outputs.unfiltered != 'true'
         with:
           filters: |
             server:
@@ -315,3 +363,201 @@ jobs:
       - run: bun run check
       - run: bun run typecheck:astro
       - run: bun run build
+
+  # ── Reporting for the scheduled run ─────────────────────────────────────────
+  #
+  # A scheduled run that goes red where nobody looks is barely better than no
+  # scheduled run at all. GitHub's own notification for a failed scheduled workflow goes
+  # to whoever last touched the workflow file, which is not the same as whoever
+  # broke master.
+  #
+  # So the same shape as check-android-pin.yml: one open tracking issue at a
+  # time, found by label rather than by title so the lookup keeps working
+  # however the title is worded, its body refreshed while master stays broken,
+  # closed once a scheduled run passes again.
+  # It reports only — nothing here reverts, reruns or pushes.
+  #
+  # Deliberately not on pull_request or push: those already show a red tick on
+  # something a person is looking at.
+  scheduled-report:
+    name: Scheduled – report
+    # always(), or a failed job upstream would skip the reporting too — which is
+    # precisely the case that has to be reported.
+    #
+    # workflow_dispatch as well as schedule: otherwise every line below first
+    # executes for real at 00:00, in a log nobody is watching. A dispatch against
+    # a healthy master reads the run and writes nothing, which rehearses
+    # `actions: read`, `gh run view` and the tracker lookup on demand. It cannot
+    # rehearse `gh label create` or `gh issue create` — those need a broken
+    # master to reach.
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    # Ordering only. What counts as broken is read from the run itself, below —
+    # deriving it from `needs.*.result` meant a job added to this workflow but
+    # not to this list left every listed result green, so the close step fired
+    # and shut the tracker while master was red.
+    needs: [changes, server, server-test, web, devcli, ios, desktop, site]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      # Declaring any permissions block zeroes the rest, and the step below
+      # reads GET /actions/runs/{id}/jobs, which is documented as actions: read.
+      # A public repo may serve it unauthenticated, but that is a thin thing to
+      # rely on in the one step that only ever runs when master is broken.
+      actions: read
+    env:
+      TRACKER_LABEL: scheduled-ci
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Must match this job's `name:` above — it is how the job excludes itself
+      # from a run it is still executing inside.
+      SELF: Scheduled – report
+    steps:
+      # One read of the run decides both what to say and whether to say it.
+      # Splitting those was a bug: the verdict came from `needs.*.result` while
+      # the list came from the API, so a job in the workflow but not in `needs`
+      # failed, the run went red, every listed result stayed green, and the close
+      # step shut the tracker. Such a job also imposes no ordering, so it may
+      # still be running when this reads — hence `settled` as well as `broken`.
+      - name: Read this run's job results
+        id: run
+        run: |
+          jobs=$(gh run view "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs --jq '.jobs') || jobs=""
+
+          if [ -z "$jobs" ]; then
+            # No evidence is not evidence of health. Say so and touch nothing:
+            # both later steps require a definite answer.
+            {
+              echo "broken=unknown"
+              echo "settled=false"
+              echo "list<<EOF"
+              echo "- (this run's jobs could not be read)"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          others=$(printf '%s' "$jobs" | jq --arg self "$SELF" '[.[] | select(.name != $self)]')
+
+          # SELF is tied to this job's `name:` by nothing but a matching string.
+          # Rename one without the other and the job stops excluding itself, so
+          # it forever counts its own null conclusion as unfinished, `settled` is
+          # never true, and the tracker is never closed again — silently, which
+          # is the class of failure this whole job exists to remove. Fail loudly
+          # instead: the report going red is itself a signal somebody sees.
+          excluded=$(( $(printf '%s' "$jobs" | jq 'length') - $(printf '%s' "$others" | jq 'length') ))
+          if [ "$excluded" -ne 1 ]; then
+            echo "::error::SELF ($SELF) matched $excluded jobs in this run, expected exactly 1 — it must equal this job's name:"
+            exit 1
+          fi
+
+          failed=$(printf '%s' "$others" | jq -r '[.[] | select(.conclusion == "failure" or .conclusion == "cancelled") | "- **\(.name)** — \(.conclusion)"] | join("\n")')
+          # A skipped job is not a broken one; an unfinished job is simply not an
+          # answer yet, and closing on a partial picture is the failure that
+          # matters most here.
+          unfinished=$(printf '%s' "$others" | jq '[.[] | select(.conclusion == null)] | length')
+
+          if [ -n "$failed" ]; then broken=true; else broken=false; fi
+          if [ "$unfinished" -eq 0 ]; then settled=true; else settled=false; fi
+
+          {
+            echo "broken=$broken"
+            echo "settled=$settled"
+            echo "list<<EOF"
+            echo "${failed:-- (no job reported a failure)}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "broken=$broken settled=$settled unfinished=$unfinished"
+
+      - name: Look for the tracking issue
+        id: tracker
+        run: |
+          # The label does not exist until the first issue is filed, and gh
+          # reports an unknown label as an error rather than an empty list.
+          num=$(gh issue list --repo "$GITHUB_REPOSITORY" --label "$TRACKER_LABEL" \
+                --state open --limit 1 --json number --jq '.[0].number // empty' \
+                2>/dev/null || true)
+          echo "number=$num" >> "$GITHUB_OUTPUT"
+
+      # Both writing steps are default-branch-only. workflow_dispatch accepts any
+      # ref, so dispatching CI on a feature branch and watching it fail would
+      # otherwise file an issue titled "failing on master" carrying that branch's
+      # SHA. On `schedule` the ref is always the default branch, so this costs
+      # nothing there — it only keeps a rehearsal from lying.
+      #
+      # Compared against the repository's actual default branch rather than a
+      # literal 'refs/heads/master'. A literal is the same string coupling as
+      # SELF above, except this one cannot be made loud: rename the default
+      # branch and both steps would skip forever with nothing raised anywhere.
+      # `repository` is in both the schedule and workflow_dispatch payloads.
+      - name: Open or refresh the tracking issue
+        if: steps.run.outputs.broken == 'true' && github.ref_name == github.event.repository.default_branch
+        env:
+          NUM: ${{ steps.tracker.outputs.number }}
+          FAILED_LIST: ${{ steps.run.outputs.list }}
+          SHA: ${{ github.sha }}
+        run: |
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          title="The scheduled unfiltered CI run is failing on master"
+
+          cat > /tmp/body.md <<EOF
+          The scheduled unfiltered run of \`.github/workflows/ci.yml\` did not pass on \`master\`.
+
+          | | |
+          |---|---|
+          | commit | \`$SHA\` |
+          | run | [#$GITHUB_RUN_NUMBER]($run_url) |
+
+          $FAILED_LIST
+
+          This run applies no path filters, so it covers jobs a push may skip. A
+          failure here that no pull request showed means the break reached master
+          through a commit that did not route to the job that catches it.
+
+          <sub>Kept current by the \`scheduled-report\` job in \`.github/workflows/ci.yml\`,
+          which closes this issue once a scheduled run passes.</sub>
+          EOF
+
+          if [ -z "$NUM" ]; then
+            # --force so a deleted label repairs itself instead of failing the run.
+            gh label create "$TRACKER_LABEL" --repo "$GITHUB_REPOSITORY" --force \
+              --color B60205 --description "The scheduled unfiltered CI run is failing on master" >/dev/null
+
+            # github_actions rather than a ci label: gh rejects an unknown label
+            # outright, and filing this issue is the one thing that must not
+            # fail when master breaks. github_actions already exists in
+            # this repo; a made-up second label would have to be created here
+            # too, for no gain.
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+              --body-file /tmp/body.md --label "$TRACKER_LABEL" --label github_actions
+            exit 0
+          fi
+
+          # Only the body is refreshed: the title is fixed, and the run number,
+          # commit and failing jobs it would otherwise carry all live in the body.
+          #
+          # Edited rather than commented on. A comment every 24 hours about a
+          # break somebody is already working through is how a reminder trains
+          # people to mute it.
+          gh issue edit "$NUM" --repo "$GITHUB_REPOSITORY" --body-file /tmp/body.md
+          echo "Refreshed #$NUM"
+
+      - name: Close the tracking issue
+        # Three conditions, not one. `broken == 'false'` rather than `!= 'true'`
+        # so an unreadable run ("unknown") leaves the issue alone, and `settled`
+        # so a job still in flight cannot be mistaken for a passing one. Closing
+        # a tracker while master is red is the worst thing this job can do — it
+        # is worse than staying silent, because it reports health that was never
+        # observed.
+        if: >-
+          steps.run.outputs.broken == 'false' &&
+          steps.run.outputs.settled == 'true' &&
+          steps.tracker.outputs.number != '' &&
+          github.ref_name == github.event.repository.default_branch
+        env:
+          NUM: ${{ steps.tracker.outputs.number }}
+          SHA: ${{ github.sha }}
+        run: |
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh issue close "$NUM" --repo "$GITHUB_REPOSITORY" \
+            --comment "The scheduled run passed on \`$SHA\` ([run #$GITHUB_RUN_NUMBER]($run_url)) — closing."
