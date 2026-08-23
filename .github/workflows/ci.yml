@@ -479,13 +479,19 @@ jobs:
                 2>/dev/null || true)
           echo "number=$num" >> "$GITHUB_OUTPUT"
 
-      # Both writing steps are master-only. workflow_dispatch accepts any ref, so
-      # dispatching CI on a feature branch and watching it fail would otherwise
-      # file an issue titled "failing on master" carrying that branch's SHA. On
-      # `schedule` the ref is always the default branch, so this costs nothing
-      # there — it only keeps a rehearsal from lying.
+      # Both writing steps are default-branch-only. workflow_dispatch accepts any
+      # ref, so dispatching CI on a feature branch and watching it fail would
+      # otherwise file an issue titled "failing on master" carrying that branch's
+      # SHA. On `schedule` the ref is always the default branch, so this costs
+      # nothing there — it only keeps a rehearsal from lying.
+      #
+      # Compared against the repository's actual default branch rather than a
+      # literal 'refs/heads/master'. A literal is the same string coupling as
+      # SELF above, except this one cannot be made loud: rename the default
+      # branch and both steps would skip forever with nothing raised anywhere.
+      # `repository` is in both the schedule and workflow_dispatch payloads.
       - name: Open or refresh the tracking issue
-        if: steps.run.outputs.broken == 'true' && github.ref == 'refs/heads/master'
+        if: steps.run.outputs.broken == 'true' && github.ref_name == github.event.repository.default_branch
         env:
           NUM: ${{ steps.tracker.outputs.number }}
           FAILED_LIST: ${{ steps.run.outputs.list }}
@@ -547,7 +553,7 @@ jobs:
           steps.run.outputs.broken == 'false' &&
           steps.run.outputs.settled == 'true' &&
           steps.tracker.outputs.number != '' &&
-          github.ref == 'refs/heads/master'
+          github.ref_name == github.event.repository.default_branch
         env:
           NUM: ${{ steps.tracker.outputs.number }}
           SHA: ${{ github.sha }}
