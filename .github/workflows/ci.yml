@@ -14,10 +14,9 @@ on:
   # proves master still builds and passes from scratch rather than from the
   # last commit that happened to touch the right tree.
   #
-  # 00:00 UTC — the start of the day, so the answer is waiting rather than
-  # arriving partway through it. Same convention as check-android-pin.yml.
-  # GitHub queues on-the-hour crons behind everyone else's and can start it tens
-  # of minutes late; nothing here is time-sensitive to that degree.
+  # 00:00 UTC, the same convention as check-android-pin.yml. GitHub queues
+  # on-the-hour crons behind everyone else's and may start this tens of minutes
+  # late; a daily health check is not time-sensitive to that degree.
   schedule:
     - cron: "0 0 * * *"
   # The same unfiltered run, on demand — for confirming a fix without waiting
@@ -439,6 +438,19 @@ jobs:
           fi
 
           others=$(printf '%s' "$jobs" | jq --arg self "$SELF" '[.[] | select(.name != $self)]')
+
+          # SELF is tied to this job's `name:` by nothing but a matching string.
+          # Rename one without the other and the job stops excluding itself, so
+          # it forever counts its own null conclusion as unfinished, `settled` is
+          # never true, and the tracker is never closed again — silently, which
+          # is the class of failure this whole job exists to remove. Fail loudly
+          # instead: the report going red is itself a signal somebody sees.
+          excluded=$(( $(printf '%s' "$jobs" | jq 'length') - $(printf '%s' "$others" | jq 'length') ))
+          if [ "$excluded" -ne 1 ]; then
+            echo "::error::SELF ($SELF) matched $excluded jobs in this run, expected exactly 1 — it must equal this job's name:"
+            exit 1
+          fi
+
           failed=$(printf '%s' "$others" | jq -r '[.[] | select(.conclusion == "failure" or .conclusion == "cancelled") | "- **\(.name)** — \(.conclusion)"] | join("\n")')
           # A skipped job is not a broken one; an unfinished job is simply not an
           # answer yet, and closing on a partial picture is the failure that
@@ -467,8 +479,13 @@ jobs:
                 2>/dev/null || true)
           echo "number=$num" >> "$GITHUB_OUTPUT"
 
+      # Both writing steps are master-only. workflow_dispatch accepts any ref, so
+      # dispatching CI on a feature branch and watching it fail would otherwise
+      # file an issue titled "failing on master" carrying that branch's SHA. On
+      # `schedule` the ref is always the default branch, so this costs nothing
+      # there — it only keeps a rehearsal from lying.
       - name: Open or refresh the tracking issue
-        if: steps.run.outputs.broken == 'true'
+        if: steps.run.outputs.broken == 'true' && github.ref == 'refs/heads/master'
         env:
           NUM: ${{ steps.tracker.outputs.number }}
           FAILED_LIST: ${{ steps.run.outputs.list }}
@@ -529,7 +546,8 @@ jobs:
         if: >-
           steps.run.outputs.broken == 'false' &&
           steps.run.outputs.settled == 'true' &&
-          steps.tracker.outputs.number != ''
+          steps.tracker.outputs.number != '' &&
+          github.ref == 'refs/heads/master'
         env:
           NUM: ${{ steps.tracker.outputs.number }}
           SHA: ${{ github.sha }}

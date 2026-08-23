@@ -22,7 +22,7 @@ flowchart TB
   relPub --> Apt
   relPub --> Dnf
   cronQ --> CodeQL
-  cronS --> BumpAndroid
+  cronS --> CheckAndroid
   PR["PR to master"] --> CI
   PR --> PRBeta
 ```
@@ -33,14 +33,15 @@ flowchart TB
 | **Deploy Site** | `deploy-site.yml` | after a **push**-triggered CI success on `master`, or manual | GitHub Pages (landing + docs) |
 | **Release** | `release.yml` | tag `v*` | Full production release |
 | **PR Beta** | `pr-beta.yml` | PR open/sync/reopen/close | Per-PR beta assets |
-| **Bump Android Pin** | `bump-android-pin.yml` | weekly, or manual | PR to move `apps/android` to bedrud-android's newest release |
+| **Check Android Pin** | `check-android-pin.yml` | weekly, or manual | Tracking issue when `apps/android` falls behind bedrud-android's newest release |
+| **CODEOWNERS Change Alert** | `codeowners-alert.yml` | PR touching `.github/CODEOWNERS` | Comment flagging that the file deciding who reviews has itself changed |
 | **CodeQL** | `codeql.yml` | push/PR + weekly | Security analysis |
 | **Apt repo** | `apt-repo.yml` | release published | `.deb` apt index on Pages |
 | **DNF repo** | `dnf-repo.yml` | release published | `.rpm` dnf index |
 
 There is **no** auto SSH deploy to a production host (`deploy-server.yml` removed) and **no**
 nightly or dev **build** pipeline — nothing is published on a schedule. The daily CI cron below
-only re-runs the existing checks; it produces no artifacts and deploys nothing. Android is built,
+only re-runs the existing checks; it publishes nothing and deploys nothing. Android is built,
 signed and released entirely in its own repo; this one only records which of those releases it
 sits alongside.
 
@@ -67,7 +68,7 @@ commit last happened to touch the right tree.
 `apps/android` has no filter and no job here. It is a git submodule pointing at
 [bedrud-android](https://github.com/themadorg/bedrud-android), which lints, tests and
 signs its own releases — moving the pinned commit in this repo builds nothing in this
-repo. See [Bump Android Pin](#bump-android-pin-bump-android-pinyml).
+repo. See [Check Android Pin](#check-android-pin-check-android-pinyml).
 
 **Important examples**
 
@@ -230,8 +231,8 @@ git add apps/android && git commit -m "chore(android): pin submodule to bedrud-a
 git tag vX.Y.Z && git push origin master vX.Y.Z
 ```
 
-`bump-android-pin.yml` proposes that same commit as a PR every Saturday, so the pin is
-usually already current; the manual route above is for a release cut mid-week.
+`check-android-pin.yml` files a tracking issue every Saturday when the pin falls behind, so a
+stale pin is visible without anyone watching for it; the steps above are how it is moved.
 
 ---
 
@@ -244,7 +245,7 @@ usually already current; the manual route above is for a release cut mid-week.
 
 ---
 
-## Bump Android Pin (`bump-android-pin.yml`)
+## Check Android Pin (`check-android-pin.yml`)
 
 **When:** cron `0 0 * * 6` (00:00 Saturday UTC), or manual dispatch.
 
@@ -256,12 +257,19 @@ referencing whatever it was last pinned to. This job closes that gap:
   before that repo's signed build is dispatched and approved, so a tag can exist for days
   with nothing built behind it). Pre-releases count — beta and stable of one tag are the
   same commit, built and signed identically.
-- Compare it to the commit currently pinned in the index; stop if they match.
-- Otherwise write the new gitlink and open `chore/pin-android-<tag>` as a PR.
+- Compare it to the commit currently pinned in the index; close any open tracking issue
+  and stop if they match.
+- Otherwise open — or retitle and refresh — one issue labelled `android-pin`, naming the
+  release to move to and the `make pin-android-stable` steps to do it.
 
-It never merges, and it never touches an open bump PR it already created. Because the PR
-is opened with `GITHUB_TOKEN`, GitHub does not run workflows on it — which costs nothing
-here, since no job in this repo builds Android anyway.
+**It reports only.** It moves nothing and pushes nothing, and it deliberately does not open
+a pull request: `GITHUB_TOKEN` cannot create one unless "Allow GitHub Actions to create and
+approve pull requests" is enabled, and that switch is repo-wide. It would also let every
+other workflow *approve* pull requests — `pr-beta.yml` included, which builds unreviewed
+code from a PR branch with `pull-requests: write`. A bot approval satisfies the required
+review count, and CODEOWNERS only covers `/.github/`, so for the rest of the tree that
+would be a clean bypass of review. Reporting needs `issues: write` and nothing else, so the
+switch stays off.
 
 ---
 
