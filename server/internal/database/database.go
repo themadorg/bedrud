@@ -21,8 +21,26 @@ const (
 	DBTypeSQLite   = "sqlite"
 )
 
-// Initialize sets up the database connection
+// Initialize sets up the database connection (server process; may log at info).
 func Initialize(cfg *config.DatabaseConfig) error {
+	return initialize(cfg, false)
+}
+
+// InitializeQuiet connects without GORM SQL dumps or JSON info logs.
+func InitializeQuiet(cfg *config.DatabaseConfig) error {
+	return initialize(cfg, true)
+}
+
+// OpenCLI connects and runs schema migrations without GORM SQL dumps or
+// JSON info logs. Use from operator CLI commands (update, user, room, db).
+func OpenCLI(cfg *config.DatabaseConfig) error {
+	if err := initialize(cfg, true); err != nil {
+		return err
+	}
+	return runMigrations(true)
+}
+
+func initialize(cfg *config.DatabaseConfig, quiet bool) error {
 	var err error
 	var dsn string
 	var dialector gorm.Dialector
@@ -30,6 +48,9 @@ func Initialize(cfg *config.DatabaseConfig) error {
 	// Map zerolog global level to GORM log level so GORM respects
 	// the logger.level setting from config.yaml.
 	gormLogLevel := gormLogLevelFromZerolog(zerolog.GlobalLevel())
+	if quiet {
+		gormLogLevel = logger.Silent
+	}
 
 	// Configure GORM
 	gormConfig := GormConfig(gormLogLevel)
@@ -42,7 +63,9 @@ func Initialize(cfg *config.DatabaseConfig) error {
 		dbType = DBTypePostgres
 	}
 
-	log.Info().Str("databaseType", dbType).Msg("Initializing database")
+	if !quiet {
+		log.Info().Str("databaseType", dbType).Msg("Initializing database")
+	}
 
 	switch dbType {
 	case DBTypePostgres:
@@ -55,7 +78,9 @@ func Initialize(cfg *config.DatabaseConfig) error {
 			cfg.SSLMode,
 		)
 		dialector = postgres.Open(dsn)
-		log.Info().Msg("Using PostgreSQL driver")
+		if !quiet {
+			log.Info().Msg("Using PostgreSQL driver")
+		}
 	case DBTypeSQLite:
 		if cfg.Path == "" {
 			err = fmt.Errorf("SQLite database path (DB_PATH or config.database.path) is not configured")
@@ -64,7 +89,9 @@ func Initialize(cfg *config.DatabaseConfig) error {
 		}
 		dsn = cfg.Path // For SQLite, DSN is the file path
 		dialector = sqlite.Open(dsn)
-		log.Info().Str("path", dsn).Msg("Using SQLite driver")
+		if !quiet {
+			log.Info().Str("path", dsn).Msg("Using SQLite driver")
+		}
 	default:
 		err = fmt.Errorf("unsupported database type: %s. Supported types are 'postgres' and 'sqlite'", dbType)
 		log.Error().Err(err).Msg("Database configuration error")
@@ -110,7 +137,9 @@ func Initialize(cfg *config.DatabaseConfig) error {
 		sqlDB.SetMaxOpenConns(1)
 	}
 
-	log.Info().Msg("Database connection established successfully")
+	if !quiet {
+		log.Info().Msg("Database connection established successfully")
+	}
 	return nil
 }
 
@@ -123,11 +152,12 @@ func GetDB() *gorm.DB {
 // GORM levels: Silent (no logs), Error, Warn, Info (all queries).
 func gormLogLevelFromZerolog(level zerolog.Level) logger.LogLevel {
 	switch {
+	case level <= zerolog.DebugLevel:
+		return logger.Info // all SQL when logger.level is debug/trace
 	case level >= zerolog.ErrorLevel:
 		return logger.Error
-	case level >= zerolog.WarnLevel:
-		return logger.Warn
 	default:
+		// info (and unset): slow queries + errors only — not every AutoMigrate SELECT
 		return logger.Warn
 	}
 }

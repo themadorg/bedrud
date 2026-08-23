@@ -107,14 +107,10 @@ func CreateUser(configPath, email, password, name string, admin bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
-	if err := database.Initialize(&cfg.Database); err != nil {
+	if err := database.OpenCLI(&cfg.Database); err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
 	defer database.Close()
-
-	if err := database.RunMigrations(); err != nil {
-		return fmt.Errorf("failed to run migrations: %w", err)
-	}
 
 	hashedPassword, err := auth.HashPassword(password)
 	if err != nil {
@@ -163,14 +159,10 @@ func DeleteUser(configPath, email string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
-	if err := database.Initialize(&cfg.Database); err != nil {
+	if err := database.OpenCLI(&cfg.Database); err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
 	defer database.Close()
-
-	if err := database.RunMigrations(); err != nil {
-		return fmt.Errorf("failed to run migrations: %w", err)
-	}
 
 	userRepo := repository.NewUserRepository(database.GetDB())
 	user, err := userRepo.GetUserByEmail(email)
@@ -237,13 +229,10 @@ func ListUsers(configPath string, page, pageSize int) error {
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
-	if err := database.Initialize(&cfg.Database); err != nil {
+	if err := database.OpenCLI(&cfg.Database); err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
 	defer database.Close()
-	if err := database.RunMigrations(); err != nil {
-		return fmt.Errorf("failed to run migrations: %w", err)
-	}
 
 	if page < 1 {
 		page = 1
@@ -422,14 +411,10 @@ func withUser(configPath, email string, fn func(*repository.UserRepository, *mod
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
-	if err := database.Initialize(&cfg.Database); err != nil {
+	if err := database.OpenCLI(&cfg.Database); err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
 	defer database.Close()
-
-	if err := database.RunMigrations(); err != nil {
-		return fmt.Errorf("failed to run migrations: %w", err)
-	}
 
 	repo := repository.NewUserRepository(database.GetDB())
 	user, err := repo.GetUserByEmail(email)
