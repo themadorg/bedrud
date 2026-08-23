@@ -12,7 +12,7 @@ flowchart TB
   tag["push tag v*"]
   cronQ["cron Mon 06:00 UTC"]
   cronS["cron Sat 00:00 UTC"]
-  cronCI["cron daily 03:37 UTC"]
+  cronCI["cron daily 00:00 UTC"]
   relPub["release published"]
 
   push --> CI
@@ -91,7 +91,7 @@ repo. See [Bump Android Pin](#bump-android-pin-bump-android-pinyml).
 
 ## CI (`ci.yml`)
 
-**When:** push to `master`; every pull request, whatever branch it targets; daily at 03:37 UTC;
+**When:** push to `master`; every pull request, whatever branch it targets; daily at 00:00 UTC;
 and on manual `workflow_dispatch`. The last two run unfiltered — see
 [Path filters](#path-filters-what-runs-when).
 
@@ -101,10 +101,15 @@ Grouping master by ref is how a merge landing on top of another cancelled the fi
 leaving that commit with no result at all — and `cancel-in-progress: false` does not fix it,
 because a third run arriving cancels the *pending* second one.
 
-**Failure reporting:** the `Scheduled – report` job runs only on the cron. It keeps a single open
-issue labelled `scheduled-ci` while `master` is failing, refreshing its body each run and closing
-it once a scheduled run passes. A push or a pull request already shows a red tick to somebody who
-is looking, so it stays out of those.
+**Failure reporting:** the `Scheduled – report` job runs on the cron and on `workflow_dispatch`,
+never on a push or a pull request — those already show a red tick to somebody who is looking. It
+keeps a single open issue labelled `scheduled-ci` while `master` is failing, refreshing its body
+each run and closing it once a run passes with every job settled.
+
+What counts as broken is read from the run's own job list, not from `needs`. A job added to the
+workflow but not to that list would otherwise leave every listed result green while the run was
+red — and the close step would shut the tracker. `needs` is ordering only. A run whose jobs cannot
+be read, or one with a job still in flight, leaves the issue untouched rather than guessing.
 
 ```mermaid
 flowchart LR

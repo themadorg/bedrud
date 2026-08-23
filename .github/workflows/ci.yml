@@ -14,10 +14,12 @@ on:
   # proves master still builds and passes from scratch rather than from the
   # last commit that happened to touch the right tree.
   #
-  # 03:37 rather than a round hour: scheduled runs queue behind everyone else's
-  # on-the-hour cron and can be delayed by tens of minutes.
+  # 00:00 UTC — the start of the day, so the answer is waiting rather than
+  # arriving partway through it. Same convention as check-android-pin.yml.
+  # GitHub queues on-the-hour crons behind everyone else's and can start it tens
+  # of minutes late; nothing here is time-sensitive to that degree.
   schedule:
-    - cron: "37 3 * * *"
+    - cron: "0 0 * * *"
   # The same unfiltered run, on demand — for confirming a fix without waiting
   # for the next scheduled one, or after changing the filters themselves.
   workflow_dispatch:
@@ -382,7 +384,18 @@ jobs:
     name: Scheduled – report
     # always(), or a failed job upstream would skip the reporting too — which is
     # precisely the case that has to be reported.
-    if: always() && github.event_name == 'schedule'
+    #
+    # workflow_dispatch as well as schedule: otherwise every line below first
+    # executes for real at 00:00, in a log nobody is watching. A dispatch against
+    # a healthy master reads the run and writes nothing, which rehearses
+    # `actions: read`, `gh run view` and the tracker lookup on demand. It cannot
+    # rehearse `gh label create` or `gh issue create` — those need a broken
+    # master to reach.
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    # Ordering only. What counts as broken is read from the run itself, below —
+    # deriving it from `needs.*.result` meant a job added to this workflow but
+    # not to this list left every listed result green, so the close step fired
+    # and shut the tracker while master was red.
     needs: [changes, server, server-test, web, devcli, ios, desktop, site]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -397,23 +410,52 @@ jobs:
     env:
       TRACKER_LABEL: scheduled-ci
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # A cancelled job counts as broken: this run is never superseded, so a
-      # cancellation means something went wrong rather than something newer won.
-      BROKEN: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+      # Must match this job's `name:` above — it is how the job excludes itself
+      # from a run it is still executing inside.
+      SELF: Scheduled – report
     steps:
-      # Asked of the API rather than assembled from the needs context, so adding
-      # a job to this workflow does not silently drop it out of the report.
-      - name: Collect the failed jobs
-        id: failed
+      # One read of the run decides both what to say and whether to say it.
+      # Splitting those was a bug: the verdict came from `needs.*.result` while
+      # the list came from the API, so a job in the workflow but not in `needs`
+      # failed, the run went red, every listed result stayed green, and the close
+      # step shut the tracker. Such a job also imposes no ordering, so it may
+      # still be running when this reads — hence `settled` as well as `broken`.
+      - name: Read this run's job results
+        id: run
         run: |
-          names=$(gh run view "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs \
-                  --jq '[.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled")
-                         | "- **\(.name)** — \(.conclusion)"] | join("\n")') || names=""
+          jobs=$(gh run view "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs --jq '.jobs') || jobs=""
+
+          if [ -z "$jobs" ]; then
+            # No evidence is not evidence of health. Say so and touch nothing:
+            # both later steps require a definite answer.
+            {
+              echo "broken=unknown"
+              echo "settled=false"
+              echo "list<<EOF"
+              echo "- (this run's jobs could not be read)"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          others=$(printf '%s' "$jobs" | jq --arg self "$SELF" '[.[] | select(.name != $self)]')
+          failed=$(printf '%s' "$others" | jq -r '[.[] | select(.conclusion == "failure" or .conclusion == "cancelled") | "- **\(.name)** — \(.conclusion)"] | join("\n")')
+          # A skipped job is not a broken one; an unfinished job is simply not an
+          # answer yet, and closing on a partial picture is the failure that
+          # matters most here.
+          unfinished=$(printf '%s' "$others" | jq '[.[] | select(.conclusion == null)] | length')
+
+          if [ -n "$failed" ]; then broken=true; else broken=false; fi
+          if [ "$unfinished" -eq 0 ]; then settled=true; else settled=false; fi
+
           {
+            echo "broken=$broken"
+            echo "settled=$settled"
             echo "list<<EOF"
-            echo "${names:-- (no individual job reported a conclusion)}"
+            echo "${failed:-- (no job reported a failure)}"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
+          echo "broken=$broken settled=$settled unfinished=$unfinished"
 
       - name: Look for the tracking issue
         id: tracker
@@ -426,10 +468,10 @@ jobs:
           echo "number=$num" >> "$GITHUB_OUTPUT"
 
       - name: Open or refresh the tracking issue
-        if: env.BROKEN == 'true'
+        if: steps.run.outputs.broken == 'true'
         env:
           NUM: ${{ steps.tracker.outputs.number }}
-          FAILED_LIST: ${{ steps.failed.outputs.list }}
+          FAILED_LIST: ${{ steps.run.outputs.list }}
           SHA: ${{ github.sha }}
         run: |
           run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
@@ -478,7 +520,16 @@ jobs:
           echo "Refreshed #$NUM"
 
       - name: Close the tracking issue
-        if: env.BROKEN != 'true' && steps.tracker.outputs.number != ''
+        # Three conditions, not one. `broken == 'false'` rather than `!= 'true'`
+        # so an unreadable run ("unknown") leaves the issue alone, and `settled`
+        # so a job still in flight cannot be mistaken for a passing one. Closing
+        # a tracker while master is red is the worst thing this job can do — it
+        # is worse than staying silent, because it reports health that was never
+        # observed.
+        if: >-
+          steps.run.outputs.broken == 'false' &&
+          steps.run.outputs.settled == 'true' &&
+          steps.tracker.outputs.number != ''
         env:
           NUM: ${{ steps.tracker.outputs.number }}
           SHA: ${{ github.sha }}
