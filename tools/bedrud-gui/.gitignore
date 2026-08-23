@@ -1,0 +1,5 @@
+bedrud-gui
+internal/hostbin/bedrud-host
+.appimage-tools/
+dist/
+*.AppImage
