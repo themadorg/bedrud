@@ -16,13 +16,28 @@ import (
 // meeting with a broken edge — a webhook that never fires, TURN that is simply
 // absent — rather than as a startup failure.
 
+// isolateTempDir points os.CreateTemp at dir, which is what lets a test assert
+// on everything the generator did or did not leave behind.
+//
+// All three variables, because os.TempDir reads TMPDIR on Unix and TMP then TEMP
+// on Windows. Setting only TMPDIR would leave the Windows runs writing into the
+// real system temp directory, where "nothing was left behind" would be checking
+// an unrelated empty directory and passing for no reason.
+func isolateTempDir(t *testing.T, dir string) {
+	t.Helper()
+
+	for _, key := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(key, dir)
+	}
+}
+
 // writeConfig calls generateTempConfig into an isolated temp dir and returns the
 // parsed result, so assertions are made against what LiveKit would actually read
 // rather than against the struct we happened to build.
 func writeConfig(t *testing.T, apiKey, apiSecret string, port int, nodeIP, certFile, keyFile, serverHost, httpPort string) (ConfigYAML, string) {
 	t.Helper()
 
-	t.Setenv("TMPDIR", t.TempDir())
+	isolateTempDir(t, t.TempDir())
 
 	path, err := generateTempConfig(apiKey, apiSecret, port, nodeIP, certFile, keyFile, serverHost, httpPort)
 	if err != nil {
@@ -105,7 +120,7 @@ func TestGenerateTempConfig_NodeIP(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.wantErrSubstr != "" {
 				dir := t.TempDir()
-				t.Setenv("TMPDIR", dir)
+				isolateTempDir(t, dir)
 
 				_, err := generateTempConfig("k", "s", 7880, tc.nodeIP, "", "", "", "")
 				if err == nil {

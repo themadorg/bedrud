@@ -193,24 +193,38 @@ func TestExportBinary_OverwritesARunningExecutable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("pipe helper stdout: %v", err)
 	}
+	// The helper lives until this pipe closes, so it goes away with the parent
+	// even if the parent is killed outright — `go test -timeout` included. A
+	// sleeping helper would outlive that and leak a process.
+	if _, err := cmd.StdinPipe(); err != nil {
+		t.Fatalf("pipe helper stdin: %v", err)
+	}
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start the helper: %v", err)
 	}
-	t.Cleanup(func() {
-		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
-	})
 
 	// Wait for the child to announce itself, so the kernel has certainly mapped
 	// the file. Starting the process is not enough — without this the write can
 	// land before the image is held and the test passes for the wrong reason.
 	ready := make(chan struct{})
+	drained := make(chan struct{})
 	go func() {
+		defer close(drained)
 		buf := make([]byte, len(helperReady))
 		if _, err := io.ReadFull(stdout, buf); err == nil && string(buf) == helperReady {
 			close(ready)
 		}
+		// Keep reading to EOF: os/exec forbids calling Wait while a read from
+		// StdoutPipe is still in flight, and cleanup below waits for this.
+		_, _ = io.Copy(io.Discard, stdout)
 	}()
+
+	t.Cleanup(func() {
+		_ = cmd.Process.Kill()
+		<-drained
+		_ = cmd.Wait()
+	})
+
 	select {
 	case <-ready:
 	case <-time.After(30 * time.Second):
@@ -249,6 +263,9 @@ func TestExportBinaryHelperProcess(t *testing.T) {
 		t.Skip("helper process, driven by TestExportBinary_OverwritesARunningExecutable")
 	}
 	fmt.Print(helperReady)
-	os.Stdout.Sync()
-	time.Sleep(60 * time.Second)
+	_ = os.Stdout.Sync()
+	// Blocks until the parent's end of the pipe closes, which happens whether the
+	// parent finishes or is killed. Nothing here needs to read stdin; the read is
+	// the lifetime.
+	_, _ = io.Copy(io.Discard, os.Stdin)
 }
