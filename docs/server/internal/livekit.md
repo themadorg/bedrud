@@ -25,7 +25,7 @@ The pre-compiled `livekit-server` executable is embedded at build time:
 internal/livekit/bin/livekit-server  →  embed.FS  →  extracted at runtime
 ```
 
-CI placeholder: `touch internal/livekit/bin/livekit-server` (empty file satisfies build).
+CI placeholder: `touch internal/livekit/bin/livekit-server` (empty file satisfies build). On Windows the embed wants `internal/livekit/bin/livekit-server.exe`.
 
 ### `ExportBinary(destPath)`
 

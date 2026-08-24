@@ -315,7 +315,7 @@ cd apps/android && ./gradlew lint testDebugUnitTest
 make build-dist
 ```
 
-LiveKit embed placeholder (CI): `mkdir -p server/internal/livekit/bin && touch server/internal/livekit/bin/livekit-server`
+LiveKit embed placeholder (CI): `mkdir -p server/internal/livekit/bin && touch server/internal/livekit/bin/livekit-server` (on Windows the embed wants `livekit-server.exe`)
 
 ---
 
