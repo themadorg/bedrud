@@ -3,6 +3,7 @@ package install
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -92,6 +93,10 @@ func TestInstallAndRemoveCLIDocs(t *testing.T) {
 }
 
 func TestCLIDocPathsFHS(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("FHS paths are Linux-only; filepath.Join builds them with backslashes on Windows")
+	}
+
 	if defaultManPagePath("bedrud") != "/usr/share/man/man1/bedrud.1" {
 		t.Fatal(defaultManPagePath("bedrud"))
 	}
