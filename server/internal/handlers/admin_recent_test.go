@@ -628,19 +628,45 @@ func TestRoomEvents_WithEvents(t *testing.T) {
 	}
 }
 
+// getRoomEvents issues the request and fails unless it comes back 200, then
+// checks that every returned event carries a parsed timestamp.
+//
+// Both guards exist because their absence is invisible: a 500 body
+// ({"error":"Failed to fetch room events"}) decodes cleanly into
+// roomEventsResponse as {Events: nil, Total: 0}, so every "expect zero events"
+// assertion below is also satisfied by a failing request; and a timestamp the
+// repository cannot parse is dropped to the zero value rather than reported.
+func getRoomEvents(t *testing.T, app *fiber.App, query string) roomEventsResponse {
+	t.Helper()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events"+query, http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("GET %q: transport error: %v", query, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("GET %q: expected 200, got %d: %s", query, resp.StatusCode, string(body))
+	}
+
+	var result roomEventsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("GET %q: failed to decode: %v", query, err)
+	}
+	for i, ev := range result.Events {
+		if ev.Timestamp.IsZero() {
+			t.Fatalf("GET %q: event %d (%s on %q) came back with a zero timestamp", query, i, ev.Type, ev.RoomName)
+		}
+	}
+	return result
+}
+
 func TestRoomEvents_Pagination(t *testing.T) {
 	app, roomRepo, userRepo, db := setupRoomEventsTestApp(t)
 	seedRoomEvents(t, roomRepo, userRepo, db)
 
-	// Page 1, limit 2
-	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?page=1&limit=2", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
-
-	var p1 roomEventsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&p1); err != nil {
-		t.Fatal(err)
-	}
+	p1 := getRoomEvents(t, app, "?page=1&limit=2")
 	if len(p1.Events) != 2 {
 		t.Fatalf("expected 2 events on page 1, got %d", len(p1.Events))
 	}
@@ -648,43 +674,31 @@ func TestRoomEvents_Pagination(t *testing.T) {
 		t.Fatalf("expected total 5, got %d", p1.Total)
 	}
 
-	// Page 2, limit 2 — should have 2 events
-	req2 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?page=2&limit=2", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
-
-	var p2 roomEventsResponse
-	if err := json.NewDecoder(resp2.Body).Decode(&p2); err != nil {
-		t.Fatal(err)
-	}
+	p2 := getRoomEvents(t, app, "?page=2&limit=2")
 	if len(p2.Events) != 2 {
 		t.Fatalf("expected 2 events on page 2, got %d", len(p2.Events))
 	}
 
-	// Page 3, limit 2 — should have 1 event
-	req3 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?page=3&limit=2", http.NoBody)
-	resp3, _ := app.Test(req3, -1)
-	defer resp3.Body.Close()
-
-	var p3 roomEventsResponse
-	if err := json.NewDecoder(resp3.Body).Decode(&p3); err != nil {
-		t.Fatal(err)
-	}
+	p3 := getRoomEvents(t, app, "?page=3&limit=2")
 	if len(p3.Events) != 1 {
 		t.Fatalf("expected 1 event on page 3, got %d", len(p3.Events))
 	}
 
-	// Page 4, limit 2 — should be empty
-	req4 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?page=4&limit=2", http.NoBody)
-	resp4, _ := app.Test(req4, -1)
-	defer resp4.Body.Close()
-
-	var p4 roomEventsResponse
-	if err := json.NewDecoder(resp4.Body).Decode(&p4); err != nil {
-		t.Fatal(err)
-	}
+	p4 := getRoomEvents(t, app, "?page=4&limit=2")
 	if len(p4.Events) != 0 {
 		t.Fatalf("expected 0 events on page 4, got %d", len(p4.Events))
+	}
+
+	// Every page reports the same total, and the pages together account for it.
+	// Admin pagination derives its page count from total, so a total that
+	// disagrees with the rows makes the last page unreachable.
+	for i, p := range []roomEventsResponse{p2, p3, p4} {
+		if p.Total != p1.Total {
+			t.Fatalf("page %d reports total %d, page 1 reports %d", i+2, p.Total, p1.Total)
+		}
+	}
+	if got := len(p1.Events) + len(p2.Events) + len(p3.Events) + len(p4.Events); got != p1.Total {
+		t.Fatalf("pages hold %d events but total is %d", got, p1.Total)
 	}
 }
 
@@ -692,43 +706,28 @@ func TestRoomEvents_TypeFilter(t *testing.T) {
 	app, roomRepo, userRepo, db := setupRoomEventsTestApp(t)
 	seedRoomEvents(t, roomRepo, userRepo, db)
 
-	// Filter by room_created only
-	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?type=room_created", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
-
-	var result roomEventsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatal(err)
+	created := getRoomEvents(t, app, "?type=room_created")
+	if len(created.Events) != 2 {
+		t.Fatalf("expected 2 room_created events, got %d", len(created.Events))
 	}
-	if len(result.Events) != 2 {
-		t.Fatalf("expected 2 room_created events, got %d", len(result.Events))
+	if created.Total != len(created.Events) {
+		t.Fatalf("total %d disagrees with %d events on one page", created.Total, len(created.Events))
 	}
 
-	// Filter by room_joined only
-	req2 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?type=room_joined", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
-
-	var result2 roomEventsResponse
-	if err := json.NewDecoder(resp2.Body).Decode(&result2); err != nil {
-		t.Fatal(err)
+	joined := getRoomEvents(t, app, "?type=room_joined")
+	if len(joined.Events) != 3 {
+		t.Fatalf("expected 3 room_joined events (2 auto-joins + 1 explicit), got %d", len(joined.Events))
 	}
-	if len(result2.Events) != 3 {
-		t.Fatalf("expected 3 room_joined events (2 auto-joins + 1 explicit), got %d", len(result2.Events))
+	if joined.Total != len(joined.Events) {
+		t.Fatalf("total %d disagrees with %d events on one page", joined.Total, len(joined.Events))
 	}
 
-	// Filter by both
-	req3 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?type=room_created,room_joined", http.NoBody)
-	resp3, _ := app.Test(req3, -1)
-	defer resp3.Body.Close()
-
-	var result3 roomEventsResponse
-	if err := json.NewDecoder(resp3.Body).Decode(&result3); err != nil {
-		t.Fatal(err)
+	both := getRoomEvents(t, app, "?type=room_created,room_joined")
+	if len(both.Events) != 5 {
+		t.Fatalf("expected 5 events for both types, got %d", len(both.Events))
 	}
-	if len(result3.Events) != 5 {
-		t.Fatalf("expected 5 events for both types, got %d", len(result3.Events))
+	if both.Total != len(both.Events) {
+		t.Fatalf("total %d disagrees with %d events on one page", both.Total, len(both.Events))
 	}
 }
 
@@ -736,7 +735,10 @@ func TestRoomEvents_InvalidType(t *testing.T) {
 	app, _, _, _ := setupRoomEventsTestApp(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?type=invalid_type", http.NoBody)
-	resp, _ := app.Test(req, -1)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid type, got %d", resp.StatusCode)
@@ -747,30 +749,26 @@ func TestRoomEvents_SearchFilter(t *testing.T) {
 	app, roomRepo, userRepo, db := setupRoomEventsTestApp(t)
 	seedRoomEvents(t, roomRepo, userRepo, db)
 
-	// Search by room name
-	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?q=meeting", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
-
-	var result roomEventsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatal(err)
+	// The seed puts three events on meeting-room: the room_created row, the
+	// creator's auto-join, and joiner1's join.
+	byRoom := getRoomEvents(t, app, "?q=meeting")
+	if len(byRoom.Events) != 3 {
+		t.Fatalf("expected 3 events matching 'meeting', got %d", len(byRoom.Events))
 	}
-	if len(result.Events) == 0 {
-		t.Fatal("expected events matching 'meeting'")
+	// The page holds every match, so total has to agree with it. Count and data
+	// are two reads of the same derived table; this is what catches them
+	// drifting apart — the count used to project '' as room_name for
+	// room_created rows and reported 2 here.
+	if byRoom.Total != len(byRoom.Events) {
+		t.Fatalf("total %d disagrees with %d events on one page", byRoom.Total, len(byRoom.Events))
 	}
 
-	// Search by user name
-	req2 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?q=joiner", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
-
-	var result2 roomEventsResponse
-	if err := json.NewDecoder(resp2.Body).Decode(&result2); err != nil {
-		t.Fatal(err)
-	}
-	if len(result2.Events) == 0 {
+	byUser := getRoomEvents(t, app, "?q=joiner")
+	if len(byUser.Events) == 0 {
 		t.Fatal("expected events matching 'joiner'")
+	}
+	if byUser.Total != len(byUser.Events) {
+		t.Fatalf("total %d disagrees with %d events on one page", byUser.Total, len(byUser.Events))
 	}
 }
 
@@ -780,48 +778,43 @@ func TestRoomEvents_DateFilter(t *testing.T) {
 
 	today := time.Now().Format("2006-01-02")
 
-	// Filter from today — all events
-	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?dateFrom="+today, http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
-
-	var result roomEventsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatal(err)
-	}
-	if len(result.Events) == 0 {
+	fromToday := getRoomEvents(t, app, "?dateFrom="+today)
+	if len(fromToday.Events) == 0 {
 		t.Fatal("expected events from today")
 	}
 
-	// Filter to yesterday — no events (all events are from today/today-2)
-	req3 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?dateTo=2010-01-01", http.NoBody)
-	resp3, _ := app.Test(req3, -1)
-	defer resp3.Body.Close()
-
-	var result3 roomEventsResponse
-	if err := json.NewDecoder(resp3.Body).Decode(&result3); err != nil {
-		t.Fatal(err)
+	// dateTo is an exclusive next-day bound computed in Go; it used to be
+	// date(?, '+1 day'), a SQLite builtin that 500s on Postgres. The status
+	// check in the helper is what stops that from reading as "0 events".
+	old := getRoomEvents(t, app, "?dateTo=2010-01-01")
+	if len(old.Events) != 0 {
+		t.Fatalf("expected 0 events before 2010, got %d", len(old.Events))
 	}
-	if len(result3.Events) != 0 {
-		t.Fatalf("expected 0 events before 2010, got %d", len(result3.Events))
+	if old.Total != 0 {
+		t.Fatalf("expected total 0 before 2010, got %d", old.Total)
+	}
+
+	// dateTo is inclusive of its own day, which is what the next-day bound buys.
+	throughToday := getRoomEvents(t, app, "?dateTo="+today)
+	if len(throughToday.Events) != 5 {
+		t.Fatalf("expected all 5 events through today, got %d", len(throughToday.Events))
 	}
 }
 
 func TestRoomEvents_InvalidDate(t *testing.T) {
 	app, _, _, _ := setupRoomEventsTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?dateFrom=bad", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("expected 400 for invalid dateFrom, got %d", resp.StatusCode)
-	}
-
-	req2 := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?dateTo=also-bad", http.NoBody)
-	resp2, _ := app.Test(req2, -1)
-	defer resp2.Body.Close()
-	if resp2.StatusCode != http.StatusBadRequest {
-		t.Fatalf("expected 400 for invalid dateTo, got %d", resp2.StatusCode)
+	for _, q := range []string{"?dateFrom=bad", "?dateTo=also-bad"} {
+		req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events"+q, http.NoBody)
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("GET %q: unexpected error: %v", q, err)
+		}
+		if resp.StatusCode != http.StatusBadRequest {
+			resp.Body.Close()
+			t.Fatalf("GET %q: expected 400, got %d", q, resp.StatusCode)
+		}
+		resp.Body.Close()
 	}
 }
 
@@ -829,16 +822,16 @@ func TestRoomEvents_OrderAsc(t *testing.T) {
 	app, roomRepo, userRepo, db := setupRoomEventsTestApp(t)
 	seedRoomEvents(t, roomRepo, userRepo, db)
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?order=asc", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
-
-	var result roomEventsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatal(err)
-	}
+	result := getRoomEvents(t, app, "?order=asc")
 	if len(result.Events) != 5 {
 		t.Fatalf("expected 5 events, got %d", len(result.Events))
+	}
+	// asc means asc — checkable only because the timestamps actually parsed.
+	for i := 1; i < len(result.Events); i++ {
+		if result.Events[i].Timestamp.Before(result.Events[i-1].Timestamp) {
+			t.Fatalf("events not in ascending order at %d: %s before %s",
+				i, result.Events[i].Timestamp, result.Events[i-1].Timestamp)
+		}
 	}
 }
 
@@ -846,7 +839,10 @@ func TestRoomEvents_InvalidOrder(t *testing.T) {
 	app, _, _, _ := setupRoomEventsTestApp(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?order=invalid", http.NoBody)
-	resp, _ := app.Test(req, -1)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid order, got %d", resp.StatusCode)
@@ -857,14 +853,7 @@ func TestRoomEvents_LimitClamping(t *testing.T) {
 	app, roomRepo, userRepo, db := setupRoomEventsTestApp(t)
 	seedRoomEvents(t, roomRepo, userRepo, db)
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?limit=200", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
-
-	var result roomEventsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatal(err)
-	}
+	result := getRoomEvents(t, app, "?limit=200")
 	if result.Limit > 100 {
 		t.Fatalf("expected limit clamped, got %d", result.Limit)
 	}
@@ -874,14 +863,7 @@ func TestRoomEvents_NegativeLimit(t *testing.T) {
 	app, roomRepo, userRepo, db := setupRoomEventsTestApp(t)
 	seedRoomEvents(t, roomRepo, userRepo, db)
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?limit=-5", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
-
-	var result roomEventsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatal(err)
-	}
+	result := getRoomEvents(t, app, "?limit=-5")
 	if result.Limit != 50 {
 		t.Fatalf("expected limit clamped to 50, got %d", result.Limit)
 	}
@@ -891,14 +873,7 @@ func TestRoomEvents_ZeroPage(t *testing.T) {
 	app, roomRepo, userRepo, db := setupRoomEventsTestApp(t)
 	seedRoomEvents(t, roomRepo, userRepo, db)
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?page=0", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
-
-	var result roomEventsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatal(err)
-	}
+	result := getRoomEvents(t, app, "?page=0")
 	if result.Page != 1 {
 		t.Fatalf("expected page 1, got %d", result.Page)
 	}
@@ -910,17 +885,12 @@ func TestRoomEvents_DateFromAndTo(t *testing.T) {
 
 	today := time.Now().Format("2006-01-02")
 
-	// Both dateFrom and dateTo = today — should get all today's events
-	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?dateFrom="+today+"&dateTo="+today, http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
-
-	var result roomEventsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatal(err)
-	}
+	result := getRoomEvents(t, app, "?dateFrom="+today+"&dateTo="+today)
 	if len(result.Events) == 0 {
 		t.Fatal("expected some events with dateFrom+dateTo both set to today")
+	}
+	if result.Total != len(result.Events) {
+		t.Fatalf("total %d disagrees with %d events on one page", result.Total, len(result.Events))
 	}
 }
 
@@ -928,17 +898,13 @@ func TestRoomEvents_DateFromReversed(t *testing.T) {
 	app, roomRepo, userRepo, db := setupRoomEventsTestApp(t)
 	seedRoomEvents(t, roomRepo, userRepo, db)
 
-	// dateFrom after dateTo — should return empty (no events in that range)
-	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?dateFrom=2030-01-01&dateTo=2020-01-01", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
-
-	var result roomEventsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatal(err)
-	}
+	// dateFrom after dateTo — an empty range, not an error.
+	result := getRoomEvents(t, app, "?dateFrom=2030-01-01&dateTo=2020-01-01")
 	if len(result.Events) != 0 {
 		t.Fatalf("expected 0 events for reversed date range, got %d", len(result.Events))
+	}
+	if result.Total != 0 {
+		t.Fatalf("expected total 0 for reversed date range, got %d", result.Total)
 	}
 }
 
@@ -947,14 +913,7 @@ func TestRoomEvents_EmptyTypeParam(t *testing.T) {
 	seedRoomEvents(t, roomRepo, userRepo, db)
 
 	// type= with empty value should be treated as no filter
-	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?type=", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
-
-	var result roomEventsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatal(err)
-	}
+	result := getRoomEvents(t, app, "?type=")
 	if len(result.Events) != 5 {
 		t.Fatalf("expected 5 events (no filter), got %d", len(result.Events))
 	}
@@ -965,16 +924,12 @@ func TestRoomEvents_CombinedFilters(t *testing.T) {
 	seedRoomEvents(t, roomRepo, userRepo, db)
 
 	// type=room_joined + q=meeting — should only get join events for "meeting-room"
-	req := httptest.NewRequest(http.MethodGet, "/admin/rooms/events?type=room_joined&q=meeting", http.NoBody)
-	resp, _ := app.Test(req, -1)
-	defer resp.Body.Close()
-
-	var result roomEventsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatal(err)
-	}
+	result := getRoomEvents(t, app, "?type=room_joined&q=meeting")
 	if len(result.Events) == 0 {
 		t.Fatal("expected at least 1 join event for meeting-room")
+	}
+	if result.Total != len(result.Events) {
+		t.Fatalf("total %d disagrees with %d events on one page", result.Total, len(result.Events))
 	}
 	for _, ev := range result.Events {
 		if ev.Type != "room_joined" {
