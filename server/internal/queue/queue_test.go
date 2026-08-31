@@ -320,11 +320,18 @@ func TestWorkerGracefulShutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	entered := make(chan struct{})
+	// entered is buffered and sent to without blocking rather than closed: the
+	// job goes terminal and nothing retries it today, but a second run of this
+	// handler would make close panic, and that is a sharp edge to leave for
+	// whoever changes the retry path.
+	entered := make(chan struct{}, 1)
 	release := make(chan struct{})
 	handlers := map[string]Handler{
 		"blocking": func(context.Context, *gorm.DB, *models.Job) error {
-			close(entered)
+			select {
+			case entered <- struct{}{}:
+			default:
+			}
 			<-release
 			return nil
 		},
