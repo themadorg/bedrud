@@ -9,6 +9,7 @@ import (
 	"bedrud/internal/models"
 
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
 )
 
@@ -751,7 +752,10 @@ func (r *RoomRepository) EnrichAdminRoomDetails(rooms []models.Room) ([]AdminRoo
 	activityMap := make(map[string]*time.Time, len(activities))
 	for _, a := range activities {
 		if a.MaxAt != "" {
-			if t, err := parseSQLiteTime(a.MaxAt); err == nil {
+			t, err := parseDBTime(a.MaxAt)
+			if err != nil {
+				log.Warn().Str("value", a.MaxAt).Str("roomID", a.RoomID).Msg("Unparseable last-activity timestamp from DB")
+			} else {
 				activityMap[a.RoomID] = &t
 			}
 		}
@@ -1294,9 +1298,12 @@ func (r *RoomRepository) GetRoomEventsFiltered(p *RoomEventsFilterParams) ([]mod
 		}
 	}
 	if p.DateTo != "" {
-		if _, err := time.Parse("2006-01-02", p.DateTo); err == nil {
-			conditions = append(conditions, "timestamp < date(?, '+1 day')")
-			args = append(args, p.DateTo)
+		// Exclusive upper bound computed here rather than in SQL: date(x, '+1 day')
+		// is a SQLite builtin and errors out on Postgres. Bound as a plain date
+		// string, matching the DateFrom clause above.
+		if d, err := time.Parse("2006-01-02", p.DateTo); err == nil {
+			conditions = append(conditions, "timestamp < ?")
+			args = append(args, d.AddDate(0, 0, 1).Format("2006-01-02"))
 		}
 	}
 
@@ -1305,16 +1312,22 @@ func (r *RoomRepository) GetRoomEventsFiltered(p *RoomEventsFilterParams) ([]mod
 		whereSQL = " WHERE " + strings.Join(conditions, " AND ")
 	}
 
-	// Count query — uses same filters
-	countSQL := `
-		SELECT COUNT(*) FROM (
-			SELECT 'room_created' as type, '' as room_name, '' as user_name, created_at as timestamp
-			FROM rooms
-			UNION ALL
-			SELECT 'room_joined' as type, r.name as room_name, COALESCE(u.name, '') as user_name, rp.joined_at as timestamp
-			FROM room_participants rp
-			JOIN rooms r ON r.id = rp.room_id
-			LEFT JOIN users u ON u.id = rp.user_id
+	// One derived table, shared by the count and the page. Writing the UNION
+	// twice let them disagree: the count projected '' as room_name for
+	// room_created rows, so a room-name search matched rows in the page that it
+	// could never match in the total, and admin pagination lost its last page.
+	eventsSQL := `
+		SELECT 'room_created' as type, id as room_id, name as room_name,
+			created_by as user_id, '' as user_name, created_at as timestamp
+		FROM rooms
+		UNION ALL
+		SELECT 'room_joined' as type, r.id as room_id, r.name as room_name,
+			rp.user_id as user_id, COALESCE(u.name, '') as user_name, rp.joined_at as timestamp
+		FROM room_participants rp
+		JOIN rooms r ON r.id = rp.room_id
+		LEFT JOIN users u ON u.id = rp.user_id`
+
+	countSQL := `SELECT COUNT(*) FROM (` + eventsSQL + `
 		) AS events` + whereSQL
 
 	var total int64
@@ -1322,18 +1335,7 @@ func (r *RoomRepository) GetRoomEventsFiltered(p *RoomEventsFilterParams) ([]mod
 		return nil, 0, err
 	}
 
-	// Data query
-	dataSQL := `
-		SELECT type, room_id, room_name, user_id, user_name, timestamp FROM (
-			SELECT 'room_created' as type, id as room_id, name as room_name,
-				created_by as user_id, '' as user_name, created_at as timestamp
-			FROM rooms
-			UNION ALL
-			SELECT 'room_joined' as type, r.id as room_id, r.name as room_name,
-				rp.user_id as user_id, COALESCE(u.name, '') as user_name, rp.joined_at as timestamp
-			FROM room_participants rp
-			JOIN rooms r ON r.id = rp.room_id
-			LEFT JOIN users u ON u.id = rp.user_id
+	dataSQL := `SELECT type, room_id, room_name, user_id, user_name, timestamp FROM (` + eventsSQL + `
 		) AS events` + whereSQL + `
 		ORDER BY timestamp ` + orderDir + `
 		LIMIT ? OFFSET ?`
@@ -1354,9 +1356,9 @@ func (r *RoomRepository) GetRoomEventsFiltered(p *RoomEventsFilterParams) ([]mod
 		if err := rows.Scan(&typ, &roomID, &roomName, &userID, &userName, &ts); err != nil {
 			return nil, 0, err
 		}
-		var timestamp time.Time
-		if t, err := parseSQLiteTime(ts); err == nil {
-			timestamp = t
+		timestamp, err := parseDBTime(ts)
+		if err != nil {
+			log.Warn().Str("value", ts).Str("roomID", roomID).Msg("Unparseable room-event timestamp from DB")
 		}
 		events = append(events, models.RoomEvent{
 			Type:      typ,
@@ -1405,9 +1407,9 @@ func (r *RoomRepository) GetRecentRoomEvents(limit int) ([]models.RoomEvent, err
 		if err := rows.Scan(&typ, &roomID, &roomName, &userID, &userName, &ts); err != nil {
 			return nil, err
 		}
-		var timestamp time.Time
-		if t, err := parseSQLiteTime(ts); err == nil {
-			timestamp = t
+		timestamp, err := parseDBTime(ts)
+		if err != nil {
+			log.Warn().Str("value", ts).Str("roomID", roomID).Msg("Unparseable room-event timestamp from DB")
 		}
 		events = append(events, models.RoomEvent{
 			Type:      typ,
@@ -1433,10 +1435,16 @@ func (r *RoomRepository) CountActiveRoomsWithParticipantCount() (int64, error) {
 	return count, err
 }
 
-// sqliteTimeFormats matches mattn/go-sqlite3's SQLiteTimestampFormats.
-var sqliteTimeFormats = []string{
+// dbTimeFormats covers every timestamp shape the drivers hand back as a string.
+// The first two are mattn/go-sqlite3's SQLiteTimestampFormats; the Z07:00 pair
+// is what database/sql's convertAssign produces from the time.Time the Postgres
+// driver returns, and only that pair accepts the "Z" of a UTC timestamp — which
+// is what a Postgres server running in UTC yields for every row.
+var dbTimeFormats = []string{
 	"2006-01-02 15:04:05.999999999-07:00",
 	"2006-01-02T15:04:05.999999999-07:00",
+	"2006-01-02 15:04:05.999999999Z07:00",
+	time.RFC3339Nano,
 	"2006-01-02 15:04:05.999999999",
 	"2006-01-02T15:04:05.999999999",
 	"2006-01-02 15:04:05",
@@ -1446,13 +1454,13 @@ var sqliteTimeFormats = []string{
 	"2006-01-02",
 }
 
-// parseSQLiteTime parses a SQLite timestamp string returned by the driver
-// into time.Time, trying all common SQLite timestamp formats.
-func parseSQLiteTime(s string) (time.Time, error) {
-	for _, f := range sqliteTimeFormats {
+// parseDBTime parses a timestamp string returned by the driver into time.Time,
+// trying every layout the supported dialects produce.
+func parseDBTime(s string) (time.Time, error) {
+	for _, f := range dbTimeFormats {
 		if t, err := time.Parse(f, s); err == nil {
 			return t, nil
 		}
 	}
-	return time.Time{}, fmt.Errorf("cannot parse SQLite time: %s", s)
+	return time.Time{}, fmt.Errorf("cannot parse DB time: %s", s)
 }
