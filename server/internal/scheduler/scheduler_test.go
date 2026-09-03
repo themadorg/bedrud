@@ -1,8 +1,8 @@
 package scheduler
 
 import (
-	"net/http"
-	"net/http/httptest"
+	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -12,45 +12,48 @@ import (
 	"bedrud/internal/testutil"
 
 	"github.com/livekit/protocol/livekit"
-	"google.golang.org/protobuf/proto"
 )
 
-// mockLkNoRooms returns an httptest.Server that responds to
-// ListRooms with an empty room list (simulating 0 participants).
-func mockLkNoRooms() *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/twirp/livekit.RoomService/ListRooms" {
-			resp := &livekit.ListRoomsResponse{}
-			data, _ := proto.Marshal(resp)
-			w.Header().Set("Content-Type", "application/protobuf")
-			if _, err := w.Write(data); err != nil {
-				return
-			}
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
+// lkConfig is the config every test that means to reach the room loop needs.
+//
+// checkIdleRooms mints a JWT before it calls the client, and
+// auth.AccessToken.ToJWT returns ErrKeysMissing when either credential is
+// empty — so a config without these two returns at the token step and never
+// touches LiveKit at all, whatever client it was handed. Several tests here
+// used to do exactly that while claiming to cover the loop below it.
+func lkConfig() *config.LiveKitConfig {
+	return &config.LiveKitConfig{Host: "mock", APIKey: "key", APISecret: "secret"}
 }
 
-// mockLkRoom returns an httptest.Server that responds to
-// ListRooms with a single room having the given participant count.
-func mockLkRoom(roomName string, numParticipants uint32) *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/twirp/livekit.RoomService/ListRooms" {
-			resp := &livekit.ListRoomsResponse{
-				Rooms: []*livekit.Room{
-					{Name: roomName, NumParticipants: numParticipants},
-				},
-			}
-			data, _ := proto.Marshal(resp)
-			w.Header().Set("Content-Type", "application/protobuf")
-			if _, err := w.Write(data); err != nil {
-				return
-			}
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
+// activeRoom builds a room the idle check will consider: active, and old
+// enough to be past the five-minute grace period unless told otherwise.
+func activeRoom(id, name string, age time.Duration, persistent bool) *models.Room {
+	return &models.Room{
+		ID:        id,
+		Name:      name,
+		CreatedBy: "user-1",
+		IsActive:  true,
+		CreatedAt: time.Now().Add(-age),
+		Settings:  models.RoomSettings{IsPersistent: persistent},
+	}
+}
+
+// assertActive reads the room back and fails if it is missing or its IsActive
+// does not match. Reading with `updated != nil && ...` instead would turn a
+// missing row into a pass, which is how these assertions used to be written.
+func assertActive(t *testing.T, roomRepo *repository.RoomRepository, id string, want bool, msg string) {
+	t.Helper()
+
+	updated, err := roomRepo.GetRoom(id)
+	if err != nil {
+		t.Fatalf("GetRoom(%s): %v", id, err)
+	}
+	if updated == nil {
+		t.Fatalf("GetRoom(%s): room is gone", id)
+	}
+	if updated.IsActive != want {
+		t.Fatalf("%s: IsActive=%v, want %v", msg, updated.IsActive, want)
+	}
 }
 
 func TestInitialize_DoesNotPanic(t *testing.T) {
@@ -61,7 +64,13 @@ func TestInitialize_DoesNotPanic(t *testing.T) {
 }
 
 func TestStop_BeforeInitialize(t *testing.T) {
-	// Should not panic if called before Initialize
+	// scheduler is a package-level var and TestInitialize_DoesNotPanic sets it,
+	// so without this reset the nil branch in Stop is never taken and the test
+	// proves nothing about the order it is named for.
+	saved := scheduler
+	scheduler = nil
+	t.Cleanup(func() { scheduler = saved })
+
 	Stop()
 }
 
@@ -78,223 +87,144 @@ func TestCheckIdleRooms_EmptyRooms(t *testing.T) {
 	checkIdleRooms(roomRepo, &config.LiveKitConfig{}, nil)
 }
 
+// TestCheckIdleRooms_MissingCredentialsStopBeforeLiveKit covers the token step
+// on its own. It is the branch several tests reached by accident, so it gets
+// one test that says so and asserts the client was never called.
+func TestCheckIdleRooms_MissingCredentialsStopBeforeLiveKit(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	roomRepo := repository.NewRoomRepository(db)
+	db.Create(activeRoom("no-creds", "no-creds", 10*time.Minute, false))
+
+	lk := testutil.NewMockRoomService()
+	checkIdleRooms(roomRepo, &config.LiveKitConfig{Host: "mock"}, lk)
+
+	if n := lk.ListRoomsCalls.Load(); n != 0 {
+		t.Fatalf("expected LiveKit to be untouched without credentials, got %d ListRooms calls", n)
+	}
+	assertActive(t, roomRepo, "no-creds", true, "room with no LiveKit credentials")
+}
+
+// TestCheckIdleRooms_ListRoomsErrorLeavesRoomsActive covers the early return
+// when LiveKit answers with an error — deterministically, instead of by
+// pointing a real client at a port nothing is expected to be listening on.
+func TestCheckIdleRooms_ListRoomsErrorLeavesRoomsActive(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	roomRepo := repository.NewRoomRepository(db)
+	db.Create(activeRoom("lk-down", "lk-down", 10*time.Minute, false))
+
+	lk := testutil.NewMockRoomService()
+	lk.OnListRooms = func(context.Context, *livekit.ListRoomsRequest) (*livekit.ListRoomsResponse, error) {
+		return nil, errors.New("livekit unreachable")
+	}
+
+	checkIdleRooms(roomRepo, lkConfig(), lk)
+
+	if n := lk.ListRoomsCalls.Load(); n != 1 {
+		t.Fatalf("expected exactly 1 ListRooms call, got %d", n)
+	}
+	assertActive(t, roomRepo, "lk-down", true, "room while LiveKit is erroring")
+}
+
+// TestCheckIdleRooms_RoomsWithinGracePeriod pairs the young room with an old
+// one in the same run. Without the control the test passes whenever the loop is
+// not reached at all, which is what it used to do.
 func TestCheckIdleRooms_RoomsWithinGracePeriod(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	roomRepo := repository.NewRoomRepository(db)
+	db.Create(activeRoom("grace-room", "grace-room", 0, false))
+	db.Create(activeRoom("old-room", "old-room", 10*time.Minute, false))
 
-	// Create a room that is brand new (within 5-minute grace period)
-	room := &models.Room{
-		ID:        "grace-room-1",
-		Name:      "grace-room",
-		CreatedBy: "user-1",
-		IsActive:  true,
-		CreatedAt: time.Now(), // just now → within grace
-	}
-	db.Create(room)
+	lk := testutil.NewMockRoomService() // ListRooms returns an empty list
 
-	// Should NOT call LiveKit nor mark idle; exits early due to grace period
-	lkClient := livekit.NewRoomServiceProtobufClient("http://localhost:9999", http.DefaultClient)
-	checkIdleRooms(roomRepo, &config.LiveKitConfig{Host: "http://localhost:9999"}, lkClient)
+	checkIdleRooms(roomRepo, lkConfig(), lk)
 
-	// Room should still be active
-	updated, _ := roomRepo.GetRoom("grace-room-1")
-	if updated != nil && !updated.IsActive {
-		t.Fatal("room within grace period should not be marked idle")
-	}
+	assertActive(t, roomRepo, "grace-room", true, "room inside the grace period")
+	assertActive(t, roomRepo, "old-room", false, "control room past the grace period")
 }
 
-func TestCheckIdleRooms_OldRoomLiveKitUnavailable(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	roomRepo := repository.NewRoomRepository(db)
-
-	// Create a room older than 5 minutes
-	room := &models.Room{
-		ID:        "old-room-1",
-		Name:      "old-room",
-		CreatedBy: "user-1",
-		IsActive:  true,
-		CreatedAt: time.Now().Add(-10 * time.Minute),
-	}
-	db.Create(room)
-
-	// LiveKit is unreachable — checkIdleRooms should handle this gracefully
-	lkClient := livekit.NewRoomServiceProtobufClient("http://localhost:9999", http.DefaultClient)
-	checkIdleRooms(roomRepo, &config.LiveKitConfig{
-		Host: "http://localhost:9999", // nothing listening here
-	}, lkClient)
-
-	// Room stays active since LiveKit reported an error
-	updated, _ := roomRepo.GetRoom("old-room-1")
-	if updated != nil && !updated.IsActive {
-		t.Fatal("room should stay active when LiveKit call fails")
-	}
-}
-
+// TestCheckIdleRooms_PersistentRoomSkipped is the same shape: the persistent
+// room is only meaningful next to a non-persistent one that does get marked.
 func TestCheckIdleRooms_PersistentRoomSkipped(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	roomRepo := repository.NewRoomRepository(db)
+	db.Create(activeRoom("persistent-room", "persistent-room", 10*time.Minute, true))
+	db.Create(activeRoom("normal-room", "normal-room", 10*time.Minute, false))
 
-	room := &models.Room{
-		ID:        "persistent-room-1",
-		Name:      "persistent-room",
-		CreatedBy: "user-1",
-		IsActive:  true,
-		CreatedAt: time.Now().Add(-10 * time.Minute),
-		Settings:  models.RoomSettings{IsPersistent: true},
-	}
-	db.Create(room)
+	lk := testutil.NewMockRoomService()
 
-	lkClient := livekit.NewRoomServiceProtobufClient("http://localhost:9999", http.DefaultClient)
-	checkIdleRooms(roomRepo, &config.LiveKitConfig{Host: "http://localhost:9999"}, lkClient)
+	checkIdleRooms(roomRepo, lkConfig(), lk)
 
-	updated, _ := roomRepo.GetRoom("persistent-room-1")
-	if updated == nil {
-		t.Fatal("expected to find persistent room")
-	}
-	if !updated.IsActive {
-		t.Fatal("persistent room should remain active regardless of participant count")
-	}
-}
-
-func TestCheckIdleRooms_NonPersistentRoomUnchangedOnLKUnavailable(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	roomRepo := repository.NewRoomRepository(db)
-
-	room := &models.Room{
-		ID:        "normal-room-1",
-		Name:      "normal-room",
-		CreatedBy: "user-1",
-		IsActive:  true,
-		CreatedAt: time.Now().Add(-10 * time.Minute),
-		Settings:  models.RoomSettings{IsPersistent: false},
-	}
-	db.Create(room)
-
-	lkClient := livekit.NewRoomServiceProtobufClient("http://localhost:9999", http.DefaultClient)
-	checkIdleRooms(roomRepo, &config.LiveKitConfig{Host: "http://localhost:9999"}, lkClient)
-
-	updated, _ := roomRepo.GetRoom("normal-room-1")
-	if updated != nil && !updated.IsActive {
-		t.Fatal("non-persistent room should stay active when LiveKit is unavailable (scheduler returns early on LK error)")
-	}
-}
-
-func TestCheckIdleRooms_PersistentSkipWorksOnLKUnavailable(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	roomRepo := repository.NewRoomRepository(db)
-
-	persistentRoom := &models.Room{
-		ID:        "mixed-persistent",
-		Name:      "mixed-persistent",
-		CreatedBy: "user-1",
-		IsActive:  true,
-		CreatedAt: time.Now().Add(-10 * time.Minute),
-		Settings:  models.RoomSettings{IsPersistent: true},
-	}
-	normalRoom := &models.Room{
-		ID:        "mixed-normal",
-		Name:      "mixed-normal",
-		CreatedBy: "user-1",
-		IsActive:  true,
-		CreatedAt: time.Now().Add(-10 * time.Minute),
-		Settings:  models.RoomSettings{IsPersistent: false},
-	}
-	db.Create(persistentRoom)
-	db.Create(normalRoom)
-
-	lkClient := livekit.NewRoomServiceProtobufClient("http://localhost:9999", http.DefaultClient)
-	checkIdleRooms(roomRepo, &config.LiveKitConfig{Host: "http://localhost:9999"}, lkClient)
-
-	// Both rooms stay active because LiveKit is unavailable — scheduler returns early on LK error.
-	// This test verifies the persistent skip doesn't panic and the flow completes.
-	persisted, _ := roomRepo.GetRoom("mixed-persistent")
-	if persisted == nil || !persisted.IsActive {
-		t.Fatal("persistent room should remain active")
-	}
-	normal, _ := roomRepo.GetRoom("mixed-normal")
-	if normal == nil || !normal.IsActive {
-		t.Fatal("non-persistent room should stay active when LiveKit is unavailable")
-	}
-}
-
-func TestCheckIdleRooms_PersistentRoomStaysActive_WhenLKReportsEmpty(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	roomRepo := repository.NewRoomRepository(db)
-
-	room := &models.Room{
-		ID:        "persist-empty-lk",
-		Name:      "persist-empty-lk",
-		CreatedBy: "user-1",
-		IsActive:  true,
-		CreatedAt: time.Now().Add(-10 * time.Minute),
-		Settings:  models.RoomSettings{IsPersistent: true},
-	}
-	db.Create(room)
-
-	mockLK := mockLkNoRooms()
-	defer mockLK.Close()
-
-	lkClient := livekit.NewRoomServiceProtobufClient(mockLK.URL, http.DefaultClient)
-	checkIdleRooms(roomRepo, &config.LiveKitConfig{Host: mockLK.URL, APIKey: "key", APISecret: "secret"}, lkClient)
-
-	updated, _ := roomRepo.GetRoom("persist-empty-lk")
-	if updated == nil || !updated.IsActive {
-		t.Fatal("persistent room should remain active when LK reports 0 participants")
-	}
+	assertActive(t, roomRepo, "persistent-room", true, "persistent room")
+	assertActive(t, roomRepo, "normal-room", false, "control non-persistent room")
 }
 
 func TestCheckIdleRooms_NonPersistentMarkedIdle_WhenLKReportsEmpty(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	roomRepo := repository.NewRoomRepository(db)
+	db.Create(activeRoom("normal-empty-lk", "normal-empty-lk", 10*time.Minute, false))
 
-	room := &models.Room{
-		ID:        "normal-empty-lk",
-		Name:      "normal-empty-lk",
-		CreatedBy: "user-1",
-		IsActive:  true,
-		CreatedAt: time.Now().Add(-10 * time.Minute),
-		Settings:  models.RoomSettings{IsPersistent: false},
-	}
-	db.Create(room)
+	lk := testutil.NewMockRoomService()
 
-	mockLK := mockLkNoRooms()
-	defer mockLK.Close()
+	checkIdleRooms(roomRepo, lkConfig(), lk)
 
-	lkClient := livekit.NewRoomServiceProtobufClient(mockLK.URL, http.DefaultClient)
-	checkIdleRooms(roomRepo, &config.LiveKitConfig{Host: mockLK.URL, APIKey: "key", APISecret: "secret"}, lkClient)
-
-	updated, _ := roomRepo.GetRoom("normal-empty-lk")
-	if updated == nil {
-		t.Fatal("expected room to still exist after being marked idle")
-	}
-	if updated.IsActive {
-		t.Fatal("non-persistent room should be marked idle when LK reports 0 participants")
-	}
+	assertActive(t, roomRepo, "normal-empty-lk", false, "non-persistent room with no LiveKit participants")
 }
 
 func TestCheckIdleRooms_NonPersistentNotMarked_WhenLKHasParticipants(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	roomRepo := repository.NewRoomRepository(db)
+	db.Create(activeRoom("active-lk-room", "active-lk-room", 10*time.Minute, false))
 
-	room := &models.Room{
-		ID:        "active-lk-room",
-		Name:      "active-lk-room",
-		CreatedBy: "user-1",
-		IsActive:  true,
-		CreatedAt: time.Now().Add(-10 * time.Minute),
-		Settings:  models.RoomSettings{IsPersistent: false},
+	lk := testutil.NewMockRoomService()
+	lk.OnListRooms = func(context.Context, *livekit.ListRoomsRequest) (*livekit.ListRoomsResponse, error) {
+		return &livekit.ListRoomsResponse{
+			Rooms: []*livekit.Room{{Name: "active-lk-room", NumParticipants: 1}},
+		}, nil
 	}
-	db.Create(room)
 
-	mockLK := mockLkRoom("active-lk-room", 1)
-	defer mockLK.Close()
+	checkIdleRooms(roomRepo, lkConfig(), lk)
 
-	lkClient := livekit.NewRoomServiceProtobufClient(mockLK.URL, http.DefaultClient)
-	checkIdleRooms(roomRepo, &config.LiveKitConfig{Host: mockLK.URL, APIKey: "key", APISecret: "secret"}, lkClient)
+	assertActive(t, roomRepo, "active-lk-room", true, "room LiveKit reports as occupied")
+}
 
-	updated, _ := roomRepo.GetRoom("active-lk-room")
-	if updated == nil || !updated.IsActive {
-		t.Fatal("non-persistent room with active participants should NOT be marked idle")
+// TestCheckIdleRooms_ReactivatesWhenParticipantJoinsDuringCheck covers the
+// re-check after SetRoomIdle: ListRooms said the room was empty, but somebody
+// joined before the write landed, so the room is put back and its participants
+// are left alone. Nothing reached this branch before — mockLkNoRooms answered
+// 404 to ListParticipants, so the re-check always errored out.
+func TestCheckIdleRooms_ReactivatesWhenParticipantJoinsDuringCheck(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	roomRepo := repository.NewRoomRepository(db)
+	db.Create(activeRoom("racing-room", "racing-room", 10*time.Minute, false))
+	db.Create(&models.RoomParticipant{
+		ID:       "racing-participant",
+		RoomID:   "racing-room",
+		UserID:   "user-1",
+		IsActive: true,
+	})
+
+	lk := testutil.NewMockRoomService() // ListRooms: empty, so the room is marked idle
+	lk.OnListParticipants = func(context.Context, *livekit.ListParticipantsRequest) (*livekit.ListParticipantsResponse, error) {
+		return &livekit.ListParticipantsResponse{
+			Participants: []*livekit.ParticipantInfo{{Identity: "user-1"}},
+		}, nil
+	}
+
+	checkIdleRooms(roomRepo, lkConfig(), lk)
+
+	if n := lk.ListParticipantsCalls.Load(); n != 1 {
+		t.Fatalf("expected the idle write to be re-checked once, got %d ListParticipants calls", n)
+	}
+	assertActive(t, roomRepo, "racing-room", true, "room somebody joined during the idle check")
+
+	// Reactivating returns before DeactivateRoomParticipants, so the participant
+	// that caused it must still be active.
+	var p models.RoomParticipant
+	if err := db.First(&p, "id = ?", "racing-participant").Error; err != nil {
+		t.Fatalf("load participant: %v", err)
+	}
+	if !p.IsActive {
+		t.Fatal("participant was deactivated even though the room was reactivated")
 	}
 }
 
@@ -313,8 +243,5 @@ func TestScheduler_CleanupExpiredRooms_Integration(t *testing.T) {
 	// Call the same logic scheduler would
 	_ = roomRepo.CleanupExpiredRooms()
 
-	updated, _ := roomRepo.GetRoom("expired-room")
-	if updated != nil && updated.IsActive {
-		t.Fatal("expired room should be marked inactive")
-	}
+	assertActive(t, roomRepo, "expired-room", false, "expired room")
 }
