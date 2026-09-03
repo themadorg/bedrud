@@ -85,7 +85,7 @@ make build-dist    # Compressed linux/amd64 tarball
 
 **Build order:** Frontend first. `make build` copies `apps/web/build/*` → `server/frontend/` → `//go:embed all:frontend`.
 
-**LK placeholder:** `internal/livekit/bin/livekit-server` must exist (even empty). CI: `mkdir -p internal/livekit/bin && touch internal/livekit/bin/livekit-server`.
+**LK placeholder:** `internal/livekit/bin/livekit-server` must exist (even empty) — `livekit-server.exe` on Windows. CI: `mkdir -p internal/livekit/bin && touch internal/livekit/bin/livekit-server`.
 
 **Docker:** Multi-stage cross-compile (`tonistiigi/xx`). See `Dockerfile`.
 
@@ -202,7 +202,7 @@ Regen: `make swagger-gen` (needs `swag` CLI).
 ## Common Gotchas
 
 - **Wrong entrypoint:** `cmd/server/` skips CLI. Use `cmd/bedrud/` for prod.
-- **Missing LK placeholder:** Build fails without `internal/livekit/bin/livekit-server` (even empty).
+- **Missing LK placeholder:** Build fails without `internal/livekit/bin/livekit-server` (even empty), or `livekit-server.exe` on Windows.
 - **Frontend not embedded:** `go build` without `make build` → no frontend → 404.
 - **Hot reload:** Only `make dev-server-hot` (Air). `make dev-server` no reload.
 - **Path aliases:** Use `#/*` not `../src/*`. TanStack Start resolves via tsconfig paths.

@@ -160,6 +160,8 @@ mkdir -p server/internal/livekit/bin
 touch server/internal/livekit/bin/livekit-server
 ```
 
+On Windows the embed pattern is `livekit-server.exe`, so create that name instead.
+
 `make init` downloads the real binary for local dev.
 
 ---
