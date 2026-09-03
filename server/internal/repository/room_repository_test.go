@@ -9,6 +9,8 @@ import (
 
 	"bedrud/internal/models"
 	"bedrud/internal/testutil"
+
+	"gorm.io/gorm"
 )
 
 const testUserIDRoom = "user-1"
@@ -1303,14 +1305,27 @@ func TestRoomRepository_NewParticipantHasNoPermissions(t *testing.T) {
 	db.Create(&models.User{ID: "user-2", Email: "u2@ex.com", Name: "U2", Provider: "local", IsActive: true})
 
 	room, _ := repo.CreateRoom(testUserIDRoom, "noperm-room", false, "standard", 0, &models.RoomSettings{})
-	_ = repo.AddParticipant(room.ID, "user-2")
-
-	// New participant should NOT have permissions entry
-	_, err := repo.GetParticipantPermissions(room.ID, "user-2")
-	if err == nil {
-		t.Logf("Note: new participant has a permissions record (may be auto-created)")
+	if err := repo.AddParticipant(room.ID, "user-2"); err != nil {
+		t.Fatalf("AddParticipant: %v", err)
 	}
-	// If no error, permissions should all be false
+
+	// AddParticipant writes a RoomParticipant and nothing else, so there is no
+	// permissions row to find. Asserting the specific error matters: any other
+	// one — a renamed column, a broken query — would otherwise read as
+	// "this participant has no permissions", which is the answer the caller
+	// acts on.
+	perms, err := repo.GetParticipantPermissions(room.ID, "user-2")
+	if err == nil {
+		t.Fatalf("expected no permissions record for a new participant, got %+v", perms)
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("expected gorm.ErrRecordNotFound, got %T: %v", err, err)
+	}
+
+	// The creator is the contrast: CreateRoom does write admin permissions.
+	if _, err := repo.GetParticipantPermissions(room.ID, testUserIDRoom); err != nil {
+		t.Fatalf("creator should have a permissions record: %v", err)
+	}
 }
 
 // ====== RemoveParticipant sets LeftAt ======

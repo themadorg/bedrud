@@ -280,34 +280,81 @@ func TestQueueDepthCap(t *testing.T) {
 	t.Logf("got expected error: %v", err)
 }
 
+// waitForSettledJobStatus polls until the job leaves the transient states and
+// reports what it settled on.
+//
+// Polling for one expected status and returning on first sight is not enough:
+// a job that is briefly 'active' on the way to 'done' satisfies an assertion
+// for either one, so such a test passes whichever contract you write down. It
+// has to wait for the job to stop moving first.
+func waitForSettledJobStatus(t *testing.T, db *gorm.DB) models.JobStatus {
+	t.Helper()
+
+	deadline := time.Now().Add(5 * time.Second)
+	var last models.JobStatus
+	for time.Now().Before(deadline) {
+		var j models.Job
+		if err := db.First(&j).Error; err != nil {
+			t.Fatalf("load job: %v", err)
+		}
+		last = j.Status
+		if last != models.JobPending && last != models.JobActive {
+			return last
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("job never left the transient states (last: %q)", last)
+	return ""
+}
+
+// TestWorkerGracefulShutdown pins what shutdown does to a job that is already
+// running. run() checks the context between jobs, never inside one, so the
+// in-flight handler is left to finish and its result is written normally.
+//
+// The job is therefore terminal, not abandoned in 'active' for
+// recoverStaleJobs — which would not reclaim it for another ten minutes
+// anyway. That is the contract; the test exists to keep it from changing by
+// accident.
 func TestWorkerGracefulShutdown(t *testing.T) {
 	db := openTestDB(t)
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	blockCh := make(chan struct{})
+	// entered is buffered and sent to without blocking rather than closed: the
+	// job goes terminal and nothing retries it today, but a second run of this
+	// handler would make close panic, and that is a sharp edge to leave for
+	// whoever changes the retry path.
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
 	handlers := map[string]Handler{
-		"blocking": func(ctx context.Context, db *gorm.DB, job *models.Job) error {
-			<-blockCh
+		"blocking": func(context.Context, *gorm.DB, *models.Job) error {
+			select {
+			case entered <- struct{}{}:
+			default:
+			}
+			<-release
 			return nil
 		},
 	}
-	w := NewWorker(db, handlers, WorkerOptions{Interval: 50 * time.Millisecond, Concurrency: 1})
+	w := NewWorker(db, handlers, WorkerOptions{Interval: 10 * time.Millisecond, Concurrency: 1})
 
 	if err := Enqueue(ctx, db, "blocking", "payload"); err != nil {
 		t.Fatal(err)
 	}
 	w.Start(ctx)
 
-	time.Sleep(200 * time.Millisecond) // let worker claim and start handling
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("worker never started the job")
+	}
 
-	cancel()       // trigger shutdown
-	close(blockCh) // unblock handler
+	cancel()       // shut down with the job in flight
+	close(release) // let the handler run to completion
 
-	time.Sleep(100 * time.Millisecond)
-
-	var j models.Job
-	db.First(&j)
-	t.Logf("job status after shutdown: %s", j.Status)
+	if got := waitForSettledJobStatus(t, db); got != models.JobDone {
+		t.Fatalf("in-flight job settled on %q, want %q", got, models.JobDone)
+	}
 }
 
 func TestRecoverStaleJobs(t *testing.T) {

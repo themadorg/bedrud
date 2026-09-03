@@ -216,11 +216,17 @@ func TestDispatchWebhook_MalformedURL(t *testing.T) {
 }
 
 func TestDispatchWebhook_Timeout(t *testing.T) {
+	// The handler blocks until the test says so, rather than sleeping past the
+	// client's deadline. srv.Close waits for in-flight handlers to return, so a
+	// fixed sleep would have cost the test its full duration in wall clock —
+	// long after the 50ms client timeout had already decided the outcome.
+	release := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		time.Sleep(2 * time.Second)
+		<-release
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
+	defer close(release)
 
 	handler := NewDispatchWebhookHandler()
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
