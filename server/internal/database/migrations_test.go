@@ -1,16 +1,14 @@
 package database
 
 import (
-	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	"bedrud/internal/models"
+	"bedrud/internal/testutil/pgtest"
 
-	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -62,62 +60,9 @@ func newMemoryDB(t *testing.T) *gorm.DB {
 func newPostgresDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
-	db := openPostgresSchema(t, GormConfig(logger.Silent))
+	db := pgtest.Open(t, GormConfig(logger.Silent))
 	SetForTest(db)
 	t.Cleanup(ResetForTest)
-	return db
-}
-
-// openPostgresSchema builds a handle pointed at a schema of its own. The
-// gorm.Config is a parameter because one test deliberately opens with a
-// configuration production never uses — see
-// TestModels_DeriveNoForeignKeysOfTheirOwn.
-func openPostgresSchema(t *testing.T, cfg *gorm.Config) *gorm.DB {
-	t.Helper()
-
-	dsn := os.Getenv("BEDRUD_TEST_POSTGRES_DSN")
-	if dsn == "" {
-		// Read as ==1 to match how BEDRUD_SKIP_MIGRATE is read in migrations.go,
-		// so REQUIRED=0 does not mean "required".
-		if os.Getenv("BEDRUD_TEST_POSTGRES_REQUIRED") == "1" {
-			t.Fatal("BEDRUD_TEST_POSTGRES_REQUIRED=1 but BEDRUD_TEST_POSTGRES_DSN is empty: Postgres coverage would be skipped silently")
-		}
-		t.Skip("BEDRUD_TEST_POSTGRES_DSN not set — skipping Postgres dialect coverage")
-	}
-
-	// The schema has to exist before any connection that selects it, so create
-	// it over the base DSN first, then hand every later connection a DSN that
-	// already points at it.
-	//
-	// Setting search_path on one connection and pinning the pool to a single
-	// connection is not enough: database/sql discards a connection on
-	// driver.ErrBadConn and silently opens a fresh one, which lands in public.
-	// Tables would leak into the shared schema and survive the DROP below.
-	admin, err := gorm.Open(postgres.Open(dsn), GormConfig(logger.Silent))
-	if err != nil {
-		t.Fatalf("connect to test postgres: %v", err)
-	}
-	schema := fmt.Sprintf("bedrud_test_%d", time.Now().UnixNano())
-	if err := admin.Exec("CREATE SCHEMA " + schema).Error; err != nil {
-		t.Fatalf("create test schema: %v", err)
-	}
-
-	db, err := gorm.Open(postgres.Open(dsn+" search_path="+schema), cfg)
-	if err != nil {
-		t.Fatalf("connect to test schema: %v", err)
-	}
-
-	t.Cleanup(func() {
-		if sqlDB, err := db.DB(); err == nil {
-			_ = sqlDB.Close()
-		}
-		if err := admin.Exec("DROP SCHEMA " + schema + " CASCADE").Error; err != nil {
-			t.Logf("drop test schema %s: %v", schema, err)
-		}
-		if sqlDB, err := admin.DB(); err == nil {
-			_ = sqlDB.Close()
-		}
-	})
 	return db
 }
 
@@ -482,7 +427,7 @@ func TestRunMigrations_ForeignKeysAreExactlyTheHandWrittenSet(t *testing.T) {
 // Two runs, because the first survives on ordering: GORM cannot build a
 // constraint against a table that does not exist yet.
 func TestModels_DeriveNoForeignKeysOfTheirOwn(t *testing.T) {
-	db := openPostgresSchema(t, &gorm.Config{
+	db := pgtest.Open(t, &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 		// DisableForeignKeyConstraintWhenMigrating deliberately left false.
 	})
