@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -39,7 +40,10 @@ func TestInstallBinaryFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.Mode()&0o111 == 0 {
+	// Windows decides executability by extension, not by mode bits. The copy and
+	// the ETXTBSY-safe overwrite below still matter there — Windows locks a
+	// running image outright — so only this assertion steps aside.
+	if runtime.GOOS != "windows" && st.Mode()&0o111 == 0 {
 		t.Fatalf("expected executable bits, mode=%v", st.Mode())
 	}
 
@@ -92,6 +96,10 @@ func TestResolveUpdateSource_localBinary(t *testing.T) {
 }
 
 func TestResolveUpdateSource_self(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skipf("--self resolves the running binary and quickELFCheck wants an ELF image (got %s)", runtime.GOOS)
+	}
+
 	res, err := resolveUpdateSource(UpdateOptions{Self: true})
 	if err != nil {
 		t.Fatal(err)

@@ -3,10 +3,30 @@ package utils
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
+// requireSymlinks skips when this process cannot create a symlink.
+//
+// A probe rather than a GOOS check: on Windows os.Symlink needs
+// SeCreateSymbolicLinkPrivilege, which Developer Mode or an elevated shell
+// grants, so a machine that has it still runs these tests. Everywhere else the
+// probe succeeds and nothing is skipped.
+func requireSymlinks(t *testing.T) {
+	t.Helper()
+
+	dir := t.TempDir()
+	if err := os.Symlink(filepath.Join(dir, "target"), filepath.Join(dir, "link")); err != nil {
+		t.Skipf("symlinks unavailable on this host: %v", err)
+	}
+}
+
 func TestSafeCreate_NewFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows exposes a single write bit, so 0o644 lands as 0o666")
+	}
+
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "newfile.txt")
 
@@ -39,6 +59,8 @@ func TestSafeCreate_ExistingFile(t *testing.T) {
 }
 
 func TestSafeCreate_ExistingSymlink(t *testing.T) {
+	requireSymlinks(t)
+
 	tmpDir := t.TempDir()
 	target := filepath.Join(tmpDir, "target.txt")
 	if err := os.WriteFile(target, []byte("data"), 0o644); err != nil {
@@ -56,6 +78,8 @@ func TestSafeCreate_ExistingSymlink(t *testing.T) {
 }
 
 func TestSafeCreate_DanglingSymlink(t *testing.T) {
+	requireSymlinks(t)
+
 	tmpDir := t.TempDir()
 	link := filepath.Join(tmpDir, "dangling.txt")
 	if err := os.Symlink("/nonexistent/target", link); err != nil {
@@ -79,6 +103,8 @@ func TestSafeCreate_NonexistentParent(t *testing.T) {
 }
 
 func TestSafeCreate_ParentIsSymlink(t *testing.T) {
+	requireSymlinks(t)
+
 	tmpDir := t.TempDir()
 	realDir := t.TempDir()
 	linkDir := filepath.Join(tmpDir, "linkeddir")
@@ -157,6 +183,8 @@ func TestSafeOpenAppend_Restart(t *testing.T) {
 }
 
 func TestSafeOpenAppend_ExistingSymlink(t *testing.T) {
+	requireSymlinks(t)
+
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "sneaky.log")
 
@@ -182,6 +210,8 @@ func TestSafeOpenAppend_ExistingSymlink(t *testing.T) {
 }
 
 func TestSafeOpenAppend_DanglingSymlink(t *testing.T) {
+	requireSymlinks(t)
+
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "dangling.log")
 	if err := os.Symlink("/nonexistent/target", path); err != nil {
@@ -218,6 +248,8 @@ func TestSafeOpenAppend_NonexistentParent(t *testing.T) {
 }
 
 func TestSafeOpenAppend_ParentIsSymlink(t *testing.T) {
+	requireSymlinks(t)
+
 	tmpDir := t.TempDir()
 	realDir := t.TempDir()
 	linkDir := filepath.Join(tmpDir, "linkeddir")
