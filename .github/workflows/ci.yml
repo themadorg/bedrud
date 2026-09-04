@@ -139,6 +139,57 @@ jobs:
       - run: go vet ./...
       - run: go build ./...
 
+  # Windows is not a deployment target for the server, so this leg deliberately
+  # stops at build and vet: no database, no test binaries, nothing that needs a
+  # toolchain install. A full `go test` leg would — with cgo off, go-sqlite3 is
+  # a stub and 10 of the 19 packages that have tests fail on that alone.
+  #
+  # What it buys is the class of break that only shows up here. embed_windows.go
+  # embeds bin/livekit-server.exe while embed.go embeds bin/livekit-server, so a
+  # missing .exe placeholder fails the build on Windows and nowhere else — which
+  # is exactly what the ubuntu-only job could not see.
+  #
+  # Cost is dominated by setup-go's cache, not by this job's work, so no fixed
+  # figure is recorded here — it would age. The first run against a new cache
+  # spends minutes in `go vet` compiling the dependency graph from scratch;
+  # once warm it converges toward the ubuntu job. Observed on this branch:
+  # vet went 129s, 123s, 33s, 8s across four runs as the cache filled.
+  #
+  # Not cgo, which the CGO_ENABLED pin below was first assumed to explain:
+  # pinning it moved the cold number by about 5%, warming the cache by 94%.
+  server-windows:
+    name: Server – Build & Vet (Windows)
+    needs: changes
+    if: needs.changes.outputs.server == 'true'
+    runs-on: windows-latest
+    # Pinned rather than inherited: windows-latest ships a C compiler, so cgo
+    # would otherwise default on and the job's dependency graph would depend on
+    # what the runner image happens to include. This is for determinism, not
+    # speed; see the cost note above. go-sqlite3's non-cgo path is a stub behind
+    # `!cgo`, which still compiles, so the embed check this job exists for is
+    # unaffected either way.
+    env:
+      CGO_ENABLED: "0"
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: "1.26"
+          cache-dependency-path: server/go.sum
+      - run: go mod download
+      # Create placeholders for //go:embed directives. The binary takes the
+      # .exe name here — that difference is the point of this job.
+      - run: mkdir -p frontend && touch frontend/.gitkeep
+        shell: bash
+      - run: mkdir -p internal/livekit/bin && touch internal/livekit/bin/livekit-server.exe
+        shell: bash
+      - run: go vet ./...
+      - run: go build ./...
+
   server-test:
     name: Server – Tests
     runs-on: ubuntu-latest
@@ -395,7 +446,7 @@ jobs:
     # deriving it from `needs.*.result` meant a job added to this workflow but
     # not to this list left every listed result green, so the close step fired
     # and shut the tracker while master was red.
-    needs: [changes, server, server-test, web, devcli, ios, desktop, site]
+    needs: [changes, server, server-windows, server-test, web, devcli, ios, desktop, site]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
