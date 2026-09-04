@@ -429,11 +429,15 @@ func (h *AdminOverviewHandler) buildKPIs(totalUsers, usersWeek, onlineNow, publi
 	}
 }
 
+// buildActivityTrend joins the three daily series into the chart's rows.
+//
+// The days come from the series themselves, not from a range rebuilt here. All
+// three are zero-filled over the same UTC window by the repository, and
+// deriving a second range from a local time.Now() — which is what this did —
+// put the axis in a different key space from the counts it was looking up, so
+// the chart read zero for the whole window whenever the process calendar
+// disagreed with UTC.
 func (h *AdminOverviewHandler) buildActivityTrend(roomDays, participantDays, activeRoomDays []models.DayCount) []models.DayActivity {
-	roomsByDay := make(map[string]int)
-	for _, d := range roomDays {
-		roomsByDay[d.Date.Format("2006-01-02")] = d.Count
-	}
 	partsByDay := make(map[string]int)
 	for _, d := range participantDays {
 		partsByDay[d.Date.Format("2006-01-02")] = d.Count
@@ -443,15 +447,12 @@ func (h *AdminOverviewHandler) buildActivityTrend(roomDays, participantDays, act
 		activeRoomsByDay[d.Date.Format("2006-01-02")] = d.Count
 	}
 
-	now := time.Now()
-	cutoff := now.Add(-overviewDays * 24 * time.Hour)
 	var trend []models.DayActivity
-	for i := range overviewDays {
-		day := cutoff.Add(time.Duration(i) * 24 * time.Hour)
-		key := day.Format("2006-01-02")
+	for _, d := range roomDays {
+		key := d.Date.Format("2006-01-02")
 		trend = append(trend, models.DayActivity{
 			Date:         key,
-			RoomsCreated: roomsByDay[key],
+			RoomsCreated: d.Count,
 			RoomsActive:  activeRoomsByDay[key],
 			Participants: partsByDay[key],
 		})

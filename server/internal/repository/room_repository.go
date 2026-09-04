@@ -1148,15 +1148,11 @@ func (r *RoomRepository) CountPersistentRooms() (int64, error) {
 // CountActiveRoomsByDay returns distinct active room counts per day for last N days.
 // Counts rooms that had at least one active participant join on that day.
 func (r *RoomRepository) CountActiveRoomsByDay(days int) ([]models.DayCount, error) {
-	cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
-	type dateRow struct {
-		Date  string
-		Count int
-	}
-	var rows []dateRow
+	start := dayWindowStart(time.Now(), days)
+	var rows []dayCountRow
 	err := r.db.Model(&models.RoomParticipant{}).
 		Select("DATE(joined_at) as date, COUNT(DISTINCT room_id) as count").
-		Where("joined_at >= ?", cutoff).
+		Where("joined_at >= ?", dayQueryFloor(start)).
 		Where("is_active = ?", true).
 		Group("DATE(joined_at)").
 		Order("date ASC").
@@ -1169,20 +1165,16 @@ func (r *RoomRepository) CountActiveRoomsByDay(days int) ([]models.DayCount, err
 		t, _ := time.Parse("2006-01-02", r.Date)
 		results[i] = models.DayCount{Date: t, Count: r.Count}
 	}
-	return fillMissingDays(results, days, cutoff), nil
+	return fillMissingDays(results, days, start), nil
 }
 
 // CountRoomsByDay returns room creation counts grouped by day for the last N days.
 func (r *RoomRepository) CountRoomsByDay(days int) ([]models.DayCount, error) {
-	cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
-	type dateRow struct {
-		Date  string
-		Count int
-	}
-	var rows []dateRow
+	start := dayWindowStart(time.Now(), days)
+	var rows []dayCountRow
 	err := r.db.Model(&models.Room{}).
 		Select("DATE(created_at) as date, COUNT(*) as count").
-		Where("created_at >= ?", cutoff).
+		Where("created_at >= ?", dayQueryFloor(start)).
 		Group("DATE(created_at)").
 		Order("date ASC").
 		Scan(&rows).Error
@@ -1194,20 +1186,16 @@ func (r *RoomRepository) CountRoomsByDay(days int) ([]models.DayCount, error) {
 		t, _ := time.Parse("2006-01-02", r.Date)
 		results[i] = models.DayCount{Date: t, Count: r.Count}
 	}
-	return fillMissingDays(results, days, cutoff), nil
+	return fillMissingDays(results, days, start), nil
 }
 
 // CountActiveParticipantsByDay returns distinct active participant counts per day for last N days.
 func (r *RoomRepository) CountActiveParticipantsByDay(days int) ([]models.DayCount, error) {
-	cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
-	type dateRow struct {
-		Date  string
-		Count int
-	}
-	var rows []dateRow
+	start := dayWindowStart(time.Now(), days)
+	var rows []dayCountRow
 	err := r.db.Model(&models.RoomParticipant{}).
 		Select("DATE(joined_at) as date, COUNT(DISTINCT user_id) as count").
-		Where("joined_at >= ?", cutoff).
+		Where("joined_at >= ?", dayQueryFloor(start)).
 		Where("is_active = ?", true).
 		Group("DATE(joined_at)").
 		Order("date ASC").
@@ -1220,11 +1208,56 @@ func (r *RoomRepository) CountActiveParticipantsByDay(days int) ([]models.DayCou
 		t, _ := time.Parse("2006-01-02", r.Date)
 		results[i] = models.DayCount{Date: t, Count: r.Count}
 	}
-	return fillMissingDays(results, days, cutoff), nil
+	return fillMissingDays(results, days, start), nil
 }
 
-// fillMissingDays ensures every day in the range has an entry (zero-fill gaps).
-func fillMissingDays(results []models.DayCount, days int, cutoff time.Time) []models.DayCount {
+// dayCountRow is one bucket as the daily-count queries scan it: a day rendered
+// as text, and its count. One declaration rather than four identical ones.
+type dayCountRow struct {
+	Date  string
+	Count int
+}
+
+// dayWindowStart returns the UTC midnight that opens a days-long window ending
+// on the UTC day that contains now.
+//
+// The buckets this window is matched against are UTC calendar days — SQLite's
+// DATE() normalises an offset-bearing value to UTC and never consults the
+// process zone (measured on 3.46.1: DATE('2026-09-03 20:19:00-04:00') is
+// 2026-09-04 under TZ=UTC and TZ=America/New_York alike) — so the axis has to
+// be UTC as well. Built from a local time.Time, as it was, the two key spaces
+// come apart by a whole day whenever the process calendar disagrees with UTC:
+// west of UTC, between 00:00Z and the offset, every lookup misses and every
+// count reads zero.
+//
+// The window ends today. It used to run [now-days*24h, now-24h], so rows
+// created today were counted by the query and then dropped by the zero-fill,
+// and the last column of a "last 7 days" chart was always yesterday.
+func dayWindowStart(now time.Time, days int) time.Time {
+	utc := now.UTC()
+	return time.Date(utc.Year(), utc.Month(), utc.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, -(days - 1))
+}
+
+// dayQueryFloor is the lower bound the daily-count queries filter on: one day
+// below the window they display.
+//
+// The bound goes to the driver as an instant, but on SQLite the column is text
+// and the comparison is lexicographic against whatever offset the writing
+// process carried (#126). A row at 01:00Z written four hours west is stored as
+// the previous day's 21:00 and sorts below a bound placed at the window's own
+// start, even though DATE() buckets it into the first day being displayed. No
+// zone sits further from UTC than 14 hours, so a day of slack covers every
+// deployment, and the extra rows cost nothing: the fill reads only the days it
+// emits, so anything outside the window is dropped.
+func dayQueryFloor(start time.Time) time.Time {
+	return start.AddDate(0, 0, -1)
+}
+
+// fillMissingDays ensures every day in the window has an entry (zero-fill gaps).
+//
+// start comes from dayWindowStart, so the emitted Date and the lookup key are
+// both UTC calendar days — the key space the SQL buckets already use.
+func fillMissingDays(results []models.DayCount, days int, start time.Time) []models.DayCount {
 	found := make(map[string]int)
 	for _, r := range results {
 		key := r.Date.Format("2006-01-02")
@@ -1232,7 +1265,7 @@ func fillMissingDays(results []models.DayCount, days int, cutoff time.Time) []mo
 	}
 	var filled []models.DayCount
 	for i := range days {
-		day := cutoff.Add(time.Duration(i) * 24 * time.Hour)
+		day := start.AddDate(0, 0, i)
 		key := day.Format("2006-01-02")
 		c := found[key]
 		filled = append(filled, models.DayCount{

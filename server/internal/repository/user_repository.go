@@ -820,15 +820,11 @@ func (r *UserRepository) GetRecentUsers(limit int) ([]models.User, error) {
 
 // CountUsersByDay returns user signup counts grouped by day for the last N days.
 func (r *UserRepository) CountUsersByDay(days int) ([]models.DayCount, error) {
-	cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
-	type dateRow struct {
-		Date  string
-		Count int
-	}
-	var rows []dateRow
+	start := dayWindowStart(time.Now(), days)
+	var rows []dayCountRow
 	err := r.db.Model(&models.User{}).
 		Select("DATE(created_at) as date, COUNT(*) as count").
-		Where("created_at >= ?", cutoff).
+		Where("created_at >= ?", dayQueryFloor(start)).
 		Group("DATE(created_at)").
 		Order("date ASC").
 		Scan(&rows).Error
@@ -840,20 +836,7 @@ func (r *UserRepository) CountUsersByDay(days int) ([]models.DayCount, error) {
 		t, _ := time.Parse("2006-01-02", r.Date)
 		results[i] = models.DayCount{Date: t, Count: r.Count}
 	}
-	// Zero-fill gaps
-	found := make(map[string]int)
-	for _, r := range results {
-		key := r.Date.Format("2006-01-02")
-		found[key] = r.Count
-	}
-	var filled []models.DayCount
-	for i := range days {
-		day := cutoff.Add(time.Duration(i) * 24 * time.Hour)
-		key := day.Format("2006-01-02")
-		filled = append(filled, models.DayCount{
-			Date:  day,
-			Count: found[key],
-		})
-	}
-	return filled, nil
+	// The day helpers live in room_repository.go; this function used to carry
+	// its own copy of the zero-fill, with the same day-window defect.
+	return fillMissingDays(results, days, start), nil
 }
