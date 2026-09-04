@@ -139,6 +139,40 @@ jobs:
       - run: go vet ./...
       - run: go build ./...
 
+  # Windows is not a deployment target for the server, so this leg deliberately
+  # stops at build and vet: no CGO, no database, nothing that needs MinGW. A
+  # full `go test` leg would — CGO_ENABLED=0 leaves go-sqlite3 a stub and 21
+  # packages fail on that alone.
+  #
+  # What it buys is the class of break that only shows up here. embed_windows.go
+  # embeds bin/livekit-server.exe while embed.go embeds bin/livekit-server, so a
+  # missing .exe placeholder fails the build on Windows and nowhere else — which
+  # is exactly what the ubuntu-only job could not see.
+  server-windows:
+    name: Server – Build & Vet (Windows)
+    needs: changes
+    if: needs.changes.outputs.server == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: "1.26"
+          cache-dependency-path: server/go.sum
+      - run: go mod download
+      # Create placeholders for //go:embed directives. The binary takes the
+      # .exe name here — that difference is the point of this job.
+      - run: mkdir -p frontend && touch frontend/.gitkeep
+        shell: bash
+      - run: mkdir -p internal/livekit/bin && touch internal/livekit/bin/livekit-server.exe
+        shell: bash
+      - run: go vet ./...
+      - run: go build ./...
+
   server-test:
     name: Server – Tests
     runs-on: ubuntu-latest
