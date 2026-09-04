@@ -1290,20 +1290,26 @@ func (r *RoomRepository) GetRoomEventsFiltered(p *RoomEventsFilterParams) ([]mod
 		args = append(args, searchTerm, searchTerm)
 	}
 
-	// Date range filters — parameterized
+	// Date range filters.
+	//
+	// Both bounds are bound as instants, not as bare YYYY-MM-DD strings. A bare
+	// date carries no offset, so PostgreSQL resolves it in the session's
+	// timezone and the whole window slides by that offset — east of UTC the
+	// upper bound lands before the end of the day being asked for, west of it
+	// the lower bound reaches back into the previous one. time.Parse with no
+	// zone yields UTC, so the filter means the UTC day on every server.
 	if p.DateFrom != "" {
-		if _, err := time.Parse("2006-01-02", p.DateFrom); err == nil {
+		if d, err := time.Parse("2006-01-02", p.DateFrom); err == nil {
 			conditions = append(conditions, "timestamp >= ?")
-			args = append(args, p.DateFrom)
+			args = append(args, d)
 		}
 	}
 	if p.DateTo != "" {
 		// Exclusive upper bound computed here rather than in SQL: date(x, '+1 day')
-		// is a SQLite builtin and errors out on Postgres. Bound as a plain date
-		// string, matching the DateFrom clause above.
+		// is a SQLite builtin and errors out on Postgres.
 		if d, err := time.Parse("2006-01-02", p.DateTo); err == nil {
 			conditions = append(conditions, "timestamp < ?")
-			args = append(args, d.AddDate(0, 0, 1).Format("2006-01-02"))
+			args = append(args, d.AddDate(0, 0, 1))
 		}
 	}
 

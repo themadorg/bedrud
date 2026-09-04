@@ -83,3 +83,26 @@ func Open(t *testing.T, cfg *gorm.Config) *gorm.DB {
 	})
 	return db
 }
+
+// OpenWith is Open with extra space-separated settings appended to the DSN.
+//
+// The one setting that matters so far is TimeZone: it pins the *session*
+// timezone, which is what PostgreSQL uses to resolve a date literal that
+// carries no offset. Tests covering that resolution have to pin it rather than
+// inherit whatever the local server is configured with, or they pass or fail by
+// the hour.
+//
+// It does not control how the driver renders a value on the way back — that
+// follows the local zone of the test process — so it is not a lever for
+// anything on the read path.
+//
+// An unset DSN is left untouched so Open still skips (or fails under
+// BEDRUD_TEST_POSTGRES_REQUIRED) rather than trying to dial a bare setting.
+func OpenWith(t *testing.T, cfg *gorm.Config, extraDSN string) *gorm.DB {
+	t.Helper()
+
+	if base := os.Getenv(DSNEnv); base != "" && extraDSN != "" {
+		t.Setenv(DSNEnv, base+" "+extraDSN)
+	}
+	return Open(t, cfg)
+}

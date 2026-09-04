@@ -252,3 +252,21 @@ The admin panel `PUT /api/admin/settings` updates the DB. Many handlers read `se
 ## External LiveKit Config
 
 Example at `server/config/livekit.yaml.example`. Set `livekit.configPath` or `LIVEKIT_CONFIG_PATH`. When `livekit.external: true`, the embedded server and `/livekit` proxy are skipped.
+
+---
+
+## Server timezone
+
+Run the server process in UTC, and set `TZ=UTC` explicitly rather than relying
+on a default. The Dockerfile sets no `TZ`, so the zone comes from whatever the
+base image supplies; Go falls back to UTC only when nothing does.
+
+Admin date filters are resolved as UTC days, so those are correct on any server.
+Storage is the part that still depends on the process zone: on SQLite the driver
+writes each timestamp with whatever offset the value carried, and the column is
+compared as text — so rows written under two different zones sort against each
+other by local wall time rather than by instant. A deployment that has always
+run in one zone is self-consistent; one whose `TZ` changes, or that moves
+between a local-zone host and a UTC one, is not.
+
+Postgres is unaffected: `timestamptz` stores an instant.
