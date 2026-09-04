@@ -141,8 +141,8 @@ jobs:
 
   # Windows is not a deployment target for the server, so this leg deliberately
   # stops at build and vet: no CGO, no database, nothing that needs MinGW. A
-  # full `go test` leg would — CGO_ENABLED=0 leaves go-sqlite3 a stub and 21
-  # packages fail on that alone.
+  # full `go test` leg would — with cgo off, go-sqlite3 is a stub and 10 of the
+  # 19 packages that have tests fail on that alone.
   #
   # What it buys is the class of break that only shows up here. embed_windows.go
   # embeds bin/livekit-server.exe while embed.go embeds bin/livekit-server, so a
@@ -153,6 +153,12 @@ jobs:
     needs: changes
     if: needs.changes.outputs.server == 'true'
     runs-on: windows-latest
+    # windows-latest ships a C compiler, so cgo would default on and `go vet`
+    # would build go-sqlite3's C amalgamation — 129s against 7s on ubuntu, for a
+    # job that never runs a test. The non-cgo path is a stub behind `!cgo`, which
+    # still compiles, so the embed check this job exists for is unaffected.
+    env:
+      CGO_ENABLED: "0"
     timeout-minutes: 20
     defaults:
       run:
@@ -429,7 +435,7 @@ jobs:
     # deriving it from `needs.*.result` meant a job added to this workflow but
     # not to this list left every listed result green, so the close step fired
     # and shut the tracker while master was red.
-    needs: [changes, server, server-test, web, devcli, ios, desktop, site]
+    needs: [changes, server, server-windows, server-test, web, devcli, ios, desktop, site]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
