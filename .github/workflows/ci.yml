@@ -149,10 +149,11 @@ jobs:
   # missing .exe placeholder fails the build on Windows and nowhere else — which
   # is exactly what the ubuntu-only job could not see.
   #
-  # It costs about 3 minutes against 25s for the ubuntu job. Most of that is a
-  # cold build cache — go mod download takes 24s here against 0s there, and the
-  # go build step right after vet takes 6s once the cache is warm — plus Windows
-  # compile overhead. Not cgo: pinning CGO_ENABLED=0 moved it by about 5%.
+  # Cost, measured on this workflow: 97s against 22s for the ubuntu job once
+  # setup-go's cache is warm — vet 33s against 4s. The first run on a new cache
+  # is much worse (go mod download 24s, vet 123s) because vet compiles the whole
+  # dependency graph from scratch. Not cgo: pinning CGO_ENABLED=0 moved the cold
+  # number by about 5%.
   server-windows:
     name: Server – Build & Vet (Windows)
     needs: changes
@@ -161,7 +162,7 @@ jobs:
     # Pinned rather than inherited: windows-latest ships a C compiler, so cgo
     # would otherwise default on and the job's dependency graph would depend on
     # what the runner image happens to include. This is for determinism, not
-    # speed — measured, it changes the vet step by about 5%. go-sqlite3's
+    # speed — measured, it changed the vet step by about 5%. go-sqlite3's
     # non-cgo path is a stub behind `!cgo`, which still compiles, so the embed
     # check this job exists for is unaffected either way.
     env:
