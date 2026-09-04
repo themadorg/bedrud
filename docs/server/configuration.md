@@ -261,12 +261,22 @@ Run the server process in UTC, and set `TZ=UTC` explicitly rather than relying
 on a default. The Dockerfile sets no `TZ`, so the zone comes from whatever the
 base image supplies; Go falls back to UTC only when nothing does.
 
-Admin date filters are resolved as UTC days, so those are correct on any server.
-Storage is the part that still depends on the process zone: on SQLite the driver
-writes each timestamp with whatever offset the value carried, and the column is
-compared as text — so rows written under two different zones sort against each
-other by local wall time rather than by instant. A deployment that has always
-run in one zone is self-consistent; one whose `TZ` changes, or that moves
-between a local-zone host and a UTC one, is not.
+It matters because the admin date filters mean different things on the two
+engines:
 
-Postgres is unaffected: `timestamptz` stores an instant.
+- **Postgres** — the bounds are bound as instants, so `?dateFrom=`/`?dateTo=`
+  select the UTC day whatever the server's session timezone is.
+- **SQLite** — the column is text and the comparison is lexicographic against a
+  string the driver wrote with whatever offset the value carried. The same
+  filter therefore selects the *writing process's local day*. An instant at
+  `2026-08-31T23:59Z` written by a UTC+3:30 process is stored
+  `2026-09-01 03:29:00+03:30` and falls outside a request for `2026-08-31`.
+
+So on SQLite the filter is only the UTC day while the process runs in UTC. The
+same textual comparison also means rows written under two different zones sort
+against each other by local wall time rather than by instant — a deployment
+that has always run in one zone is self-consistent, one whose `TZ` changes, or
+that moves between a local-zone host and a UTC one, is not.
+
+Normalising what gets written is tracked separately; until then, UTC is the
+setting that makes both correct.
