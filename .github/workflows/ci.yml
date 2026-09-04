@@ -149,11 +149,14 @@ jobs:
   # missing .exe placeholder fails the build on Windows and nowhere else — which
   # is exactly what the ubuntu-only job could not see.
   #
-  # Cost, measured on this workflow: 97s against 22s for the ubuntu job once
-  # setup-go's cache is warm — vet 33s against 4s. The first run on a new cache
-  # is much worse (go mod download 24s, vet 123s) because vet compiles the whole
-  # dependency graph from scratch. Not cgo: pinning CGO_ENABLED=0 moved the cold
-  # number by about 5%.
+  # Cost is dominated by setup-go's cache, not by this job's work, so no fixed
+  # figure is recorded here — it would age. The first run against a new cache
+  # spends minutes in `go vet` compiling the dependency graph from scratch;
+  # once warm it converges toward the ubuntu job. Observed on this branch:
+  # vet went 129s, 123s, 33s, 8s across four runs as the cache filled.
+  #
+  # Not cgo, which the CGO_ENABLED pin below was first assumed to explain:
+  # pinning it moved the cold number by about 5%, warming the cache by 94%.
   server-windows:
     name: Server – Build & Vet (Windows)
     needs: changes
@@ -162,9 +165,9 @@ jobs:
     # Pinned rather than inherited: windows-latest ships a C compiler, so cgo
     # would otherwise default on and the job's dependency graph would depend on
     # what the runner image happens to include. This is for determinism, not
-    # speed — measured, it changed the vet step by about 5%. go-sqlite3's
-    # non-cgo path is a stub behind `!cgo`, which still compiles, so the embed
-    # check this job exists for is unaffected either way.
+    # speed; see the cost note above. go-sqlite3's non-cgo path is a stub behind
+    # `!cgo`, which still compiles, so the embed check this job exists for is
+    # unaffected either way.
     env:
       CGO_ENABLED: "0"
     timeout-minutes: 20
