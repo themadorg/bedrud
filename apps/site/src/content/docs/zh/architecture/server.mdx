@@ -73,11 +73,11 @@ The server follows a layered architecture:
 
 ```mermaid
 flowchart TB
-    HTTP[HTTP Request] */} Middleware
-    Middleware["Middleware<br/>JWT validation, CORS, logging"] */} Handlers
-    Handlers["Handlers<br/>Parse requests, call services, format responses"] */} Services
-    Services["Services<br/>Business logic (auth, room management)"] */} Repository
-    Repository["Repository<br/>Database queries via GORM"] */} Database
+    HTTP[HTTP Request] --> Middleware
+    Middleware["Middleware<br/>JWT validation, CORS, logging"] --> Handlers
+    Handlers["Handlers<br/>Parse requests, call services, format responses"] --> Services
+    Services["Services<br/>Business logic (auth, room management)"] --> Repository
+    Repository["Repository<br/>Database queries via GORM"] --> Database
     Database["Database<br/>SQLite (dev) or PostgreSQL (production)"]
 ```
 
