@@ -14,6 +14,20 @@ updates:
         patterns:
           - "*"
     open-pull-requests-limit: 5
+    # gorm.io/driver/postgres 1.6.1 rewrote Migrator.DropIndex to qualify the
+    # index with the current schema, and the default schema is the expression
+    # CURRENT_SCHEMA(), so it emits DROP INDEX CURRENT_SCHEMA()."idx_rooms_name"
+    # — rejected as a syntax error, SQLSTATE 42601, on PostgreSQL 15.19.
+    # RunMigrations drops that index through the same call, so it is the upgrade
+    # path that breaks, not only its test. HasIndex is unaffected: it binds the
+    # schema as a parameter rather than splicing it in as an identifier.
+    #
+    # Only the two broken releases are held. A later one is proposed as usual,
+    # and TestRunMigrations_ReplacesLegacyUniqueRoomNameIndex fails on it if the
+    # regression is still there.
+    ignore:
+      - dependency-name: "gorm.io/driver/postgres"
+        versions: ["1.6.1", "1.6.2"]
 
   # Web frontend (npm/bun)
   - package-ecosystem: "npm"
