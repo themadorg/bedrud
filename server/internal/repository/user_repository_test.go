@@ -471,10 +471,11 @@ func TestUserRepository_CountUsersByDay(t *testing.T) {
 	db.Model(&models.User{}).Where("id = ?", "cud-2").Update("created_at", day0)
 	db.Model(&models.User{}).Where("id = ?", "cud-3").Update("created_at", day1)
 
-	counts, err := repo.CountUsersByDay(7)
+	series, err := repo.CountUsersByDay(7)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	counts := series.Days
 	if len(counts) != 7 {
 		t.Fatalf("expected 7 days, got %d", len(counts))
 	}

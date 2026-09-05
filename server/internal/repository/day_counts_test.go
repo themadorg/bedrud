@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 	"testing"
@@ -69,7 +70,7 @@ func TestDayCounts_SeriesCoversUTCDaysEndingToday(t *testing.T) {
 
 	series := []struct {
 		name  string
-		fetch func(int) ([]models.DayCount, error)
+		fetch func(int) (models.DaySeries, error)
 	}{
 		{"rooms created", roomRepo.CountRoomsByDay},
 		{"active participants", roomRepo.CountActiveParticipantsByDay},
@@ -80,10 +81,11 @@ func TestDayCounts_SeriesCoversUTCDaysEndingToday(t *testing.T) {
 	want := wantDayKeys(7)
 	for _, s := range series {
 		t.Run(s.name, func(t *testing.T) {
-			counts, err := s.fetch(7)
+			got, err := s.fetch(7)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+			counts := got.Days
 			if len(counts) != len(want) {
 				t.Fatalf("expected %d days, got %d", len(want), len(counts))
 			}
@@ -151,10 +153,11 @@ func TestDayCounts_FirstBucketKeepsRowsStoredWestOfUTC(t *testing.T) {
 			"if writes have been normalised to UTC (#126) this test needs rewriting", stored, bound)
 	}
 
-	counts, err := repo.CountRoomsByDay(7)
+	series, err := repo.CountRoomsByDay(7)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	counts := series.Days
 	if len(counts) != 7 {
 		t.Fatalf("expected 7 days, got %d", len(counts))
 	}
@@ -273,10 +276,11 @@ func TestDayCounts_OneUnreadableRowDoesNotSinkTheSeries(t *testing.T) {
 		t.Fatalf("premise gone: the corrupt row reads back as %q", stored)
 	}
 
-	counts, err := repo.CountRoomsByDay(7)
+	series, err := repo.CountRoomsByDay(7)
 	if err != nil {
 		t.Fatalf("one unreadable row took down the whole series: %v", err)
 	}
+	counts := series.Days
 	if len(counts) != 7 {
 		t.Fatalf("expected 7 days, got %d", len(counts))
 	}
@@ -290,19 +294,26 @@ func TestDayCounts_OneUnreadableRowDoesNotSinkTheSeries(t *testing.T) {
 	}
 }
 
-// TestParseDayCounts_SkipsTheUnreadableAndRejectsTheUnexpected states the
-// distinction on its own, without a database in the way.
-func TestParseDayCounts_SkipsTheUnreadableAndRejectsTheUnexpected(t *testing.T) {
-	t.Run("empty day is one unreadable bucket", func(t *testing.T) {
-		got, err := parseDayCounts([]dayCountRow{
-			{Date: "2026-09-01", Count: 2},
-			{Date: "", Count: 3},
-		})
+// TestParseDayCounts_TellsAMissingDayFromAMalformedOne states the distinction
+// on its own, without a database in the way — including the case a database
+// cannot currently produce, which is the reason the scan type is nullable
+// rather than a plain string.
+func TestParseDayCounts_TellsAMissingDayFromAMalformedOne(t *testing.T) {
+	day := func(s string) sql.NullString { return sql.NullString{String: s, Valid: true} }
+
+	t.Run("a NULL day is one unreadable bucket", func(t *testing.T) {
+		got, unbucketed, err := parseDayCounts([]dayCountRow{
+			{Date: day("2026-09-01"), Count: 2},
+			{Date: sql.NullString{}, Count: 3},
+		}, "rooms.created_at")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if len(got) != 1 || got[0].Count != 2 || dayKey(got[0].Date) != "2026-09-01" {
 			t.Fatalf("expected only 2026-09-01=2, got %s", keysOf(got))
+		}
+		if unbucketed != 3 {
+			t.Fatalf("expected the dropped bucket to be reported as 3, got %d", unbucketed)
 		}
 	})
 
@@ -310,12 +321,24 @@ func TestParseDayCounts_SkipsTheUnreadableAndRejectsTheUnexpected(t *testing.T) 
 	// the shape Postgres hands back for a bare date, and every bucket in the
 	// series would carry it.
 	t.Run("a day that is not a day is a broken query", func(t *testing.T) {
-		_, err := parseDayCounts([]dayCountRow{{Date: "2026-09-01T00:00:00Z", Count: 1}})
+		_, _, err := parseDayCounts([]dayCountRow{{Date: day("2026-09-01T00:00:00Z"), Count: 1}}, "rooms.created_at")
 		if err == nil {
 			t.Fatal("expected an error for a bucket that is not a plain day")
 		}
 		if !strings.Contains(err.Error(), "2026-09-01T00:00:00Z") {
 			t.Fatalf("error does not name the value it rejected: %v", err)
+		}
+	})
+
+	// The case that separates a nullable scan from a string one. No dialect in
+	// use answers an empty string today, but one that did would be rendering
+	// nothing for every bucket in the series — a broken query, not unreadable
+	// data — and reading the empty string as "missing" would file it under the
+	// branch that drops rows and carries on.
+	t.Run("an empty day is malformed, not missing", func(t *testing.T) {
+		_, _, err := parseDayCounts([]dayCountRow{{Date: day(""), Count: 1}}, "rooms.created_at")
+		if err == nil {
+			t.Fatal("expected an error for a bucket that came back as an empty day")
 		}
 	})
 }

@@ -51,10 +51,11 @@ func TestPostgres_DayCounts_BucketByUTCDayNotSessionZone(t *testing.T) {
 			seedPostgresDayCounts(t, repo, db, early, late)
 
 			t.Run("rooms created", func(t *testing.T) {
-				counts, err := repo.CountRoomsByDay(7)
+				series, err := repo.CountRoomsByDay(7)
 				if err != nil {
 					t.Fatalf("session %s: %v", tz, err)
 				}
+				counts := series.Days
 				assertDayCounts(t, counts, map[string]int{
 					dayKey(early): 1,
 					dayKey(late):  1,
@@ -62,10 +63,11 @@ func TestPostgres_DayCounts_BucketByUTCDayNotSessionZone(t *testing.T) {
 			})
 
 			t.Run("active participants", func(t *testing.T) {
-				counts, err := repo.CountActiveParticipantsByDay(7)
+				series, err := repo.CountActiveParticipantsByDay(7)
 				if err != nil {
 					t.Fatalf("session %s: %v", tz, err)
 				}
+				counts := series.Days
 				// Two distinct users joined on the early day, one on the late.
 				assertDayCounts(t, counts, map[string]int{
 					dayKey(early): 2,
@@ -177,10 +179,11 @@ func TestPostgres_DayCounts_SurviveANonISODateStyle(t *testing.T) {
 		t.Fatalf("premise gone: the session reports DateStyle %q, so this test is no longer about anything", style)
 	}
 
-	counts, err := repo.CountRoomsByDay(7)
+	series, err := repo.CountRoomsByDay(7)
 	if err != nil {
 		t.Fatalf("DateStyle %s: %v", style, err)
 	}
+	counts := series.Days
 	assertDayCounts(t, counts, map[string]int{
 		dayKey(early): 1,
 		dayKey(late):  1,

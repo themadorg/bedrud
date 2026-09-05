@@ -1846,10 +1846,11 @@ func TestRoomRepository_CountRoomsByDay(t *testing.T) {
 	db.Model(room2).Update("created_at", day0)
 	db.Model(room3).Update("created_at", day1)
 
-	counts, err := repo.CountRoomsByDay(7)
+	series, err := repo.CountRoomsByDay(7)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	counts := series.Days
 	if len(counts) != 7 {
 		t.Fatalf("expected 7 days, got %d", len(counts))
 	}
@@ -1878,10 +1879,11 @@ func TestRoomRepository_CountRoomsByDay_Empty(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := NewRoomRepository(db)
 
-	counts, err := repo.CountRoomsByDay(7)
+	series, err := repo.CountRoomsByDay(7)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	counts := series.Days
 	if len(counts) != 7 {
 		t.Fatalf("expected 7 days, got %d", len(counts))
 	}
@@ -1910,10 +1912,11 @@ func TestRoomRepository_CountActiveParticipantsByDay(t *testing.T) {
 	db.Model(&models.RoomParticipant{}).Where("user_id = ?", "cap-u1").Update("joined_at", day0)
 	db.Model(&models.RoomParticipant{}).Where("user_id = ?", "cap-u2").Update("joined_at", day1)
 
-	counts, err := repo.CountActiveParticipantsByDay(7)
+	series, err := repo.CountActiveParticipantsByDay(7)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	counts := series.Days
 	if len(counts) != 7 {
 		t.Fatalf("expected 7 days, got %d", len(counts))
 	}
@@ -2097,10 +2100,11 @@ func TestRoomRepository_CountActiveRoomsByDay(t *testing.T) {
 	db.Model(&models.RoomParticipant{}).Where("user_id = ?", "card-u1").Update("joined_at", day0)
 	db.Model(&models.RoomParticipant{}).Where("user_id = ?", "card-u2").Update("joined_at", day1)
 
-	counts, err := repo.CountActiveRoomsByDay(7)
+	series, err := repo.CountActiveRoomsByDay(7)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	counts := series.Days
 	if len(counts) != 7 {
 		t.Fatalf("expected 7 days, got %d", len(counts))
 	}
@@ -2130,10 +2134,11 @@ func TestRoomRepository_CountActiveRoomsByDay_Empty(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := NewRoomRepository(db)
 
-	counts, err := repo.CountActiveRoomsByDay(7)
+	series, err := repo.CountActiveRoomsByDay(7)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	counts := series.Days
 	if len(counts) != 7 {
 		t.Fatalf("expected 7 days, got %d", len(counts))
 	}

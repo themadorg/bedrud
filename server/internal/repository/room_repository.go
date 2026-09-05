@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -1147,7 +1148,7 @@ func (r *RoomRepository) CountPersistentRooms() (int64, error) {
 
 // CountActiveRoomsByDay returns distinct active room counts per day for last N days.
 // Counts rooms that had at least one active participant join on that day.
-func (r *RoomRepository) CountActiveRoomsByDay(days int) ([]models.DayCount, error) {
+func (r *RoomRepository) CountActiveRoomsByDay(days int) (models.DaySeries, error) {
 	start := dayWindowStart(time.Now(), days)
 	dayExpr := utcDayExpr(r.db, "joined_at")
 	var rows []dayCountRow
@@ -1159,17 +1160,13 @@ func (r *RoomRepository) CountActiveRoomsByDay(days int) ([]models.DayCount, err
 		Order("date ASC").
 		Scan(&rows).Error
 	if err != nil {
-		return nil, err
+		return models.DaySeries{}, err
 	}
-	results, err := parseDayCounts(rows)
-	if err != nil {
-		return nil, err
-	}
-	return fillMissingDays(results, days, start), nil
+	return buildDaySeries(rows, days, start, "room_participants.joined_at")
 }
 
 // CountRoomsByDay returns room creation counts grouped by day for the last N days.
-func (r *RoomRepository) CountRoomsByDay(days int) ([]models.DayCount, error) {
+func (r *RoomRepository) CountRoomsByDay(days int) (models.DaySeries, error) {
 	start := dayWindowStart(time.Now(), days)
 	dayExpr := utcDayExpr(r.db, "created_at")
 	var rows []dayCountRow
@@ -1180,17 +1177,13 @@ func (r *RoomRepository) CountRoomsByDay(days int) ([]models.DayCount, error) {
 		Order("date ASC").
 		Scan(&rows).Error
 	if err != nil {
-		return nil, err
+		return models.DaySeries{}, err
 	}
-	results, err := parseDayCounts(rows)
-	if err != nil {
-		return nil, err
-	}
-	return fillMissingDays(results, days, start), nil
+	return buildDaySeries(rows, days, start, "rooms.created_at")
 }
 
 // CountActiveParticipantsByDay returns distinct active participant counts per day for last N days.
-func (r *RoomRepository) CountActiveParticipantsByDay(days int) ([]models.DayCount, error) {
+func (r *RoomRepository) CountActiveParticipantsByDay(days int) (models.DaySeries, error) {
 	start := dayWindowStart(time.Now(), days)
 	dayExpr := utcDayExpr(r.db, "joined_at")
 	var rows []dayCountRow
@@ -1202,20 +1195,33 @@ func (r *RoomRepository) CountActiveParticipantsByDay(days int) ([]models.DayCou
 		Order("date ASC").
 		Scan(&rows).Error
 	if err != nil {
-		return nil, err
+		return models.DaySeries{}, err
 	}
-	results, err := parseDayCounts(rows)
-	if err != nil {
-		return nil, err
-	}
-	return fillMissingDays(results, days, start), nil
+	return buildDaySeries(rows, days, start, "room_participants.joined_at")
 }
 
-// dayCountRow is one bucket as the daily-count queries scan it: a day rendered
-// as text, and its count.
+// dayCountRow is one bucket as the daily-count queries scan it.
+//
+// Date is nullable because SQLite's DATE() answers NULL for a value it cannot
+// read as a date, and that is a different thing from a day arriving in an
+// unexpected shape — see parseDayCounts. Scanned as a plain string, the two
+// would merge into the empty string.
 type dayCountRow struct {
-	Date  string
+	Date  sql.NullString
 	Count int
+}
+
+// buildDaySeries turns scanned buckets into the zero-filled series plus the
+// count of what could not be placed on it. source names the column, for the log.
+func buildDaySeries(rows []dayCountRow, days int, start time.Time, source string) (models.DaySeries, error) {
+	results, unbucketed, err := parseDayCounts(rows, source)
+	if err != nil {
+		return models.DaySeries{}, err
+	}
+	return models.DaySeries{
+		Days:       fillMissingDays(results, days, start),
+		Unbucketed: unbucketed,
+	}, nil
 }
 
 // dayWindowStart returns the UTC midnight that opens a days-long window ending
@@ -1278,41 +1284,56 @@ func utcDayExpr(db *gorm.DB, col string) string {
 	return "DATE(" + col + ")"
 }
 
-// parseDayCounts turns scanned buckets into the series' own type.
+// parseDayCounts turns scanned buckets into the series' own type, and reports
+// what it could not place.
 //
-// Two things can go wrong here and they are not the same. A bucket that comes
-// back empty is SQLite's DATE() answering NULL for a value it could not read as
-// a date, which GORM scans into the zero string: one bucket's worth of
-// unreadable rows, with the rest of the window still answerable. It is dropped
-// and logged rather than raised — a single hand-edited timestamp should not
-// take the whole dashboard down.
+// Two things can go wrong here and they are not the same. A NULL day is
+// SQLite's DATE() reporting that it could not read that value: one bucket's
+// worth of rows, with the rest of the window still answerable. It is dropped
+// and logged, and its aggregate is handed back so the caller can say the series
+// is incomplete — one hand-edited timestamp should not take the whole dashboard
+// down, and it should not pass for a quiet week either.
 //
-// A bucket that arrives non-empty and still will not parse is the other case:
-// the query rendering something other than a day on this dialect, which affects
-// every bucket in the series and is a property of the SQL, not of the data.
-// Dropping that quietly is what let the Postgres charts read zero for every day
-// of the window without a single failing test or logged line.
-func parseDayCounts(rows []dayCountRow) ([]models.DayCount, error) {
+// A day that arrives non-NULL and still will not parse is the other case: the
+// query rendering something other than a day on this dialect, which affects
+// every bucket in the series and is a property of the SQL rather than of the
+// data. Dropping that quietly is what let the Postgres charts read zero for
+// every day of the window without a single failing test or logged line. The
+// empty string belongs to this case, not the first: a dialect that ever
+// answered "" for a broken query would otherwise be filed as unreadable data
+// and vanish.
+//
+// Neither branch can see the third failure. A value that is readable but was
+// written with no offset by a process outside UTC buckets into the wrong
+// column with no NULL and no error: DATE('2026-09-04 02:00:00') is 2026-09-04
+// even when the instant is 2026-09-03 22:30Z. Read-time handling gives the two
+// engines the same diagnosis, never the same guarantee — the guarantee lives at
+// the storage boundary, which is #126.
+func parseDayCounts(rows []dayCountRow, source string) ([]models.DayCount, int, error) {
 	results := make([]models.DayCount, 0, len(rows))
+	unbucketed := 0
 	for _, row := range rows {
-		if row.Date == "" {
-			log.Warn().Int("rows", row.Count).
-				Msg("Daily counts: dropping rows whose timestamp the database could not read as a date")
+		if !row.Date.Valid {
+			log.Warn().Str("column", source).Int("aggregate", row.Count).
+				Msg("Daily counts: dropping a bucket whose timestamps the database could not read as dates")
+			unbucketed += row.Count
 			continue
 		}
-		day, err := time.Parse("2006-01-02", row.Date)
+		day, err := time.Parse("2006-01-02", row.Date.String)
 		if err != nil {
-			return nil, fmt.Errorf("unparseable day bucket %q: %w", row.Date, err)
+			return nil, 0, fmt.Errorf("unparseable day bucket %q from %s: %w", row.Date.String, source, err)
 		}
 		results = append(results, models.DayCount{Date: day, Count: row.Count})
 	}
-	return results, nil
+	return results, unbucketed, nil
 }
 
 // fillMissingDays ensures every day in the window has an entry (zero-fill gaps).
 //
 // start comes from dayWindowStart, so the emitted Date and the lookup key are
-// both UTC calendar days — the key space the SQL buckets already use.
+// both UTC calendar days — the key space the SQL buckets already use. The order
+// the buckets arrive in does not matter: they are looked up by key, which is
+// also why a NULL bucket sorting to the front on SQLite is harmless here.
 func fillMissingDays(results []models.DayCount, days int, start time.Time) []models.DayCount {
 	found := make(map[string]int)
 	for _, r := range results {

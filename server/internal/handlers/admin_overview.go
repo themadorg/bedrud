@@ -116,9 +116,9 @@ func (h *AdminOverviewHandler) GetOverview(c *fiber.Ctx) error {
 		queuePending    int64
 		events          []models.RoomEvent
 		recentUsers     []models.User
-		activityDays    []models.DayCount
-		participantDays []models.DayCount
-		activeRoomDays  []models.DayCount
+		activityDays    models.DaySeries
+		participantDays models.DaySeries
+		activeRoomDays  models.DaySeries
 	}
 
 	var data overviewData
@@ -293,7 +293,13 @@ func (h *AdminOverviewHandler) GetOverview(c *fiber.Ctx) error {
 
 	health := h.buildHealth(lkErr)
 	kpis := h.buildKPIs(data.totalUsers, data.usersWeek, onlineNow, liveKitPublishers, data.totalRooms, data.activeRooms, data.queuePending)
-	trend := h.buildActivityTrend(data.activityDays, data.participantDays, data.activeRoomDays)
+	trend := h.buildActivityTrend(data.activityDays.Days, data.participantDays.Days, data.activeRoomDays.Days)
+	// The three series aggregate different things over two tables, so their
+	// Unbucketed values do not add up to a row count worth publishing. What the
+	// operator needs is whether any of them had to drop something.
+	chartsIncomplete := data.activityDays.Unbucketed > 0 ||
+		data.participantDays.Unbucketed > 0 ||
+		data.activeRoomDays.Unbucketed > 0
 	comp := models.RoomComposition{
 		Live:       int(data.activeRooms),
 		Public:     int(data.publicRooms),
@@ -307,7 +313,7 @@ func (h *AdminOverviewHandler) GetOverview(c *fiber.Ctx) error {
 		KPIs:            kpis,
 		ActivityTrend:   trend,
 		RoomComposition: comp,
-		NeedsAttention:  h.buildNeedsAttention(data.staleRooms),
+		NeedsAttention:  h.buildNeedsAttention(data.staleRooms, chartsIncomplete),
 		RecentSignups:   h.buildRecentSignups(data.recentUsers),
 		RecentEvents:    data.events,
 		InstanceInfo:    h.buildInstanceInfo(),
@@ -464,7 +470,7 @@ func (h *AdminOverviewHandler) buildActivityTrend(roomDays, participantDays, act
 	return trend
 }
 
-func (h *AdminOverviewHandler) buildNeedsAttention(staleRooms int64) []models.AttentionItem {
+func (h *AdminOverviewHandler) buildNeedsAttention(staleRooms int64, chartsIncomplete bool) []models.AttentionItem {
 	var items []models.AttentionItem
 
 	settings, err := h.settingsRepo.GetEffectiveSettings()
@@ -493,6 +499,18 @@ func (h *AdminOverviewHandler) buildNeedsAttention(staleRooms int64) []models.At
 			Type:     "stale_room",
 			Severity: "info",
 			Message:  msg,
+		})
+	}
+
+	// Rows the database could not read as dates are missing from the charts
+	// above. Saying so here is the difference between an incomplete week and a
+	// quiet one, which the chart alone cannot show; the counts and the column
+	// they came from are in the log.
+	if chartsIncomplete {
+		items = append(items, models.AttentionItem{
+			Type:     "unreadable_timestamps",
+			Severity: "warning",
+			Message:  "Activity charts are incomplete: some timestamps cannot be read as dates",
 		})
 	}
 
