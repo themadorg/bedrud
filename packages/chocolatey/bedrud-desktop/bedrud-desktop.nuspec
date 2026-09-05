@@ -7,7 +7,7 @@
     <authors>Bedrud</authors>
     <projectUrl>https://bedrud.org</projectUrl>
     <iconUrl>https://raw.githubusercontent.com/themadorg/bedrud/main/apps/web/public/logo512.png</iconUrl>
-    <licenseUrl>https://github.com/themadorg/bedrud/blob/main/LICENSE</licenseUrl>
+    <licenseUrl>https://github.com/themadorg/bedrud/blob/master/LICENSE</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <projectSourceUrl>https://github.com/themadorg/bedrud</projectSourceUrl>
     <bugTrackerUrl>https://github.com/themadorg/bedrud/issues</bugTrackerUrl>
