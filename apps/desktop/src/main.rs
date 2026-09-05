@@ -19,7 +19,15 @@ fn main() -> anyhow::Result<()> {
     env_logger::init();
     log::info!("[main] starting bedrud-desktop");
 
-    if let Err(e) = keyring::use_native_store(true) {
+    // keyring 4.1 moved use_native_store() behind the `cli` feature, which
+    // links every backend that CLI can name. The default `v1` feature installs
+    // the same three platform stores into keyring_core's global default —
+    // Keychain on macOS, Credential Manager on Windows, Secret Service on the
+    // *nix variants, which is what prefer_secret_service asked for here — and
+    // store_status() forces that one-time initialization and reports how it
+    // went without creating an entry. auth::session reads that same global
+    // through keyring_core::Entry.
+    if let Err(e) = keyring::Entry::store_status() {
         log::warn!("[main] failed to initialize native keyring store: {}; session persistence disabled", e);
     }
 
