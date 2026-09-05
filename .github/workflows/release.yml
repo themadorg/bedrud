@@ -230,7 +230,7 @@ jobs:
     timeout-minutes: 45
     needs: server-binary
     steps:
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
@@ -313,7 +313,7 @@ jobs:
     timeout-minutes: 45
     needs: server-binary
     steps:
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
@@ -398,7 +398,7 @@ jobs:
     timeout-minutes: 45
     needs: server-binary
     steps:
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
@@ -1196,7 +1196,7 @@ jobs:
           sed -i "s/sha256sums_aarch64 = .*/sha256sums_aarch64 = ${ARM_SHA}/" packages/aur/.SRCINFO
 
       - name: Push to AUR
-        uses: KSXGitHub/github-actions-deploy-aur@a97f56a8425a7a7f3b8c58607f769c69b089cadb # v3
+        uses: KSXGitHub/github-actions-deploy-aur@084b0d9b15415bf9cdb65d44dad1efe37a354050 # v3
         with:
           pkgname: bedrud-desktop-bin
           pkgbuild: packages/aur/PKGBUILD
@@ -1239,7 +1239,7 @@ jobs:
           sed -i "s|source_aarch64 = .*tar.xz.*|source_aarch64 = bedrud-bin-${PKGVER}-aarch64.tar.xz::${ARM_URL}|" packages/aur/bedrud-server/.SRCINFO
 
       - name: Push to AUR
-        uses: KSXGitHub/github-actions-deploy-aur@a97f56a8425a7a7f3b8c58607f769c69b089cadb # v3
+        uses: KSXGitHub/github-actions-deploy-aur@084b0d9b15415bf9cdb65d44dad1efe37a354050 # v3
         with:
           pkgname: bedrud-bin
           pkgbuild: packages/aur/bedrud-server/PKGBUILD
