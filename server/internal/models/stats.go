@@ -8,6 +8,20 @@ type DayCount struct {
 	Count int       `json:"count"`
 }
 
+// DaySeries is a zero-filled daily series together with what the query could
+// not place on it.
+//
+// Unbucketed is the aggregate the series produced for rows whose timestamp the
+// database could not read as a date — rows for a COUNT(*) series, distinct
+// rooms or users for the COUNT(DISTINCT …) ones, so it is a signal that the
+// series is incomplete rather than a row count to publish. It is always zero on
+// PostgreSQL, where the column type makes an unreadable timestamp
+// unrepresentable; on SQLite the column is text and carries no such guarantee.
+type DaySeries struct {
+	Days       []DayCount
+	Unbucketed int
+}
+
 // RoomEvent represents a recent room activity event.
 type RoomEvent struct {
 	Type      string    `json:"type"` // room_created, room_joined
@@ -66,7 +80,7 @@ type RoomComposition struct {
 
 // AttentionItem represents something needing operator review.
 type AttentionItem struct {
-	Type     string `json:"type"`     // tls_expiry, stale_room, empty_room, auth_spike
+	Type     string `json:"type"`     // tls_expiry, stale_room, empty_room, auth_spike, unreadable_timestamps
 	Severity string `json:"severity"` // error, warning, info
 	Message  string `json:"message"`
 	DaysLeft int    `json:"daysLeft,omitempty"`

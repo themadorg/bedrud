@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -1147,84 +1148,193 @@ func (r *RoomRepository) CountPersistentRooms() (int64, error) {
 
 // CountActiveRoomsByDay returns distinct active room counts per day for last N days.
 // Counts rooms that had at least one active participant join on that day.
-func (r *RoomRepository) CountActiveRoomsByDay(days int) ([]models.DayCount, error) {
-	cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
-	type dateRow struct {
-		Date  string
-		Count int
-	}
-	var rows []dateRow
+func (r *RoomRepository) CountActiveRoomsByDay(days int) (models.DaySeries, error) {
+	start := dayWindowStart(time.Now(), days)
+	dayExpr := utcDayExpr(r.db, "joined_at")
+	var rows []dayCountRow
 	err := r.db.Model(&models.RoomParticipant{}).
-		Select("DATE(joined_at) as date, COUNT(DISTINCT room_id) as count").
-		Where("joined_at >= ?", cutoff).
+		Select(dayExpr+" as date, COUNT(DISTINCT room_id) as count").
+		Where("joined_at >= ?", dayQueryFloor(start)).
 		Where("is_active = ?", true).
-		Group("DATE(joined_at)").
+		Group(dayExpr).
 		Order("date ASC").
 		Scan(&rows).Error
 	if err != nil {
-		return nil, err
+		return models.DaySeries{}, err
 	}
-	results := make([]models.DayCount, len(rows))
-	for i, r := range rows {
-		t, _ := time.Parse("2006-01-02", r.Date)
-		results[i] = models.DayCount{Date: t, Count: r.Count}
-	}
-	return fillMissingDays(results, days, cutoff), nil
+	return buildDaySeries(rows, days, start, "room_participants.joined_at")
 }
 
 // CountRoomsByDay returns room creation counts grouped by day for the last N days.
-func (r *RoomRepository) CountRoomsByDay(days int) ([]models.DayCount, error) {
-	cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
-	type dateRow struct {
-		Date  string
-		Count int
-	}
-	var rows []dateRow
+func (r *RoomRepository) CountRoomsByDay(days int) (models.DaySeries, error) {
+	start := dayWindowStart(time.Now(), days)
+	dayExpr := utcDayExpr(r.db, "created_at")
+	var rows []dayCountRow
 	err := r.db.Model(&models.Room{}).
-		Select("DATE(created_at) as date, COUNT(*) as count").
-		Where("created_at >= ?", cutoff).
-		Group("DATE(created_at)").
+		Select(dayExpr+" as date, COUNT(*) as count").
+		Where("created_at >= ?", dayQueryFloor(start)).
+		Group(dayExpr).
 		Order("date ASC").
 		Scan(&rows).Error
 	if err != nil {
-		return nil, err
+		return models.DaySeries{}, err
 	}
-	results := make([]models.DayCount, len(rows))
-	for i, r := range rows {
-		t, _ := time.Parse("2006-01-02", r.Date)
-		results[i] = models.DayCount{Date: t, Count: r.Count}
-	}
-	return fillMissingDays(results, days, cutoff), nil
+	return buildDaySeries(rows, days, start, "rooms.created_at")
 }
 
 // CountActiveParticipantsByDay returns distinct active participant counts per day for last N days.
-func (r *RoomRepository) CountActiveParticipantsByDay(days int) ([]models.DayCount, error) {
-	cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
-	type dateRow struct {
-		Date  string
-		Count int
-	}
-	var rows []dateRow
+func (r *RoomRepository) CountActiveParticipantsByDay(days int) (models.DaySeries, error) {
+	start := dayWindowStart(time.Now(), days)
+	dayExpr := utcDayExpr(r.db, "joined_at")
+	var rows []dayCountRow
 	err := r.db.Model(&models.RoomParticipant{}).
-		Select("DATE(joined_at) as date, COUNT(DISTINCT user_id) as count").
-		Where("joined_at >= ?", cutoff).
+		Select(dayExpr+" as date, COUNT(DISTINCT user_id) as count").
+		Where("joined_at >= ?", dayQueryFloor(start)).
 		Where("is_active = ?", true).
-		Group("DATE(joined_at)").
+		Group(dayExpr).
 		Order("date ASC").
 		Scan(&rows).Error
 	if err != nil {
-		return nil, err
+		return models.DaySeries{}, err
 	}
-	results := make([]models.DayCount, len(rows))
-	for i, r := range rows {
-		t, _ := time.Parse("2006-01-02", r.Date)
-		results[i] = models.DayCount{Date: t, Count: r.Count}
-	}
-	return fillMissingDays(results, days, cutoff), nil
+	return buildDaySeries(rows, days, start, "room_participants.joined_at")
 }
 
-// fillMissingDays ensures every day in the range has an entry (zero-fill gaps).
-func fillMissingDays(results []models.DayCount, days int, cutoff time.Time) []models.DayCount {
+// dayCountRow is one bucket as the daily-count queries scan it.
+//
+// Date is nullable because SQLite's DATE() answers NULL for a value it cannot
+// read as a date, and that is a different thing from a day arriving in an
+// unexpected shape — see parseDayCounts. Scanned as a plain string, the two
+// would merge into the empty string.
+type dayCountRow struct {
+	Date  sql.NullString
+	Count int
+}
+
+// buildDaySeries turns scanned buckets into the zero-filled series plus the
+// count of what could not be placed on it. source names the column, for the log.
+func buildDaySeries(rows []dayCountRow, days int, start time.Time, source string) (models.DaySeries, error) {
+	results, unbucketed, err := parseDayCounts(rows, source)
+	if err != nil {
+		return models.DaySeries{}, err
+	}
+	return models.DaySeries{
+		Days:       fillMissingDays(results, days, start),
+		Unbucketed: unbucketed,
+	}, nil
+}
+
+// dayWindowStart returns the UTC midnight that opens a days-long window ending
+// on the UTC day that contains now.
+//
+// The buckets this window is matched against are UTC calendar days — see
+// utcDayExpr — so the axis has to be UTC as well. Built from a local time.Time,
+// as it was, the two key spaces come apart by a whole day whenever the process
+// calendar disagrees with UTC: west of UTC, between 00:00Z and the offset,
+// every lookup misses and every count reads zero.
+//
+// The window ends today. It used to run [now-days*24h, now-24h], so rows
+// created today were counted by the query and then dropped by the zero-fill,
+// and the last column of a "last 7 days" chart was always yesterday.
+func dayWindowStart(now time.Time, days int) time.Time {
+	utc := now.UTC()
+	return time.Date(utc.Year(), utc.Month(), utc.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, -(days - 1))
+}
+
+// dayQueryFloor is the lower bound the daily-count queries filter on: one day
+// below the window they display.
+//
+// The bound goes to the driver as an instant, but on SQLite the column is text
+// and the comparison is lexicographic against whatever offset the writing
+// process carried (#126). A row at 01:00Z written four hours west is stored as
+// the previous day's 21:00 and sorts below a bound placed at the window's own
+// start, even though DATE() buckets it into the first day being displayed. No
+// zone sits further from UTC than 14 hours, so a day of slack covers every
+// deployment, and the extra rows cost nothing: the fill reads only the days it
+// emits, so anything outside the window is dropped.
+func dayQueryFloor(start time.Time) time.Time {
+	return start.AddDate(0, 0, -1)
+}
+
+// utcDayExpr renders col as the UTC calendar date it falls on, written
+// YYYY-MM-DD.
+//
+// The two dialects need different SQL for the same thing, and differ again in
+// what they hand back. SQLite's DATE() normalises an offset-bearing value to
+// UTC, never consults a session zone (measured on 3.46.1:
+// DATE('2026-09-03 20:19:00-04:00') is 2026-09-04 under TZ=UTC and
+// TZ=America/New_York alike), and returns exactly that text.
+//
+// PostgreSQL needs both halves stated. DATE(timestamptz) resolves in the
+// session's zone, so on 15.19 the instant 2026-09-04 00:19Z buckets as
+// 2026-09-03 with the session on America/New_York and as 2026-09-04 with it on
+// UTC — the same row in different columns on two servers that differ only in
+// configuration. And a date reaching a Go string is rendered by the session's
+// DateStyle: the default ISO gives "2026-09-01", but a database carrying
+// ALTER DATABASE … SET DateStyle = 'German, DMY' gives "01.09.2026", and the
+// driver passes that through rather than pinning a style of its own (measured).
+// TO_CHAR states the layout instead of inheriting one, and AT TIME ZONE 'UTC'
+// states the zone.
+//
+// col is a literal from this file, never anything a request supplies.
+func utcDayExpr(db *gorm.DB, col string) string {
+	if db.Dialector.Name() == "postgres" {
+		return "TO_CHAR(" + col + " AT TIME ZONE 'UTC', 'YYYY-MM-DD')"
+	}
+	return "DATE(" + col + ")"
+}
+
+// parseDayCounts turns scanned buckets into the series' own type, and reports
+// what it could not place.
+//
+// Two things can go wrong here and they are not the same. A NULL day is
+// SQLite's DATE() reporting that it could not read that value: one bucket's
+// worth of rows, with the rest of the window still answerable. It is dropped
+// and logged, and its aggregate is handed back so the caller can say the series
+// is incomplete — one hand-edited timestamp should not take the whole dashboard
+// down, and it should not pass for a quiet week either.
+//
+// A day that arrives non-NULL and still will not parse is the other case: the
+// query rendering something other than a day on this dialect, which affects
+// every bucket in the series and is a property of the SQL rather than of the
+// data. Dropping that quietly is what let the Postgres charts read zero for
+// every day of the window without a single failing test or logged line. The
+// empty string belongs to this case, not the first: a dialect that ever
+// answered "" for a broken query would otherwise be filed as unreadable data
+// and vanish.
+//
+// Neither branch can see the third failure. A value that is readable but was
+// written with no offset by a process outside UTC buckets into the wrong
+// column with no NULL and no error: DATE('2026-09-04 02:00:00') is 2026-09-04
+// even when the instant is 2026-09-03 22:30Z. Read-time handling gives the two
+// engines the same diagnosis, never the same guarantee — the guarantee lives at
+// the storage boundary, which is #126.
+func parseDayCounts(rows []dayCountRow, source string) ([]models.DayCount, int, error) {
+	results := make([]models.DayCount, 0, len(rows))
+	unbucketed := 0
+	for _, row := range rows {
+		if !row.Date.Valid {
+			log.Warn().Str("column", source).Int("aggregate", row.Count).
+				Msg("Daily counts: dropping a bucket whose timestamps the database could not read as dates")
+			unbucketed += row.Count
+			continue
+		}
+		day, err := time.Parse("2006-01-02", row.Date.String)
+		if err != nil {
+			return nil, 0, fmt.Errorf("unparseable day bucket %q from %s: %w", row.Date.String, source, err)
+		}
+		results = append(results, models.DayCount{Date: day, Count: row.Count})
+	}
+	return results, unbucketed, nil
+}
+
+// fillMissingDays ensures every day in the window has an entry (zero-fill gaps).
+//
+// start comes from dayWindowStart, so the emitted Date and the lookup key are
+// both UTC calendar days — the key space the SQL buckets already use. The order
+// the buckets arrive in does not matter: they are looked up by key, which is
+// also why a NULL bucket sorting to the front on SQLite is harmless here.
+func fillMissingDays(results []models.DayCount, days int, start time.Time) []models.DayCount {
 	found := make(map[string]int)
 	for _, r := range results {
 		key := r.Date.Format("2006-01-02")
@@ -1232,7 +1342,7 @@ func fillMissingDays(results []models.DayCount, days int, cutoff time.Time) []mo
 	}
 	var filled []models.DayCount
 	for i := range days {
-		day := cutoff.Add(time.Duration(i) * 24 * time.Hour)
+		day := start.AddDate(0, 0, i)
 		key := day.Format("2006-01-02")
 		c := found[key]
 		filled = append(filled, models.DayCount{

@@ -278,5 +278,12 @@ against each other by local wall time rather than by instant — a deployment
 that has always run in one zone is self-consistent, one whose `TZ` changes, or
 that moves between a local-zone host and a UTC one, is not.
 
+The dashboard's daily charts are UTC days on both engines: rows are bucketed by
+the UTC date of their timestamp, and the chart's axis is built in UTC, so the
+columns hold still when the server's zone does not. The window is the last seven
+UTC days, ending with today. A server far from UTC therefore reports on days
+that are not its local ones — deliberately, since that is the only reading on
+which a SQLite deployment and a Postgres one agree.
+
 Normalising what gets written is tracked separately; until then, UTC is the
 setting that makes both correct.
