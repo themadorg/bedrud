@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -230,4 +231,91 @@ func TestDayWindowStart_IsUTCMidnightEndingOnTodaysUTCDay(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestDayCounts_OneUnreadableRowDoesNotSinkTheSeries separates a bad row from a
+// bad query.
+//
+// SQLite's column is text and its DATE() answers NULL for a value it cannot
+// read as a date, which GORM scans into the zero string. That is one bucket's
+// worth of unreadable rows; the rest of the window is still answerable, and the
+// dashboard should show it rather than fail whole. A day that arrives non-empty
+// and still will not parse is the other case — the query rendering something
+// other than a day on this dialect — and that one stays an error.
+func TestDayCounts_OneUnreadableRowDoesNotSinkTheSeries(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewRoomRepository(db)
+
+	if err := db.Create(&models.User{
+		ID: "dcu-owner", Email: "dcu-owner@ex.com", Name: "DcuOwner",
+		Provider: "local", IsActive: true,
+	}).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	if _, err := repo.CreateRoom("dcu-owner", "dcu-good", true, "standard", 0, &models.RoomSettings{}); err != nil {
+		t.Fatalf("create good room: %v", err)
+	}
+	corrupt, err := repo.CreateRoom("dcu-owner", "dcu-corrupt", true, "standard", 0, &models.RoomSettings{})
+	if err != nil {
+		t.Fatalf("create corrupt room: %v", err)
+	}
+	// Written straight past the driver, the way a hand-edited database or an
+	// import from another tool would leave it.
+	if err := db.Exec("UPDATE rooms SET created_at = 'garbage' WHERE id = ?", corrupt.ID).Error; err != nil {
+		t.Fatalf("corrupt the timestamp: %v", err)
+	}
+	var stored string
+	if err := db.Raw("SELECT CAST(created_at AS TEXT) FROM rooms WHERE id = ?", corrupt.ID).
+		Row().Scan(&stored); err != nil {
+		t.Fatalf("read stored timestamp: %v", err)
+	}
+	if stored != "garbage" {
+		t.Fatalf("premise gone: the corrupt row reads back as %q", stored)
+	}
+
+	counts, err := repo.CountRoomsByDay(7)
+	if err != nil {
+		t.Fatalf("one unreadable row took down the whole series: %v", err)
+	}
+	if len(counts) != 7 {
+		t.Fatalf("expected 7 days, got %d", len(counts))
+	}
+	total := 0
+	for _, c := range counts {
+		total += c.Count
+	}
+	if last := counts[len(counts)-1]; last.Count != 1 || total != 1 {
+		t.Fatalf("expected the readable room on %s and nothing else, got %s",
+			dayKey(last.Date), keysOf(counts))
+	}
+}
+
+// TestParseDayCounts_SkipsTheUnreadableAndRejectsTheUnexpected states the
+// distinction on its own, without a database in the way.
+func TestParseDayCounts_SkipsTheUnreadableAndRejectsTheUnexpected(t *testing.T) {
+	t.Run("empty day is one unreadable bucket", func(t *testing.T) {
+		got, err := parseDayCounts([]dayCountRow{
+			{Date: "2026-09-01", Count: 2},
+			{Date: "", Count: 3},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(got) != 1 || got[0].Count != 2 || dayKey(got[0].Date) != "2026-09-01" {
+			t.Fatalf("expected only 2026-09-01=2, got %s", keysOf(got))
+		}
+	})
+
+	// What a dialect rendering something other than a day looks like: this is
+	// the shape Postgres hands back for a bare date, and every bucket in the
+	// series would carry it.
+	t.Run("a day that is not a day is a broken query", func(t *testing.T) {
+		_, err := parseDayCounts([]dayCountRow{{Date: "2026-09-01T00:00:00Z", Count: 1}})
+		if err == nil {
+			t.Fatal("expected an error for a bucket that is not a plain day")
+		}
+		if !strings.Contains(err.Error(), "2026-09-01T00:00:00Z") {
+			t.Fatalf("error does not name the value it rejected: %v", err)
+		}
+	})
 }

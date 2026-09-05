@@ -1280,19 +1280,31 @@ func utcDayExpr(db *gorm.DB, col string) string {
 
 // parseDayCounts turns scanned buckets into the series' own type.
 //
-// An unparseable day is returned as an error rather than skipped: the value is
-// produced by utcDayExpr, not by the data, so anything else means the SQL is
-// rendering something other than a plain day on this dialect. Dropping it
-// quietly is what let the Postgres charts read zero for every day of the window
-// without a single failing test or logged line.
+// Two things can go wrong here and they are not the same. A bucket that comes
+// back empty is SQLite's DATE() answering NULL for a value it could not read as
+// a date, which GORM scans into the zero string: one bucket's worth of
+// unreadable rows, with the rest of the window still answerable. It is dropped
+// and logged rather than raised — a single hand-edited timestamp should not
+// take the whole dashboard down.
+//
+// A bucket that arrives non-empty and still will not parse is the other case:
+// the query rendering something other than a day on this dialect, which affects
+// every bucket in the series and is a property of the SQL, not of the data.
+// Dropping that quietly is what let the Postgres charts read zero for every day
+// of the window without a single failing test or logged line.
 func parseDayCounts(rows []dayCountRow) ([]models.DayCount, error) {
-	results := make([]models.DayCount, len(rows))
-	for i, row := range rows {
+	results := make([]models.DayCount, 0, len(rows))
+	for _, row := range rows {
+		if row.Date == "" {
+			log.Warn().Int("rows", row.Count).
+				Msg("Daily counts: dropping rows whose timestamp the database could not read as a date")
+			continue
+		}
 		day, err := time.Parse("2006-01-02", row.Date)
 		if err != nil {
 			return nil, fmt.Errorf("unparseable day bucket %q: %w", row.Date, err)
 		}
-		results[i] = models.DayCount{Date: day, Count: row.Count}
+		results = append(results, models.DayCount{Date: day, Count: row.Count})
 	}
 	return results, nil
 }

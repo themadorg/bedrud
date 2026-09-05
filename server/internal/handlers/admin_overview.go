@@ -437,6 +437,10 @@ func (h *AdminOverviewHandler) buildKPIs(totalUsers, usersWeek, onlineNow, publi
 // put the axis in a different key space from the counts it was looking up, so
 // the chart read zero for the whole window whenever the process calendar
 // disagreed with UTC.
+//
+// roomDays carries the axis, which holds because all three are fetched with
+// overviewDays. Fetching them over different lengths would silently truncate
+// the other two to this one.
 func (h *AdminOverviewHandler) buildActivityTrend(roomDays, participantDays, activeRoomDays []models.DayCount) []models.DayActivity {
 	partsByDay := make(map[string]int)
 	for _, d := range participantDays {
