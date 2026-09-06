@@ -125,13 +125,10 @@ func withSettingsRepo(fn func(*repository.SettingsRepository) error) error {
 	if err != nil {
 		return err
 	}
-	if err := database.Initialize(&cfg.Database); err != nil {
+	if err := database.OpenCLI(&cfg.Database); err != nil {
 		return err
 	}
 	defer database.Close()
-	if err := database.RunMigrations(); err != nil {
-		return err
-	}
 	repo := repository.NewSettingsRepository(database.GetDB())
 	repo.SetConfig(cfg)
 	return fn(repo)

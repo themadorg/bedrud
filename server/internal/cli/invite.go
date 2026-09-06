@@ -146,13 +146,10 @@ func withInviteRepo(fn func(*repository.InviteTokenRepository) error) error {
 	if err != nil {
 		return err
 	}
-	if err := database.Initialize(&cfg.Database); err != nil {
+	if err := database.OpenCLI(&cfg.Database); err != nil {
 		return err
 	}
 	defer database.Close()
-	if err := database.RunMigrations(); err != nil {
-		return err
-	}
 	return fn(repository.NewInviteTokenRepository(database.GetDB()))
 }
 

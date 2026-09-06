@@ -17,10 +17,11 @@ import (
 )
 
 const (
-	githubAPILatest  = "https://api.github.com/repos/themadorg/bedrud/releases/latest"
-	downloadTimeout  = 10 * time.Minute
-	maxDownloadBytes = 512 << 20 // 512 MiB
-	httpUserAgent    = "bedrud-update/1.0 (+https://github.com/themadorg/bedrud)"
+	githubAPILatest   = "https://api.github.com/repos/themadorg/bedrud/releases/latest"
+	githubAPIReleases = "https://api.github.com/repos/themadorg/bedrud/releases?per_page=30"
+	downloadTimeout   = 10 * time.Minute
+	maxDownloadBytes  = 512 << 20 // 512 MiB
+	httpUserAgent     = "bedrud-update/1.0 (+https://github.com/themadorg/bedrud)"
 )
 
 // Overridable for tests.
@@ -28,7 +29,21 @@ var (
 	httpClient = &http.Client{Timeout: downloadTimeout}
 	// githubLatestURL can be overridden in tests.
 	githubLatestURL = githubAPILatest
+	// githubReleasesURL lists recent releases (stable + prerelease) for --nightly.
+	githubReleasesURL = githubAPIReleases
 )
+
+// githubRelease is the GitHub Releases API subset we need.
+type githubRelease struct {
+	TagName    string `json:"tag_name"`
+	Name       string `json:"name"`
+	Draft      bool   `json:"draft"`
+	Prerelease bool   `json:"prerelease"`
+	Assets     []struct {
+		Name               string `json:"name"`
+		BrowserDownloadURL string `json:"browser_download_url"`
+	} `json:"assets"`
+}
 
 // resolvedSource is the result of resolving an update source to a local binary.
 type resolvedSource struct {
@@ -36,6 +51,8 @@ type resolvedSource struct {
 	Cleanup     func()
 	Version     string // optional, from release tag
 	Description string
+	// Channel is "stable" or "nightly" for GitHub fetches; empty for local/--self.
+	Channel string
 }
 
 // resolveUpdateSource turns UpdateOptions into a local binary path.
@@ -59,12 +76,20 @@ func resolveUpdateSource(opts UpdateOptions) (resolvedSource, error) {
 	}
 
 	src := strings.TrimSpace(opts.Source)
+
+	if opts.Nightly {
+		if src != "" && !strings.EqualFold(src, "latest") {
+			return resolvedSource{}, fmt.Errorf("--nightly cannot be combined with a local path or URL")
+		}
+		return resolveGitHubChannel(opts.SkipChecksum, true)
+	}
+
 	if src == "" {
 		return resolvedSource{}, fmt.Errorf("empty source")
 	}
 
 	if strings.EqualFold(src, "latest") {
-		return resolveLatest(opts.SkipChecksum)
+		return resolveGitHubChannel(opts.SkipChecksum, false)
 	}
 
 	if strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://") {
@@ -224,8 +249,24 @@ func resolveURL(raw string, skipChecksum bool) (resolvedSource, error) {
 }
 
 func resolveLatest(skipChecksum bool) (resolvedSource, error) {
+	return resolveGitHubChannel(skipChecksum, false)
+}
+
+func resolveGitHubChannel(skipChecksum, nightly bool) (resolvedSource, error) {
+	channel := "stable"
+	label := "latest"
+	if nightly {
+		channel = "nightly"
+		label = "nightly"
+	}
 	if skipChecksum {
-		return resolvedSource{}, fmt.Errorf("--skip-checksum is not allowed with \"latest\" (checksum required)")
+		return resolvedSource{}, fmt.Errorf("--skip-checksum is not allowed with %q (checksum required)", label)
+	}
+
+	if nightly {
+		fmt.Println("➜ Fetching latest nightly GitHub release...")
+	} else {
+		fmt.Println("➜ Fetching latest stable GitHub release...")
 	}
 
 	assetName, err := releaseAssetName()
@@ -233,32 +274,15 @@ func resolveLatest(skipChecksum bool) (resolvedSource, error) {
 		return resolvedSource{}, err
 	}
 
-	req, err := http.NewRequest(http.MethodGet, githubLatestURL, nil)
+	rel, err := fetchGitHubRelease(nightly)
 	if err != nil {
 		return resolvedSource{}, err
 	}
-	req.Header.Set("User-Agent", httpUserAgent)
-	req.Header.Set("Accept", "application/vnd.github+json")
 
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return resolvedSource{}, fmt.Errorf("github latest: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return resolvedSource{}, fmt.Errorf("github latest: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-
-	var rel struct {
-		TagName string `json:"tag_name"`
-		Assets  []struct {
-			Name               string `json:"name"`
-			BrowserDownloadURL string `json:"browser_download_url"`
-		} `json:"assets"`
-	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&rel); err != nil {
-		return resolvedSource{}, fmt.Errorf("decode release JSON: %w", err)
+	if nightly {
+		fmt.Println("➜ Nightly release:", rel.TagName)
+	} else {
+		fmt.Println("➜ Stable release:", rel.TagName)
 	}
 
 	var assetURL, sumsURL string
@@ -271,17 +295,17 @@ func resolveLatest(skipChecksum bool) (resolvedSource, error) {
 		}
 	}
 	if assetURL == "" {
-		return resolvedSource{}, fmt.Errorf("latest release %s has no asset %q", rel.TagName, assetName)
+		return resolvedSource{}, fmt.Errorf("%s release %s has no asset %q", label, rel.TagName, assetName)
 	}
 	if sumsURL == "" {
 		return resolvedSource{}, fmt.Errorf(
-			"latest release %s has no SHA256SUMS asset; cannot verify integrity\n"+
+			"%s release %s has no SHA256SUMS asset; cannot verify integrity\n"+
 				"Download the release manually and run: sudo bedrud update /path/to/archive-or-binary",
-			rel.TagName,
+			label, rel.TagName,
 		)
 	}
 
-	dir, err := os.MkdirTemp("", "bedrud-update-latest-*")
+	dir, err := os.MkdirTemp("", "bedrud-update-"+label+"-*")
 	if err != nil {
 		return resolvedSource{}, err
 	}
@@ -297,11 +321,12 @@ func resolveLatest(skipChecksum bool) (resolvedSource, error) {
 		return resolvedSource{}, err
 	}
 
-	res, err := extractArchiveToResolved(dest, fmt.Sprintf("latest %s (%s)", rel.TagName, assetName), rel.TagName)
+	res, err := extractArchiveToResolved(dest, fmt.Sprintf("%s %s (%s)", label, rel.TagName, assetName), rel.TagName)
 	if err != nil {
 		cleanupAll()
 		return resolvedSource{}, err
 	}
+	res.Channel = channel
 	inner := res.Cleanup
 	res.Cleanup = func() {
 		if inner != nil {
@@ -310,6 +335,98 @@ func resolveLatest(skipChecksum bool) (resolvedSource, error) {
 		cleanupAll()
 	}
 	return res, nil
+}
+
+func fetchGitHubRelease(nightly bool) (githubRelease, error) {
+	if !nightly {
+		rel, err := getJSONRelease(githubLatestURL)
+		if err != nil {
+			return githubRelease{}, err
+		}
+		if !isStableRelease(rel) {
+			return githubRelease{}, fmt.Errorf(
+				"GitHub latest is not a stable release (%s); refusing\n"+
+					"Use --nightly for prereleases, or wait for a stable tag",
+				rel.TagName,
+			)
+		}
+		return rel, nil
+	}
+
+	list, err := getJSONReleaseList(githubReleasesURL)
+	if err != nil {
+		return githubRelease{}, err
+	}
+	for _, rel := range list {
+		if isNightlyRelease(rel) {
+			return rel, nil
+		}
+	}
+	return githubRelease{}, fmt.Errorf(
+		"no nightly/prerelease found on GitHub\n" +
+			"Use: sudo bedrud update latest   for the latest stable release",
+	)
+}
+
+func githubAPIGet(urlStr string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodGet, urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", httpUserAgent)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		_ = resp.Body.Close()
+		return nil, fmt.Errorf("github %s: HTTP %d: %s", urlStr, resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return resp, nil
+}
+
+func getJSONRelease(urlStr string) (githubRelease, error) {
+	resp, err := githubAPIGet(urlStr)
+	if err != nil {
+		return githubRelease{}, fmt.Errorf("github latest: %w", err)
+	}
+	defer resp.Body.Close()
+	var rel githubRelease
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&rel); err != nil {
+		return githubRelease{}, fmt.Errorf("decode release JSON: %w", err)
+	}
+	return rel, nil
+}
+
+func getJSONReleaseList(urlStr string) ([]githubRelease, error) {
+	resp, err := githubAPIGet(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("github releases: %w", err)
+	}
+	defer resp.Body.Close()
+	var list []githubRelease
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(&list); err != nil {
+		return nil, fmt.Errorf("decode releases JSON: %w", err)
+	}
+	return list, nil
+}
+
+func isStableRelease(r githubRelease) bool {
+	if r.Draft || r.Prerelease || r.TagName == "" {
+		return false
+	}
+	t := strings.ToLower(r.TagName + " " + r.Name)
+	return !strings.Contains(t, "nightly")
+}
+
+func isNightlyRelease(r githubRelease) bool {
+	if r.Draft || r.TagName == "" {
+		return false
+	}
+	t := strings.ToLower(r.TagName + " " + r.Name)
+	return r.Prerelease || strings.Contains(t, "nightly")
 }
 
 func releaseAssetName() (string, error) {

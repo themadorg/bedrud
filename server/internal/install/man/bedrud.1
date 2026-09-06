@@ -198,11 +198,35 @@ sudo bedrud update /tmp/bedrud
 .RE
 .fi
 .PP
-Upgrade to the latest GitHub release (HTTPS + SHA256):
+Upgrade to the latest stable GitHub release (prompts unless \-y):
 .PP
 .nf
 .RS
 sudo bedrud update latest
+sudo bedrud update latest \-y
+.RE
+.fi
+.PP
+List and switch installed versions (\fI/opt/bedrud/versions\fP):
+.PP
+.nf
+.RS
+bedrud versions list
+bedrud versions list \-\-remote
+bedrud versions current
+sudo bedrud versions use 1.2.3
+sudo bedrud versions prune \-\-keep 5 \-\-yes
+sudo bedrud versions remove 1.1.0 \-\-yes
+bedrud versions path
+.RE
+.fi
+.PP
+Upgrade to the latest nightly/prerelease:
+.PP
+.nf
+.RS
+sudo bedrud update \-\-nightly
+sudo bedrud update \-\-nightly \-y
 .RE
 .fi
 .PP

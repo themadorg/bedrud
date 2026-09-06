@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 
 	"bedrud/config"
 	"bedrud/internal/database"
@@ -34,8 +35,12 @@ type UpdateOptions struct {
 	// SkipRestart skips stopping/starting init services.
 	SkipRestart bool
 	// SkipChecksum allows local operator-provided files without SHA256SUMS.
-	// Never used for "latest" (always verified).
+	// Never used for "latest" or "--nightly" (always verified).
 	SkipChecksum bool
+	// Nightly fetches the newest GitHub prerelease/nightly instead of latest stable.
+	Nightly bool
+	// Yes skips the interactive confirmation for GitHub latest/nightly updates.
+	Yes bool
 }
 
 // LinuxUpdate upgrades an existing Bedrud installation in place:
@@ -87,7 +92,6 @@ func LinuxUpdate(opts UpdateOptions) error {
 
 	fmt.Println("➜ Bedrud update")
 	fmt.Println("  Previous version:", previousVersion)
-	fmt.Println("  New version:     ", newVersion)
 	fmt.Println("  Config:          ", cfgPath)
 
 	// Resolve binary source before stopping services so network/checksum
@@ -110,9 +114,15 @@ func LinuxUpdate(opts UpdateOptions) error {
 		}
 		if srcMeta.Version != "" {
 			newVersion = srcMeta.Version
-			fmt.Println("  Source version: ", newVersion)
 		}
 		fmt.Println("  Source:         ", srcMeta.Description)
+	} else {
+		fmt.Println("  Source:          installed binary (unchanged)")
+	}
+	fmt.Println("  New version:     ", newVersion)
+
+	if err := confirmUpdateHook(opts, previousVersion, newVersion, srcMeta.Channel); err != nil {
+		return err
 	}
 
 	// Ensure runtime layout still exists (partial upgrades / moved data).
@@ -134,25 +144,45 @@ func LinuxUpdate(opts UpdateOptions) error {
 		stopAllInitSystems([]string{"bedrud", "livekit"})
 	}
 
-	// Replace binary
+	// Replace binary via version tree; stable PATH is a symlink to the active version.
 	binaryUpdated := false
 	if opts.SkipBinary {
 		fmt.Println("➜ Skipping binary replacement (--skip-binary)")
 	} else {
 		installTarget := targetBin
 		if packageManaged {
-			// Package managers own /usr/bin/bedrud — install to /usr/local/bin instead.
 			fmt.Printf("➜ Package-managed binary at %s — installing to %s\n", targetBin, binaryLocalPath)
 			installTarget = binaryLocalPath
 			fmt.Println("  Note: ensure PATH prefers /usr/local/bin over /usr/bin, or update service ExecStart.")
 		}
-		fmt.Println("➜ Replacing binary at", installTarget)
-		if err := installBinaryFile(installTarget, srcBinary); err != nil {
+		root := installRoot()
+		archiveCurrentIfNeeded(root, previousVersion, installTarget)
+		sha := ""
+		if sum, err := fileSHA256(srcBinary); err == nil {
+			sha = sum
+		}
+		channel := srcMeta.Channel
+		if channel == "" {
+			channel = "local"
+		}
+		fmt.Println("➜ Installing version", newVersion, "under", versionsDir(root))
+		if _, err := installCandidate(root, newVersion, srcBinary, VersionMeta{
+			Version: newVersion,
+			Source:  srcMeta.Description,
+			SHA256:  sha,
+			Variant: runtime.GOOS + "-" + runtime.GOARCH,
+			OS:      runtime.GOOS,
+			Channel: channel,
+		}); err != nil {
+			return err
+		}
+		if err := setActive(root, newVersion, installTarget); err != nil {
 			return err
 		}
 		targetBin = installTarget
 		binaryUpdated = true
-		fmt.Println("➜ Binary updated:", targetBin)
+		fmt.Println("➜ Active version:", newVersion)
+		fmt.Println("➜ Binary:", targetBin, "->", versionBinaryPath(root, newVersion))
 	}
 
 	// Ownership for data dirs (config stays root/bedrud 0600).
@@ -228,6 +258,18 @@ func LinuxUpdate(opts UpdateOptions) error {
 }
 
 func validateUpdateOptions(opts UpdateOptions) error {
+	if opts.Nightly {
+		if opts.Self {
+			return fmt.Errorf("--nightly cannot be combined with --self")
+		}
+		if opts.SkipBinary {
+			return fmt.Errorf("--nightly cannot be combined with --skip-binary")
+		}
+		src := strings.TrimSpace(opts.Source)
+		if src != "" && !strings.EqualFold(src, "latest") {
+			return fmt.Errorf("--nightly cannot be combined with a local path or URL (use: sudo bedrud update --nightly)")
+		}
+	}
 	if opts.SkipBinary {
 		if opts.Source != "" || opts.Self {
 			return fmt.Errorf("--skip-binary cannot be combined with a source or --self")
@@ -237,8 +279,8 @@ func validateUpdateOptions(opts UpdateOptions) error {
 	if opts.Self && opts.Source != "" {
 		return fmt.Errorf("--self cannot be combined with a source argument")
 	}
-	if !opts.Self && opts.Source == "" {
-		return fmt.Errorf("missing source: path, URL, \"latest\", or --self (or use --skip-binary for migrations only)")
+	if !opts.Self && opts.Source == "" && !opts.Nightly {
+		return fmt.Errorf("missing source: path, URL, \"latest\", --nightly, or --self (or use --skip-binary for migrations only)")
 	}
 	return nil
 }
@@ -248,9 +290,9 @@ func runDBMigrations(configPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := database.Initialize(&cfg.Database); err != nil {
+	if err := database.OpenCLI(&cfg.Database); err != nil {
 		return err
 	}
 	defer func() { _ = database.Close() }()
-	return database.RunMigrations()
+	return nil
 }
