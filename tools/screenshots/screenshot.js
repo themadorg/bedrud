@@ -14,6 +14,8 @@
  *   BEDRUD_SCREENSHOT_PASSWORD
  *   BEDRUD_SCREENSHOT_OUT        output directory (default tools/screenshots/output)
  *   BEDRUD_SCREENSHOT_NO_START   set to 1 to skip spawning the app
+ *   BEDRUD_SESSION_TIMEOUT       ms to wait for an authenticated page to show the
+ *                                signed-in account before failing (default 30000)
  */
 
 import { spawn } from 'node:child_process'
@@ -38,6 +40,7 @@ const SHOULD_START =
   !args['no-start'] && process.env.BEDRUD_SCREENSHOT_NO_START !== '1'
 const HEADLESS = args.headful ? false : true
 const TIMEOUT_MS = Number(args.timeout || 30_000)
+const SESSION_TIMEOUT_MS = Number(args['session-timeout'] || process.env.BEDRUD_SESSION_TIMEOUT || 30_000)
 const LIVEKIT_URL = trimSlash(args['livekit-url'] || process.env.BEDRUD_LIVEKIT_URL || 'http://127.0.0.1:7072')
 /** Iranian names + Koboyo face icons as profile pictures. */
 const HOST_PERSON = {
@@ -108,6 +111,12 @@ const ADMIN_PAGES = [
 ]
 
 const children = []
+
+/** Slugs of session-bearing pages that rendered their signed-out shell. */
+const sessionFailures = []
+
+/** A page whose capture is only meaningful once the session has taken. */
+const withSession = (pageDef) => ({ ...pageDef, requiresSession: true })
 
 process.on('SIGINT', () => shutdown(130))
 process.on('SIGTERM', () => shutdown(143))
@@ -190,7 +199,7 @@ async function main() {
       for (const theme of THEMES) {
         const pages = [...PUBLIC_PAGES]
         if (session) {
-          pages.push(...AUTHED_PAGES, ...ADMIN_PAGES)
+          pages.push(...AUTHED_PAGES.map(withSession), ...ADMIN_PAGES.map(withSession))
         }
         if (roomName) {
           pages.push(
@@ -246,6 +255,18 @@ async function main() {
     `${JSON.stringify({ capturedAt: new Date().toISOString(), baseUrl: BASE_URL, files: manifest }, null, 2)}\n`,
   )
   console.log(`wrote ${manifest.length} screenshots → ${OUT_DIR}`)
+
+  // Fail loudly rather than publishing a gallery of signed-out shells. The
+  // manifest is written first so the run's artifacts survive for inspection.
+  if (sessionFailures.length) {
+    console.error(`\n${sessionFailures.length} authenticated page(s) never signed in as ${EMAIL}:`)
+    // "signed out:" prefixed, not bare — a bare slug is how a captured page is
+    // logged, and the two lists are otherwise indistinguishable in CI output.
+    for (const slug of sessionFailures) console.error(`  signed out: ${slug}`)
+    console.error(`evidence: ${path.join(OUT_DIR, 'failures')}`)
+    shutdown(1)
+  }
+
   shutdown(0)
 }
 
@@ -341,6 +362,10 @@ async function capturePage(browser, { pageDef, viewport, theme, session, expectP
       await waitForPeople(page, Math.min(peopleCount || 2, 4))
       await applyMeetingChrome(page, pageDef.kind, extras)
       await sleep(700)
+    }
+
+    if (pageDef.requiresSession && session && !skipAuth) {
+      await waitForSignedIn(page, slug)
     }
 
     const slices = await captureScrollSlices(page, slug, {
@@ -476,6 +501,42 @@ async function settle(page) {
       if (document.fonts?.ready) await document.fonts.ready
     })
     .catch(() => {})
+}
+
+/**
+ * Prove the injected session actually took before the shutter fires.
+ *
+ * A dashboard page rendered signed out is indistinguishable from a finished one:
+ * the layout is complete, nothing errors, and the PNG publishes. The sidebar
+ * footer prints the account's email once the user store is filled, so that string
+ * is the evidence — and it identifies the account, not merely "somebody".
+ *
+ * Scoped to the sidebar, not the document: the admin users list and the
+ * recent-signups list both print the screenshot account's own address in the page
+ * body, so a whole-document match reports those two as signed in while the chrome
+ * beside them is still the signed-out shell.
+ *
+ * textContent, not innerText: the sidebar is `hidden lg:flex`, so it contributes
+ * no visible text at the mobile viewport while still sitting in the DOM.
+ *
+ * settle() is not enough on its own. It waits for readyState plus a fixed 600ms,
+ * which lands before the client finishes /api/auth/refresh and /api/auth/me.
+ */
+async function waitForSignedIn(page, slug) {
+  try {
+    await page.waitForFunction(
+      (email) => [...document.querySelectorAll('aside')].some((el) => el.textContent.includes(email)),
+      { timeout: SESSION_TIMEOUT_MS },
+      EMAIL,
+    )
+  } catch {
+    sessionFailures.push(slug)
+    const evidence = path.join(OUT_DIR, 'failures', `${slug}.png`)
+    // Outside OUT_DIR's own glob so publish-to-site.sh can never pick it up.
+    await mkdir(path.dirname(evidence), { recursive: true }).catch(() => {})
+    await page.screenshot({ path: evidence, fullPage: false }).catch(() => {})
+    throw new Error(`signed out after ${SESSION_TIMEOUT_MS}ms — ${EMAIL} never reached the page`)
+  }
 }
 
 async function login(apiUrl, email, password) {
