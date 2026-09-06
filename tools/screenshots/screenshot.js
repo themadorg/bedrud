@@ -5,10 +5,15 @@
  *
  * Usage (from repo root or this folder):
  *   node tools/screenshots/screenshot.js
- *   node tools/screenshots/screenshot.js --base-url http://127.0.0.1:7070 --no-start
+ *   node tools/screenshots/screenshot.js --base-url http://127.0.0.1:7071 --no-start
+ *
+ * The app is captured as it ships: the Go binary serving the embedded bundle from
+ * server/frontend, with the API on the same origin. `vite dev` is not an
+ * equivalent target — it adds a TanStack Start SSR pass whose dehydrated route
+ * loaders leave every dashboard page rendered signed out (#129).
  *
  * Env:
- *   BEDRUD_BASE_URL              default http://127.0.0.1:7070
+ *   BEDRUD_BASE_URL              default http://127.0.0.1:7071
  *   BEDRUD_API_URL               default http://127.0.0.1:7071 (login + start probe)
  *   BEDRUD_SCREENSHOT_EMAIL      account used for dashboard/admin pages
  *   BEDRUD_SCREENSHOT_PASSWORD
@@ -29,7 +34,7 @@ const REPO_ROOT = path.resolve(__dirname, '../..')
 
 const args = parseArgs(process.argv.slice(2))
 
-const BASE_URL = trimSlash(args['base-url'] || process.env.BEDRUD_BASE_URL || 'http://127.0.0.1:7070')
+const BASE_URL = trimSlash(args['base-url'] || process.env.BEDRUD_BASE_URL || 'http://127.0.0.1:7071')
 const API_URL = trimSlash(args['api-url'] || process.env.BEDRUD_API_URL || 'http://127.0.0.1:7071')
 const EMAIL = args.email || process.env.BEDRUD_SCREENSHOT_EMAIL || ''
 const PASSWORD = args.password || process.env.BEDRUD_SCREENSHOT_PASSWORD || ''
@@ -911,16 +916,12 @@ async function clickLabeled(page, prefixes) {
 }
 
 async function startStack() {
-  const webReady = await ping(BASE_URL).catch(() => false)
-  if (!webReady) {
-    console.log('starting web (make dev-web)…')
-    spawnManaged('make', ['dev-web'], { cwd: REPO_ROOT })
-  } else {
-    console.log(`web already listening on ${BASE_URL}`)
-  }
-
   const apiReady = await ping(API_URL).catch(() => false)
   if (!apiReady) {
+    // Order matters: the Go binary embeds server/frontend at compile time, so the
+    // bundle has to be written before the server is built.
+    console.log('building the web bundle into server/frontend (bun run build:embed)…')
+    await runToCompletion('bun', ['run', 'build:embed'], { cwd: path.join(REPO_ROOT, 'apps/web') })
     console.log('starting api (make dev-api)…')
     spawnManaged('make', ['dev-api'], { cwd: REPO_ROOT })
   } else {
@@ -934,6 +935,17 @@ async function startStack() {
   } else {
     console.log(`livekit already listening on ${LIVEKIT_URL}`)
   }
+}
+
+/** Run a build step to the end; a partial bundle would be embedded silently. */
+function runToCompletion(cmd, cmdArgs, opts) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, cmdArgs, { ...opts, stdio: 'inherit' })
+    child.on('error', reject)
+    child.on('exit', (code) =>
+      code === 0 ? resolve() : reject(new Error(`${cmd} ${cmdArgs.join(' ')} exited ${code}`)),
+    )
+  })
 }
 
 function spawnManaged(cmd, cmdArgs, opts) {
