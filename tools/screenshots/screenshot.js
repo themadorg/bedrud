@@ -21,6 +21,8 @@
  *   BEDRUD_SCREENSHOT_NO_START   set to 1 to skip spawning the app
  *   BEDRUD_SESSION_TIMEOUT       ms to wait for an authenticated page to show the
  *                                signed-in account before failing (default 30000)
+ *   BEDRUD_QUIET_TIMEOUT         ms to wait for loading placeholders to clear
+ *                                before shooting anyway (default 10000)
  */
 
 import { spawn } from 'node:child_process'
@@ -46,6 +48,7 @@ const SHOULD_START =
 const HEADLESS = args.headful ? false : true
 const TIMEOUT_MS = Number(args.timeout || 30_000)
 const SESSION_TIMEOUT_MS = Number(args['session-timeout'] || process.env.BEDRUD_SESSION_TIMEOUT || 30_000)
+const QUIET_TIMEOUT_MS = Number(args['quiet-timeout'] || process.env.BEDRUD_QUIET_TIMEOUT || 10_000)
 const LIVEKIT_URL = trimSlash(args['livekit-url'] || process.env.BEDRUD_LIVEKIT_URL || 'http://127.0.0.1:7072')
 /** Iranian names + Koboyo face icons as profile pictures. */
 const HOST_PERSON = {
@@ -371,6 +374,7 @@ async function capturePage(browser, { pageDef, viewport, theme, session, expectP
 
     if (pageDef.requiresSession && session && !skipAuth) {
       await waitForSignedIn(page, slug)
+      await waitForQuiet(page, slug)
     }
 
     const slices = await captureScrollSlices(page, slug, {
@@ -541,6 +545,34 @@ async function waitForSignedIn(page, slug) {
     await mkdir(path.dirname(evidence), { recursive: true }).catch(() => {})
     await page.screenshot({ path: evidence, fullPage: false }).catch(() => {})
     throw new Error(`signed out after ${SESSION_TIMEOUT_MS}ms — ${EMAIL} never reached the page`)
+  }
+}
+
+/**
+ * Hold the shutter until the page has finished loading its own content.
+ *
+ * The session gate is satisfied by the chrome, and the panels inside it resolve
+ * a few hundred milliseconds later. Measured against the built bundle, at the
+ * moment the gate opens: /dashboard/admin still has 35 skeleton elements,
+ * /dashboard/admin/queue 22, /dashboard/admin/rooms reads "Loading rooms…" and
+ * /dashboard/admin/users "Loading users…". All four go quiet by t+1.9s, within
+ * 550ms of the gate. Shooting at the gate is what put the skeletons in the
+ * published gallery that #129 reported.
+ *
+ * Best-effort, unlike waitForSignedIn: a page that keeps a spinner on purpose
+ * should still be captured, so this warns and shoots rather than failing. A
+ * signed-out capture is wrong; a busy one is merely worse.
+ */
+async function waitForQuiet(page, slug) {
+  try {
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll('[class*="animate-pulse"]').length === 0 &&
+        !/\bLoading\b/.test(document.body.innerText),
+      { timeout: QUIET_TIMEOUT_MS },
+    )
+  } catch {
+    console.warn(`  ${slug}: still loading after ${QUIET_TIMEOUT_MS}ms — captured anyway`)
   }
 }
 
