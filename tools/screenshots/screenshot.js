@@ -23,6 +23,8 @@
  *                                signed-in account before failing (default 30000)
  *   BEDRUD_QUIET_TIMEOUT         ms to wait for loading placeholders to clear
  *                                before shooting anyway (default 10000)
+ *   BEDRUD_MAX_SESSION_FAILURES  give up after this many signed-out pages
+ *                                (default 3)
  */
 
 import { spawn } from 'node:child_process'
@@ -49,6 +51,12 @@ const HEADLESS = args.headful ? false : true
 const TIMEOUT_MS = Number(args.timeout || 30_000)
 const SESSION_TIMEOUT_MS = Number(args['session-timeout'] || process.env.BEDRUD_SESSION_TIMEOUT || 30_000)
 const QUIET_TIMEOUT_MS = Number(args['quiet-timeout'] || process.env.BEDRUD_QUIET_TIMEOUT || 10_000)
+// Every signed-out page costs a full SESSION_TIMEOUT_MS, and they fail in
+// batches: the run that exposed #129 had 88 of 104 fail, which at the default
+// timeout is 44 minutes against deploy-site's 20-minute job. The job would be
+// killed before printing the summary or the path to the evidence. The 88th
+// failure says nothing the first one did not.
+const MAX_SESSION_FAILURES = Number(args['max-session-failures'] || process.env.BEDRUD_MAX_SESSION_FAILURES || 3)
 const LIVEKIT_URL = trimSlash(args['livekit-url'] || process.env.BEDRUD_LIVEKIT_URL || 'http://127.0.0.1:7072')
 /** Iranian names + Koboyo face icons as profile pictures. */
 const HOST_PERSON = {
@@ -246,8 +254,14 @@ async function main() {
           })
           if (Array.isArray(files)) manifest.push(...files)
           else if (files) manifest.push(files)
+          if (sessionFailures.length >= MAX_SESSION_FAILURES) break
         }
+        if (sessionFailures.length >= MAX_SESSION_FAILURES) break
       }
+      if (sessionFailures.length >= MAX_SESSION_FAILURES) break
+    }
+    if (sessionFailures.length >= MAX_SESSION_FAILURES) {
+      console.error(`\nstopping after ${sessionFailures.length} signed-out pages — the rest would fail the same way`)
     }
   } finally {
     for (const extra of extras) {
@@ -572,7 +586,20 @@ async function waitForQuiet(page, slug) {
       { timeout: QUIET_TIMEOUT_MS },
     )
   } catch {
-    console.warn(`  ${slug}: still loading after ${QUIET_TIMEOUT_MS}ms — captured anyway`)
+    // Report what was still on screen. The gate keys on the `animate-pulse`
+    // class, and if that class is ever renamed it matches nothing, every page
+    // passes instantly, and the skeletons come back with nothing to say so.
+    // A warning naming zero placeholders is that failure, in the open.
+    const seen = await page
+      .evaluate(() => ({
+        placeholders: document.querySelectorAll('[class*="animate-pulse"]').length,
+        loading: (document.body.innerText.match(/Loading[^\n]*/g) || []).slice(0, 3),
+      }))
+      .catch(() => ({ placeholders: -1, loading: [] }))
+    console.warn(
+      `  ${slug}: still loading after ${QUIET_TIMEOUT_MS}ms — ${seen.placeholders} placeholder(s)` +
+        `${seen.loading.length ? `, ${JSON.stringify(seen.loading)}` : ''} — captured anyway`,
+    )
   }
 }
 
