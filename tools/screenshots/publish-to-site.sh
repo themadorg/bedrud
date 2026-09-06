@@ -45,6 +45,18 @@ for png in "$OUT"/*.png; do
   fi
 done
 
+# The reverse alias. A page taller than the viewport is only ever written as
+# name_1.png, name_2.png, …, and the gallery names several pages unsuffixed. A
+# page that starts rendering its real content grows past the viewport and stops
+# publishing under the name the site asks for.
+for png in "$OUT"/*_1.png; do
+  base="$(basename "$png")"
+  unsliced="${base%_1.png}.png"
+  if [ ! -f "$OUT/$unsliced" ]; then
+    cp -f "$png" "$DEST/gallery/$unsliced"
+  fi
+done
+
 cp -f "$OUT/meeting-chat__dark__mobile.png" "$DEST/meeting-phone.png"
 cp -f "$OUT/meeting-chat__light__mobile.png" "$DEST/meeting-phone-light.png"
 # MacBook lid is 4:3; prefer dark desktop grid (landing crops with object-cover).
@@ -70,3 +82,18 @@ for f in "${REQUIRED[@]}"; do
     exit 1
   fi
 done
+
+# Everything the landing gallery names has to be on disk, or the page ships
+# broken images and nothing says so. Derived from the component rather than
+# listed here, so adding a shot to the gallery cannot drift from this check.
+GALLERY_SRC="$ROOT/apps/site/src/components/landing/screenshots-gallery.tsx"
+missing=0
+for f in $(grep -oE '/preview/gallery/[A-Za-z0-9_.-]+\.png' "$GALLERY_SRC" | sed 's|.*/||' | sort -u); do
+  if [ ! -f "$DEST/gallery/$f" ]; then
+    echo "gallery references a shot that was not captured: $f" >&2
+    missing=1
+  fi
+done
+if [ "$missing" -ne 0 ]; then
+  exit 1
+fi
