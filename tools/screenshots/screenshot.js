@@ -5,15 +5,26 @@
  *
  * Usage (from repo root or this folder):
  *   node tools/screenshots/screenshot.js
- *   node tools/screenshots/screenshot.js --base-url http://127.0.0.1:7070 --no-start
+ *   node tools/screenshots/screenshot.js --base-url http://127.0.0.1:7071 --no-start
+ *
+ * The app is captured as it ships: the Go binary serving the embedded bundle from
+ * server/frontend, with the API on the same origin. `vite dev` is not an
+ * equivalent target — it adds a TanStack Start SSR pass whose dehydrated route
+ * loaders leave every dashboard page rendered signed out (#129).
  *
  * Env:
- *   BEDRUD_BASE_URL              default http://127.0.0.1:7070
+ *   BEDRUD_BASE_URL              default http://127.0.0.1:7071
  *   BEDRUD_API_URL               default http://127.0.0.1:7071 (login + start probe)
  *   BEDRUD_SCREENSHOT_EMAIL      account used for dashboard/admin pages
  *   BEDRUD_SCREENSHOT_PASSWORD
  *   BEDRUD_SCREENSHOT_OUT        output directory (default tools/screenshots/output)
  *   BEDRUD_SCREENSHOT_NO_START   set to 1 to skip spawning the app
+ *   BEDRUD_SESSION_TIMEOUT       ms to wait for an authenticated page to show the
+ *                                signed-in account before failing (default 30000)
+ *   BEDRUD_QUIET_TIMEOUT         ms to wait for loading placeholders to clear
+ *                                before shooting anyway (default 10000)
+ *   BEDRUD_MAX_SESSION_FAILURES  give up after this many signed-out pages
+ *                                (default 3)
  */
 
 import { spawn } from 'node:child_process'
@@ -27,7 +38,7 @@ const REPO_ROOT = path.resolve(__dirname, '../..')
 
 const args = parseArgs(process.argv.slice(2))
 
-const BASE_URL = trimSlash(args['base-url'] || process.env.BEDRUD_BASE_URL || 'http://127.0.0.1:7070')
+const BASE_URL = trimSlash(args['base-url'] || process.env.BEDRUD_BASE_URL || 'http://127.0.0.1:7071')
 const API_URL = trimSlash(args['api-url'] || process.env.BEDRUD_API_URL || 'http://127.0.0.1:7071')
 const EMAIL = args.email || process.env.BEDRUD_SCREENSHOT_EMAIL || ''
 const PASSWORD = args.password || process.env.BEDRUD_SCREENSHOT_PASSWORD || ''
@@ -38,6 +49,14 @@ const SHOULD_START =
   !args['no-start'] && process.env.BEDRUD_SCREENSHOT_NO_START !== '1'
 const HEADLESS = args.headful ? false : true
 const TIMEOUT_MS = Number(args.timeout || 30_000)
+const SESSION_TIMEOUT_MS = Number(args['session-timeout'] || process.env.BEDRUD_SESSION_TIMEOUT || 30_000)
+const QUIET_TIMEOUT_MS = Number(args['quiet-timeout'] || process.env.BEDRUD_QUIET_TIMEOUT || 10_000)
+// Every signed-out page costs a full SESSION_TIMEOUT_MS, and they fail in
+// batches: the run that exposed #129 had 88 of 104 fail, which at the default
+// timeout is 44 minutes against deploy-site's 20-minute job. The job would be
+// killed before printing the summary or the path to the evidence. The 88th
+// failure says nothing the first one did not.
+const MAX_SESSION_FAILURES = Number(args['max-session-failures'] || process.env.BEDRUD_MAX_SESSION_FAILURES || 3)
 const LIVEKIT_URL = trimSlash(args['livekit-url'] || process.env.BEDRUD_LIVEKIT_URL || 'http://127.0.0.1:7072')
 /** Iranian names + Koboyo face icons as profile pictures. */
 const HOST_PERSON = {
@@ -108,6 +127,12 @@ const ADMIN_PAGES = [
 ]
 
 const children = []
+
+/** Slugs of session-bearing pages that rendered their signed-out shell. */
+const sessionFailures = []
+
+/** A page whose capture is only meaningful once the session has taken. */
+const withSession = (pageDef) => ({ ...pageDef, requiresSession: true })
 
 process.on('SIGINT', () => shutdown(130))
 process.on('SIGTERM', () => shutdown(143))
@@ -190,7 +215,7 @@ async function main() {
       for (const theme of THEMES) {
         const pages = [...PUBLIC_PAGES]
         if (session) {
-          pages.push(...AUTHED_PAGES, ...ADMIN_PAGES)
+          pages.push(...AUTHED_PAGES.map(withSession), ...ADMIN_PAGES.map(withSession))
         }
         if (roomName) {
           pages.push(
@@ -229,8 +254,14 @@ async function main() {
           })
           if (Array.isArray(files)) manifest.push(...files)
           else if (files) manifest.push(files)
+          if (sessionFailures.length >= MAX_SESSION_FAILURES) break
         }
+        if (sessionFailures.length >= MAX_SESSION_FAILURES) break
       }
+      if (sessionFailures.length >= MAX_SESSION_FAILURES) break
+    }
+    if (sessionFailures.length >= MAX_SESSION_FAILURES) {
+      console.error(`\nstopping after ${sessionFailures.length} signed-out pages — the rest would fail the same way`)
     }
   } finally {
     for (const extra of extras) {
@@ -246,6 +277,18 @@ async function main() {
     `${JSON.stringify({ capturedAt: new Date().toISOString(), baseUrl: BASE_URL, files: manifest }, null, 2)}\n`,
   )
   console.log(`wrote ${manifest.length} screenshots → ${OUT_DIR}`)
+
+  // Fail loudly rather than publishing a gallery of signed-out shells. The
+  // manifest is written first so the run's artifacts survive for inspection.
+  if (sessionFailures.length) {
+    console.error(`\n${sessionFailures.length} authenticated page(s) never signed in as ${EMAIL}:`)
+    // "signed out:" prefixed, not bare — a bare slug is how a captured page is
+    // logged, and the two lists are otherwise indistinguishable in CI output.
+    for (const slug of sessionFailures) console.error(`  signed out: ${slug}`)
+    console.error(`evidence: ${path.join(OUT_DIR, 'failures')}`)
+    shutdown(1)
+  }
+
   shutdown(0)
 }
 
@@ -341,6 +384,11 @@ async function capturePage(browser, { pageDef, viewport, theme, session, expectP
       await waitForPeople(page, Math.min(peopleCount || 2, 4))
       await applyMeetingChrome(page, pageDef.kind, extras)
       await sleep(700)
+    }
+
+    if (pageDef.requiresSession && session && !skipAuth) {
+      await waitForSignedIn(page, slug)
+      await waitForQuiet(page, slug)
     }
 
     const slices = await captureScrollSlices(page, slug, {
@@ -476,6 +524,83 @@ async function settle(page) {
       if (document.fonts?.ready) await document.fonts.ready
     })
     .catch(() => {})
+}
+
+/**
+ * Prove the injected session actually took before the shutter fires.
+ *
+ * A dashboard page rendered signed out is indistinguishable from a finished one:
+ * the layout is complete, nothing errors, and the PNG publishes. The sidebar
+ * footer prints the account's email once the user store is filled, so that string
+ * is the evidence — and it identifies the account, not merely "somebody".
+ *
+ * Scoped to the sidebar, not the document: the admin users list and the
+ * recent-signups list both print the screenshot account's own address in the page
+ * body, so a whole-document match reports those two as signed in while the chrome
+ * beside them is still the signed-out shell.
+ *
+ * textContent, not innerText: the sidebar is `hidden lg:flex`, so it contributes
+ * no visible text at the mobile viewport while still sitting in the DOM.
+ *
+ * settle() is not enough on its own. It waits for readyState plus a fixed 600ms,
+ * which lands before the client finishes /api/auth/refresh and /api/auth/me.
+ */
+async function waitForSignedIn(page, slug) {
+  try {
+    await page.waitForFunction(
+      (email) => [...document.querySelectorAll('aside')].some((el) => el.textContent.includes(email)),
+      { timeout: SESSION_TIMEOUT_MS },
+      EMAIL,
+    )
+  } catch {
+    sessionFailures.push(slug)
+    const evidence = path.join(OUT_DIR, 'failures', `${slug}.png`)
+    // Outside OUT_DIR's own glob so publish-to-site.sh can never pick it up.
+    await mkdir(path.dirname(evidence), { recursive: true }).catch(() => {})
+    await page.screenshot({ path: evidence, fullPage: false }).catch(() => {})
+    throw new Error(`signed out after ${SESSION_TIMEOUT_MS}ms — ${EMAIL} never reached the page`)
+  }
+}
+
+/**
+ * Hold the shutter until the page has finished loading its own content.
+ *
+ * The session gate is satisfied by the chrome, and the panels inside it resolve
+ * a few hundred milliseconds later. Measured against the built bundle, at the
+ * moment the gate opens: /dashboard/admin still has 35 skeleton elements,
+ * /dashboard/admin/queue 22, /dashboard/admin/rooms reads "Loading rooms…" and
+ * /dashboard/admin/users "Loading users…". All four go quiet by t+1.9s, within
+ * 550ms of the gate. Shooting at the gate is what put the skeletons in the
+ * published gallery that #129 reported.
+ *
+ * Best-effort, unlike waitForSignedIn: a page that keeps a spinner on purpose
+ * should still be captured, so this warns and shoots rather than failing. A
+ * signed-out capture is wrong; a busy one is merely worse.
+ */
+async function waitForQuiet(page, slug) {
+  try {
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll('[class*="animate-pulse"]').length === 0 &&
+        !/\bLoading\b/.test(document.body.innerText),
+      { timeout: QUIET_TIMEOUT_MS },
+    )
+  } catch {
+    // Report what was still on screen. The gate keys on the `animate-pulse`
+    // class, and if that class is ever renamed it matches nothing, every page
+    // passes instantly, and the skeletons come back with nothing to say so.
+    // A warning naming zero placeholders is that failure, in the open.
+    const seen = await page
+      .evaluate(() => ({
+        placeholders: document.querySelectorAll('[class*="animate-pulse"]').length,
+        loading: (document.body.innerText.match(/Loading[^\n]*/g) || []).slice(0, 3),
+      }))
+      .catch(() => ({ placeholders: -1, loading: [] }))
+    console.warn(
+      `  ${slug}: still loading after ${QUIET_TIMEOUT_MS}ms — ${seen.placeholders} placeholder(s)` +
+        `${seen.loading.length ? `, ${JSON.stringify(seen.loading)}` : ''} — captured anyway`,
+    )
+  }
 }
 
 async function login(apiUrl, email, password) {
@@ -850,16 +975,12 @@ async function clickLabeled(page, prefixes) {
 }
 
 async function startStack() {
-  const webReady = await ping(BASE_URL).catch(() => false)
-  if (!webReady) {
-    console.log('starting web (make dev-web)…')
-    spawnManaged('make', ['dev-web'], { cwd: REPO_ROOT })
-  } else {
-    console.log(`web already listening on ${BASE_URL}`)
-  }
-
   const apiReady = await ping(API_URL).catch(() => false)
   if (!apiReady) {
+    // Order matters: the Go binary embeds server/frontend at compile time, so the
+    // bundle has to be written before the server is built.
+    console.log('building the web bundle into server/frontend (bun run build:embed)…')
+    await runToCompletion('bun', ['run', 'build:embed'], { cwd: path.join(REPO_ROOT, 'apps/web') })
     console.log('starting api (make dev-api)…')
     spawnManaged('make', ['dev-api'], { cwd: REPO_ROOT })
   } else {
@@ -873,6 +994,17 @@ async function startStack() {
   } else {
     console.log(`livekit already listening on ${LIVEKIT_URL}`)
   }
+}
+
+/** Run a build step to the end; a partial bundle would be embedded silently. */
+function runToCompletion(cmd, cmdArgs, opts) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, cmdArgs, { ...opts, stdio: 'inherit' })
+    child.on('error', reject)
+    child.on('exit', (code) =>
+      code === 0 ? resolve() : reject(new Error(`${cmd} ${cmdArgs.join(' ')} exited ${code}`)),
+    )
+  })
 }
 
 function spawnManaged(cmd, cmdArgs, opts) {

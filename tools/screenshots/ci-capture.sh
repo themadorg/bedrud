@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
-# Start local web + API + LiveKit and capture product screenshots (CI).
+# Build the app the way a release does, serve it from the Go binary, and capture
+# product screenshots (CI).
+#
+# The app and the API share one origin here because that is what a deployment
+# looks like: the Go server serves the embedded bundle from server/frontend and
+# answers /api on the same port. Capturing `vite dev` instead adds a TanStack
+# Start SSR pass whose dehydrated route loaders never re-run on the client, so
+# every dashboard page renders signed out — see #129.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -7,6 +14,9 @@ cd "$ROOT"
 
 EMAIL="${BEDRUD_SCREENSHOT_EMAIL:-screenshots@bedrud.local}"
 PASSWORD="${BEDRUD_SCREENSHOT_PASSWORD:-Screenshot1!}"
+
+# One origin for the app and the API — the Go server serves both.
+APP_URL="http://127.0.0.1:7071"
 
 export PATH="$HOME/.local/bin:$PATH"
 
@@ -38,9 +48,13 @@ if ! command -v livekit-server >/dev/null 2>&1; then
   chmod +x "$HOME/.local/bin/livekit-server"
 fi
 
+# Must precede the server build: server/frontend is embedded at compile time.
+# VITE_API_URL stays unset on purpose — an empty base is what makes the bundle
+# same-origin, and that is what a deployment ships.
+echo "➜ building the web bundle into server/frontend"
+(cd apps/web && bun run build:embed)
+
 echo "➜ starting stack"
-# Bind IPv4 so curl 127.0.0.1 works (Vite 8 on GH runners often listens on ::1 only).
-(cd apps/web && bun run dev -- --host 127.0.0.1 --port 7070) > /tmp/bedrud-web.log 2>&1 &
 make dev-api > /tmp/bedrud-api.log 2>&1 &
 make dev-livekit > /tmp/bedrud-lk.log 2>&1 &
 
@@ -50,6 +64,7 @@ http_up() {
 
 wait_port() {
   local url="$1"
+  local log="$2"
   local n=0
   until http_up "$url" || [ "$n" -ge 90 ]; do
     n=$((n + 1))
@@ -57,24 +72,15 @@ wait_port() {
   done
   if [ "$n" -ge 90 ]; then
     echo "timed out waiting for $url" >&2
-    tail -n 80 /tmp/bedrud-web.log /tmp/bedrud-api.log /tmp/bedrud-lk.log >&2 || true
+    tail -n 80 "$log" >&2 || true
     exit 1
   fi
 }
 
-wait_port "http://127.0.0.1:7070/"
-# API health
-n=0
-until http_up "http://127.0.0.1:7071/api/health" || [ "$n" -ge 90 ]; do
-  n=$((n + 1))
-  sleep 2
-done
-if [ "$n" -ge 90 ]; then
-  echo "timed out waiting for API" >&2
-  tail -n 80 /tmp/bedrud-api.log >&2 || true
-  exit 1
-fi
-wait_port "http://127.0.0.1:7072/"
+# The API health endpoint and the app itself come up together — one process.
+wait_port "$APP_URL/api/health" /tmp/bedrud-api.log
+wait_port "$APP_URL/" /tmp/bedrud-api.log
+wait_port "http://127.0.0.1:7072/" /tmp/bedrud-lk.log
 
 echo "➜ ensuring screenshot admin user"
 (cd server && go run ./cmd/bedrud --config config.yaml user create \
@@ -84,6 +90,8 @@ echo "➜ capturing screenshots"
 (cd tools/screenshots && \
   BEDRUD_SCREENSHOT_EMAIL="$EMAIL" \
   BEDRUD_SCREENSHOT_PASSWORD="$PASSWORD" \
+  BEDRUD_BASE_URL="$APP_URL" \
+  BEDRUD_API_URL="$APP_URL" \
   BEDRUD_SCREENSHOT_NO_START=1 \
   node screenshot.js --no-start --timeout 120000)
 
