@@ -567,7 +567,7 @@ func (r *RoomRepository) GetAllRoomsFiltered(p *RoomFilterParams) ([]models.Room
 
 	// Search
 	if p.Search != "" {
-		query = query.Where("name LIKE ?", "%"+p.Search+"%")
+		query = query.Where("rooms.name LIKE ?", "%"+p.Search+"%")
 	}
 
 	// Visibility
@@ -576,7 +576,7 @@ func (r *RoomRepository) GetAllRoomsFiltered(p *RoomFilterParams) ([]models.Room
 		for i, v := range p.Visibility {
 			bools[i] = v == "public"
 		}
-		query = query.Where("is_public IN ?", bools)
+		query = query.Where("rooms.is_public IN ?", bools)
 	}
 
 	// Status
@@ -587,11 +587,11 @@ func (r *RoomRepository) GetAllRoomsFiltered(p *RoomFilterParams) ([]models.Room
 
 		switch {
 		case hasActive && !hasSuspended && !hasArchived:
-			query = query.Where("is_active = ? AND deleted_at IS NULL", true)
+			query = query.Where("rooms.is_active = ? AND rooms.deleted_at IS NULL", true)
 		case hasSuspended && !hasActive && !hasArchived:
-			query = query.Where("is_active = ? AND deleted_at IS NULL", false)
+			query = query.Where("rooms.is_active = ? AND rooms.deleted_at IS NULL", false)
 		case hasArchived && !hasActive && !hasSuspended:
-			query = query.Where("deleted_at IS NOT NULL")
+			query = query.Where("rooms.deleted_at IS NOT NULL")
 		}
 	}
 
@@ -613,19 +613,23 @@ func (r *RoomRepository) GetAllRoomsFiltered(p *RoomFilterParams) ([]models.Room
 	if p.Occupancy == "" {
 		switch p.Capacity {
 		case "empty":
-			query = query.Where("max_participants = ?", 0)
+			query = query.Where("rooms.max_participants = ?", 0)
 		case "1-5":
-			query = query.Where("max_participants BETWEEN 1 AND 5")
+			query = query.Where("rooms.max_participants BETWEEN 1 AND 5")
 		case "6-20":
-			query = query.Where("max_participants BETWEEN 6 AND 20")
+			query = query.Where("rooms.max_participants BETWEEN 6 AND 20")
 		case "20+":
-			query = query.Where("max_participants > 20")
+			query = query.Where("rooms.max_participants > 20")
 		}
 	}
 
 	// Owner filter — JOIN with users table for owner lookup
 	needOwnerJoin := p.Owner != "" || p.DateFrom != "" || p.DateTo != "" || p.LastActivityFrom != "" || p.LastActivityTo != ""
 	if needOwnerJoin || p.Sort == "createdBy" || p.Sort == "lastActivityAt" || p.Sort == "participantsCount" {
+		// No projection: GORM quotes a lone Select("rooms.*") as an identifier
+		// and Postgres answers `column rooms.* does not exist`. The statement
+		// stays SELECT *, and the Postgres test asserts the room comes back with
+		// its own id and name rather than the joined user's.
 		query = query.Joins("LEFT JOIN users ON users.id = rooms.created_by")
 	}
 
@@ -634,42 +638,30 @@ func (r *RoomRepository) GetAllRoomsFiltered(p *RoomFilterParams) ([]models.Room
 	}
 
 	// Created date range
-	if p.DateFrom != "" {
-		t, err := time.Parse(time.RFC3339, p.DateFrom)
-		if err == nil {
-			query = query.Where("created_at >= ?", t)
-		}
+	if from, ok := dayStart(p.DateFrom); ok {
+		query = query.Where("rooms.created_at >= ?", from)
 	}
-	if p.DateTo != "" {
-		t, err := time.Parse(time.RFC3339, p.DateTo)
-		if err == nil {
-			query = query.Where("created_at <= ?", t)
-		}
+	if to, ok := dayEnd(p.DateTo); ok {
+		query = query.Where("rooms.created_at < ?", to)
 	}
 
 	// Last activity date range
-	if p.LastActivityFrom != "" {
-		t, err := time.Parse(time.RFC3339, p.LastActivityFrom)
-		if err == nil {
-			query = query.Where("(SELECT COALESCE(MAX(joined_at), '1970-01-01') FROM room_participants WHERE room_id = rooms.id AND is_active = ?) >= ?", true, t)
-		}
+	if from, ok := dayStart(p.LastActivityFrom); ok {
+		query = query.Where("(SELECT COALESCE(MAX(joined_at), '1970-01-01') FROM room_participants WHERE room_id = rooms.id AND is_active = ?) >= ?", true, from)
 	}
-	if p.LastActivityTo != "" {
-		t, err := time.Parse(time.RFC3339, p.LastActivityTo)
-		if err == nil {
-			query = query.Where("(SELECT COALESCE(MAX(joined_at), '1970-01-01') FROM room_participants WHERE room_id = rooms.id AND is_active = ?) <= ?", true, t)
-		}
+	if to, ok := dayEnd(p.LastActivityTo); ok {
+		query = query.Where("(SELECT COALESCE(MAX(joined_at), '1970-01-01') FROM room_participants WHERE room_id = rooms.id AND is_active = ?) < ?", true, to)
 	}
 
 	// Legacy created shortcut
 	if p.DateFrom == "" && p.DateTo == "" {
 		switch p.Created {
 		case "today":
-			query = query.Where("created_at >= ?", startOfDay(time.Now()))
+			query = query.Where("rooms.created_at >= ?", startOfDay(time.Now()))
 		case "7d":
-			query = query.Where("created_at >= ?", time.Now().AddDate(0, 0, -7))
+			query = query.Where("rooms.created_at >= ?", time.Now().AddDate(0, 0, -7))
 		case "30d":
-			query = query.Where("created_at >= ?", time.Now().AddDate(0, 0, -30))
+			query = query.Where("rooms.created_at >= ?", time.Now().AddDate(0, 0, -30))
 		}
 	}
 
@@ -680,25 +672,32 @@ func (r *RoomRepository) GetAllRoomsFiltered(p *RoomFilterParams) ([]models.Room
 	}
 
 	// Sort
-	orderClause := "created_at DESC"
+	orderClause := "rooms.created_at DESC"
 	switch p.Sort {
 	case sortFieldName:
-		orderClause = "name " + p.Order
+		orderClause = "rooms.name " + p.Order
 	case "maxParticipants":
-		orderClause = "max_participants " + p.Order
+		orderClause = "rooms.max_participants " + p.Order
 	case "createdAt":
-		orderClause = "created_at " + p.Order
+		orderClause = "rooms.created_at " + p.Order
 	case "participantsCount":
-		orderClause = "(SELECT COUNT(*) FROM room_participants WHERE room_id = rooms.id AND is_active = ? AND is_banned = ?) " + p.Order
-		query = query.Select("rooms.*", true, false)
+		// Written out for the same reason as lastActivityAt below. This one used
+		// to smuggle its two bind values in through Select("rooms.*", true,
+		// false), which SQLite tolerated and Postgres answered with
+		// "syntax error at or near \"AND\"".
+		orderClause = "(SELECT COUNT(*) FROM room_participants WHERE room_id = rooms.id AND is_active = true AND is_banned = false) " + p.Order
 	case "lastActivityAt":
-		orderClause = "COALESCE((SELECT MAX(joined_at) FROM room_participants WHERE room_id = rooms.id AND is_active = ?), created_at) " + p.Order
+		// The predicate is written out rather than bound. Order() takes no bind
+		// arguments, so the `?` this used to carry reached the driver unfilled
+		// and every request sorting by last activity failed with "not enough
+		// args to execute query: want 1 got 0" — on both dialects, join or no
+		// join. `= true` is accepted by SQLite and Postgres alike.
+		orderClause = "COALESCE((SELECT MAX(joined_at) FROM room_participants WHERE room_id = rooms.id AND is_active = true), rooms.created_at) " + p.Order
 	case "createdBy":
+		// The join is already in place: the guard above adds it for this sort
+		// as well as for the owner and date filters. Adding it again here made
+		// users.id ambiguous against itself.
 		orderClause = "users.name " + p.Order
-		// Ensure users JOIN is present
-		if !needOwnerJoin {
-			query = query.Joins("LEFT JOIN users ON users.id = rooms.created_by")
-		}
 	}
 	query = query.Order(orderClause)
 
@@ -1408,19 +1407,15 @@ func (r *RoomRepository) GetRoomEventsFiltered(p *RoomEventsFilterParams) ([]mod
 	// upper bound lands before the end of the day being asked for, west of it
 	// the lower bound reaches back into the previous one. time.Parse with no
 	// zone yields UTC, so the filter means the UTC day on every server.
-	if p.DateFrom != "" {
-		if d, err := time.Parse("2006-01-02", p.DateFrom); err == nil {
-			conditions = append(conditions, "timestamp >= ?")
-			args = append(args, d)
-		}
+	if from, ok := dayStart(p.DateFrom); ok {
+		conditions = append(conditions, "timestamp >= ?")
+		args = append(args, from)
 	}
-	if p.DateTo != "" {
-		// Exclusive upper bound computed here rather than in SQL: date(x, '+1 day')
-		// is a SQLite builtin and errors out on Postgres.
-		if d, err := time.Parse("2006-01-02", p.DateTo); err == nil {
-			conditions = append(conditions, "timestamp < ?")
-			args = append(args, d.AddDate(0, 0, 1))
-		}
+	// Exclusive upper bound computed in Go rather than in SQL: date(x, '+1 day')
+	// is a SQLite builtin and errors out on Postgres.
+	if to, ok := dayEnd(p.DateTo); ok {
+		conditions = append(conditions, "timestamp < ?")
+		args = append(args, to)
 	}
 
 	whereSQL := ""
