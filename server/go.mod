@@ -1,6 +1,6 @@
 module bedrud
 
-go 1.26
+go 1.26.0
 
 require (
 	github.com/caddyserver/certmagic v0.25.4
@@ -21,7 +21,7 @@ require (
 	github.com/swaggo/swag v1.16.6
 	github.com/twitchtv/twirp v8.1.3+incompatible
 	github.com/ulikunitz/xz v0.5.16
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.56.0
 	golang.org/x/mod v0.40.0
 	golang.org/x/net v0.58.0
 	golang.org/x/text v0.41.0
