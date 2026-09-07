@@ -815,22 +815,3 @@ func (r *UserRepository) GetRecentUsers(limit int) ([]models.User, error) {
 	err := r.db.Order("created_at DESC").Limit(limit).Find(&users).Error
 	return users, err
 }
-
-// CountUsersByDay returns user signup counts grouped by day for the last N days.
-func (r *UserRepository) CountUsersByDay(days int) (models.DaySeries, error) {
-	start := dayWindowStart(time.Now(), days)
-	dayExpr := utcDayExpr(r.db, "created_at")
-	var rows []dayCountRow
-	err := r.db.Model(&models.User{}).
-		Select(dayExpr+" as date, COUNT(*) as count").
-		Where("created_at >= ?", dayQueryFloor(start)).
-		Group(dayExpr).
-		Order("date ASC").
-		Scan(&rows).Error
-	if err != nil {
-		return models.DaySeries{}, err
-	}
-	// The day helpers live in room_repository.go; this function used to carry
-	// its own copy of the zero-fill, with the same day-window defect.
-	return buildDaySeries(rows, days, start, "users.created_at")
-}
