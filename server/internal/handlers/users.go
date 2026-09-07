@@ -1106,18 +1106,11 @@ func (h *UsersHandler) ListRecentSignups(c *fiber.Ctx) error {
 	}
 
 	// Date range — validate format
-	p.DateFrom = c.Query("dateFrom")
-	p.DateTo = c.Query("dateTo")
-	if p.DateFrom != "" {
-		if _, err := time.Parse("2006-01-02", p.DateFrom); err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "Invalid dateFrom format, expected YYYY-MM-DD"})
-		}
+	dates, invalid := queryDayFilters(c, "dateFrom", "dateTo")
+	if invalid != "" {
+		return c.Status(400).JSON(fiber.Map{"error": invalidDayFilter(invalid)})
 	}
-	if p.DateTo != "" {
-		if _, err := time.Parse("2006-01-02", p.DateTo); err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "Invalid dateTo format, expected YYYY-MM-DD"})
-		}
-	}
+	p.DateFrom, p.DateTo = dates[0], dates[1]
 
 	// Sort
 	p.Sort = c.Query("sort", "createdAt")

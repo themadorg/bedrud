@@ -762,16 +762,14 @@ func (r *UserRepository) GetRecentSignupsFiltered(p *RecentSignupsFilterParams) 
 		query = query.Where("provider != ?", models.ProviderGuest)
 	}
 
-	// Date range
-	if p.DateFrom != "" {
-		if t, err := time.Parse("2006-01-02", p.DateFrom); err == nil {
-			query = query.Where("created_at >= ?", t)
-		}
+	// Date range. Upper bound exclusive: `<= dateTo + 24h` included the
+	// following midnight, so a user created at exactly 00:00:00.000000000
+	// belonged to two adjacent day filters at once.
+	if from, ok := dayStart(p.DateFrom); ok {
+		query = query.Where("created_at >= ?", from)
 	}
-	if p.DateTo != "" {
-		if t, err := time.Parse("2006-01-02", p.DateTo); err == nil {
-			query = query.Where("created_at <= ?", t.Add(24*time.Hour))
-		}
+	if to, ok := dayEnd(p.DateTo); ok {
+		query = query.Where("created_at < ?", to)
 	}
 
 	// Sort
