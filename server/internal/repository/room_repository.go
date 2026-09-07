@@ -1480,6 +1480,12 @@ func (r *RoomRepository) GetRoomEventsFiltered(p *RoomEventsFilterParams) ([]mod
 			Timestamp: timestamp,
 		})
 	}
+	// A result set can stop early — a dropped connection, a driver-side error
+	// after the first row — and rows.Next() reports that the same way it reports
+	// the end of the data. Without this the page silently comes back short.
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
 	if events == nil {
 		events = []models.RoomEvent{}
 	}
@@ -1530,6 +1536,9 @@ func (r *RoomRepository) GetRecentRoomEvents(limit int) ([]models.RoomEvent, err
 			UserName:  userName,
 			Timestamp: timestamp,
 		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	if events == nil {
 		events = []models.RoomEvent{}
