@@ -181,6 +181,11 @@ const config = defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // Node 22 and later define their own `localStorage` and `sessionStorage` accessors on
+    // the global object, which yield `undefined` unless `--localstorage-file` is set. The
+    // jsdom environment leaves an existing global alone, so tests would see Node's empty
+    // accessor instead of jsdom's Storage. Switching Node's Web Storage off restores jsdom's.
+    execArgv: ['--no-experimental-webstorage'],
     setupFiles: [],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     exclude: ['**/node_modules/**', '**/vendor/excalidraw/**'],
