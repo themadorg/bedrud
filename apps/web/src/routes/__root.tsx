@@ -12,7 +12,11 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import appCss from '../styles.css?url'
 
 // Inline script that runs before first paint to avoid theme flash.
-// Reads the persisted Zustand value from localStorage directly.
+// Reads the persisted Zustand value from localStorage directly, then writes the resolved
+// background into the theme-color meta so the system bar is right from the first frame. The
+// script creates that meta itself because React must not render one: React 19 hydrates head
+// metas as hoistables keyed by their content, so a meta this script has recoloured no longer
+// matches and React appends a second, stale one.
 const themeScript = `
 (function(){
   try {
@@ -21,6 +25,16 @@ const themeScript = `
     var dark = theme === 'dark' ||
       (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     if (dark) document.documentElement.classList.add('dark');
+    var background = getComputedStyle(document.documentElement).getPropertyValue('--background').trim();
+    if (background) {
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'theme-color');
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', background);
+    }
   } catch(e) {}
 })();
 `
