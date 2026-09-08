@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { IntlProvider } from 'react-intl'
 import { Toaster } from 'sonner'
 import { useAuthStore } from '#/lib/auth.store'
+import { documentLinks, documentMeta } from '#/lib/document-head'
 import { applyTheme, useThemeStore } from '#/lib/theme.store'
 import { installVisualViewportCssVars } from '#/lib/visual-viewport'
 import enMessages from '#/locales/en.json'
@@ -60,17 +61,8 @@ const queryClient = new QueryClient({
 
 export const Route = createRootRoute({
   head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
-      { title: 'Bedrud' },
-    ],
-    links: [
-      { rel: 'stylesheet', href: appCss },
-      { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
-      { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
-      { rel: 'manifest', href: '/manifest.json' },
-    ],
+    meta: documentMeta,
+    links: documentLinks(appCss),
     scripts: [{ children: themeScript }, { children: viewportScript }],
   }),
   shellComponent: RootDocument,
