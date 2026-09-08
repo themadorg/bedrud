@@ -762,16 +762,14 @@ func (r *UserRepository) GetRecentSignupsFiltered(p *RecentSignupsFilterParams) 
 		query = query.Where("provider != ?", models.ProviderGuest)
 	}
 
-	// Date range
-	if p.DateFrom != "" {
-		if t, err := time.Parse("2006-01-02", p.DateFrom); err == nil {
-			query = query.Where("created_at >= ?", t)
-		}
+	// Date range. Upper bound exclusive: `<= dateTo + 24h` included the
+	// following midnight, so a user created at exactly 00:00:00.000000000
+	// belonged to two adjacent day filters at once.
+	if from, ok := dayStart(p.DateFrom); ok {
+		query = query.Where("created_at >= ?", from)
 	}
-	if p.DateTo != "" {
-		if t, err := time.Parse("2006-01-02", p.DateTo); err == nil {
-			query = query.Where("created_at <= ?", t.Add(24*time.Hour))
-		}
+	if to, ok := dayEnd(p.DateTo); ok {
+		query = query.Where("created_at < ?", to)
 	}
 
 	// Sort
@@ -816,23 +814,4 @@ func (r *UserRepository) GetRecentUsers(limit int) ([]models.User, error) {
 	var users []models.User
 	err := r.db.Order("created_at DESC").Limit(limit).Find(&users).Error
 	return users, err
-}
-
-// CountUsersByDay returns user signup counts grouped by day for the last N days.
-func (r *UserRepository) CountUsersByDay(days int) (models.DaySeries, error) {
-	start := dayWindowStart(time.Now(), days)
-	dayExpr := utcDayExpr(r.db, "created_at")
-	var rows []dayCountRow
-	err := r.db.Model(&models.User{}).
-		Select(dayExpr+" as date, COUNT(*) as count").
-		Where("created_at >= ?", dayQueryFloor(start)).
-		Group(dayExpr).
-		Order("date ASC").
-		Scan(&rows).Error
-	if err != nil {
-		return models.DaySeries{}, err
-	}
-	// The day helpers live in room_repository.go; this function used to carry
-	// its own copy of the zero-fill, with the same day-window defect.
-	return buildDaySeries(rows, days, start, "users.created_at")
 }

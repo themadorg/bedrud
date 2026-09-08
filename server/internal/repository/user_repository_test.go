@@ -452,54 +452,6 @@ func TestUserRepository_GetRecentUsers_Empty(t *testing.T) {
 	}
 }
 
-func TestUserRepository_CountUsersByDay(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	repo := NewUserRepository(db)
-	now := time.Now().UTC()
-
-	// Create users with specific CreatedAt
-	u1 := &models.User{ID: "cud-1", Email: "cud1@ex.com", Name: "CUD1", Provider: "local", IsActive: true}
-	u2 := &models.User{ID: "cud-2", Email: "cud2@ex.com", Name: "CUD2", Provider: "local", IsActive: true}
-	u3 := &models.User{ID: "cud-3", Email: "cud3@ex.com", Name: "CUD3", Provider: "local", IsActive: true}
-	_ = repo.CreateUser(u1)
-	_ = repo.CreateUser(u2)
-	_ = repo.CreateUser(u3)
-
-	day0 := now.Add(-24 * time.Hour)
-	day1 := now.Add(-48 * time.Hour)
-	db.Model(&models.User{}).Where("id = ?", "cud-1").Update("created_at", day0)
-	db.Model(&models.User{}).Where("id = ?", "cud-2").Update("created_at", day0)
-	db.Model(&models.User{}).Where("id = ?", "cud-3").Update("created_at", day1)
-
-	series, err := repo.CountUsersByDay(7)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	counts := series.Days
-	if len(counts) != 7 {
-		t.Fatalf("expected 7 days, got %d", len(counts))
-	}
-
-	day0Key := day0.Format("2006-01-02")
-	day1Key := day1.Format("2006-01-02")
-	var day0Count, day1Count int
-	for _, c := range counts {
-		key := c.Date.Format("2006-01-02")
-		if key == day0Key {
-			day0Count = c.Count
-		}
-		if key == day1Key {
-			day1Count = c.Count
-		}
-	}
-	if day0Count != 2 {
-		t.Fatalf("expected 2 users on %s, got %d", day0Key, day0Count)
-	}
-	if day1Count != 1 {
-		t.Fatalf("expected 1 user on %s, got %d", day1Key, day1Count)
-	}
-}
-
 func TestUserRepository_CountUsersFiltered(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := NewUserRepository(db)

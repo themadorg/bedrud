@@ -54,7 +54,6 @@ func wantDayKeys(days int) []string {
 func TestDayCounts_SeriesCoversUTCDaysEndingToday(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	roomRepo := NewRoomRepository(db)
-	userRepo := NewUserRepository(db)
 
 	if err := db.Create(&models.User{
 		ID: "dc-owner", Email: "dc-owner@ex.com", Name: "DcOwner",
@@ -75,7 +74,6 @@ func TestDayCounts_SeriesCoversUTCDaysEndingToday(t *testing.T) {
 		{"rooms created", roomRepo.CountRoomsByDay},
 		{"active participants", roomRepo.CountActiveParticipantsByDay},
 		{"active rooms", roomRepo.CountActiveRoomsByDay},
-		{"users", userRepo.CountUsersByDay},
 	}
 
 	want := wantDayKeys(7)

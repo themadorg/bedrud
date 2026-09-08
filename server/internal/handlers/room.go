@@ -2066,6 +2066,11 @@ func (h *RoomHandler) UpdateSettings(c *fiber.Ctx) error {
 // @Param visibility query string false "Comma-separated: public, private"
 // @Param occupancy query string false "Filter by participant count: empty, 1-5, 6-20, 20+"
 // @Param createdBy query string false "Filter by creator user ID"
+// @Param owner query string false "Filter by owner name or email"
+// @Param dateFrom query string false "Created on or after this date (YYYY-MM-DD)"
+// @Param dateTo query string false "Created on or before this date, inclusive (YYYY-MM-DD)"
+// @Param lastActivityFrom query string false "Last activity on or after this date (YYYY-MM-DD)"
+// @Param lastActivityTo query string false "Last activity on or before this date, inclusive (YYYY-MM-DD)"
 // @Param sort query string false "Sort field: name, createdAt, maxParticipants, participantsCount, lastActivityAt, createdBy" default(createdAt)
 // @Param order query string false "Sort direction: asc, desc" default(desc)
 // @Success 200 {object} map[string]interface{} "{rooms, total, page, limit}"
@@ -2133,10 +2138,15 @@ func (h *RoomHandler) AdminListRooms(c *fiber.Ctx) error {
 
 	// Parse new filters
 	p.Owner = c.Query("owner")
-	p.DateFrom = c.Query("dateFrom")
-	p.DateTo = c.Query("dateTo")
-	p.LastActivityFrom = c.Query("lastActivityFrom")
-	p.LastActivityTo = c.Query("lastActivityTo")
+
+	// All four take a bare YYYY-MM-DD, the shape the other admin date filters
+	// document and the admin UI sends. They used to be handed to the repository
+	// unchecked, where an RFC3339 parse dropped whatever it could not read.
+	dates, invalid := queryDayFilters(c, "dateFrom", "dateTo", "lastActivityFrom", "lastActivityTo")
+	if invalid != "" {
+		return c.Status(400).JSON(fiber.Map{"error": invalidDayFilter(invalid)})
+	}
+	p.DateFrom, p.DateTo, p.LastActivityFrom, p.LastActivityTo = dates[0], dates[1], dates[2], dates[3]
 
 	// Parse sort/order
 	p.Sort = c.Query("sort", "createdAt")
@@ -2913,18 +2923,11 @@ func (h *RoomHandler) ListRoomEvents(c *fiber.Ctx) error {
 	}
 
 	// Date range — validate format
-	p.DateFrom = c.Query("dateFrom")
-	p.DateTo = c.Query("dateTo")
-	if p.DateFrom != "" {
-		if _, err := time.Parse("2006-01-02", p.DateFrom); err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "Invalid dateFrom format, expected YYYY-MM-DD"})
-		}
+	dates, invalid := queryDayFilters(c, "dateFrom", "dateTo")
+	if invalid != "" {
+		return c.Status(400).JSON(fiber.Map{"error": invalidDayFilter(invalid)})
 	}
-	if p.DateTo != "" {
-		if _, err := time.Parse("2006-01-02", p.DateTo); err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "Invalid dateTo format, expected YYYY-MM-DD"})
-		}
-	}
+	p.DateFrom, p.DateTo = dates[0], dates[1]
 
 	// Order
 	p.Order = c.Query("order", orderDesc)
