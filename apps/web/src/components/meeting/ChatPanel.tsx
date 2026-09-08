@@ -1,6 +1,6 @@
 import { useLocalParticipant, useParticipants } from '@livekit/components-react'
 import { Mic, MicOff, Pin, Users, X } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { DeafenHeadphonesIcon } from '@/components/meeting/DeafenHeadphonesIcon'
 import {
@@ -16,13 +16,11 @@ import { MeetingElevatedPanelBody, MeetingElevatedPanelHeader } from '@/componen
 import { useMeetingExpandChromeHandlers } from '@/components/meeting/meeting-expand-chrome-context'
 import { useMeetingMicKeyboard } from '@/components/meeting/useMeetingMicKeyboard'
 import { api } from '@/lib/api'
+import { useIsMobile } from '@/lib/use-is-mobile'
 import { cn } from '@/lib/utils'
 import { ChatInput, type ChatInputHandle } from './chat/ChatInput'
 import { ChatMessageList } from './chat/ChatMessageList'
 import { useFocusTrap } from './useFocusTrap'
-
-/** Matches Tailwind `sm` and ControlsBar mobile breakpoint (640px). */
-const MOBILE_MAX_WIDTH_MQ = '(max-width: 639px)'
 
 /**
  * Unpinned overlay above stage WebXDC (body z-15) and screen-share shells (z-5).
@@ -59,20 +57,6 @@ const headerBtnClass = (active = false) =>
       : 'text-[var(--meet-fg-muted)] hover:bg-[var(--meet-control)] hover:text-[var(--meet-fg-strong)]',
   )
 
-function useIsMobileChat() {
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia(MOBILE_MAX_WIDTH_MQ).matches : false,
-  )
-  useEffect(() => {
-    const mq = window.matchMedia(MOBILE_MAX_WIDTH_MQ)
-    const onChange = () => setIsMobile(mq.matches)
-    onChange()
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [])
-  return isMobile
-}
-
 export function ChatPanel({
   onClose,
   roomId,
@@ -93,7 +77,7 @@ export function ChatPanel({
 }: Props) {
   const inputRef = useRef<ChatInputHandle>(null)
   const noop = useCallback(() => {}, [])
-  const isMobile = useIsMobileChat()
+  const isMobile = useIsMobile()
   const { closeChat: closeElevatedChat } = useMeetingExpandChromeHandlers()
   const handleClose = elevated ? closeElevatedChat : onClose
   const isDocked = stuck && !isMobile
@@ -210,14 +194,14 @@ export function ChatPanel({
 
   const body = (
     <>
-      <div className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--meet-border-subtle)] px-3 sm:h-[52px] sm:px-4">
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--meet-border-subtle)] px-3 lg:h-[52px] lg:px-4">
         <span className="text-base font-semibold text-[var(--meet-fg-strong)]">Chat</span>
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex items-center gap-1 lg:gap-2">
           {!elevated && (
             <button
               type="button"
               onClick={() => onStuckChange?.(!stuck)}
-              className={cn(headerBtnClass(stuck), 'max-sm:hidden')}
+              className={cn(headerBtnClass(stuck), 'max-lg:hidden')}
               aria-label={stuck ? 'Unstick chat' : 'Stick chat open'}
               aria-pressed={stuck}
             >
@@ -227,7 +211,7 @@ export function ChatPanel({
           <button
             type="button"
             onClick={handleClose}
-            className={cn(headerBtnClass(), 'h-11 w-11 max-sm:rounded-lg')}
+            className={cn(headerBtnClass(), 'h-11 w-11 max-lg:rounded-lg')}
             aria-label="Close chat"
           >
             <X size={18} />
@@ -270,10 +254,10 @@ export function ChatPanel({
         'fixed left-[var(--app-offset-left,0px)] top-[var(--app-offset-top,0px)] h-[var(--app-height,100svh)] w-[var(--app-width,100svw)] max-h-[var(--app-height,100svh)] max-w-[var(--app-width,100svw)]',
         'pt-[env(safe-area-inset-top,0px)]',
         // Desktop: 320px sidebar — always `fixed` so overlay can sit above body-portaled stage apps.
-        'sm:fixed sm:top-0 sm:h-full sm:max-h-none sm:w-[min(320px,var(--app-width,100svw))] sm:max-w-none sm:pt-[env(safe-area-inset-top,0px)] sm:pb-[env(safe-area-inset-bottom,0px)]',
+        'lg:fixed lg:top-0 lg:h-full lg:max-h-none lg:w-[min(320px,var(--app-width,100svw))] lg:max-w-none lg:pt-[env(safe-area-inset-top,0px)] lg:pb-[env(safe-area-inset-bottom,0px)]',
         fromLeft
-          ? 'sm:left-0 sm:right-auto sm:border-r sm:border-[var(--meet-border-subtle)]'
-          : 'sm:left-auto sm:right-0 sm:border-l sm:border-[var(--meet-border-subtle)]',
+          ? 'lg:left-0 lg:right-auto lg:border-r lg:border-[var(--meet-border-subtle)]'
+          : 'lg:left-auto lg:right-0 lg:border-l lg:border-[var(--meet-border-subtle)]',
         isOverlay && 'shadow-2xl',
       )}
     >

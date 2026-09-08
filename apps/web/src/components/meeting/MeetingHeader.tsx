@@ -87,9 +87,9 @@ export function MeetingHeader({ meetId, infoOpen = false, onToggleInfo }: Meetin
         className={cn(
           'flex h-14 min-w-0 items-center gap-2 pointer-events-auto leading-none',
           // Mobile: left-aligned, clear of top-right icons.
-          'justify-start ps-3 max-sm:pe-[calc(100px+env(safe-area-inset-right,0px))]',
+          'justify-start ps-3 max-lg:pe-[calc(100px+env(safe-area-inset-right,0px))]',
           // Desktop: centered title cluster.
-          'sm:justify-center sm:px-4',
+          'lg:justify-center lg:px-4',
         )}
       >
         {/* Connection status — desktop only (mobile: Room info in ⋯ menu) */}
@@ -98,7 +98,7 @@ export function MeetingHeader({ meetId, infoOpen = false, onToggleInfo }: Meetin
           onClick={onToggleInfo}
           disabled={!onToggleInfo}
           className={cn(
-            'hidden sm:flex items-center gap-[5px] rounded-[7px] px-[9px] py-[3px] border transition-all duration-150',
+            'hidden lg:flex items-center gap-[5px] rounded-[7px] px-[9px] py-[3px] border transition-all duration-150',
             onToggleInfo && 'cursor-pointer hover:brightness-110',
             !onToggleInfo && 'cursor-default',
             infoOpen
@@ -184,7 +184,7 @@ export function MeetingHeader({ meetId, infoOpen = false, onToggleInfo }: Meetin
             {statusLabel}
           </span>
         </button>
-        <span className="hidden text-[13px] leading-none text-[var(--meet-fg-muted)] sm:inline">·</span>
+        <span className="hidden text-[13px] leading-none text-[var(--meet-fg-muted)] lg:inline">·</span>
         <span className="truncate text-xs font-mono leading-none text-[var(--meet-fg-muted)]">{meetId}</span>
         <span className="text-[13px] leading-none text-[var(--meet-fg-muted)]">·</span>
         <button

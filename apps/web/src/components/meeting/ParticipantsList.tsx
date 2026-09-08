@@ -51,11 +51,11 @@ export function ParticipantsList({ onClose, adminId }: Props) {
         'fixed left-[var(--app-offset-left,0px)] top-[var(--app-offset-top,0px)] h-[var(--app-height,100svh)] w-[var(--app-width,100svw)] max-h-[var(--app-height,100svh)] max-w-[var(--app-width,100svw)]',
         'pt-[env(safe-area-inset-top,0px)] pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]',
         // Desktop: left sidebar — fixed + body portal so it stacks above stage WebXDC (z-15).
-        'sm:fixed sm:inset-y-0 sm:start-0 sm:bottom-0 sm:left-0 sm:top-0 sm:h-full sm:max-h-none sm:w-[min(288px,var(--app-width,100svw))] sm:max-w-none sm:border-e sm:border-[var(--meet-border-subtle)] sm:pb-[calc(88px+env(safe-area-inset-bottom,0px))]',
+        'lg:fixed lg:inset-y-0 lg:start-0 lg:bottom-0 lg:left-0 lg:top-0 lg:h-full lg:max-h-none lg:w-[min(288px,var(--app-width,100svw))] lg:max-w-none lg:border-e lg:border-[var(--meet-border-subtle)] lg:pb-[calc(88px+env(safe-area-inset-bottom,0px))]',
       )}
     >
       {/* Header */}
-      <div className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--meet-border-subtle)] px-3 sm:h-[52px] sm:px-4">
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--meet-border-subtle)] px-3 lg:h-[52px] lg:px-4">
         <div className="flex items-center gap-[7px]">
           <Users size={14} className="text-[var(--meet-btn-muted-fg)]" />
           <span className="text-[13px] font-semibold text-[var(--meet-fg-strong)]">Participants</span>
@@ -66,10 +66,10 @@ export function ParticipantsList({ onClose, adminId }: Props) {
         <button
           type="button"
           onClick={onClose}
-          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-[7px] border-none bg-transparent text-[var(--meet-fg-muted)] transition-[background,color] duration-150 hover:bg-[var(--meet-control)] hover:text-[var(--meet-fg-strong)] sm:h-7 sm:w-7"
+          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-[7px] border-none bg-transparent text-[var(--meet-fg-muted)] transition-[background,color] duration-150 hover:bg-[var(--meet-control)] hover:text-[var(--meet-fg-strong)] lg:h-7 lg:w-7"
           aria-label="Close participants"
         >
-          <X size={18} className="sm:h-[15px] sm:w-[15px]" />
+          <X size={18} className="lg:h-[15px] lg:w-[15px]" />
         </button>
       </div>
 

@@ -1,3 +1,10 @@
+/**
+ * Docking state for the meeting overlays, and the layout class helpers that read it.
+ *
+ * The `lg:` and `max-lg:` prefixes in this file must move together with `MOBILE_BREAKPOINT_PX`
+ * in `lib/use-is-mobile.ts`, or the CSS layout and the hook disagree about where phone ends.
+ */
+
 import { createContext, type ReactNode, useContext, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -35,13 +42,13 @@ export function useMeetingUILayout() {
  */
 export function meetRightInsetClass({ chatDocked, participantsDocked }: MeetingUILayoutState) {
   if (chatDocked && participantsDocked) {
-    return 'right-0 sm:right-[min(calc(320px+288px),var(--app-width,100svw))]'
+    return 'right-0 lg:right-[min(calc(320px+288px),var(--app-width,100svw))]'
   }
   if (chatDocked) {
-    return 'right-0 sm:right-[min(320px,var(--app-width,100svw))]'
+    return 'right-0 lg:right-[min(320px,var(--app-width,100svw))]'
   }
   if (participantsDocked) {
-    return 'right-0 sm:right-[min(288px,var(--app-width,100svw))]'
+    return 'right-0 lg:right-[min(288px,var(--app-width,100svw))]'
   }
   return 'right-0'
 }
@@ -55,7 +62,7 @@ export function meetStageBottomClass({ participantsDocked }: Pick<MeetingUILayou
     // Keep full class strings static for Tailwind. Values match MEET_MOBILE_* constants (68 + 72).
     return cn(
       'bottom-[calc(88px+env(safe-area-inset-bottom))]',
-      'max-sm:bottom-[calc(68px+72px+env(safe-area-inset-bottom))]',
+      'max-lg:bottom-[calc(68px+72px+env(safe-area-inset-bottom))]',
     )
   }
   return 'bottom-[calc(88px+env(safe-area-inset-bottom))]'
@@ -74,13 +81,13 @@ export function meetStageShellClass(layout: MeetingUILayoutState, extra?: string
 export function meetControlsDockClass({ chatDocked, participantsDocked }: MeetingUILayoutState) {
   // Mobile: always centered (filmstrip is bottom, not side).
   if (chatDocked && participantsDocked) {
-    return 'left-1/2 sm:left-[calc(50%-min(160px,50vw)-min(144px,50vw))]'
+    return 'left-1/2 lg:left-[calc(50%-min(160px,50vw)-min(144px,50vw))]'
   }
   if (chatDocked) {
-    return 'left-1/2 sm:left-[calc(50%-min(160px,50vw))]'
+    return 'left-1/2 lg:left-[calc(50%-min(160px,50vw))]'
   }
   if (participantsDocked) {
-    return 'left-1/2 sm:left-[calc(50%-min(144px,50vw))]'
+    return 'left-1/2 lg:left-[calc(50%-min(144px,50vw))]'
   }
   return 'left-1/2'
 }

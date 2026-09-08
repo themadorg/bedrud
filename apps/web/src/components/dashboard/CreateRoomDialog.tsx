@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { getErrorMessage } from '@/lib/errors'
+import { isMobileViewport } from '@/lib/use-is-mobile'
 import { cn } from '@/lib/utils'
 
 export interface RoomSettings {
@@ -94,7 +95,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
 
   useEffect(() => {
     if (!open) return
-    if (window.matchMedia('(max-width: 767px)').matches) {
+    if (isMobileViewport()) {
       setName(randomRoomName())
     }
   }, [open])
@@ -119,7 +120,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
   }
 
   function handleOpenAutoFocus(e: Event) {
-    if (window.matchMedia('(max-width: 767px)').matches) {
+    if (isMobileViewport()) {
       e.preventDefault()
       return
     }

@@ -87,7 +87,7 @@ export function MeetingPanels({
     <>
       {/* Desktop left chrome (participants stay left on desktop; mobile uses top-right icons). */}
       <div
-        className="absolute z-[25] hidden items-center gap-2 sm:flex"
+        className="absolute z-[25] hidden items-center gap-2 lg:flex"
         style={{
           top: 'calc(14px + env(safe-area-inset-top, 0px))',
           left: 'calc(14px + env(safe-area-inset-left, 0px))',
@@ -100,7 +100,7 @@ export function MeetingPanels({
 
       {/* Mobile top-right: participants + chat — vertically centered in the 56px header band. */}
       <div
-        className={cn('absolute z-[25] flex h-9 items-center gap-2 sm:hidden', mobileOverlayOpen && 'hidden')}
+        className={cn('absolute z-[25] flex h-9 items-center gap-2 lg:hidden', mobileOverlayOpen && 'hidden')}
         style={{
           // (56px band − 38px buttons) / 2 = 9px below safe-area
           top: 'calc(env(safe-area-inset-top, 0px) + 9px)',
@@ -112,7 +112,7 @@ export function MeetingPanels({
       </div>
 
       {/* Desktop chat — top-right */}
-      <ChatToggle isOpen={chatOpen} onToggle={toggleChat} className="hidden sm:flex" />
+      <ChatToggle isOpen={chatOpen} onToggle={toggleChat} className="hidden lg:flex" />
 
       <RoomAccessDialog open={accessDialogOpen} onOpenChange={setAccessDialogOpen} />
 

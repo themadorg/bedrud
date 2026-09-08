@@ -37,6 +37,7 @@ import { useAuthStore } from '#/lib/auth.store'
 import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
 import { readMeetingDeviceId, writeMeetingDeviceId } from '#/lib/meeting-device-storage'
 import { SCREEN_SHARE_CAPTURE_OPTIONS } from '#/lib/screen-share-capture'
+import { useIsMobile } from '#/lib/use-is-mobile'
 import { getPublicSettings, refreshPublicSettings } from '#/lib/use-public-settings'
 import { useRequestNoiseMode } from '#/lib/use-request-noise-mode'
 import { cn } from '#/lib/utils'
@@ -85,22 +86,6 @@ interface Props {
   onLeave: () => void
   /** Mobile room-chrome actions live in the existing bottom ⋯ (not a second top ⋯). */
   moreExtras?: ControlsBarMoreExtras
-}
-
-/* ── Mobile detection ──────────────────────────────────────────────────────── */
-
-function useIsMobile(breakpoint = 640) {
-  const [mobile, setMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia(`(max-width: ${breakpoint - 1}px)`).matches : false,
-  )
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
-    const onChange = () => setMobile(mq.matches)
-    onChange()
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [breakpoint])
-  return mobile
 }
 
 /* ── CtrlBtn: tooltip-wrapped control button ─────────────────────────────── */
@@ -180,7 +165,7 @@ function CtrlBtn({
   )
 }
 
-const dividerCn = 'w-px h-7 bg-[var(--meet-border)] mx-0.5 shrink-0 max-sm:hidden'
+const dividerCn = 'w-px h-7 bg-[var(--meet-border)] mx-0.5 shrink-0 max-lg:hidden'
 
 const meetMenuCn =
   'meet-dialog min-w-60 max-w-[calc(var(--app-width,100svw)-24px)] rounded-xl border border-[var(--meet-border-subtle)] !bg-[var(--meet-bg-panel)] !text-[var(--meet-fg)] shadow-[var(--meet-shadow)] backdrop-blur-xl'

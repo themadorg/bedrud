@@ -53,7 +53,7 @@ export function MeetingControls({ onNavigate, hideOnMobile = false, moreExtras }
 
   return (
     <>
-      <div className={cn(hideOnMobile && 'max-sm:hidden')}>
+      <div className={cn(hideOnMobile && 'max-lg:hidden')}>
         <ControlsBar onLeave={handleLeaveRequest} moreExtras={moreExtras} />
       </div>
       <Dialog open={endDialogOpen} onOpenChange={setEndDialogOpen}>

@@ -1,13 +1,16 @@
 import { useNavigate } from '@tanstack/react-router'
 import { type ReactNode, useEffect, useState } from 'react'
 import { MobileBottomNav } from '@/components/dashboard/MobileBottomNav'
+import { isMobileViewport } from '@/lib/use-is-mobile'
 
 export function MobileOnlyGate({ desktopTo = '/dashboard', children }: { desktopTo?: string; children: ReactNode }) {
   const navigate = useNavigate()
   const [ready, setReady] = useState(false)
 
+  // Reads the viewport inside the effect rather than through the hook: the hook's server
+  // snapshot is "desktop", and an effect keyed on it would bounce phones away on hydration.
   useEffect(() => {
-    if (window.matchMedia('(min-width: 1024px)').matches) {
+    if (!isMobileViewport()) {
       navigate({ to: desktopTo, replace: true })
       return
     }

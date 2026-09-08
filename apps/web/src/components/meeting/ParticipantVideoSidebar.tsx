@@ -1,29 +1,15 @@
 import { useIsSpeaking, useParticipants } from '@livekit/components-react'
 import type { Participant } from 'livekit-client'
 import { Users, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
 import { MEET_MOBILE_CONTROLS_H, MEET_MOBILE_FILMSTRIP_H } from '@/components/meeting/MeetingUILayoutContext'
 import { ParticipantTile } from '@/components/meeting/ParticipantTile'
+import { useIsMobile } from '@/lib/use-is-mobile'
 import { cn } from '@/lib/utils'
 import { useFocusTrap } from './useFocusTrap'
 
 interface Props {
   stackOffset?: string
   onClose: () => void
-}
-
-function useIsMobileFilmstrip(breakpoint = 640) {
-  const [mobile, setMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia(`(max-width: ${breakpoint - 1}px)`).matches : false,
-  )
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
-    const onChange = () => setMobile(mq.matches)
-    onChange()
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [breakpoint])
-  return mobile
 }
 
 function SidebarTile({
@@ -56,7 +42,7 @@ function SidebarTile({
 export function ParticipantVideoSidebar({ stackOffset, onClose }: Props) {
   const participants = useParticipants()
   const totalCount = participants.length
-  const isMobile = useIsMobileFilmstrip()
+  const isMobile = useIsMobile()
   // Desktop sidebar traps focus; mobile filmstrip must not (controls stay usable).
   const trapRef = useFocusTrap({ enabled: !isMobile, onClose })
 
