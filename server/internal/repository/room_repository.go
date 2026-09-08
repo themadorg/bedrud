@@ -626,10 +626,13 @@ func (r *RoomRepository) GetAllRoomsFiltered(p *RoomFilterParams) ([]models.Room
 	// Owner filter — JOIN with users table for owner lookup
 	needOwnerJoin := p.Owner != "" || p.DateFrom != "" || p.DateTo != "" || p.LastActivityFrom != "" || p.LastActivityTo != ""
 	if needOwnerJoin || p.Sort == "createdBy" || p.Sort == "lastActivityAt" || p.Sort == "participantsCount" {
-		// No projection: GORM quotes a lone Select("rooms.*") as an identifier
-		// and Postgres answers `column rooms.* does not exist`. The statement
-		// stays SELECT *, and the Postgres test asserts the room comes back with
-		// its own id and name rather than the joined user's.
+		// No projection needed: Model(&Room{}) already makes GORM name the
+		// model's columns explicitly and qualified — SELECT `rooms`.`id`,
+		// `rooms`.`name`, … — so the join cannot put a users column into a Room.
+		// Adding Select("rooms.*") here breaks it instead, because GORM quotes
+		// that as one identifier and Postgres answers `column rooms.* does not
+		// exist`. The ambiguity this function had was never in the projection;
+		// it was in the WHERE and ORDER BY terms below.
 		query = query.Joins("LEFT JOIN users ON users.id = rooms.created_by")
 	}
 

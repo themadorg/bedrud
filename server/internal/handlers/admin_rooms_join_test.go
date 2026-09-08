@@ -21,8 +21,14 @@ import (
 // The admin rooms list LEFT JOINs users to resolve the owner, and every column
 // it filters and sorts by was written unqualified. `rooms` and `users` share
 // id, name, is_active, created_at and updated_at, so the moment that join is in
-// play SQLite answers "ambiguous column name: created_at" and the endpoint
-// returns 500.
+// play the statement is ambiguous and the endpoint returns 500.
+//
+// The two halves do not behave alike, which is why this file has a Postgres
+// counterpart in repository/admin_rooms_postgres_test.go. An unqualified column
+// in a WHERE is ambiguous on both dialects. In an ORDER BY it is ambiguous only
+// on SQLite: Postgres resolves the term against the projection first, and GORM
+// names the model's columns explicitly, so `ORDER BY created_at` binds there
+// and errors here. Default deployments are SQLite.
 //
 // The join is added for the owner filter, for all four date filters, and for
 // three of the six sort options — so those are 500s in production, not
@@ -46,8 +52,16 @@ func TestAdminListRooms_JoiningFiltersDoNotBreakTheQuery(t *testing.T) {
 		{"sort by last activity", "?sort=lastActivityAt&order=desc", 1},
 		{"sort by participant count", "?sort=participantsCount&order=desc", 1},
 		// Search and status filter on columns that also exist on users, so they
-		// only become ambiguous once something else forces the join.
-		{"search alongside the owner join", "?owner=Admin&search=date-filter-room", 1},
+		// only become ambiguous once something else forces the join. The search
+		// parameter is `q`, not `search` — an earlier version of this table used
+		// the latter, which the handler ignores, so the case tested the owner
+		// filter twice and said nothing about the search column.
+		{"search alongside the owner join", "?owner=Admin&q=date-filter-room", 1},
+		// A term the room name satisfies and the owner name does not. An
+		// unqualified `name` resolving against users would return nothing.
+		{"search only the room name satisfies", "?owner=Admin&q=date-filter", 1},
+		// …and its mirror, so a clause matching everything would not pass.
+		{"search only the owner name satisfies", "?owner=Admin&q=Admin", 0},
 		{"status alongside the owner join", "?owner=Admin&status=active", 1},
 	}
 

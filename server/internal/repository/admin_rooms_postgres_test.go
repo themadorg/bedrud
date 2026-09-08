@@ -8,10 +8,18 @@ import (
 )
 
 // The admin rooms list joins users to resolve the owner, and `rooms` and
-// `users` share id, name, is_active, created_at and updated_at. SQLite does not
-// treat every one of those as ambiguous — an unqualified `name` resolves
-// quietly against the driving table there — so the SQLite suite cannot tell a
-// qualified column from an unqualified one for all of them.
+// `users` share id, name, is_active, created_at and updated_at. The two
+// dialects do not agree about that, so neither half of the suite sees all of
+// it. Measured on both, with the join in place:
+//
+//	reference                  sqlite 3.46.1              postgres 15
+//	WHERE name / is_active     ambiguous column name      column ... is ambiguous
+//	ORDER BY created_at        ambiguous column name      resolves, no error
+//
+// Postgres binds an ORDER BY term to the projection first, and GORM names the
+// model's columns explicitly, so the sort clauses are only visibly broken on
+// SQLite. Going the other way, sort=participantsCount used to smuggle bind
+// values through Select() in a form only Postgres rejects.
 //
 // This file is the Postgres half, alongside room_events_postgres_test.go and
 // for the same reason: it is where a dialect-specific regression in this
@@ -71,9 +79,9 @@ func TestPostgres_AdminRoomsList_JoinedQueriesResolve(t *testing.T) {
 			if len(rooms) != tc.want {
 				t.Errorf("returned %d room(s), want %d", len(rooms), tc.want)
 			}
-			// The statement is SELECT * over a join, and `users` repeats id,
-			// name, is_active, created_at and updated_at. Assert the row that
-			// comes back is the room and not the owner scanned into its place.
+			// GORM names the model's columns explicitly and qualified, so the
+			// join should not be able to put a users column into a Room. Assert
+			// it, rather than trusting that the projection stays that way.
 			for i := range rooms {
 				if rooms[i].ID != room.ID || rooms[i].Name != "pg-admin-room" {
 					t.Errorf("scanned room = {id:%s name:%s}, want {id:%s name:pg-admin-room} — a joined users column landed in the Room",
