@@ -1,8 +1,8 @@
 # Bedrud Design System
 
-## Aesthetic — Rose + Teal (Retro, Sharp)
+## Aesthetic — Rose + Teal (Rounded)
 
-Sharp corners. Bold colors. No purple. Zero border-radius everywhere.
+Rounded corners on the Android client's scale. Bold colors. No purple.
 
 - **Primary** — rose: brand CTAs, links, focus rings
 - **Accent** — teal: highlights, badges, secondary actions
@@ -101,15 +101,29 @@ Accessibility-first. Every status color pairs with an icon, label, or pattern �
 
 ## Border Radius
 
-**0px.** All components use sharp, square corners. This is enforced globally in `styles.css`:
+The web shares the Android client's shape scale (`apps/android`, `Shape.kt`), applied through
+the Tailwind radius tokens in `styles.css`. Use the class, never an arbitrary `rounded-[Npx]`.
 
-```css
-* { border-radius: 0 !important; }
-```
+| Web class | px | Android token | Used for |
+|---|---|---|---|
+| `rounded` | 4 | `xs` | brand mark, checkbox square, tooltip |
+| `rounded-sm` | 8 | `sm` | chips, icon-button hover fills, swatches |
+| `rounded-md` | 12 | `md` | buttons |
+| `rounded-lg` | 12 | `md` | fields, inline banners, row containers |
+| `rounded-xl` | 16 | `lg` | cards |
+| `rounded-2xl` | 20 | `xl` | |
+| `rounded-3xl` | 28 | `xxl` | sheet top, video tile, controls bar |
+| `rounded-full` | pill | `full` | avatars, pills, FAB |
 
-Individual `rounded-*` Tailwind classes are stripped from all components. `rounded-full` is kept only for avatars and circular elements (which the global override doesn't affect due to `border-radius: 50%` being a different property level).
-
-The `--radius` token is `0px`. All Tailwind radius scales (`--radius-sm/md/lg/xl`) are `0px`.
+`--radius` in `theme.css` is the default corner (12px) that self-hosters may retune: `rounded-md`
+and `rounded-lg` both resolve to it, so retuning the one value moves every button and field. The
+rest of the scale lives in `styles.css`. `src/design-tokens.test.ts` pins both. The shadcn primitives in
+`apps/web/src/components/ui/` carry their corner class themselves (button `rounded-md`, input
+`rounded-lg`, card `rounded-xl`, alert `rounded-lg`, badge `rounded-sm`, dialog `rounded-3xl`,
+menus `rounded-md`), so a page never has to add one. Badge is the chip, not a pill; alert is the
+inline banner and shares the banner corner with the hand-rolled ones beside it. Each primitive
+carries exactly one `rounded-*` class — `cn` runs the string through tailwind-merge, which keeps
+the last radius and drops the rest.
 
 ## Token Architecture
 
@@ -146,7 +160,7 @@ The full rose and teal scales are available as Tailwind utilities:
 
 ## Spacing & Layout
 
-- **Radius**: `0px` — all corners sharp
+- **Radius**: the scale above; `--radius` 12px is the default corner
 - **Page padding**: `px-4 sm:px-8 md:px-16 lg:px-24`
 - **Section spacing**: `space-y-20` between page sections
 - **Component spacing**: `space-y-4` for list items, `gap-2` for inline groups
@@ -177,7 +191,7 @@ The full rose and teal scales are available as Tailwind utilities:
 ### Inputs
 - Bare: `border` only, no background fill
 - Focus: `ring-2 ring-ring`
-- No border-radius
+- Corner: `rounded-lg` (12px, the field size)
 
 ## Dark Mode
 
@@ -191,10 +205,10 @@ The full rose and teal scales are available as Tailwind utilities:
 
 | Breakpoint | Width | Usage |
 |-----------|-------|-------|
-| Default | 0–639px | Mobile: compact padding, hidden sidebar |
-| `sm` | 640px+ | Tablet: larger text, show hostname prefix |
-| `md` | 768px+ | Desktop: full headline size |
-| `lg` | 1024px+ | Wide: show sidebar, auth brand panel |
+| Default | 0–1023px | Phone layout: bottom navigation, sheets, no sidebar (`MOBILE_BREAKPOINT_PX` in `lib/use-is-mobile.ts`) |
+| `sm` | 640px+ | Larger text, hostname prefix |
+| `md` | 768px+ | Full headline size |
+| `lg` | 1024px+ | Desktop: sidebar, auth brand panel, meeting side panels |
 
 ## Self-Hosting Customization
 
@@ -202,7 +216,7 @@ Edit `src/theme.css` to rebrand. One file controls all colors. See `theme.exampl
 
 ## What NOT to Do
 
-- Do NOT add `rounded-*` classes — the design is sharp-cornered. The global `border-radius: 0 !important` enforces this.
+- Do NOT write `rounded-[Npx]` — pick the class from the Border Radius table.
 - Do NOT use color alone for status signals — always pair with icons or labels.
 - Do NOT use `--destructive-500` for emphasis — it's reserved for irreversible actions.
 - Do NOT put white text on `--accent-500` — always use ink text (`--fg-1`).

@@ -95,6 +95,8 @@ Use `bg-primary text-primary-foreground` with `rounded-md` or `rounded-lg`:
 **No gradient buttons.** No `linear-gradient(135deg, #6366f1 ...)` on CTAs.
 **No `active:scale-95`** — it feels cheap.
 
+Corners come from the shared scale (`rounded-md` 12px for buttons, `rounded-lg` 12px for fields and inline banners, `rounded-xl` 16px for cards, `rounded-3xl` 28px for sheets, `rounded-sm` 8px for chips and icon-button hover fills, `rounded` 4px for the brand mark, the checkbox square and the tooltip). A hand-rolled control filled with `bg-primary` or `bg-destructive` takes `rounded-lg`, the same 12px the `<Button>` beside it renders; an icon-only button matches its siblings in the same group, or takes `rounded-sm` when it stands alone with a hover fill. A class string that lives in a `.ts` helper counts like one in a `.tsx` file, so any corner sweep runs with `--include="*.ts"` as well. The table with the Android token names is in the root `DESIGN.md`. Never `rounded-[Npx]`.
+
 ---
 
 ## Forms & Inputs
@@ -251,7 +253,7 @@ Use `btnIconCn(active, danger, isMobile)` helper that returns Tailwind classes:
 function btnIconCn(active = false, danger = false, isMobile = false) {
   return cn(
     'flex items-center justify-center shrink-0 border-none cursor-pointer transition-[background,color] duration-150',
-    isMobile ? 'h-[38px] w-[38px] rounded-[10px]' : 'h-11 w-11 rounded-xl',
+    isMobile ? 'h-[38px] w-[38px] rounded-md' : 'h-11 w-11 rounded-xl',
     danger
       ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
       : active
@@ -260,6 +262,10 @@ function btnIconCn(active = false, danger = false, isMobile = false) {
   )
 }
 ```
+
+## Mobile detection
+
+One breakpoint: `MOBILE_BREAKPOINT_PX` (1024, Tailwind `lg`) in `src/lib/use-is-mobile.ts`. Render-time branches use `useIsMobile()`; effects and event handlers use `isMobileViewport()`. CSS uses `lg:` / `max-lg:` for the same line. No component defines its own `matchMedia` width check.
 
 ## Do / Don't
 
