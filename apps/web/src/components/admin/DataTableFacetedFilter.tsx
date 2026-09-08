@@ -58,7 +58,7 @@ export function DataTableFacetedFilter({ label, options, values, onChange }: Dat
                   >
                     <div
                       className={cn(
-                        'mr-2 flex h-4 w-4 items-center justify-center border',
+                        'mr-2 flex h-4 w-4 items-center justify-center rounded border',
                         isSelected
                           ? 'bg-primary text-primary-foreground border-primary'
                           : 'opacity-50 [&_svg]:invisible',

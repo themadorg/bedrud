@@ -57,7 +57,7 @@ function NavLink({
     <Link to={to} onClick={onClick}>
       <div
         className={cn(
-          'flex items-center gap-2 px-2 py-1.5 text-xs font-medium transition-colors',
+          'flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
           active ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
         )}
       >
@@ -98,7 +98,7 @@ function SidebarContent({
           <div className="mt-3">
             <div className="mb-1 flex items-center gap-2 px-2">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40">Admin</p>
-              <span className="rounded border border-destructive/30 bg-destructive/10 px-1 py-px text-[9px] font-semibold uppercase text-destructive">
+              <span className="rounded-sm border border-destructive/30 bg-destructive/10 px-1 py-px text-[9px] font-semibold uppercase text-destructive">
                 Restricted
               </span>
             </div>
@@ -110,7 +110,7 @@ function SidebarContent({
       </nav>
 
       <div className="shrink-0 border-t p-2">
-        <div className="group flex items-center gap-2 px-2 py-1.5 transition-colors hover:bg-accent">
+        <div className="group flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-accent">
           <Avatar className="h-6 w-6 shrink-0">
             {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
             <AvatarFallback className="bg-primary text-[9px] font-semibold text-primary-foreground">
@@ -126,7 +126,7 @@ function SidebarContent({
             size="icon"
             type="button"
             onClick={onLogout}
-            className="h-9 w-9 rounded p-1.5 text-muted-foreground opacity-60 transition-all hover:bg-destructive/10 hover:text-destructive hover:opacity-100"
+            className="h-9 w-9 p-1.5 text-muted-foreground opacity-60 transition-all hover:bg-destructive/10 hover:text-destructive hover:opacity-100"
             aria-label="Sign out"
           >
             <LogOut className="h-4 w-4" />
@@ -141,7 +141,7 @@ function Sidebar({ user, onLogout }: { user: BedrudUser | null; onLogout: () => 
   return (
     <aside className="hidden lg:flex fixed inset-y-0 start-0 z-50 w-52 flex-col border-e bg-card">
       <div className="flex h-11 shrink-0 items-center gap-2 border-b px-4">
-        <div className="flex h-6 w-6 items-center justify-center bg-primary">
+        <div className="flex h-6 w-6 items-center justify-center rounded bg-primary">
           <Radio className="h-3 w-3 text-primary-foreground" />
         </div>
         <span className="font-mono text-xs font-semibold tracking-tight">bedrud</span>

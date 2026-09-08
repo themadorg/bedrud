@@ -160,8 +160,9 @@ export function WebxdcFrame({
             }
           : {})}
         className={cn(
-          'flex overflow-hidden border border-border bg-background shadow-2xl',
-          expand.expanded && 'border-0',
+          'flex overflow-hidden rounded-xl border border-border bg-background shadow-2xl',
+          // The expanded surface fills the viewport, where a corner would cut into the content.
+          expand.expanded && 'rounded-none border-0',
         )}
         style={expand.shellStyle}
       >

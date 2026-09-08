@@ -35,14 +35,14 @@ function SettingsLayout() {
         <div className="space-y-4">
           <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
           <nav aria-label="Settings categories">
-            <ul className="m-0 list-none overflow-hidden border border-border bg-muted/40 p-0">
+            <ul className="m-0 list-none overflow-hidden rounded-xl border border-border bg-muted/40 p-0">
               {SECTIONS.map(({ to, label, description, icon: Icon }, index) => (
                 <li key={to} className={cn(index > 0 && 'border-t border-border')}>
                   <Link
                     to={to}
                     className="flex w-full items-center gap-3 bg-transparent px-3.5 py-3 text-start transition-colors active:bg-muted hover:bg-muted"
                   >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center bg-primary/10 text-primary">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary">
                       <Icon size={16} />
                     </span>
                     <span className="min-w-0 flex-1">

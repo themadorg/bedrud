@@ -66,7 +66,7 @@ export function ParticipantsList({ onClose, adminId }: Props) {
         <button
           type="button"
           onClick={onClose}
-          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-[7px] border-none bg-transparent text-[var(--meet-fg-muted)] transition-[background,color] duration-150 hover:bg-[var(--meet-control)] hover:text-[var(--meet-fg-strong)] lg:h-7 lg:w-7"
+          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent text-[var(--meet-fg-muted)] transition-[background,color] duration-150 hover:bg-[var(--meet-control)] hover:text-[var(--meet-fg-strong)] lg:h-7 lg:w-7"
           aria-label="Close participants"
         >
           <X size={18} className="lg:h-[15px] lg:w-[15px]" />
@@ -132,17 +132,17 @@ function ParticipantRow({ p, adminId }: RowProps): React.ReactElement {
         {(isRoomAdmin || isMod || isGuest) && (
           <div className="flex gap-1">
             {isRoomAdmin && (
-              <span className="rounded border border-[color-mix(in_oklab,var(--accent-600)_28%,transparent)] bg-[var(--meet-btn-muted-bg)] px-[5px] py-px text-[10px] font-semibold tracking-wide text-[var(--meet-btn-muted-fg)]">
+              <span className="rounded-sm border border-[color-mix(in_oklab,var(--accent-600)_28%,transparent)] bg-[var(--meet-btn-muted-bg)] px-[5px] py-px text-[10px] font-semibold tracking-wide text-[var(--meet-btn-muted-fg)]">
                 Admin
               </span>
             )}
             {isMod && (
-              <span className="rounded border border-emerald-500/25 bg-emerald-500/10 px-[5px] py-px text-[10px] font-semibold text-emerald-600 dark:text-emerald-300">
+              <span className="rounded-sm border border-emerald-500/25 bg-emerald-500/10 px-[5px] py-px text-[10px] font-semibold text-emerald-600 dark:text-emerald-300">
                 Mod
               </span>
             )}
             {isGuest && (
-              <span className="rounded border border-[var(--meet-border)] bg-[var(--meet-control)] px-[5px] py-px text-[10px] font-medium text-[var(--meet-fg-muted)]">
+              <span className="rounded-sm border border-[var(--meet-border)] bg-[var(--meet-control)] px-[5px] py-px text-[10px] font-medium text-[var(--meet-fg-muted)]">
                 Guest
               </span>
             )}

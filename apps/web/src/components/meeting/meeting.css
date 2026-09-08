@@ -23,7 +23,7 @@
   --meet-btn-leave-bg: #dc2626;
   --meet-btn-leave-fg: #ffffff;
   --meet-btn-leave-hover: #b91c1c;
-  /* Subtle chrome radii (global * zeros radius; @layer base exceptions use these) */
+  /* Chrome radii; the @layer base exceptions in styles.css apply these over rounded-* utilities. */
   --meet-controls-bar-radius: 4px;
   --meet-btn-leave-radius: 3px;
   --meet-gallery-icon-radius: 8px;
@@ -271,7 +271,7 @@
 
 .meet-prejoin-panel {
   width: min(340px, calc(100vw - 32px));
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--meet-border);
   background: var(--meet-bg-panel);
   padding: 32px 28px;

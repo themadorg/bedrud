@@ -22,7 +22,7 @@ interface DataTableToolbarProps {
 
 export function DataTableToolbar({ children, table }: DataTableToolbarProps) {
   return (
-    <div className="border bg-card px-4 py-3 space-y-3">
+    <div className="rounded-xl border bg-card px-4 py-3 space-y-3">
       <div className="flex flex-wrap items-center gap-2">{children}</div>
       <DataTableFilterChips
         filters={table.activeFilterKeys}

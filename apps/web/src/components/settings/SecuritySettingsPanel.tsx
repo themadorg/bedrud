@@ -94,7 +94,7 @@ function AccountForm({
       {accountStatus && (
         <div
           className={cn(
-            'flex items-center gap-2 border px-3 py-2 text-xs',
+            'flex items-center gap-2 rounded-lg border px-3 py-2 text-xs',
             accountStatus.type === 'success'
               ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
               : 'border-destructive/30 bg-destructive/10 text-destructive',
@@ -171,7 +171,7 @@ export function SecuritySettingsPanel() {
         </CardHeader>
         <CardContent className="p-5">
           {isOAuthOnly ? (
-            <div className="flex items-start gap-2.5 border px-3 py-3 text-xs">
+            <div className="flex items-start gap-2.5 rounded-lg border px-3 py-3 text-xs">
               <LogIn className="h-3.5 w-3.5 shrink-0 mt-0.5 text-muted-foreground" />
               <p className="text-muted-foreground">
                 Your account uses <span className="font-medium text-foreground capitalize">{user?.provider}</span> for

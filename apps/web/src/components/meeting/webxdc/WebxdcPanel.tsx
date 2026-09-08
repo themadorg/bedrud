@@ -124,7 +124,7 @@ export function WebxdcPanel({ roomId, canUpload = true }: Props) {
       <div>
         <h2 className="text-base font-semibold">
           Apps{' '}
-          <span className="bg-muted text-muted-foreground ml-1 rounded px-1.5 py-0.5 text-xs font-normal">
+          <span className="bg-muted text-muted-foreground ml-1 rounded-sm px-1.5 py-0.5 text-xs font-normal">
             experimental
           </span>
         </h2>

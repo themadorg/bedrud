@@ -348,7 +348,7 @@ export function WebxdcAppsDialog({ open, onOpenChange, roomId, selfName, userId 
                         {Array.from({ length: 6 }, (_, i) => (
                           <li
                             key={`skel-${i}`}
-                            className="flex flex-col items-center gap-2 border border-[var(--meet-border)] bg-[var(--meet-surface-muted)] p-3"
+                            className="meet-gallery-app-card flex flex-col items-center gap-2 border border-[var(--meet-border)] bg-[var(--meet-surface-muted)] p-3"
                           >
                             <Skeleton className="h-14 w-14 shrink-0 bg-[var(--meet-control)]" />
                             <div className="flex w-full flex-col items-center gap-1.5">

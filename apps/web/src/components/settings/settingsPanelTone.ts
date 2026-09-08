@@ -4,10 +4,19 @@ export function isMeetingTone(tone: SettingsPanelTone) {
   return tone === 'meeting'
 }
 
+/** Both tones share the panel corner and the hairline border. */
+const panelSurfaceBaseClass = 'rounded-xl border'
+
+/**
+ * Returns the surface class for a settings panel, tinted for the meeting chrome or for the app.
+ * The corner sits on the shared prefix, so neither tone branch can drop it.
+ */
 export function panelSurfaceClass(tone: SettingsPanelTone) {
-  return tone === 'meeting'
-    ? 'border border-[var(--meet-border)] bg-[var(--meet-surface-muted)] text-[var(--meet-fg)]'
-    : 'border bg-card/50'
+  const toneClass =
+    tone === 'meeting'
+      ? 'border-[var(--meet-border)] bg-[var(--meet-surface-muted)] text-[var(--meet-fg)]'
+      : 'bg-card/50'
+  return `${panelSurfaceBaseClass} ${toneClass}`
 }
 
 export const meetingSliderClass =

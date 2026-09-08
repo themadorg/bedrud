@@ -124,7 +124,7 @@ function StatCard({
   color: string
 }) {
   return (
-    <div className="border p-4" style={{ borderColor: `${color}25`, background: `${color}07` }}>
+    <div className="rounded-xl border p-4" style={{ borderColor: `${color}25`, background: `${color}07` }}>
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-xl font-bold tracking-tight" style={{ color }}>
@@ -281,13 +281,13 @@ function UserDetailPage() {
           ))}
         </div>
       ) : !user ? (
-        <div className="border px-5 py-16 text-center" style={{ borderColor: 'var(--border)' }}>
+        <div className="rounded-xl border px-5 py-16 text-center" style={{ borderColor: 'var(--border)' }}>
           <p className="text-sm text-muted-foreground">User not found</p>
         </div>
       ) : (
         <>
           {/* ── Hero card ──────────────────────────────────── */}
-          <div className="border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
+          <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
             {/* gradient banner */}
             <div
               className="h-20 w-full"
@@ -510,7 +510,7 @@ function UserDetailPage() {
 
             <TabsContent value="rooms" className="mt-4 space-y-6">
               {/* ── Room activity chart ──────────────────── */}
-              <div className="border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
+              <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
                 <div
                   className="flex items-center justify-between border-b px-5 py-3"
                   style={{
@@ -567,7 +567,7 @@ function UserDetailPage() {
               </div>
 
               {/* ── Rooms table ──────────────────────────── */}
-              <div className="border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
+              <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
                 <div
                   className="flex items-center justify-between border-b px-5 py-3"
                   style={{
@@ -657,7 +657,7 @@ function UserDetailPage() {
             </TabsContent>
 
             <TabsContent value="sessions" className="mt-4">
-              <div className="border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
+              <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
                 <div
                   className="flex items-center justify-between border-b px-5 py-3"
                   style={{
@@ -677,7 +677,7 @@ function UserDetailPage() {
                 ) : sessionsQuery.isError ? (
                   <div className="flex flex-col items-center gap-3 py-10">
                     <div
-                      className="flex items-center gap-2 border px-3 py-2 text-sm"
+                      className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
                       style={{
                         borderColor: '#ef444430',
                         background: '#ef444415',
@@ -826,7 +826,7 @@ function UserDetailPage() {
             <DialogDescription>Revoke all active sessions for this user</DialogDescription>
           </DialogHeader>
 
-          <div className="p-3 text-sm bg-muted">
+          <div className="rounded-lg p-3 text-sm bg-muted">
             <p className="font-medium text-foreground">{user?.name || '—'}</p>
             <p className="text-xs mt-0.5 text-muted-foreground">{user?.email}</p>
           </div>
@@ -838,7 +838,7 @@ function UserDetailPage() {
 
           {forceLogout.isError && (
             <div
-              className="flex items-center gap-2 border px-3 py-2 text-sm"
+              className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
               style={{
                 borderColor: '#ef444430',
                 background: '#ef444415',
@@ -872,7 +872,7 @@ function UserDetailPage() {
             <DialogDescription>This action is permanent and cannot be undone</DialogDescription>
           </DialogHeader>
 
-          <div className="p-3 text-sm bg-muted">
+          <div className="rounded-lg p-3 text-sm bg-muted">
             <p className="font-medium text-foreground">{user?.name || '—'}</p>
             <p className="text-xs mt-0.5 text-muted-foreground">{user?.email}</p>
           </div>
@@ -897,7 +897,7 @@ function UserDetailPage() {
 
           {deleteUser.isError && (
             <div
-              className="flex items-center gap-2 border px-3 py-2 text-sm"
+              className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
               style={{
                 borderColor: '#ef444430',
                 background: '#ef444415',

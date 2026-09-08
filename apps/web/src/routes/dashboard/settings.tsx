@@ -24,7 +24,10 @@ function SettingsLayout() {
       </div>
 
       {/* Plain links (not Radix Tabs) so all sections stay visible — Profile / Security / Audio / Video */}
-      <nav className="flex flex-wrap gap-1 border bg-muted p-1 text-muted-foreground" aria-label="Settings sections">
+      <nav
+        className="flex flex-wrap gap-1 rounded-lg border bg-muted p-1 text-muted-foreground"
+        aria-label="Settings sections"
+      >
         {TABS.map(({ to, label, icon: Icon, isIndex }) => {
           const active = isIndex
             ? path === '/dashboard/settings' || path === '/dashboard/settings/'
@@ -34,7 +37,7 @@ function SettingsLayout() {
               key={to}
               to={to}
               className={cn(
-                'inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors',
+                'inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                 active ? 'bg-background text-foreground shadow-sm' : 'hover:bg-background/60 hover:text-foreground',
               )}
             >

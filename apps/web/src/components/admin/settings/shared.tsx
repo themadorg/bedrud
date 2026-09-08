@@ -23,7 +23,7 @@ export function Section({
   children: React.ReactNode
 }) {
   return (
-    <div className="border bg-card/50">
+    <div className="rounded-xl border bg-card/50">
       <div className="flex items-center justify-between border-b px-5 py-3">
         <div>
           <p className="text-sm font-semibold">{title}</p>

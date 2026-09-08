@@ -93,7 +93,7 @@ interface Props {
 function btnIconCn(active = false, danger = false, ptt = false, isMobile = false) {
   return cn(
     'flex items-center justify-center shrink-0 border-none cursor-pointer transition-[background,color,box-shadow,border-color] duration-150',
-    isMobile ? 'h-[38px] w-[38px] rounded-[10px]' : 'h-11 w-11 rounded-xl',
+    isMobile ? 'h-[38px] w-[38px] rounded-md' : 'h-11 w-11 rounded-xl',
     ptt
       ? 'meet-ptt-btn'
       : danger
@@ -874,7 +874,7 @@ export function ControlsBar({ onLeave, moreExtras }: Props) {
             type="button"
             onClick={() => setMoreOpen(true)}
             className={cn(
-              'flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border-none cursor-pointer transition-[background,color] duration-150',
+              'flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-md border-none cursor-pointer transition-[background,color] duration-150',
               'bg-[var(--meet-control)] text-[var(--meet-control-fg)] hover:bg-[var(--meet-control-hover)]',
             )}
             aria-label="More options"

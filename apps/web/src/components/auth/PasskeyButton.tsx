@@ -146,7 +146,7 @@ export function PasskeyButton({ onSuccess, mode = 'both', compact = false, class
   if (verificationEmail) {
     return (
       <div className={cn('space-y-3', className)}>
-        <div className="border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+        <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
           <p className="font-medium">Verify your email</p>
           <p className="mt-1 text-muted-foreground">
             We sent a verification email to <span className="font-medium text-foreground">{verificationEmail}</span>.

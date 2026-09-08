@@ -222,7 +222,7 @@ function RoomDetailPage() {
   if (isError) {
     return (
       <div className="mx-auto max-w-5xl px-4 pt-8">
-        <div className="border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
           <span className="text-destructive">
             {error instanceof Error ? error.message : 'Failed to load room details.'}
           </span>
@@ -242,7 +242,7 @@ function RoomDetailPage() {
         <button
           type="button"
           onClick={() => navigate({ to: '/dashboard/admin/rooms' })}
-          className="p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          className="rounded-sm p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
@@ -256,7 +256,7 @@ function RoomDetailPage() {
         <button
           type="button"
           onClick={() => queryClient.invalidateQueries({ queryKey: ['admin', 'room', roomId, 'participants'] })}
-          className="p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          className="rounded-sm p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           title="Refresh now"
         >
           <RefreshCw className="h-4 w-4" />
@@ -287,7 +287,11 @@ function RoomDetailPage() {
               color: room.isPublic ? 'var(--primary)' : 'var(--accent-700)',
             },
           ].map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="border p-5" style={{ borderColor: `${color}25`, background: `${color}07` }}>
+            <div
+              key={label}
+              className="rounded-xl border p-5"
+              style={{ borderColor: `${color}25`, background: `${color}07` }}
+            >
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <p className="text-xl font-bold tracking-tight" style={{ color }}>
@@ -375,7 +379,7 @@ function RoomDetailPage() {
       )}
 
       {/* Live bitrate chart — rolling 3-minute window, per-participant lines */}
-      <div className="border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
+      <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
         <div
           className="flex items-center justify-between border-b px-5 py-3"
           style={{
@@ -455,7 +459,7 @@ function RoomDetailPage() {
       </div>
 
       {/* Participants table */}
-      <div className="border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
+      <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
         <div
           className="flex items-center justify-between border-b px-5 py-3"
           style={{
@@ -547,7 +551,7 @@ function RoomDetailPage() {
                         type="button"
                         onClick={() => mute.mutate(p.identity)}
                         disabled={mute.isPending || audioTracks.every((t) => t.muted)}
-                        className="p-1.5 text-muted-foreground transition-colors hover:bg-amber-500/10 hover:text-amber-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="rounded-sm p-1.5 text-muted-foreground transition-colors hover:bg-amber-500/10 hover:text-amber-500 disabled:opacity-30 disabled:cursor-not-allowed"
                         title="Mute audio"
                       >
                         {audioTracks.every((t) => t.muted) ? (
@@ -564,7 +568,7 @@ function RoomDetailPage() {
                             type="button"
                             onClick={() => kick.mutate(p.identity)}
                             disabled={kick.isPending}
-                            className="px-2 py-1 text-xs font-semibold text-white"
+                            className="rounded-lg px-2 py-1 text-xs font-semibold text-white"
                             style={{ background: '#ef4444' }}
                           >
                             Kick
@@ -581,7 +585,7 @@ function RoomDetailPage() {
                         <button
                           type="button"
                           onClick={() => setConfirmKick(p.identity)}
-                          className="p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          className="rounded-sm p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                           title="Kick participant"
                         >
                           <UserX className="h-4 w-4" />
@@ -598,7 +602,7 @@ function RoomDetailPage() {
 
       {/* Room settings info */}
       {room?.settings && (
-        <div className="border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
           <div
             className="border-b px-5 py-3"
             style={{

@@ -51,7 +51,7 @@ interface Props {
 
 const headerBtnClass = (active = false) =>
   cn(
-    'flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] border-none bg-transparent cursor-pointer transition-[background,color] duration-150',
+    'flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border-none bg-transparent cursor-pointer transition-[background,color] duration-150',
     active
       ? 'text-[var(--meet-accent)]'
       : 'text-[var(--meet-fg-muted)] hover:bg-[var(--meet-control)] hover:text-[var(--meet-fg-strong)]',

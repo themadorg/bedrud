@@ -28,8 +28,8 @@ function SidebarTile({
   return (
     <div
       className={cn(
-        'relative shrink-0 overflow-hidden transition-[box-shadow] duration-200',
-        compact ? 'h-14 w-[6.25rem] rounded-md' : 'aspect-video w-full rounded-[10px]',
+        'relative shrink-0 overflow-hidden rounded-md transition-[box-shadow] duration-200',
+        compact ? 'h-14 w-[6.25rem]' : 'aspect-video w-full',
         isSpeaking &&
           'shadow-[0_0_0_1.5px_color-mix(in_oklab,var(--primary)_75%,transparent),0_0_14px_color-mix(in_oklab,var(--primary)_30%,transparent)]',
       )}
@@ -101,7 +101,7 @@ export function ParticipantVideoSidebar({ stackOffset, onClose }: Props) {
         <button
           type="button"
           onClick={onClose}
-          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-[7px] border-none bg-transparent text-white/50 transition-[background,color] duration-150"
+          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent text-white/50 transition-[background,color] duration-150"
           aria-label="Close video panel"
         >
           <X size={15} />

@@ -101,7 +101,7 @@ export function EmailTab({
           <Field label="Header background" hint="Email header banner color. Default: #1a1a2e">
             <div className="flex items-center gap-2">
               <div
-                className="h-8 w-8 shrink-0 rounded border"
+                className="h-8 w-8 shrink-0 rounded-sm border"
                 style={{ background: settings.emailHeaderBg || '#1a1a2e' }}
               />
               <TextInput
@@ -119,7 +119,7 @@ export function EmailTab({
           <Field label="Button background" hint="Primary CTA button color. Default: #e11d48">
             <div className="flex items-center gap-2">
               <div
-                className="h-8 w-8 shrink-0 rounded border"
+                className="h-8 w-8 shrink-0 rounded-sm border"
                 style={{ background: settings.emailButtonBg || '#e11d48' }}
               />
               <TextInput
@@ -268,7 +268,7 @@ export function EmailTab({
             {testResult && (
               <div
                 className={cn(
-                  'mt-2 rounded border px-3 py-2 text-xs',
+                  'mt-2 rounded-lg border px-3 py-2 text-xs',
                   testResult.ok
                     ? 'border-emerald-500/40 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400'
                     : 'border-destructive/40 bg-destructive/5 text-destructive',

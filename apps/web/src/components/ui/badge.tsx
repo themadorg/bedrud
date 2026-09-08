@@ -4,7 +4,11 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
-  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+  // The badge is the web's chip, and the shape scale gives a chip the 8px `sm` corner rather
+  // than a pill, so the Android and web clients read as one brand. Exactly one corner class may
+  // sit in this string: `cn` runs it through tailwind-merge, which keeps the last radius it sees
+  // and drops the rest, so a second one would be silently dead.
+  'inline-flex items-center rounded-sm border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
   {
     variants: {
       variant: {

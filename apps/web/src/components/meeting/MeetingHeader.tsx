@@ -98,7 +98,7 @@ export function MeetingHeader({ meetId, infoOpen = false, onToggleInfo }: Meetin
           onClick={onToggleInfo}
           disabled={!onToggleInfo}
           className={cn(
-            'hidden lg:flex items-center gap-[5px] rounded-[7px] px-[9px] py-[3px] border transition-all duration-150',
+            'hidden lg:flex items-center gap-[5px] rounded-sm px-[9px] py-[3px] border transition-all duration-150',
             onToggleInfo && 'cursor-pointer hover:brightness-110',
             !onToggleInfo && 'cursor-default',
             infoOpen

@@ -104,7 +104,7 @@ export function QueueStatsPage() {
   if (isError) {
     return (
       <div className="mx-auto max-w-6xl px-4 pt-8">
-        <div className="border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
           <span className="text-destructive">
             {error instanceof Error ? error.message : 'Failed to load queue stats.'}
           </span>
@@ -189,7 +189,7 @@ export function QueueStatsPage() {
               </span>
             </p>
             {data.lastSendError && (
-              <div className="mt-2 rounded border border-red-500/20 bg-red-500/5 px-2 py-1.5 text-[10px]">
+              <div className="mt-2 rounded-lg border border-red-500/20 bg-red-500/5 px-2 py-1.5 text-[10px]">
                 <p className="font-medium text-red-500">Last send error</p>
                 <p className="mt-0.5 break-all text-muted-foreground" title={data.lastSendError}>
                   {data.lastSendError.length > 120 ? data.lastSendError.slice(0, 120) + '…' : data.lastSendError}

@@ -182,7 +182,7 @@ function SettingsListNav({
         >
           {page === null ? (
             <nav className="p-3" aria-label="Settings categories">
-              <ul className={cn('m-0 list-none overflow-hidden p-0', listSurface)}>
+              <ul className={cn('m-0 list-none overflow-hidden rounded-xl p-0', listSurface)}>
                 {tabs.map(({ id, label, icon: Icon, description }, index) => (
                   <li key={id} className={cn(index > 0 && 'border-t', listItemBorder)}>
                     <button
@@ -193,7 +193,7 @@ function SettingsListNav({
                         listHover,
                       )}
                     >
-                      <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center', iconChip)}>
+                      <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-sm', iconChip)}>
                         <Icon size={16} />
                       </span>
                       <span className="min-w-0 flex-1">

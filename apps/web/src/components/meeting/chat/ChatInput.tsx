@@ -408,7 +408,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput(
           {pendingAttachments.map((att, index) => (
             <li
               key={`${att.url}-${index}`}
-              className="group relative h-16 w-16 shrink-0 overflow-hidden border border-[var(--meet-border)] bg-white/[0.04]"
+              className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[var(--meet-border)] bg-white/[0.04]"
             >
               <img
                 src={att.url}
@@ -420,7 +420,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput(
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => removePendingAttachment(index)}
-                className="absolute top-0.5 right-0.5 flex h-5 w-5 items-center justify-center border-none bg-black/65 text-white/90 transition-colors hover:bg-black/80 hover:text-white"
+                className="absolute top-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-sm border-none bg-black/65 text-white/90 transition-colors hover:bg-black/80 hover:text-white"
                 aria-label={`Remove attachment ${index + 1}`}
                 title="Remove"
               >
