@@ -1,57 +1,68 @@
+version: "2"
 run:
-  timeout: 5m
   modules-download-mode: readonly
   allow-parallel-runners: true
-
 linters:
-  disable-all: true
+  default: none
   enable:
-    - govet
-    - staticcheck
-    - unused
-    - errcheck
-    - ineffassign
-    - unconvert
-    - goconst
     - bodyclose
-    - sqlclosecheck
-    - rowserrcheck
+    - errcheck
+    - goconst
     - gocritic
-    - revive
-    - misspell
-    # gofumpt disabled: gofumpt ≥0.9 with this Go toolchain (go1.26.4-X) misclassifies
-    # stdlib imports (e.g. sorts "fmt" after "bedrud/..."), fighting golangci's embedded
-    # gofumpt and making format non-convergent. Use make fmt (goimports) instead.
-    # - gofumpt
-    - thelper
-    - testifylint
+    - govet
+    - ineffassign
     - intrange
-    - usestdlibvars
+    - misspell
     - nolintlint
-
-linters-settings:
-  revive:
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - staticcheck
+    - testifylint
+    - thelper
+    - unconvert
+    - unused
+    - usestdlibvars
+  settings:
+    gocritic:
+      disabled-checks:
+        - appendAssign
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: exported
-        disabled: true
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-    disabled-checks:
-      - appendAssign
-
+      - linters:
+          - all
+        path: docs/
+      - linters:
+          - all
+        path: frontend/
+      - linters:
+          - all
+        path: magefile.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-rules:
-    - path: docs/
-      linters:
-        - all
-    - path: frontend/
-      linters:
-        - all
-    - path: magefile.go
-      linters:
-        - all
   max-issues-per-linter: 0
   max-same-issues: 0
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
