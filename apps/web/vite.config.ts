@@ -9,6 +9,9 @@ import { excalidrawAliases } from './src/vendor/excalidraw/aliases'
 
 const appRoot = path.dirname(fileURLToPath(import.meta.url))
 
+// Keeps the route generator away from test files that sit beside the routes they cover.
+const ROUTE_FILE_IGNORE_PATTERN = '\\.test\\.tsx?$'
+
 const DEV_PORT_WEB = 7070
 const DEV_PORT_API = 7071
 // Local make dev only — embedded LiveKit on :7072. Remote debug uses server /livekit (not this proxy).
@@ -174,6 +177,11 @@ const config = defineConfig({
     tanstackStart({
       client: {
         entry: path.join(appRoot, 'src/client.tsx'),
+      },
+      // A test file beside a route is not a route. Without this the generator scans it, finds no
+      // `Route` export, and warns on every dev start and every test run.
+      router: {
+        routeFileIgnorePattern: ROUTE_FILE_IGNORE_PATTERN,
       },
     }),
     viteReact(),
