@@ -1,6 +1,8 @@
 # 01 — Overview & Units
 
-**Status: in progress.** Unit 1 is specified in [02 — Foundation](./02-foundation.md); units 2 to 5 get their own file when they start.
+**Status: in progress.** Unit 1 is specified in [02 — Foundation](./02-foundation.md) and unit 5 in [04 — Mobile settings page](./04-mobile-settings.md); units 2 to 4 get their own file when they start.
+
+Unit 5 runs before units 2 to 4 because those three are meeting-screen work that needs a live room and a second participant, and this checkout has no LiveKit server. It is stacked on unit 1's branch rather than cut from `master`, because unit 1 is still in review and unit 5 depends on its shape scale and breakpoint.
 
 ## Problem
 
@@ -55,7 +57,7 @@ Each unit is one branch and one pull request, cut fresh from `master`.
 | 2 | Meeting chat sheet | chat as a bottom sheet over the live call: half on open, full on drag or keyboard, dismissed on a second drag down | planned |
 | 3 | Meeting controls pill | floating bottom-centre pill (camera, screen share, mic, chat, hang up), drag handle unfolds room options upward in the same surface, no "more" menu | planned |
 | 4 | Invite sheet | participants and invite as one sheet: avatar grid, count, share targets, room link | planned |
-| 5 | Mobile settings page | one scrolling page of card sections on phones; dashboard alignment (quick-join bar, filter chips) if still needed | planned |
+| 5 | Mobile settings page | one scrolling page of card sections on phones, the settings dialog moved to the shared breakpoint, and the desktop settings route redirected on phones | done, [04](./04-mobile-settings.md), [05](./05-mobile-settings-plan.md) |
 
 ## Verification
 

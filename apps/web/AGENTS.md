@@ -267,6 +267,10 @@ function btnIconCn(active = false, danger = false, isMobile = false) {
 
 One breakpoint: `MOBILE_BREAKPOINT_PX` (1024, Tailwind `lg`) in `src/lib/use-is-mobile.ts`. Render-time branches use `useIsMobile()`; effects and event handlers use `isMobileViewport()`. CSS uses `lg:` / `max-lg:` for the same line. No component defines its own `matchMedia` width check.
 
+## Phone settings
+
+Phone settings live on one scrolling page at `/settings`, one section per panel, each anchored by its route segment so `/settings/audio` and `/settings#audio` reach the same section. The sub-routes carry only their document title. Desktop settings stay at `/dashboard/settings`, and each route redirects the other's visitors. Section headers are `text-xs font-semibold uppercase tracking-wide text-primary`, the web reading of Android's `labelLarge` in the primary colour.
+
 ## Do / Don't
 
 **Do:**
