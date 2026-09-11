@@ -5,6 +5,7 @@ import { ArrowRight, Clock, Plus, Search, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '#/lib/api'
+import { parseJoinInput } from '#/lib/join-input'
 import { type RecentRoom, useRecentRoomsStore } from '#/lib/recent-rooms.store'
 import { useUserStore } from '#/lib/user.store'
 import { CreateRoomDialog } from '@/components/dashboard/CreateRoomDialog'
@@ -59,37 +60,48 @@ function timeAgo(ts: number): string {
 function QuickJoinBar({ onJoin, onCreate }: { onJoin: (name: string) => void; onCreate: () => void }) {
   const [value, setValue] = useState('')
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const slug = value.trim().toLowerCase().replace(/\s+/g, '-')
-    if (!slug) return
-    onJoin(slug)
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const roomName = parseJoinInput(value)
+    if (!roomName) {
+      toast.error('That does not look like a room name or a meeting link')
+      return
+    }
+    onJoin(roomName)
   }
 
   return (
-    <div className="flex items-center gap-2 max-md:hidden">
+    <div className="flex items-center gap-2">
       <form
         onSubmit={handleSubmit}
         className="flex h-9 flex-1 items-center gap-2 rounded-lg border border-input bg-background px-3 focus-within:ring-2 focus-within:ring-ring"
       >
         <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        {/* Room names are lowercase and have no spaces, so the phone keyboard should not
+            capitalise, correct or spell-check what is typed. This mirrors the Android field's
+            `KeyboardType.Uri` with capitalisation and auto-correct off. */}
         <Input
           value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="Join by room name or invite code..."
+          onChange={(event) => setValue(event.target.value)}
+          placeholder="Join by room name or invite link..."
+          inputMode="url"
           autoComplete="off"
+          autoCapitalize="none"
+          autoCorrect="off"
           spellCheck={false}
           className="h-full flex-1 border-none focus-visible:ring-0 px-0"
         />
-        {value.trim() && (
-          <Button type="submit" size="sm" className="gap-1">
-            Join <ArrowRight className="h-3 w-3" />
-          </Button>
-        )}
+        {/* Disabled rather than hidden while the field is empty: a button that appears as you type
+            shifts the row under your thumb. Android disables it for the same reason. */}
+        <Button type="submit" size="sm" className="gap-1" disabled={!value.trim()}>
+          Join <ArrowRight className="h-3 w-3" />
+        </Button>
       </form>
-      <Button type="button" variant="default" size="sm" onClick={onCreate}>
+      {/* Desktop only: phones create a room from the floating button in the bottom navigation,
+          which is where the Android client puts it too. */}
+      <Button type="button" variant="default" size="sm" onClick={onCreate} className="max-lg:hidden">
         <Plus className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">New room</span>
+        New room
       </Button>
     </div>
   )
