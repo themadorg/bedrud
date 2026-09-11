@@ -25,4 +25,9 @@ describe('the dashboard route', () => {
   it('should report input that names no room rather than navigating', () => {
     expect(dashboardRouteSource).toMatch(/parseJoinInput\(value\)\s*\n\s*if \(!roomName\)/)
   })
+
+  // Unit 1 made 1024px the app's one phone breakpoint. The dashboard tree was never swept.
+  it('should carry no breakpoint prefix outside the shared scale', () => {
+    expect(dashboardRouteSource).not.toMatch(/(^|[\s"'`])(max-)?(sm|md):/)
+  })
 })
