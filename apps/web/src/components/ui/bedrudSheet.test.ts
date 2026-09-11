@@ -23,8 +23,14 @@ describe('BedrudSheet', () => {
   })
 
   it('should take its ceiling from the meeting token rather than a second copy of the arithmetic', () => {
-    expect(sheetSource).toContain('max-h-[var(--meet-sheet-max-height)]')
+    expect(sheetSource).toContain('h-[var(--meet-sheet-max-height)]')
     expect(sheetSource).not.toContain('maxHeight')
+  })
+
+  it('should set that height rather than cap it, because vaul snaps against the content height', () => {
+    // `max-h` alone leaves the content at its natural height, which makes vaul's 0.5 snap point half
+    // of the content rather than half of the screen and translates the rest off the bottom.
+    expect(sheetSource).not.toContain('max-h-[var(--meet-sheet-max-height)]')
   })
 
   it('should not introduce a breakpoint other than the shared one', () => {

@@ -43,7 +43,6 @@ export function MeetingRoomShell({ meetId, navigate, children }: MeetingRoomShel
   const infoOpenRef = useRef(infoOpen)
   const elevatedPanelRef = useRef(elevatedPanel)
   const chatStuckRef = useRef(chatStuck)
-  const participantsFromChatRef = useRef(false)
   chatOpenRef.current = chatOpen
   infoOpenRef.current = infoOpen
   elevatedPanelRef.current = elevatedPanel
@@ -68,7 +67,6 @@ export function MeetingRoomShell({ meetId, navigate, children }: MeetingRoomShel
   }, [chatStuck, clearElevatedChrome])
 
   const toggleParticipants = useCallback(() => {
-    participantsFromChatRef.current = false
     setParticipantsOpen((open) => !open)
     if (!chatStuck) setChatOpen(false)
     setInfoOpen(false)
@@ -76,21 +74,8 @@ export function MeetingRoomShell({ meetId, navigate, children }: MeetingRoomShel
     requestCloseMeetingSettings()
   }, [chatStuck, clearElevatedChrome])
 
-  const openParticipantsFromChat = useCallback(() => {
-    participantsFromChatRef.current = true
-    setParticipantsOpen(true)
-    setChatOpen(true)
-    setInfoOpen(false)
-    clearElevatedChrome()
-    requestCloseMeetingSettings()
-  }, [clearElevatedChrome])
-
   const closeParticipants = useCallback(() => {
     setParticipantsOpen(false)
-    if (participantsFromChatRef.current) {
-      participantsFromChatRef.current = false
-      setChatOpen(true)
-    }
   }, [])
 
   const handleSetChatOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
@@ -310,7 +295,6 @@ export function MeetingRoomShell({ meetId, navigate, children }: MeetingRoomShel
             onToggleInfo={toggleInfo}
             participantsOpen={participantsOpen}
             onToggleParticipants={toggleParticipants}
-            onOpenParticipantsFromChat={openParticipantsFromChat}
             onCloseParticipants={closeParticipants}
           />
         </MeetingViewportPanProvider>

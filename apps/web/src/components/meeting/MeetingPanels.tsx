@@ -32,7 +32,6 @@ interface MeetingPanelsProps {
   onToggleInfo: () => void
   participantsOpen: boolean
   onToggleParticipants: () => void
-  onOpenParticipantsFromChat: () => void
   onCloseParticipants: () => void
 }
 
@@ -54,7 +53,6 @@ export function MeetingPanels({
   onToggleInfo,
   participantsOpen,
   onToggleParticipants,
-  onOpenParticipantsFromChat,
   onCloseParticipants,
 }: MeetingPanelsProps) {
   const { stage } = useMeetingStage()
@@ -133,8 +131,6 @@ export function MeetingPanels({
           side={chatSide}
           elevated={chatElevated}
           participantsOpen={participantsOpen}
-          onOpenParticipantsFromChat={onOpenParticipantsFromChat}
-          onCloseParticipants={onCloseParticipants}
         />
       )}
       {participantsOpen && !infoOpen && <ParticipantsList adminId={adminId} onClose={onCloseParticipants} />}
