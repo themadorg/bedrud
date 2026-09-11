@@ -201,14 +201,16 @@ function DashboardPage() {
 
       <QuickJoinBar onJoin={handleJoin} onCreate={() => setCreateOpen(true)} />
 
-      {/* Tabs + Search */}
+      {/* Chips + Search */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <FilterChip label="All" selected={activeFilter === 'all'} onSelect={() => setActiveFilter('all')} />
           <FilterChip label="My Rooms" selected={activeFilter === 'mine'} onSelect={() => setActiveFilter('mine')} />
         </div>
 
-        <div className="flex h-8 w-full max-w-48 items-center gap-2 rounded-lg border border-input bg-background px-2 focus-within:ring-2 focus-within:ring-ring">
+        {/* `min-w-0` lets this box shrink below its content width, so a narrow phone takes the
+            space out of the filter field rather than wrapping the chips beside it. */}
+        <div className="flex h-8 w-full min-w-0 max-w-48 items-center gap-2 rounded-lg border border-input bg-background px-2 focus-within:ring-2 focus-within:ring-ring">
           <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <Input
             value={query}

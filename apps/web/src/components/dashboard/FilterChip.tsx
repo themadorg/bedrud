@@ -26,7 +26,9 @@ export function FilterChip({ label, selected, onSelect }: Props) {
       aria-pressed={selected}
       className={cn(
         badgeVariants({ variant: selected ? 'default' : 'outline' }),
-        'h-8 cursor-pointer gap-1.5 px-3',
+        // A chip states one filter, so its label never wraps; it holds its width and the filter
+        // box beside it gives way instead.
+        'h-8 shrink-0 cursor-pointer gap-1.5 whitespace-nowrap px-3',
         selected ? 'border-transparent' : 'border-input hover:bg-accent',
       )}
     >
