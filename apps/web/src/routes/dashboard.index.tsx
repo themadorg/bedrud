@@ -240,7 +240,10 @@ function DashboardPage() {
           </div>
         ) : (
           <div className="px-4 py-12 text-center">
-            {(rooms?.length ?? 0) > 0 || recentRooms.length > 0 ? (
+            {/* Keyed on the query rather than on whether any room exists anywhere. The My Rooms chip
+                can empty the list while recents still exist, and reporting that against an empty
+                query reads as `No rooms match ""`. */}
+            {normalizedQuery ? (
               <>
                 <p className="text-sm font-medium">No rooms match "{query}"</p>
                 <Button variant="link" type="button" onClick={() => setQuery('')} className="mt-2 text-sm">

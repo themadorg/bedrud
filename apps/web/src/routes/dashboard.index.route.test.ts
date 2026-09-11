@@ -26,6 +26,13 @@ describe('the dashboard route', () => {
     expect(dashboardRouteSource).toMatch(/parseJoinInput\(value\)\s*\n\s*if \(!roomName\)/)
   })
 
+  // The My Rooms chip can empty the list while recents still exist. Keyed on whether any room
+  // exists anywhere, the empty state then reported `No rooms match ""` against an empty filter box.
+  // The query is what decides which of the two empty states applies.
+  it('should choose its empty state by the query rather than by what exists', () => {
+    expect(dashboardRouteSource).toMatch(/\{normalizedQuery \? \(/)
+  })
+
   // Unit 1 made 1024px the app's one phone breakpoint. The dashboard tree was never swept.
   it('should carry no breakpoint prefix outside the shared scale', () => {
     expect(dashboardRouteSource).not.toMatch(/(^|[\s"'`])(max-)?(sm|md):/)
