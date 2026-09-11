@@ -861,9 +861,16 @@ condition with no test regresses silently.
 
 Filed as issues rather than fixed here, and each verified against current code before filing:
 
-- `ParticipantsList` is still a full-screen phone surface. Unit 4 moves it onto `BedrudSheet`.
+- `ParticipantsList` is still a full-screen phone surface. Unit 4 moves it onto `BedrudSheet`, and
+  the wider mobile-layout backlog is tracked in #86.
 - The meeting's own radius tokens in `meeting.css` keep their current values until unit 3.
 - `Room` is declared twice, in the meeting route and in `RoomCard`, with `e2ee` required in one and
-  optional in the other. Predates this unit.
-- `tsconfig.json` maps both `#/*` and `@/*` to `./src/*`, and `ChatPanel.tsx` imports through both in
-  the same file. This unit adds imports in the `#/` form and does not sweep the rest.
+  optional in the other. Predates this unit; tracked in #157.
+- `tsconfig.json` maps both `#/*` and `@/*` to `./src/*` and the codebase uses both. This unit's new
+  and edited imports all take the `@/` form, which is what `components/ui/` already uses 25 times
+  against 1; the rest of the tree is not swept. Tracked in #158.
+- Nine inline `borderRadius` literals remain across six files, none of them touched here. Tracked
+  in #159.
+- Deleting the in-chat controls strip changes the premise of #39, which asked for meeting controls
+  in the chat header because chat was a full-screen overlay. Recorded as a comment there rather than
+  closed: the meeting controls bar is still hidden while the sheet is open.
