@@ -267,6 +267,14 @@ function btnIconCn(active = false, danger = false, isMobile = false) {
 
 One breakpoint: `MOBILE_BREAKPOINT_PX` (1024, Tailwind `lg`) in `src/lib/use-is-mobile.ts`. Render-time branches use `useIsMobile()`; effects and event handlers use `isMobileViewport()`. CSS uses `lg:` / `max-lg:` for the same line. No component defines its own `matchMedia` width check.
 
+## Phone dashboard
+
+`/dashboard` is one list at every width. The quick-join bar is always visible and resolves its field through `parseJoinInput` in `src/lib/join-input.ts`, which accepts a full meeting URL, a bare `/m/` or `/c/` path, or a plain room name, and returns null for anything else. The "New room" button beside it is desktop-only; phones create from the floating button in `MobileBottomNav`.
+
+Two filter chips, All and My Rooms, replace the tabs the page used to carry. `FilterChip` wears `badgeVariants` so the chip corner stays single-sourced. Under All the list holds server rooms and rooms known only from this device's history, merged and ordered by `mergeDashboardRooms` in `src/lib/dashboard-room-list.ts`; under My Rooms it holds server rooms only. `RoomCard` renders both kinds: a locally known room has no capacity, visibility or capability row, and carries Remove where an owned room carries Settings and Delete.
+
+The admin tree has no phone layout, so `MobileBottomNav` deliberately has no Admin tab even though the Android client shows one.
+
 ## Do / Don't
 
 **Do:**

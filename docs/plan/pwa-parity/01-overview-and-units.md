@@ -1,6 +1,6 @@
 # 01 — Overview & Units
 
-**Status: in progress.** Unit 1 is specified in [02 — Foundation](./02-foundation.md); units 2 to 5 get their own file when they start.
+**Status: in progress.** Unit 1 is specified in [02 — Foundation](./02-foundation.md) and unit 6 in [06 — Dashboard parity](./06-dashboard-parity.md); units 2 to 5 get their own file when they start.
 
 ## Problem
 
@@ -44,6 +44,7 @@ Phone layout applies below 1024px, the `lg` Tailwind breakpoint the dashboard sh
 | `MeetingControlsPanel` (floating pill, handle unfolds options upward) | floating controls pill | unit 3 |
 | `MeetingInviteSheet` (avatar grid + share targets) | invite sheet | unit 4 |
 | `SettingsContent` (one scrolling page of card sections) | mobile settings page | unit 5 |
+| `QuickJoinBar` + `FilterRow` (dashboard) | quick-join bar + filter chips | unit 6 |
 
 ## Units
 
@@ -55,7 +56,8 @@ Each unit is one branch and one pull request, cut fresh from `master`.
 | 2 | Meeting chat sheet | chat as a bottom sheet over the live call: half on open, full on drag or keyboard, dismissed on a second drag down | planned |
 | 3 | Meeting controls pill | floating bottom-centre pill (camera, screen share, mic, chat, hang up), drag handle unfolds room options upward in the same surface, no "more" menu | planned |
 | 4 | Invite sheet | participants and invite as one sheet: avatar grid, count, share targets, room link | planned |
-| 5 | Mobile settings page | one scrolling page of card sections on phones; dashboard alignment (quick-join bar, filter chips) if still needed | planned |
+| 5 | Mobile settings page | one scrolling page of card sections on phones | planned |
+| 6 | Dashboard parity | quick-join bar on phones with pasted-link support, filter chips over one merged room list, and the dashboard tree moved to the shared breakpoint | done, [06](./06-dashboard-parity.md), [07](./07-dashboard-parity-plan.md) |
 
 ## Verification
 
