@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils'
+import { Drawer } from 'vaul'
 
 /** The drawn pill: Android's `Dimens.meetingHandleWidth` × `meetingHandleHeight`. */
 const HANDLE_PILL_CLASS = 'h-1 w-8 rounded-full bg-[var(--meet-fg-muted)]'
@@ -12,24 +12,21 @@ const HANDLE_PILL_CLASS = 'h-1 w-8 rounded-full bg-[var(--meet-fg-muted)]'
  * worse on glass than it looks in an emulator. The strip is transparent, so it costs no visible
  * pixels.
  *
- * `onClick` is optional, as it is on Android. A sheet with one height has nothing for a tap to do,
- * so it gets a plain strip with no role and no label — the sheet is still dragged and dismissed the
- * usual ways.
+ * The root is vaul's own `Drawer.Handle`, so the tap that cycles the snap points and the drag that
+ * moves the sheet both stay with vaul. That makes the handle a bare `div` rather than a button, so
+ * the accessible name has to be given rather than read from the element.
+ *
+ * `preventCycle` is for a sheet with a single height, which has nothing for a tap to cycle to. The
+ * sheet is still dragged and dismissed the usual ways.
  */
-export function BedrudSheetHandle({ onClick, label }: { onClick?: () => void; label?: string }) {
-  const strip = 'flex h-12 w-full shrink-0 cursor-grab items-center justify-center active:cursor-grabbing'
-
-  if (!onClick) {
-    return (
-      <div className={strip} aria-hidden="true">
-        <span className={HANDLE_PILL_CLASS} />
-      </div>
-    )
-  }
-
+export function BedrudSheetHandle({ label, preventCycle }: { label: string; preventCycle?: boolean }) {
   return (
-    <button type="button" onClick={onClick} className={cn(strip, 'border-none bg-transparent')} aria-label={label}>
+    <Drawer.Handle
+      preventCycle={preventCycle}
+      aria-label={label}
+      className="flex h-12 w-full shrink-0 cursor-grab items-center justify-center active:cursor-grabbing"
+    >
       <span className={HANDLE_PILL_CLASS} />
-    </button>
+    </Drawer.Handle>
   )
 }
