@@ -43,7 +43,6 @@ interface Props {
   side?: 'left' | 'right'
   /** Stack above expanded WebXDC (z-200) — must portal to body. */
   elevated?: boolean
-  participantsOpen?: boolean
 }
 
 /**
@@ -94,7 +93,6 @@ export function ChatPanel({
   onStuckChange,
   side = 'right',
   elevated = false,
-  participantsOpen = false,
 }: Props) {
   const inputRef = useRef<ChatInputHandle>(null)
   const noop = useCallback(() => {}, [])
@@ -131,7 +129,7 @@ export function ChatPanel({
     [roomId],
   )
 
-  const trapRef = useFocusTrap({ enabled: (isOverlay || elevated) && !participantsOpen, onClose: handleClose })
+  const trapRef = useFocusTrap({ enabled: isOverlay || elevated, onClose: handleClose })
 
   const chatBody = (
     <>
