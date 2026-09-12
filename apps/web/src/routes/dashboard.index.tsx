@@ -146,19 +146,25 @@ function DashboardPage() {
     navigate({ to: '/m/$meetId', params: { meetId: roomName } })
   }
 
+  // The name travels with the id because deleting a room has to reach both places the room is
+  // known: the server list, and this device's history.
   const deleteRoom = useMutation({
-    mutationFn: (roomId: string) => api.delete(`/api/room/${roomId}`),
-    onMutate: async (roomId) => {
+    mutationFn: ({ id }: { id: string; name: string }) => api.delete(`/api/room/${id}`),
+    onMutate: async ({ id }) => {
       await queryClient.cancelQueries({ queryKey: ['rooms'] })
       const prev = queryClient.getQueryData<Room[]>(['rooms'])
-      queryClient.setQueryData<Room[]>(['rooms'], (old) => old?.filter((r) => r.id !== roomId))
+      queryClient.setQueryData<Room[]>(['rooms'], (old) => old?.filter((r) => r.id !== id))
       return { prev }
     },
-    onSuccess: () => {
+    onSuccess: (_result, { name }) => {
+      // Dropping it from the server list alone is not enough. The list merges local history with
+      // server rooms, so a deleted room whose name is still in history comes straight back as a
+      // recent card — in the list it just left, one frame after this toast.
+      removeRecent(name)
       toast.success('Room deleted')
       void queryClient.invalidateQueries({ queryKey: ['rooms'] })
     },
-    onError: (err, _roomId, ctx) => {
+    onError: (err, _variables, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(['rooms'], ctx.prev)
       toast.error(getErrorMessage(err, 'Failed to delete room'))
     },
@@ -234,7 +240,9 @@ function DashboardPage() {
                 key={entry.key}
                 entry={entry}
                 onJoin={() => handleJoin(entry.name)}
-                onDelete={entry.kind === 'server' ? () => deleteRoom.mutate(entry.room.id) : undefined}
+                onDelete={
+                  entry.kind === 'server' ? () => deleteRoom.mutate({ id: entry.room.id, name: entry.name }) : undefined
+                }
                 onSettings={entry.kind === 'server' ? () => setSettingsRoom(entry.room) : undefined}
                 onRemove={entry.kind === 'recent' ? () => removeRecent(entry.name) : undefined}
               />

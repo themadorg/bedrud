@@ -37,4 +37,13 @@ describe('the dashboard route', () => {
   it('should carry no breakpoint prefix outside the shared scale', () => {
     expect(dashboardRouteSource).not.toMatch(/(^|[\s"'`])(max-)?(sm|md):/)
   })
+
+  // Deleting a room dropped it from the server list but left its name in this device's history, and
+  // the list merges the two — so it returned as a recent card one frame after the "Room deleted"
+  // toast, reading as a delete that did not work. Every room created or joined from this page is in
+  // that history, so it reached nearly every delete. The mutation carries the name for this reason.
+  it('should clear the local history entry when a room is deleted', () => {
+    expect(dashboardRouteSource).toContain('removeRecent(name)')
+    expect(dashboardRouteSource).toMatch(/deleteRoom\.mutate\(\{ id: entry\.room\.id, name: entry\.name \}\)/)
+  })
 })
