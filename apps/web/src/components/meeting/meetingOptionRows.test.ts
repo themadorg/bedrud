@@ -10,6 +10,12 @@ const nothingAvailable: MeetingOptionsInput = {
   roomId: undefined,
   linkCopied: false,
   isSelfDeafened: false,
+  microphones: [],
+  activeMicrophoneId: undefined,
+  speakers: [],
+  activeSpeakerId: undefined,
+  noiseModes: [],
+  activeNoiseMode: 'browser',
   fullscreenAvailable: false,
   isFullscreen: false,
   whiteboardEnabled: false,
@@ -29,6 +35,11 @@ const everythingAvailable: MeetingOptionsInput = {
   videoSidebarAvailable: true,
   roomAccessAvailable: true,
   roomId: 'room-1',
+  microphones: [{ deviceId: 'mic-1', label: 'Built-in microphone' }],
+  activeMicrophoneId: 'mic-1',
+  speakers: [{ deviceId: 'speaker-1', label: 'Built-in speaker' }],
+  activeSpeakerId: 'speaker-1',
+  noiseModes: [{ value: 'browser', label: 'Browser' }],
   fullscreenAvailable: true,
   whiteboardEnabled: true,
   youtubeEnabled: true,
@@ -40,19 +51,23 @@ function idsOf(input: MeetingOptionsInput): string[] {
 }
 
 describe('meetingOptionRows', () => {
-  it('should always offer the link, the audio rows and settings', () => {
-    expect(idsOf(nothingAvailable)).toEqual(['copy-link', 'deafen', 'audio-devices', 'noise', 'settings'])
+  it('should always offer the link, deafen and settings', () => {
+    expect(idsOf(nothingAvailable)).toEqual(['copy-link', 'deafen', 'settings'])
   })
 
-  it('should order the rows room, then audio, then stage', () => {
+  it('should order the rows room, then audio, then the app, then stage', () => {
     expect(idsOf(everythingAvailable)).toEqual([
       'videos',
       'access',
       'info',
       'copy-link',
       'deafen',
-      'audio-devices',
-      'noise',
+      'heading:microphone',
+      'microphone:mic-1',
+      'heading:speaker',
+      'speaker:speaker-1',
+      'heading:noise',
+      'noise:browser',
       'settings',
       'fullscreen',
       'whiteboard',
@@ -120,5 +135,62 @@ describe('meetingOptionRows', () => {
     expect(rows.find((row) => row.id === 'whiteboard')?.disabled).toBe(true)
     expect(rows.find((row) => row.id === 'youtube')?.disabled).toBe(true)
     expect(rows.find((row) => row.id === 'copy-link')?.disabled).toBe(false)
+  })
+})
+
+describe('meetingOptionRows audio groups', () => {
+  it('should list every microphone under one heading', () => {
+    const rows = meetingOptionRows({
+      ...nothingAvailable,
+      microphones: [
+        { deviceId: 'mic-1', label: 'Built-in microphone' },
+        { deviceId: 'mic-2', label: 'Headset' },
+      ],
+      activeMicrophoneId: 'mic-2',
+    })
+    expect(rows.map((row) => row.id)).toEqual([
+      'copy-link',
+      'deafen',
+      'heading:microphone',
+      'microphone:mic-1',
+      'microphone:mic-2',
+      'settings',
+    ])
+    expect(rows.find((row) => row.id === 'microphone:mic-2')?.checked).toBe(true)
+    expect(rows.find((row) => row.id === 'microphone:mic-1')?.checked).toBe(false)
+  })
+
+  it('should carry the device label so the panel never renders a raw id', () => {
+    const rows = meetingOptionRows({
+      ...nothingAvailable,
+      speakers: [{ deviceId: 'speaker-9', label: 'External speakers' }],
+      activeSpeakerId: 'speaker-9',
+    })
+    expect(rows.find((row) => row.id === 'speaker:speaker-9')?.label).toBe('External speakers')
+  })
+
+  it('should check the noise mode the client is using', () => {
+    const rows = meetingOptionRows({
+      ...nothingAvailable,
+      noiseModes: [
+        { value: 'browser', label: 'Browser' },
+        { value: 'rnnoise', label: 'RNNoise' },
+      ],
+      activeNoiseMode: 'rnnoise',
+    })
+    expect(rows.find((row) => row.id === 'noise:rnnoise')?.checked).toBe(true)
+    expect(rows.find((row) => row.id === 'noise:browser')?.checked).toBe(false)
+  })
+
+  it('should drop a heading whose group is empty rather than name nothing', () => {
+    expect(idsOf(nothingAvailable)).not.toContain('heading:microphone')
+    expect(idsOf(nothingAvailable)).not.toContain('heading:speaker')
+    expect(idsOf(nothingAvailable)).not.toContain('heading:noise')
+  })
+
+  it('should mark a heading as neither a toggle nor an action', () => {
+    const rows = meetingOptionRows(everythingAvailable)
+    expect(rows.find((row) => row.id === 'heading:microphone')?.kind).toBe('heading')
+    expect(rows.find((row) => row.id === 'microphone:mic-1')?.kind).toBe('toggle')
   })
 })

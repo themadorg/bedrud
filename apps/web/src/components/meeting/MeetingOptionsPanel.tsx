@@ -1,4 +1,5 @@
 import {
+  AudioLines,
   Check,
   Film,
   Globe,
@@ -7,26 +8,29 @@ import {
   Link2,
   Lock,
   Maximize,
+  Mic,
   Package,
   PenLine,
   Settings,
   Video,
+  Volume2,
 } from 'lucide-react'
-import type { MeetingOptionRow, MeetingOptionRowId } from '@/components/meeting/meetingOptionRows'
+import type { MeetingFixedRowId, MeetingOptionRow, MeetingOptionRowId } from '@/components/meeting/meetingOptionRows'
 import { cn } from '@/lib/utils'
 
+/** The fixed rows that draw an icon. Headings draw none, so they are excluded. */
+type IconRowId = Exclude<MeetingFixedRowId, `heading:${string}`>
+
 /**
- * The icon each row wears. Keyed by id so the pure row list stays free of React values, and so a
- * new row id fails the type check here until it is given one.
+ * The icon each fixed row wears. Keyed by id so the pure row list stays free of React values, and
+ * so a new fixed row id fails the type check here until it is given one.
  */
-const ROW_ICONS: Record<MeetingOptionRowId, React.ReactNode> = {
+const ROW_ICONS: Record<IconRowId, React.ReactNode> = {
   videos: <Video size={18} className="shrink-0" />,
   access: <Globe size={18} className="shrink-0" />,
   info: <Info size={18} className="shrink-0" />,
   'copy-link': <Link2 size={18} className="shrink-0" />,
   deafen: <Headphones size={18} className="shrink-0" />,
-  'audio-devices': <Headphones size={18} className="shrink-0" />,
-  noise: <Settings size={18} className="shrink-0" />,
   settings: <Settings size={18} className="shrink-0" />,
   fullscreen: <Maximize size={18} className="shrink-0" />,
   whiteboard: <PenLine size={18} className="shrink-0" />,
@@ -34,10 +38,23 @@ const ROW_ICONS: Record<MeetingOptionRowId, React.ReactNode> = {
   'app-gallery': <Package size={18} className="shrink-0" />,
 }
 
+/** The icon a device row wears, chosen by the prefix that carries its device id. */
+function deviceIcon(id: MeetingOptionRowId): React.ReactNode | undefined {
+  if (id.startsWith('microphone:')) return <Mic size={18} className="shrink-0" />
+  if (id.startsWith('speaker:')) return <Volume2 size={18} className="shrink-0" />
+  if (id.startsWith('noise:')) return <AudioLines size={18} className="shrink-0" />
+  return undefined
+}
+
+/** Reads the icon map without widening it, so its exhaustiveness survives the lookup. */
+function fixedIcon(id: MeetingOptionRowId): React.ReactNode | undefined {
+  return id in ROW_ICONS ? ROW_ICONS[id as IconRowId] : undefined
+}
+
 /** The private-room row is the one place the icon depends on the label rather than the id. */
 function iconFor(row: MeetingOptionRow): React.ReactNode {
   if (row.id === 'access' && row.label === 'Private room') return <Lock size={18} className="shrink-0" />
-  return ROW_ICONS[row.id]
+  return deviceIcon(row.id) ?? fixedIcon(row.id)
 }
 
 interface MeetingOptionsPanelProps {
@@ -63,26 +80,35 @@ export function MeetingOptionsPanel({ rows, expanded, onSelect }: MeetingOptions
       aria-hidden={!expanded}
     >
       <ul className="max-h-[calc(var(--meet-controls-panel-max-height)-6rem)] list-none overflow-y-auto px-2 py-1">
-        {rows.map((row) => (
-          <li key={row.id}>
-            <button
-              type="button"
-              disabled={row.disabled || !expanded}
-              onClick={() => onSelect(row.id)}
-              className={cn(
-                'flex w-full items-center gap-3 rounded-md px-3 py-3 text-left text-[14px] transition-colors duration-150',
-                row.checked ? 'text-[var(--meet-btn-muted-fg)]' : 'text-[var(--meet-fg-strong)]',
-                row.disabled ? 'cursor-not-allowed opacity-40' : 'hover:bg-[var(--meet-control-hover)]',
-              )}
+        {rows.map((row) =>
+          row.kind === 'heading' ? (
+            <li
+              key={row.id}
+              className="px-3 pt-3 pb-1 font-semibold text-[11px] text-[var(--meet-fg-subtle)] uppercase tracking-wide"
             >
-              {iconFor(row)}
-              <span className="flex-1">{row.label}</span>
-              {row.kind === 'toggle' && row.checked && (
-                <Check size={16} className="shrink-0 text-[var(--meet-btn-muted-fg)]" />
-              )}
-            </button>
-          </li>
-        ))}
+              {row.label}
+            </li>
+          ) : (
+            <li key={row.id}>
+              <button
+                type="button"
+                disabled={row.disabled || !expanded}
+                onClick={() => onSelect(row.id)}
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-md px-3 py-3 text-left text-[14px] transition-colors duration-150',
+                  row.checked ? 'text-[var(--meet-btn-muted-fg)]' : 'text-[var(--meet-fg-strong)]',
+                  row.disabled ? 'cursor-not-allowed opacity-40' : 'hover:bg-[var(--meet-control-hover)]',
+                )}
+              >
+                {iconFor(row)}
+                <span className="flex-1 truncate">{row.label}</span>
+                {row.kind === 'toggle' && row.checked && (
+                  <Check size={16} className="shrink-0 text-[var(--meet-btn-muted-fg)]" />
+                )}
+              </button>
+            </li>
+          ),
+        )}
       </ul>
     </div>
   )

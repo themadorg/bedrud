@@ -1,23 +1,45 @@
-/** Every row the options panel can show. The union is the contract the panel maps to icons. */
-export type MeetingOptionRowId =
+/** A selectable audio device, as the panel needs to know it. */
+export interface MeetingDeviceOption {
+  deviceId: string
+  label: string
+}
+
+/** A noise suppression mode the instance allows. */
+export interface MeetingNoiseModeOption {
+  value: string
+  label: string
+}
+
+/** The rows whose identity is fixed. Device rows carry the device id instead. */
+export type MeetingFixedRowId =
   | 'videos'
   | 'access'
   | 'info'
   | 'copy-link'
   | 'deafen'
-  | 'audio-devices'
-  | 'noise'
   | 'settings'
   | 'fullscreen'
   | 'whiteboard'
   | 'youtube'
   | 'app-gallery'
+  | 'heading:microphone'
+  | 'heading:speaker'
+  | 'heading:noise'
+
+/**
+ * Every row the options panel can show. Audio devices cannot be enumerated ahead of time, so their
+ * ids carry the device they select; the prefix is what the panel switches on for an icon.
+ */
+export type MeetingOptionRowId = MeetingFixedRowId | `microphone:${string}` | `speaker:${string}` | `noise:${string}`
 
 export interface MeetingOptionRow {
   id: MeetingOptionRowId
   label: string
-  /** Toggles keep the panel open and carry a check. Actions close it on the way. */
-  kind: 'toggle' | 'action'
+  /**
+   * Toggles keep the panel open and carry a check. Actions close it on the way. Headings are not
+   * interactive and only name the group beneath them.
+   */
+  kind: 'toggle' | 'action' | 'heading'
   checked: boolean
   disabled: boolean
 }
@@ -30,6 +52,12 @@ export interface MeetingOptionsInput {
   roomId: string | undefined
   linkCopied: boolean
   isSelfDeafened: boolean
+  microphones: MeetingDeviceOption[]
+  activeMicrophoneId: string | undefined
+  speakers: MeetingDeviceOption[]
+  activeSpeakerId: string | undefined
+  noiseModes: MeetingNoiseModeOption[]
+  activeNoiseMode: string
   fullscreenAvailable: boolean
   isFullscreen: boolean
   whiteboardEnabled: boolean
@@ -48,16 +76,42 @@ function action(id: MeetingOptionRowId, label: string, disabled = false): Meetin
   return { id, label, kind: 'action', checked: false, disabled }
 }
 
-/** A row whose tap flips a setting in place rather than going somewhere. */
+/** A row whose tap flips or selects something in place rather than going somewhere. */
 function toggle(id: MeetingOptionRowId, label: string, checked: boolean): MeetingOptionRow {
   return { id, label, kind: 'toggle', checked, disabled: false }
 }
 
+/** A non-interactive label naming the group of rows beneath it. */
+function heading(id: MeetingFixedRowId, label: string): MeetingOptionRow {
+  return { id, label, kind: 'heading', checked: false, disabled: false }
+}
+
+/**
+ * Appends one audio group: its heading, then one selectable row per entry. An empty group
+ * contributes nothing, heading included — a section naming devices that do not exist reads as a
+ * bug rather than as an empty state.
+ */
+function pushAudioGroup(
+  rows: MeetingOptionRow[],
+  headingId: MeetingFixedRowId,
+  headingLabel: string,
+  entries: { id: MeetingOptionRowId; label: string; checked: boolean }[],
+): void {
+  if (entries.length === 0) return
+  rows.push(heading(headingId, headingLabel))
+  for (const entry of entries) {
+    rows.push(toggle(entry.id, entry.label, entry.checked))
+  }
+}
+
 /**
  * Builds the options panel's rows from what this room and this client can do. The order — room,
- * then audio, then whatever is on the stage — is part of the contract: the panel is anchored to
- * the controls and read bottom-up, so the rows nearest the thumb are the ones about the room the
- * user is in.
+ * then audio, then the app, then whatever is on the stage — is part of the contract: the panel is
+ * anchored to the controls and read bottom-up, so the rows nearest the thumb are the ones about
+ * the room the user is in.
+ *
+ * The audio devices are rows rather than a link to a second surface. They used to live in a
+ * full-screen dialog that covered the call, which is the shape this unit exists to remove.
  */
 export function meetingOptionRows(input: MeetingOptionsInput): MeetingOptionRow[] {
   const rows: MeetingOptionRow[] = []
@@ -74,8 +128,38 @@ export function meetingOptionRows(input: MeetingOptionsInput): MeetingOptionRow[
 
   rows.push(action('copy-link', input.linkCopied ? 'Copied!' : 'Copy room link'))
   rows.push(toggle('deafen', input.isSelfDeafened ? 'Undeafen' : 'Deafen', input.isSelfDeafened))
-  rows.push(action('audio-devices', 'Audio settings'))
-  rows.push(action('noise', 'Noise suppression'))
+
+  pushAudioGroup(
+    rows,
+    'heading:microphone',
+    'Microphone',
+    input.microphones.map((device) => ({
+      id: `microphone:${device.deviceId}` as const,
+      label: device.label,
+      checked: device.deviceId === input.activeMicrophoneId,
+    })),
+  )
+  pushAudioGroup(
+    rows,
+    'heading:speaker',
+    'Speaker',
+    input.speakers.map((device) => ({
+      id: `speaker:${device.deviceId}` as const,
+      label: device.label,
+      checked: device.deviceId === input.activeSpeakerId,
+    })),
+  )
+  pushAudioGroup(
+    rows,
+    'heading:noise',
+    'Noise suppression',
+    input.noiseModes.map((mode) => ({
+      id: `noise:${mode.value}` as const,
+      label: mode.label,
+      checked: mode.value === input.activeNoiseMode,
+    })),
+  )
+
   rows.push(action('settings', 'Settings'))
 
   if (input.fullscreenAvailable) {
