@@ -155,8 +155,9 @@ controls, because the row you were already touching stays the panel's floor.
 | Room info | room id present | action |
 | Copy room link | always | action |
 | Deafen | always | toggle |
-| Audio settings | always | action, opens the device lists |
-| Noise suppression | always | action, opens the mode list |
+| Microphone — one row per input device | at least one device | heading, then a checked selection |
+| Speaker — one row per output device | at least one device | heading, then a checked selection |
+| Noise suppression — one row per mode | always | heading, then a checked selection |
 | Settings | always | action, opens the settings dialog |
 | Fullscreen | `document.fullscreenEnabled` | action |
 | Open / Close whiteboard | whiteboard enabled or hosted | action |
@@ -164,7 +165,12 @@ controls, because the row you were already touching stays the panel's floor.
 | App gallery | WebXDC enabled | action |
 
 Toggles keep the panel open and carry a trailing check in the accent tint, so the flip is visible.
-Actions that lead somewhere else close the panel on the way. This is Android's rule, verbatim.
+Actions that lead somewhere else close the panel on the way. This is Android's rule, verbatim. A
+device selection is a toggle by that rule: the panel stays open and the check moves.
+
+An audio group whose list is empty contributes nothing, heading included — a "Speaker" heading over
+no speakers reads as a bug rather than as an empty state. A noise mode the instance offers but the
+browser cannot run renders disabled, as it did in the dialog this replaces.
 
 Room info was an animated sub-page inside the `⋯` dialog. It becomes an ordinary row that opens the
 existing room info panel, and the sub-page machinery — `morePage`, `moreNavDir`, `morePageAnim`,

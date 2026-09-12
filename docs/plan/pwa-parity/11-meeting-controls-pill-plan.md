@@ -172,10 +172,12 @@ export function expandedAfterDrag(expanded: boolean, deltaY: number): boolean {
 - [ ] **Step 4: Run it and watch it pass**
 
 ```bash
-cd apps/web && bun run test controlsPanelDrag
+cd apps/web && bun run test controlsPanelDrag && bun run check
 ```
 
-Expected: 6 passed.
+Expected: 6 passed, then `check` exit 0. Run `check` before every commit, not only at the end of a
+task that touches components — Biome's import ordering and formatting are errors, not warnings, and
+a test-only task can still break them.
 
 - [ ] **Step 5: Commit**
 
@@ -463,10 +465,10 @@ export function meetingOptionRows(input: MeetingOptionsInput): MeetingOptionRow[
 - [ ] **Step 4: Run it and watch it pass**
 
 ```bash
-cd apps/web && bun run test meetingOptionRows
+cd apps/web && bun run test meetingOptionRows && bun run check
 ```
 
-Expected: 10 passed.
+Expected: 10 passed, then `check` exit 0.
 
 - [ ] **Step 5: Commit**
 
@@ -1692,3 +1694,32 @@ Capture before and after screenshots in both themes, the before taken on
 
 **Then stop.** Do not commit the captures, push the branch, or open the PR without explicit
 approval.
+
+---
+
+## Deviations found during implementation
+
+Five places this plan was wrong or incomplete. Recorded here rather than quietly fixed, because
+the next unit's plan is written by someone reading this one.
+
+1. **Tasks 1 and 2 ran only `bun run test`.** Biome treats import ordering and formatting as
+   errors, so Task 2's commit went in red and had to be amended. Both tasks now run `check` too.
+2. **The audio device lists had nowhere to go.** The spec said they become panel rows; the plan
+   made them two action rows calling `setAudioOpen(true)`, which only rendered inside the dialog
+   the same task deletes. On desktop that surface is a `DropdownMenu` opened by its own trigger and
+   cannot be opened programmatically either, so the rows would have done nothing. Resolved by
+   making each microphone, speaker and noise mode its own row, which is what the spec said.
+   `meetingOptionRows` gained heading rows and device-prefixed ids.
+3. **Noise modes need a `disabled` flag.** The deleted dialog showed an "N/A" badge for Krisp when
+   the browser cannot run it. Without the flag the panel renders a selectable row that silently
+   does nothing.
+4. **The phone branch cannot be an early `return`.** `BedrudSettingsDialog` and `WebxdcAppsDialog`
+   render after the bar and are reached from the panel; returning the pill early unmounts both and
+   the Settings and App gallery rows stop working. Only the bar element branches.
+5. **Tasks 7 and 8 are one commit.** The pill needs `chatOpen` and `onToggleChat` flowing from
+   `MeetingPanels`, so Task 7 cannot compile without Task 8's plumbing. The plan's suggestion to
+   pass placeholder values would have shipped a commit whose chat button did nothing.
+
+Task 7 also split its cleanup into a second commit: with the bar now desktop-only, thirteen
+`isMobile ? … : …` expressions inside it could only ever take the desktop side, and `CtrlBtn`'s
+`isMobile` prop had no caller left.

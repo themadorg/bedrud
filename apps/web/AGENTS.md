@@ -248,17 +248,20 @@ Shared meeting styles at `components/meeting/meeting.css`:
 - Convert everything else to Tailwind classes
 
 ### CtrlBtn convention (ControlsBar)
-Use `btnIconCn(active, danger, isMobile)` helper that returns Tailwind classes:
+`ControlsBar` is the **desktop** bar; below the breakpoint the meeting draws `MeetingControlsPill`
+instead. `btnIconCn(active, danger, ptt)` therefore carries one size, not a phone branch:
 ```tsx
-function btnIconCn(active = false, danger = false, isMobile = false) {
+function btnIconCn(active = false, danger = false, ptt = false) {
   return cn(
     'flex items-center justify-center shrink-0 border-none cursor-pointer transition-[background,color] duration-150',
-    isMobile ? 'h-[38px] w-[38px] rounded-md' : 'h-11 w-11 rounded-xl',
-    danger
-      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-      : active
-        ? 'bg-primary/25 text-sky-300 hover:bg-primary/30'
-        : 'bg-white/[0.07] text-white/75 hover:bg-white/[0.12]',
+    'h-11 w-11 rounded-xl',
+    ptt
+      ? 'meet-ptt-btn'
+      : danger
+        ? 'bg-[var(--meet-btn-alert-bg)] text-[var(--meet-btn-alert-fg)] hover:bg-[var(--meet-btn-alert-hover)]'
+        : active
+          ? 'bg-[var(--meet-btn-muted-bg)] text-[var(--meet-btn-muted-fg)] hover:bg-[var(--meet-btn-muted-hover)]'
+          : 'bg-[var(--meet-control)] text-[var(--meet-control-fg)] hover:bg-[var(--meet-control-hover)]',
   )
 }
 ```
@@ -266,6 +269,33 @@ function btnIconCn(active = false, danger = false, isMobile = false) {
 ## Mobile detection
 
 One breakpoint: `MOBILE_BREAKPOINT_PX` (1024, Tailwind `lg`) in `src/lib/use-is-mobile.ts`. Render-time branches use `useIsMobile()`; effects and event handlers use `isMobileViewport()`. CSS uses `lg:` / `max-lg:` for the same line. No component defines its own `matchMedia` width check.
+
+## Phone meeting controls
+
+Below the breakpoint, `ControlsBar` renders `MeetingControlsPill` instead of the desktop bar. One
+surface anchored to the bottom: handle, options panel, controls row. The options unfold *above* the
+controls, so the controls never move.
+
+Five controls, in Android's order: camera, screen share, mic pill, chat, leave. Chat has no
+top-right toggle on a phone — the pill is its only entry point.
+
+Four things are easy to get wrong:
+
+- **The panel is not a sheet.** Do not rebuild it on a bottom-sheet primitive. A sheet puts the
+  options on a second surface carrying its own copy of the controls, which is the bug Android's
+  `MeetingControlsPanel` documents at length.
+- **Only the bar element branches on `useIsMobile()`, never the whole component.** The settings and
+  app-gallery dialogs render after it and are reached from both surfaces; an early return for the
+  phone silently makes those rows do nothing.
+- **The drag threshold lives in `controlsPanelDrag.ts`,** not in the component. `controlsPill.test.ts`
+  fails if a bare `24` appears in `MeetingControlsPill.tsx`.
+- **Audio devices are rows, not a second surface.** Microphones, speakers and noise modes are
+  panel rows with a check on the active one. They used to be a full-screen dialog over the call.
+
+The row list is pure and lives in `meetingOptionRows.ts`; icons come from `meetingOptionIcon` in
+`MeetingOptionsPanel.tsx`, which the desktop `⋯` menu shares. Fixed row ids are a union, so adding
+one fails the type check at the icon map until it is given an icon. Device rows carry their device
+id after a `microphone:` / `speaker:` / `noise:` prefix.
 
 ## Do / Don't
 

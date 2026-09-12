@@ -41,7 +41,7 @@ Phone layout applies below 1024px, the `lg` Tailwind breakpoint the dashboard sh
 | `BedrudCompactTopBar` | dashboard mobile header | exists |
 | `BedrudBottomSheet` | shadcn `Sheet` with `side="bottom"`, drag handle, `sheetTop` corners | unit 2 decides Sheet vs a vaul-based Drawer, once for all sheets |
 | `MeetingChatSheet` (half / full / dismiss over the live call) | bottom sheet over the meeting | unit 2 |
-| `MeetingControlsPanel` (floating pill, handle unfolds options upward) | floating controls pill | unit 3 |
+| `MeetingControlsPanel` (floating pill, handle unfolds options upward) | `MeetingControlsPill`, `components/meeting/MeetingControlsPill.tsx` | built in unit 3 |
 | `MeetingInviteSheet` (avatar grid + share targets) | invite sheet | unit 4 |
 | `SettingsContent` (one scrolling page of card sections) | mobile settings page | unit 5 |
 
@@ -53,7 +53,7 @@ Each unit is one branch and one pull request, cut fresh from `master`.
 |---|---|---|---|
 | 1 | Foundation | shape scale, one breakpoint hook, PWA head metas and manifest, docs, contract tests | in progress, [02](./02-foundation.md), [03](./03-foundation-plan.md) |
 | 2 | Meeting chat sheet | chat as a bottom sheet over the live call: half on open, full on drag or keyboard, dismissed on a second drag down | planned |
-| 3 | Meeting controls pill | floating bottom-centre pill (camera, screen share, mic, chat, hang up), drag handle unfolds room options upward in the same surface, no "more" menu | planned |
+| 3 | Meeting controls pill | floating bottom pill (camera, screen share, mic, chat, hang up), drag handle unfolds room options upward in the same surface, no "more" menu | done, [10](./10-meeting-controls-pill.md), [11](./11-meeting-controls-pill-plan.md) |
 | 4 | Invite sheet | participants and invite as one sheet: avatar grid, count, share targets, room link | planned |
 | 5 | Mobile settings page | one scrolling page of card sections on phones; dashboard alignment (quick-join bar, filter chips) if still needed | planned |
 
