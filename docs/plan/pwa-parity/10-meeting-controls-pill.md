@@ -235,6 +235,11 @@ These tokens are shared with the desktop bar, so **desktop corners change too**.
 stated goal — one set of corners on every width — and is the only desktop-visible change in this
 unit.
 
+Keeping it the only one takes work: both surfaces render the same row list, so every row reaches
+the desktop `⋯` menu unless `isPhoneOnlyRow` excludes it. The audio groups are excluded because the
+desktop bar has its own audio menu; Show videos, Public room, Room info and Deafen are excluded
+because each already has a desktop control of its own.
+
 ## Files
 
 | File | Responsibility |

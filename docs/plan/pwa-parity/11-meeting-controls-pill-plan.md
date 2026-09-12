@@ -1720,6 +1720,25 @@ the next unit's plan is written by someone reading this one.
    `MeetingPanels`, so Task 7 cannot compile without Task 8's plumbing. The plan's suggestion to
    pass placeholder values would have shipped a commit whose chat button did nothing.
 
+6. **The desktop `⋯` menu silently grew.** Pointing both surfaces at one row list handed the desktop
+   menu the audio device lists *and* Public room, Room info and Deafen. Every one of those already
+   has its own desktop control, and the old code gated the last three behind `isMobile` for exactly
+   that reason — so "desktop is untouched apart from two corner values" was false until
+   `isPhoneOnlyRow` filtered them back out. **Found by opening the menu in a browser; no test in
+   this plan would have caught it**, because every test asserted what the phone panel contains and
+   none asserted what the desktop menu must not.
+
 Task 7 also split its cleanup into a second commit: with the bar now desktop-only, thirteen
 `isMobile ? … : …` expressions inside it could only ever take the desktop side, and `CtrlBtn`'s
 `isMobile` prop had no caller left.
+
+### What the live pass covered
+
+Driven in a real meeting at 375 × 812, measured rather than eyeballed: collapsed geometry
+(`left 8`, `right 367`, radius `28px`, 12px above the bottom), handle tap both ways, drag up, drag
+down, a sub-threshold drag falling back to a tap, Escape, scrim tap, the controls row moving 1px
+between states, the toggle and action close rules, a noise-mode selection moving its check, and
+chat opening with the desktop toggle at `display: none`.
+
+Not covered: the desktop `⋯` contents after the `isPhoneOnlyRow` fix (unit-tested only), and the
+before/after captures — the test room went inactive partway through.

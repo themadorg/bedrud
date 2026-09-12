@@ -297,6 +297,11 @@ The row list is pure and lives in `meetingOptionRows.ts`; icons come from `meeti
 one fails the type check at the icon map until it is given an icon. Device rows carry their device
 id after a `microphone:` / `speaker:` / `noise:` prefix.
 
+**Both surfaces read one row list, so a new row appears in the desktop `⋯` menu too.** If the
+desktop already reaches it another way — its own bar button, the header, the left chrome, the audio
+menu — add it to `isPhoneOnlyRow` in `meetingOptionRows.ts`, beside the four rows already there.
+`meetingOptionRows.test.ts` pins the desktop menu to exactly the rows it carried before the pill.
+
 ## Do / Don't
 
 **Do:**
