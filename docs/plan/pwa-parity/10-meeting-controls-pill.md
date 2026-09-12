@@ -228,12 +228,24 @@ Two more are retuned. `meeting.css` still carries the flat scale unit 1 replaced
 | `--meet-controls-bar-radius` | 4px | 28px | Android `controlsBar` = `xxl`; unit 1's table already lists the controls bar under `rounded-3xl` |
 | `--meet-btn-leave-radius` | 3px | 9999px | Android `MeetEndCallButton` uses `BedrudShapeTokens.pill` |
 
-`--meet-chat-bubble-radius` and `--meet-chat-bubble-radius-near` are defined in terms of these two
-and follow them. Their values are unit 2's business and are left alone here beyond that inheritance.
+Three more are cut loose. `--meet-chat-bubble-radius`, `--meet-chat-bubble-radius-near` and
+`--meet-gallery-card-radius` were each defined as `var()` of one of the two above, so retuning the
+leave button dragged all three with it — the gallery cards to a full stadium, and the bubble corner
+whose whole job is to tighten to the loosest value there is. None of them is a control, and none
+takes the controls bar's or the leave button's shape on Android:
 
-These tokens are shared with the desktop bar, so **desktop corners change too**. That is unit 1's
-stated goal — one set of corners on every width — and is the only desktop-visible change in this
-unit.
+| Token | Today | Target | Why |
+|---|---|---|---|
+| `--meet-chat-bubble-radius` | `var(--meet-controls-bar-radius)` | 16px | Android `chatBubble` is `lg` on every corner |
+| `--meet-chat-bubble-radius-near` | `var(--meet-btn-leave-radius)` | 4px | Android tightens to `xs` where a bubble from the same sender sits against it |
+| `--meet-gallery-card-radius` | `var(--meet-btn-leave-radius)` | 16px | Android `BedrudShapeTokens.card`, the shape for cards and selectable tiles |
+
+A token that inherits another is a shape decision made somewhere other than where it is read. The
+guard in `meetingShapeTokens.test.ts` keeps `--meet-btn-leave-radius` from gathering followers again.
+
+The two retuned tokens are shared with the desktop bar, so **desktop corners change too**. That is
+unit 1's stated goal — one set of corners on every width — and is the only desktop-visible change in
+this unit.
 
 Keeping it the only one takes work: both surfaces render the same row list, so every row reaches
 the desktop `⋯` menu unless `isPhoneOnlyRow` excludes it. The audio groups are excluded because the

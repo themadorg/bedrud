@@ -33,7 +33,8 @@
   /* The options panel's ceiling: the visible viewport less the status bar and Android's space12. */
   --meet-controls-panel-max-height: calc(var(--app-height, 100svh) - 12px - env(safe-area-inset-top, 0px));
   --meet-gallery-icon-radius: 8px;
-  --meet-gallery-card-radius: var(--meet-btn-leave-radius);
+  /* Android BedrudShapeTokens.card, the shape for cards and selectable tiles. */
+  --meet-gallery-card-radius: 16px;
   --meet-tile-action-bg: rgba(23, 23, 23, 0.54);
   --meet-tile-action-fg: rgba(255, 255, 255, 0.94);
   --meet-tile-action-border: rgba(255, 255, 255, 0.14);
@@ -64,8 +65,13 @@
   --meet-chat-bubble-out-border: transparent;
   --meet-chat-bubble-out-fg: #ffffff;
   --meet-chat-bubble-out-shadow: none;
-  --meet-chat-bubble-radius: var(--meet-controls-bar-radius);
-  --meet-chat-bubble-radius-near: var(--meet-btn-leave-radius);
+  /*
+   * Android BedrudShapeTokens.chatBubble: lg on every corner, tightening to xs on the one another
+   * bubble from the same sender sits against. The tightening is what makes a run of messages read as
+   * one block, so the near corner is the tightest value here and never the loosest.
+   */
+  --meet-chat-bubble-radius: 16px;
+  --meet-chat-bubble-radius-near: 4px;
   --meet-chat-bubble-padding-block: 8px;
   --meet-chat-bubble-padding-inline: 12px;
   --meet-chat-bubble-padding-media: 4px;

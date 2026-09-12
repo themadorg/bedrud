@@ -21,9 +21,25 @@ describe('meeting shape tokens', () => {
     expect(tokenValue(meetingCss, '--meet-btn-leave-radius')).toBe('9999px')
   })
 
-  it('should leave the chat bubble radii following the two above', () => {
-    expect(tokenValue(meetingCss, '--meet-chat-bubble-radius')).toBe('var(--meet-controls-bar-radius)')
-    expect(tokenValue(meetingCss, '--meet-chat-bubble-radius-near')).toBe('var(--meet-btn-leave-radius)')
+  it('should tuck the chat bubble corners to the Android bubble radii', () => {
+    // Android BedrudShapeTokens.chatBubble is lg everywhere, tightening to xs on the corner another
+    // bubble from the same sender sits against. That tightening is what makes a run of messages read
+    // as one block rather than a stack of separate cards.
+    expect(tokenValue(meetingCss, '--meet-chat-bubble-radius')).toBe('16px')
+    expect(tokenValue(meetingCss, '--meet-chat-bubble-radius-near')).toBe('4px')
+  })
+
+  it('should give the app gallery cards the Android card corner', () => {
+    // Android BedrudShapeTokens.card, the shape for cards and selectable tiles.
+    expect(tokenValue(meetingCss, '--meet-gallery-card-radius')).toBe('16px')
+  })
+
+  it('should keep the leave button pill out of every other token', () => {
+    // The pill belongs to one control. While the gallery card and the near chat bubble corner
+    // inherited it, taking the leave button from 3px to 9999px turned the gallery rows into stadiums
+    // and rounded off the corner whose whole job is to tighten — with no test on either.
+    const inheritors = [...meetingCss.matchAll(/(--meet-[\w-]+):\s*var\(--meet-btn-leave-radius\)/g)]
+    expect(inheritors.map((match) => match[1])).toEqual([])
   })
 })
 
