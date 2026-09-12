@@ -43,6 +43,7 @@ import {
   MEETING_OPEN_SETTINGS,
   publishMeetingChromeState,
 } from '@/components/meeting/meetingChromeEvents'
+import { copyMeetingLink } from '@/components/meeting/meetingLink'
 import { isPhoneOnlyRow, type MeetingOptionRowId, meetingOptionRows } from '@/components/meeting/meetingOptionRows'
 import { useMeetingStage } from '@/components/meeting/stage/MeetingStageContext'
 import { stageOwnerLabel } from '@/components/meeting/stage/stageWire'
@@ -392,24 +393,15 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
   }, [settingsOpen, settingsElevated])
 
   const copyRoomLink = useCallback(() => {
-    void navigator.clipboard
-      .writeText(window.location.href)
-      .then(() => {
-        setLinkCopied(true)
-        toast.success('Meeting link copied', {
-          description: 'Share it so others can join this room.',
-        })
-        if (linkCopiedTimerRef.current) clearTimeout(linkCopiedTimerRef.current)
-        linkCopiedTimerRef.current = setTimeout(() => {
-          setLinkCopied(false)
-          linkCopiedTimerRef.current = null
-        }, 2000)
-      })
-      .catch(() => {
-        toast.error('Could not copy link', {
-          description: 'Check clipboard permissions and try again.',
-        })
-      })
+    void copyMeetingLink().then((copied) => {
+      if (!copied) return
+      setLinkCopied(true)
+      if (linkCopiedTimerRef.current) clearTimeout(linkCopiedTimerRef.current)
+      linkCopiedTimerRef.current = setTimeout(() => {
+        setLinkCopied(false)
+        linkCopiedTimerRef.current = null
+      }, 2000)
+    })
   }, [])
 
   const toggleFullscreen = useCallback(() => {
