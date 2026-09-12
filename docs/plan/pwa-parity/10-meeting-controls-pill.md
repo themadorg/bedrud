@@ -295,15 +295,17 @@ Before and after captures at 375 × 812 in both themes, the before taken on
 
 ## Out of scope, tracked separately
 
-- **One handle primitive.** This unit's handle and unit 2's `BedrudSheetHandle` share metrics and
-  differ in host. Folding them into one component is worth doing once both have merged and the
-  shared shape is visible in one tree.
-- **One height calculation.** `--meet-controls-panel-max-height` here and
-  `--meet-sheet-max-height` in unit 2 are the same expression under two names, because neither
-  branch can see the other. One of them should absorb the other after both merge.
+- **One handle primitive**, tracked in [#162](https://github.com/themadorg/bedrud/issues/162). This
+  unit's handle and unit 2's `BedrudSheetHandle` share metrics and differ in host. Folding them into
+  one component is worth doing once both have merged and the shared shape is visible in one tree.
+- **One height calculation**, tracked in [#163](https://github.com/themadorg/bedrud/issues/163).
+  `--meet-controls-panel-max-height` here and `--meet-sheet-max-height` in unit 2 are the same
+  expression under two names, because neither branch can see the other. One of them should absorb
+  the other after both merge.
 - **The mic status ring and the capture meter.** Android draws a reconnecting arc and a live level
   meter on its pill. Both are new capability on the web, not parity.
 - **Disable all incoming cameras.** Android has the setting; the web has no such state to toggle.
-- **`ControlsBar.tsx` at 1201 lines.** This unit removes roughly 300 of them and moves the pure
-  part out. What remains is still one file carrying the desktop bar, two dialogs and the device
-  lists.
+- **`ControlsBar.tsx` at 1201 lines**, tracked in
+  [#164](https://github.com/themadorg/bedrud/issues/164). This unit takes it to 891 and moves the
+  pure part out. What remains is still one file carrying the desktop bar, both dropdown menus, the
+  device-enumeration hook and the screen-share claim flow.
