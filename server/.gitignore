@@ -17,8 +17,6 @@
 vendor/
 
 # Environment files
-# Per-machine local profiles (not templates; see the .example files)
-*.beddev
 .env
 
 # IDE specific files

@@ -22,8 +22,6 @@ apps/site/public/search-index-*.json
 node_modules/
 
 # Environment
-# Per-machine local profiles (not templates; see the .example files)
-*.beddev
 .env
 .DS_Store
 
