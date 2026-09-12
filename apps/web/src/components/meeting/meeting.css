@@ -42,6 +42,16 @@
    * `--app-height` is the *visible* viewport, which `lib/visual-viewport.ts` keeps current.
    */
   --meet-sheet-max-height: calc(var(--app-height, 100svh) - 12px - env(safe-area-inset-top, 0px));
+  /*
+   * The invite sheet's sizes, all four from Android's `Dimens`, so the two clients' invite surfaces
+   * measure the same. The grid's ceiling is the load-bearing one: without it a busy room pushes the
+   * share targets and the room link off the bottom, and the half-height sheet the user actually sees
+   * carries a roster and nothing else.
+   */
+  --meet-invite-grid-max-height: 280px;
+  --meet-invite-avatar-size: 44px;
+  --meet-invite-target-size: 56px;
+  --meet-invite-qr-size: 240px;
   --meet-tile-action-bg: rgba(23, 23, 23, 0.54);
   --meet-tile-action-fg: rgba(255, 255, 255, 0.94);
   --meet-tile-action-border: rgba(255, 255, 255, 0.14);
