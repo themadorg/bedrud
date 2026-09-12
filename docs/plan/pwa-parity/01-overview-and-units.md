@@ -39,7 +39,7 @@ Phone layout applies below 1024px, the `lg` Tailwind breakpoint the dashboard sh
 | `BedrudBottomNavigationBar` (Rooms / Profile / Settings / Admin) | `MobileBottomNav` | exists, `components/dashboard/MobileBottomNav.tsx` |
 | Dashboard FAB, "New room" | FAB in `MobileBottomNav` | exists |
 | `BedrudCompactTopBar` | dashboard mobile header | exists |
-| `BedrudBottomSheet` | shadcn `Sheet` with `side="bottom"`, drag handle, `sheetTop` corners | unit 2 decides Sheet vs a vaul-based Drawer, once for all sheets |
+| `BedrudBottomSheet` | `BedrudSheet`, `components/ui/BedrudSheet.tsx` — vaul, drag handle, `rounded-t-3xl` | built in unit 2; units 3 and 4 reuse it rather than adding a second sheet |
 | `MeetingChatSheet` (half / full / dismiss over the live call) | bottom sheet over the meeting | unit 2 |
 | `MeetingControlsPanel` (floating pill, handle unfolds options upward) | floating controls pill | unit 3 |
 | `MeetingInviteSheet` (avatar grid + share targets) | invite sheet | unit 4 |
@@ -52,7 +52,7 @@ Each unit is one branch and one pull request, cut fresh from `master`.
 | # | Unit | Scope | Status |
 |---|---|---|---|
 | 1 | Foundation | shape scale, one breakpoint hook, PWA head metas and manifest, docs, contract tests | in progress, [02](./02-foundation.md), [03](./03-foundation-plan.md) |
-| 2 | Meeting chat sheet | chat as a bottom sheet over the live call: half on open, full on drag or keyboard, dismissed on a second drag down | planned |
+| 2 | Meeting chat sheet | chat as a bottom sheet over the live call: half on open, full on drag or keyboard, dismissed on a second drag down | done, [08](./08-meeting-chat-sheet.md), [09](./09-meeting-chat-sheet-plan.md) |
 | 3 | Meeting controls pill | floating bottom-centre pill (camera, screen share, mic, chat, hang up), drag handle unfolds room options upward in the same surface, no "more" menu | planned |
 | 4 | Invite sheet | participants and invite as one sheet: avatar grid, count, share targets, room link | planned |
 | 5 | Mobile settings page | one scrolling page of card sections on phones; dashboard alignment (quick-join bar, filter chips) if still needed | planned |

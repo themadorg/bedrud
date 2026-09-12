@@ -267,6 +267,42 @@ function btnIconCn(active = false, danger = false, isMobile = false) {
 
 One breakpoint: `MOBILE_BREAKPOINT_PX` (1024, Tailwind `lg`) in `src/lib/use-is-mobile.ts`. Render-time branches use `useIsMobile()`; effects and event handlers use `isMobileViewport()`. CSS uses `lg:` / `max-lg:` for the same line. No component defines its own `matchMedia` width check.
 
+## Phone meeting chat
+
+Below 1024px the in-call chat is a bottom sheet over the live call, not a full-screen surface.
+`BedrudSheet` (`components/ui/BedrudSheet.tsx`) is the app's only bottom sheet; it is built on vaul
+and fixes the corner (`rounded-t-3xl`), the container (`--meet-sidebar`), the handle, the bottom
+safe-area inset and the gutter. Do not add a second sheet primitive, and do not turn those five into
+props.
+
+Two heights: half the visible viewport on open, and `--meet-sheet-max-height` when expanded — the
+visible viewport minus 12px and the top safe-area inset. It expands on a drag up, on a handle tap,
+and when the visible viewport shrinks far enough to be a keyboard (`components/ui/sheetKeyboard.ts`).
+A drag below half dismisses. The drag itself is vaul's and is not reimplemented; there is no
+TypeScript copy of the height, because the stylesheet is the one that draws with it.
+
+Two things about vaul are easy to get wrong, and neither fails loudly:
+
+- The sheet's height is **set**, not capped. vaul measures its fractional snap points against the
+  content's own height, so `max-h` alone leaves the sheet as tall as its content and slides most of
+  it off the bottom of the screen.
+- `--snap-point-height` is **how far vaul has slid the sheet down**, not the height that is showing.
+  It is `0` when the sheet is fully open. The body subtracts it rather than using it as a height, so
+  that the composer stays inside the visible band at every height instead of below the fold.
+
+The handle tap is ours, not vaul's. vaul's own handle closes the sheet when tapped at the last snap
+point rather than stepping back down, so `BedrudSheet` passes `preventCycle` and decides where the
+tap lands in `components/ui/sheetSnapPoints.ts`.
+
+`meeting.css` selects on `[data-chat-overlay="true"]` and `[data-elevated-chat="true"]` **without an
+element qualifier**, because vaul renders a `div` where the desktop panel renders an `aside`.
+Re-adding `aside` to those selectors silently breaks chat's text colours on the sheet;
+`chatMarkers.test.ts` guards it.
+
+Chat carries no meeting controls of its own. The strip of mic, deafen and participant count that
+used to sit inside it existed only because the surface hid the whole call. The meeting's own
+top-right cluster stays visible behind the sheet instead; only the controls bar beneath it hides.
+
 ## Do / Don't
 
 **Do:**

@@ -32,7 +32,6 @@ interface MeetingPanelsProps {
   onToggleInfo: () => void
   participantsOpen: boolean
   onToggleParticipants: () => void
-  onOpenParticipantsFromChat: () => void
   onCloseParticipants: () => void
 }
 
@@ -54,7 +53,6 @@ export function MeetingPanels({
   onToggleInfo,
   participantsOpen,
   onToggleParticipants,
-  onOpenParticipantsFromChat,
   onCloseParticipants,
 }: MeetingPanelsProps) {
   const { stage } = useMeetingStage()
@@ -80,8 +78,12 @@ export function MeetingPanels({
   const { chatMessages, systemMessages, sendChat, markRead, votePoll, reactToMessage } = useMeetingChatContext()
   const room = useRoomContext()
   const currentIdentity = room.localParticipant.identity
-  // Full-screen panels on mobile — hide floating chrome while either is open.
-  const mobileOverlayOpen = chatOpen || participantsOpen
+  // The participants list is still a full-screen phone surface, so the chrome under it must go.
+  // Chat is a sheet now: it covers the bottom half at every height, so the controls bar below it
+  // still has to hide, but the top-right cluster stays — the chat toggle has to keep showing its
+  // active state, and the sheet stops short of the header band by design.
+  const mobileChromeHidden = participantsOpen
+  const mobileControlsHidden = chatOpen || participantsOpen
 
   return (
     <>
@@ -100,7 +102,7 @@ export function MeetingPanels({
 
       {/* Mobile top-right: participants + chat — vertically centered in the 56px header band. */}
       <div
-        className={cn('absolute z-[25] flex h-9 items-center gap-2 lg:hidden', mobileOverlayOpen && 'hidden')}
+        className={cn('absolute z-[25] flex h-9 items-center gap-2 lg:hidden', mobileChromeHidden && 'hidden')}
         style={{
           // (56px band − 38px buttons) / 2 = 9px below safe-area
           top: 'calc(env(safe-area-inset-top, 0px) + 9px)',
@@ -133,8 +135,6 @@ export function MeetingPanels({
           side={chatSide}
           elevated={chatElevated}
           participantsOpen={participantsOpen}
-          onOpenParticipantsFromChat={onOpenParticipantsFromChat}
-          onCloseParticipants={onCloseParticipants}
         />
       )}
       {participantsOpen && !infoOpen && <ParticipantsList adminId={adminId} onClose={onCloseParticipants} />}
@@ -147,7 +147,7 @@ export function MeetingPanels({
       <ChatToastNotifier chatOpen={chatOpen} />
       <MeetingControls
         onNavigate={navigate}
-        hideOnMobile={mobileOverlayOpen}
+        hideOnMobile={mobileControlsHidden}
         moreExtras={{
           onRoomAccess: () => setAccessDialogOpen(true),
           isPublic,
