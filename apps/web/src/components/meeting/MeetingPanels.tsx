@@ -1,11 +1,13 @@
 import { useParticipants, useRoomContext } from '@livekit/components-react'
 import { MessageSquare, Users, Video } from 'lucide-react'
 import { useState } from 'react'
+import { useIsMobile } from '#/lib/use-is-mobile'
 import { cn } from '#/lib/utils'
 import { ChatPanel } from '@/components/meeting/ChatPanel'
 import { ChatToastNotifier } from '@/components/meeting/ChatToastNotifier'
 import { useMeetingChatContext, useMeetingRoomContext } from '@/components/meeting/MeetingContext'
 import { MeetingControls } from '@/components/meeting/MeetingControls'
+import { MeetingInviteSheet } from '@/components/meeting/MeetingInviteSheet'
 import { ParticipantsList } from '@/components/meeting/ParticipantsList'
 import { RoomAccessBadge } from '@/components/meeting/RoomAccessBadge'
 import { RoomAccessDialog } from '@/components/meeting/RoomAccessDialog'
@@ -56,6 +58,7 @@ export function MeetingPanels({
   onCloseParticipants,
 }: MeetingPanelsProps) {
   const { stage } = useMeetingStage()
+  const isMobile = useIsMobile()
   const [accessDialogOpen, setAccessDialogOpen] = useState(false)
 
   const closeChat = () => {
@@ -78,11 +81,9 @@ export function MeetingPanels({
   const { chatMessages, systemMessages, sendChat, markRead, votePoll, reactToMessage } = useMeetingChatContext()
   const room = useRoomContext()
   const currentIdentity = room.localParticipant.identity
-  // The participants list is still a full-screen phone surface, so the chrome under it must go.
-  // Chat is a sheet now: it covers the bottom half at every height, so the controls bar below it
-  // still has to hide, but the top-right cluster stays — the chat toggle has to keep showing its
-  // active state, and the sheet stops short of the header band by design.
-  const mobileChromeHidden = participantsOpen
+  // Both phone surfaces are sheets now. A sheet covers the bottom half at every height, so the
+  // controls bar below it still has to hide, but the top-right cluster stays — its toggles have to
+  // keep showing their active state, and a sheet stops short of the header band by design.
   const mobileControlsHidden = chatOpen || participantsOpen
 
   return (
@@ -102,7 +103,7 @@ export function MeetingPanels({
 
       {/* Mobile top-right: participants + chat — vertically centered in the 56px header band. */}
       <div
-        className={cn('absolute z-[25] flex h-9 items-center gap-2 lg:hidden', mobileChromeHidden && 'hidden')}
+        className="absolute z-[25] flex h-9 items-center gap-2 lg:hidden"
         style={{
           // (56px band − 38px buttons) / 2 = 9px below safe-area
           top: 'calc(env(safe-area-inset-top, 0px) + 9px)',
@@ -134,10 +135,20 @@ export function MeetingPanels({
           onStuckChange={setChatStuck}
           side={chatSide}
           elevated={chatElevated}
-          participantsOpen={participantsOpen}
         />
       )}
-      {participantsOpen && !infoOpen && <ParticipantsList adminId={adminId} onClose={onCloseParticipants} />}
+      {/*
+        One surface per width. The phone gets the sheet over the live call; desktop keeps the sidebar,
+        which is not a sheet and never was. A CSS-only split will not do here — the sheet is a modal
+        portal that locks the page behind it, so it must not mount at all on desktop.
+      */}
+      {participantsOpen &&
+        !infoOpen &&
+        (isMobile ? (
+          <MeetingInviteSheet open onClose={onCloseParticipants} adminId={adminId} />
+        ) : (
+          <ParticipantsList adminId={adminId} onClose={onCloseParticipants} />
+        ))}
       <RoomInfoPanel
         open={infoOpen}
         onOpenChange={(open) => !open && onCloseInfo()}
