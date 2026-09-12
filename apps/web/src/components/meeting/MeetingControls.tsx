@@ -17,14 +17,23 @@ import { cn } from '@/lib/utils'
 
 interface MeetingControlsProps {
   onNavigate: () => void
-  /** Hide the floating controls bar on mobile (e.g. full-screen chat modal). */
+  /** Hide the floating controls bar on mobile (e.g. the full-screen participants list). */
   hideOnMobile?: boolean
-  /** Merged into the single bottom ⋯ menu on mobile. */
+  /** Shown as rows in the phone options panel and in the desktop ⋯ menu. */
   moreExtras?: ControlsBarMoreExtras
+  /** Chat is one of the five controls in the phone pill, so its state comes through here. */
+  chatOpen: boolean
+  onToggleChat: () => void
 }
 
 /** Renders the bottom controls bar and the end-meeting dialog for creators. */
-export function MeetingControls({ onNavigate, hideOnMobile = false, moreExtras }: MeetingControlsProps) {
+export function MeetingControls({
+  onNavigate,
+  hideOnMobile = false,
+  moreExtras,
+  chatOpen,
+  onToggleChat,
+}: MeetingControlsProps) {
   const { isCreator, roomId } = useMeetingRoomContext()
   const room = useRoomContext()
   const [endDialogOpen, setEndDialogOpen] = useState(false)
@@ -54,7 +63,12 @@ export function MeetingControls({ onNavigate, hideOnMobile = false, moreExtras }
   return (
     <>
       <div className={cn(hideOnMobile && 'max-lg:hidden')}>
-        <ControlsBar onLeave={handleLeaveRequest} moreExtras={moreExtras} />
+        <ControlsBar
+          onLeave={handleLeaveRequest}
+          moreExtras={moreExtras}
+          chatOpen={chatOpen}
+          onToggleChat={onToggleChat}
+        />
       </div>
       <Dialog open={endDialogOpen} onOpenChange={setEndDialogOpen}>
         <DialogContent className="meet-dialog sm:max-w-sm">

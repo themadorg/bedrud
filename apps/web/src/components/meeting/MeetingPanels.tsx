@@ -109,8 +109,8 @@ export function MeetingPanels({
           right: 'calc(14px + env(safe-area-inset-right, 0px))',
         }}
       >
+        {/* Chat has no toggle here on a phone: it is one of the five controls in the pill. */}
         <ParticipantsToggle isOpen={participantsOpen} onToggle={onToggleParticipants} variant="icon" />
-        <ChatToggle isOpen={chatOpen} onToggle={toggleChat} absolute={false} />
       </div>
 
       {/* Desktop chat — top-right */}
@@ -152,12 +152,13 @@ export function MeetingPanels({
           onRoomAccess: () => setAccessDialogOpen(true),
           isPublic,
           roomId,
-          // Desktop header still uses RoomInfoPanel dialog; mobile uses More sub-page.
           onRoomInfo: onToggleInfo,
           onToggleVideoSidebar,
           showVideoSidebarToggle: Boolean(stage),
           videoSidebarOpen,
         }}
+        chatOpen={chatOpen}
+        onToggleChat={toggleChat}
       />
     </>
   )
