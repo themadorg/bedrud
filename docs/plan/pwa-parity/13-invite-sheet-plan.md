@@ -1104,11 +1104,13 @@ Print this with a real pass or fail per line before calling the unit done:
 - [ ] Commits split, bisectable, no attribution
 - [ ] Leftovers filed as tracked issues
 
-## Leftovers to file, once verified against the code
+## Leftovers, verified against the code and filed
 
-- `ParticipantContextMenu.tsx`, 666 lines with no importer on any branch including `master`.
-  Confirm with `git grep -n ParticipantContextMenu $(git rev-parse master)` before filing.
-- `ParticipantsList`'s header and row `lg:` prefixes, now the only half of each pair that renders.
+- [#167](https://github.com/themadorg/bedrud/issues/167) — `ParticipantContextMenu.tsx`, 666 lines
+  with no importer on this branch or on `master`. Confirmed with
+  `git grep -n ParticipantContextMenu master -- apps/web/src`, which matches only the file itself.
+- [#168](https://github.com/themadorg/bedrud/issues/168) — `ParticipantsList`'s header, close button
+  and close icon still carry `lg:` overrides whose unprefixed halves can no longer render.
 - Issues [#162](https://github.com/themadorg/bedrud/issues/162) and
   [#163](https://github.com/themadorg/bedrud/issues/163) — the duplicated handle and height token —
   are unblocked by the merged base and are not this unit's work.

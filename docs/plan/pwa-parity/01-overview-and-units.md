@@ -1,6 +1,6 @@
 # 01 — Overview & Units
 
-**Status: in progress.** Unit 1 is specified in [02 — Foundation](./02-foundation.md); units 2 to 5 get their own file when they start.
+**Status: in progress.** Every unit gets a spec file and a plan file when it starts; unit 5 is the only one still unwritten.
 
 ## Problem
 
@@ -42,7 +42,7 @@ Phone layout applies below 1024px, the `lg` Tailwind breakpoint the dashboard sh
 | `BedrudBottomSheet` | `BedrudSheet`, `components/ui/BedrudSheet.tsx` — vaul, drag handle, `rounded-t-3xl` | built in unit 2; units 3 and 4 reuse it rather than adding a second sheet |
 | `MeetingChatSheet` (half / full / dismiss over the live call) | bottom sheet over the meeting | unit 2 |
 | `MeetingControlsPanel` (floating pill, handle unfolds options upward) | `MeetingControlsPill`, `components/meeting/MeetingControlsPill.tsx` | built in unit 3 |
-| `MeetingInviteSheet` (avatar grid + share targets) | `MeetingInviteSheet`, on `BedrudSheet` | unit 4 |
+| `MeetingInviteSheet` (avatar grid + share targets) | `MeetingInviteSheet`, on `BedrudSheet` | built in unit 4 |
 | `SettingsContent` (one scrolling page of card sections) | mobile settings page | unit 5 |
 
 ## Units
@@ -59,7 +59,7 @@ sheet rather than beside it.
 | 1 | Foundation | shape scale, one breakpoint hook, PWA head metas and manifest, docs, contract tests | in progress, [02](./02-foundation.md), [03](./03-foundation-plan.md) |
 | 2 | Meeting chat sheet | chat as a bottom sheet over the live call: half on open, full on drag or keyboard, dismissed on a second drag down | done, [08](./08-meeting-chat-sheet.md), [09](./09-meeting-chat-sheet-plan.md) |
 | 3 | Meeting controls pill | floating bottom pill (camera, screen share, mic, chat, hang up), drag handle unfolds room options upward in the same surface, no "more" menu | done, [10](./10-meeting-controls-pill.md), [11](./11-meeting-controls-pill-plan.md) |
-| 4 | Invite sheet | participants and invite as one sheet: avatar grid, count, share targets, room link | in progress, [12](./12-invite-sheet.md) |
+| 4 | Invite sheet | participants and invite as one sheet: avatar grid, count, share targets, room link | done, [12](./12-invite-sheet.md), [13](./13-invite-sheet-plan.md) |
 | 5 | Mobile settings page | one scrolling page of card sections on phones; dashboard alignment (quick-join bar, filter chips) if still needed | planned |
 
 ## Verification

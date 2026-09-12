@@ -118,6 +118,12 @@ Tapping the QR target toggles a 240px code above the target row, matching Androi
 `Dimens.inviteQrSize`. It renders on a white plate regardless of theme, because a scanner needs the
 contrast and a dark-mode QR is a QR that does not scan.
 
+Opening it also takes the sheet to full, and the sheet's body scrolls. Both are needed: a 240px code
+opened at half height pushes the target row and the room link off the bottom, including the QR target
+that would close it again. Growing the sheet fits what the user just asked for; the scroll is what
+saves the case where they drag back down to half with the code still open, or where a busy room fills
+the grid on its own. Closing the QR leaves the sheet where it is — the expand belongs to opening.
+
 QR is the only one of Android's six that does something `navigator.share` cannot: handing the room
 to somebody standing next to you.
 
@@ -127,11 +133,23 @@ The raw link in a monospace row, one line, ellipsised, with a copy glyph at the 
 the button and copies. `window.location.href` is the link, which is what the options panel's
 "Copy room link" row already copies — one definition of what the room's address is.
 
+That definition gets a home rather than a second copy: `meetingLink.ts` owns both the address and the
+copy-and-toast, and `ControlsBar` calls it too. Otherwise the sheet and the options panel would hold
+two clipboard calls, two toast titles and two opinions about what the room's address is.
+
 ## What happens to `ParticipantsList`
 
-It becomes desktop-only. The `lg:` sidebar at 288px is untouched; the mobile class block, the
-`createPortal` to body and the `useFocusTrap` go, since all three exist to make a full-screen phone
-overlay behave.
+It becomes desktop-only. The sidebar at 288px is untouched; the mobile class block and the
+`useFocusTrap` go, since both exist to make a full-screen phone overlay behave.
+
+The `createPortal` to body **stays**. An earlier draft of this section had it going with the rest,
+which was wrong: the portal is not the phone overlay's, it is the sidebar's. The sidebar is `fixed`
+at `z-40` and has to sit above the stage WebXDC, which body-portals itself to `z-15` — remove the
+portal and the desktop sidebar falls behind an expanded app, with no test to catch it.
+
+`role="dialog"` and `aria-modal="true"` go with the focus trap. They were true of a full-screen
+surface that trapped focus; a persistent sidebar that does not trap focus must not tell a screen
+reader the rest of the page is inert. What remains is a labelled `<aside>`.
 
 `MeetingPanels` loses `mobileChromeHidden = participantsOpen` with them. That constant exists because
 a full-screen list covered the header band; a sheet stops short of it, so the top-right cluster stays
@@ -181,9 +199,12 @@ where the other meeting sizes are and not inlined at a call site:
 | `components/meeting/MeetingInviteGrid.tsx` | the four-column roster and the avatar's rings and badges |
 | `components/meeting/MeetingInviteTargets.tsx` | the target row, the QR toggle, the room link row |
 | `components/meeting/inviteShareTargets.ts` | pure — the target list for a link and a `canShare` flag |
-| `components/meeting/ParticipantsList.tsx` | phone classes, portal and focus trap deleted |
+| `components/meeting/meetingLink.ts` | the room's address and the one copy-and-toast |
+| `components/meeting/ParticipantsList.tsx` | phone classes, focus trap and dialog role deleted; portal kept |
 | `components/meeting/MeetingPanels.tsx` | the icon opens the sheet; `mobileChromeHidden` goes |
-| `components/meeting/meeting.css` | the two tokens |
+| `components/meeting/ChatPanel.tsx` | the `participantsOpen` prop, dead once nothing traps focus |
+| `components/meeting/ControlsBar.tsx` | its copy row calls the shared module |
+| `components/meeting/meeting.css` | the four tokens |
 | `package.json` | `qrcode.react` |
 
 ## Tests
@@ -194,6 +215,9 @@ House style: every test file is `.test.ts`, descriptions are imperative and star
 |---|---|---|
 | `inviteShareTargets.test.ts` | pure | three targets with `canShare`, the three fallbacks without it, and that Share never appears alongside its own fallback |
 | `meetingInviteSheet.test.ts` | source text, `// @vitest-environment node` | the sheet is a `BedrudSheet` and declares no snap points, corner or handle of its own; the grid carries the max-height token; `ParticipantsList` no longer contains the phone class block, the portal or the focus trap; `MeetingPanels` no longer contains `mobileChromeHidden` |
+
+`meetingChrome.test.ts` changes with them: two of its assertions pin `mobileChromeHidden`, which this
+unit deletes, so they invert rather than survive.
 
 The second file's last two assertions are the ones worth having. Unit 3 shipped two defects that no
 test caught because every test asserted what the new surface contained and none asserted what the old
