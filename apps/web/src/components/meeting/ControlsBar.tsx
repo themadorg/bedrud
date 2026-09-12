@@ -43,7 +43,7 @@ import {
   MEETING_OPEN_SETTINGS,
   publishMeetingChromeState,
 } from '@/components/meeting/meetingChromeEvents'
-import { type MeetingOptionRowId, meetingOptionRows } from '@/components/meeting/meetingOptionRows'
+import { isPhoneOnlyRow, type MeetingOptionRowId, meetingOptionRows } from '@/components/meeting/meetingOptionRows'
 import { useMeetingStage } from '@/components/meeting/stage/MeetingStageContext'
 import { stageOwnerLabel } from '@/components/meeting/stage/stageWire'
 import { waitForScreenSharePublication } from '@/components/meeting/stage/waitForScreenShare'
@@ -475,6 +475,12 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
     ],
   )
 
+  /**
+   * The desktop `⋯` menu drops every row the desktop reaches another way, which leaves it with
+   * exactly the rows it carried before the phone pill existed.
+   */
+  const desktopMenuRows = useMemo(() => optionRows.filter((row) => !isPhoneOnlyRow(row.id)), [optionRows])
+
   /** Opens the room info panel the shell owns, in place of the deleted in-dialog sub-page. */
   const openRoomInfo = useCallback(() => {
     window.dispatchEvent(new CustomEvent(MEETING_OPEN_ROOM_INFO))
@@ -864,7 +870,7 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="end" sideOffset={12} className={cn(meetMenuCn, 'min-w-[200px]')}>
-              {optionRows.map((row) =>
+              {desktopMenuRows.map((row) =>
                 row.kind === 'heading' ? (
                   <DropdownMenuLabel key={row.id} className={meetMenuLabelCn}>
                     {row.label}

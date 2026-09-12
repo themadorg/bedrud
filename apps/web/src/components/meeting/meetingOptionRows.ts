@@ -73,6 +73,38 @@ export interface MeetingOptionsInput {
   stageTakenByOther: boolean
 }
 
+/** True for the rows that make up the three audio groups, headings included. */
+function isAudioRow(id: MeetingOptionRowId): boolean {
+  return (
+    id === 'heading:microphone' ||
+    id === 'heading:speaker' ||
+    id === 'heading:noise' ||
+    id.startsWith('microphone:') ||
+    id.startsWith('speaker:') ||
+    id.startsWith('noise:')
+  )
+}
+
+/** Rows the desktop bar already exposes somewhere else, and the control that exposes them. */
+const DESKTOP_CONTROLS_ELSEWHERE: ReadonlyArray<[MeetingFixedRowId, string]> = [
+  ['videos', 'the video sidebar toggle in the left chrome'],
+  ['access', 'the RoomAccessBadge in the left chrome'],
+  ['info', 'the room info button in the meeting header'],
+  ['deafen', 'its own button in the controls bar'],
+]
+
+/**
+ * True for a row the phone panel must carry but the desktop `⋯` menu must not.
+ *
+ * The phone panel is the only surface that has the audio devices: it replaced a full-screen dialog,
+ * so they have nowhere else to live. The desktop keeps a separate audio menu beside `⋯`, and the
+ * four rows above each have their own desktop control — listing them again in `⋯` is the
+ * duplication this unit removes elsewhere.
+ */
+export function isPhoneOnlyRow(id: MeetingOptionRowId): boolean {
+  return isAudioRow(id) || DESKTOP_CONTROLS_ELSEWHERE.some(([rowId]) => rowId === id)
+}
+
 /** Fills in the two fields most rows do not care about. */
 function action(id: MeetingOptionRowId, label: string, disabled = false): MeetingOptionRow {
   return { id, label, kind: 'action', checked: false, disabled }

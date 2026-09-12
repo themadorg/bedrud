@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type MeetingOptionsInput, meetingOptionRows } from './meetingOptionRows'
+import { isPhoneOnlyRow, type MeetingOptionsInput, meetingOptionRows } from './meetingOptionRows'
 
 /** Everything off, so each test turns on only what it is about. */
 const nothingAvailable: MeetingOptionsInput = {
@@ -199,6 +199,31 @@ describe('meetingOptionRows audio groups', () => {
     })
     expect(rows.find((row) => row.id === 'noise:krisp')?.disabled).toBe(true)
     expect(rows.find((row) => row.id === 'noise:browser')?.disabled).toBe(false)
+  })
+
+  it('should leave the desktop menu exactly the rows it carried before the pill', () => {
+    const desktop = meetingOptionRows(everythingAvailable)
+      .filter((row) => !isPhoneOnlyRow(row.id))
+      .map((row) => row.id)
+    expect(desktop).toEqual(['copy-link', 'settings', 'fullscreen', 'whiteboard', 'youtube', 'app-gallery'])
+  })
+
+  it('should treat every audio row as phone-only', () => {
+    const audio = meetingOptionRows(everythingAvailable)
+      .filter((row) => isPhoneOnlyRow(row.id))
+      .map((row) => row.id)
+    expect(audio).toEqual([
+      'videos',
+      'access',
+      'info',
+      'deafen',
+      'heading:microphone',
+      'microphone:mic-1',
+      'heading:speaker',
+      'speaker:speaker-1',
+      'heading:noise',
+      'noise:browser',
+    ])
   })
 
   it('should mark a heading as neither a toggle nor an action', () => {
