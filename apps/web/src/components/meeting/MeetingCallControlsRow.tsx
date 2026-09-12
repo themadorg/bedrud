@@ -52,7 +52,12 @@ export function MeetingCallControlsRow({
 }: MeetingCallControlsRowProps) {
   return (
     <div className="flex w-full items-center gap-2 px-3 pb-3">
-      <div className="flex flex-1 items-center justify-start gap-2">
+      {/*
+        `min-w-fit` on both clusters is what keeps the hang-up button on screen. They size from a zero
+        basis so the mic slot stays centred, and a zero basis lets a cluster be allotted less than its
+        own buttons need — which cropped the end of the row rather than shrinking anything.
+      */}
+      <div className="flex min-w-fit flex-1 items-center justify-start gap-2">
         <button
           type="button"
           onClick={onToggleCamera}
@@ -84,7 +89,7 @@ export function MeetingCallControlsRow({
         onPushToTalkChange={onPushToTalkChange}
       />
 
-      <div className="flex flex-1 items-center justify-end gap-2">
+      <div className="flex min-w-fit flex-1 items-center justify-end gap-2">
         <button
           type="button"
           onClick={onToggleChat}
