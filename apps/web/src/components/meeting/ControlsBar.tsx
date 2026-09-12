@@ -83,10 +83,10 @@ interface Props {
 
 /* ── CtrlBtn: tooltip-wrapped control button ─────────────────────────────── */
 
-function btnIconCn(active = false, danger = false, ptt = false, isMobile = false) {
+function btnIconCn(active = false, danger = false, ptt = false) {
   return cn(
     'flex items-center justify-center shrink-0 border-none cursor-pointer transition-[background,color,box-shadow,border-color] duration-150',
-    isMobile ? 'h-[38px] w-[38px] rounded-md' : 'h-11 w-11 rounded-xl',
+    'h-11 w-11 rounded-xl',
     ptt
       ? 'meet-ptt-btn'
       : danger
@@ -112,7 +112,6 @@ function CtrlBtn({
   active = false,
   danger = false,
   ptt = false,
-  isMobile = false,
   className,
   onClick,
   onPointerDown,
@@ -125,7 +124,6 @@ function CtrlBtn({
   active?: boolean
   danger?: boolean
   ptt?: boolean
-  isMobile?: boolean
   className?: string
   onClick?: () => void
   onPointerDown?: (event: React.PointerEvent<HTMLButtonElement>) => void
@@ -144,7 +142,7 @@ function CtrlBtn({
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerLeave}
           onPointerCancel={onPointerCancel}
-          className={cn(btnIconCn(active, danger, ptt, isMobile), className)}
+          className={cn(btnIconCn(active, danger, ptt), className)}
           aria-label={tip}
           aria-pressed={active}
         >
@@ -335,8 +333,9 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
   const mics = useDeviceList('audioinput')
   const speakers = useDeviceList('audiooutput')
 
-  const iconSize = isMobile ? 16 : 18
-  const iconSizeSm = isMobile ? 15 : 17
+  // The desktop bar's two icon sizes. The phone pill sizes its own.
+  const iconSize = 18
+  const iconSizeSm = 17
 
   const { pttVisible, pttAvailable, micUiEnabled, micTip, pttTip, pushToTalkEnabled, toggleMic, startPtt, stopPtt } =
     useMeetingMicKeyboard(localParticipant, isSelfDeafened, micEnabled)
@@ -624,7 +623,7 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
             // meet-controls-bar: border-radius needs !important (global * { border-radius: 0 })
             'meet-controls-bar absolute -translate-x-1/2 z-30 flex items-center bg-[var(--meet-chrome)] backdrop-blur-xl border border-[var(--meet-border-subtle)] whitespace-nowrap shadow-[var(--meet-shadow),var(--meet-shadow-inset)] transition-[left] duration-200',
             meetControlsDockClass(layout),
-            isMobile ? 'bottom-[calc(12px+env(safe-area-inset-bottom))] gap-[2px] p-1.5' : 'bottom-5 gap-[3px] p-2',
+            'bottom-5 gap-[3px] p-2',
             'max-w-[calc(var(--app-width,100svw)-16px)]',
           )}
         >
@@ -633,18 +632,16 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
             <CtrlBtn
               tip={camEnabled ? 'Disable camera' : 'Enable camera'}
               active={!camEnabled}
-              isMobile={isMobile}
               onClick={() => localParticipant?.setCameraEnabled(!camEnabled).catch(() => {})}
             >
               {camEnabled ? <Video size={iconSize} /> : <VideoOff size={iconSize} />}
             </CtrlBtn>
-            {!isMobile && <DeviceSelector kind="videoinput" />}
+            <DeviceSelector kind="videoinput" />
           </div>
 
           <CtrlBtn
             tip={shareTip}
             danger={isScreenShareEnabled}
-            isMobile={isMobile}
             onClick={
               canShare && !stageTakenByOther
                 ? async () => {
@@ -683,7 +680,6 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
             <CtrlBtn
               tip={isWebxdcOnStage ? 'App gallery (on stage)' : 'App gallery'}
               active={isWebxdcOnStage}
-              isMobile={isMobile}
               onClick={() => setWebxdcAppsOpen(true)}
             >
               <Package size={iconSize} />
@@ -692,7 +688,7 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
 
           {/* TODO oncoming feature — recording button removed */}
 
-          {!isMobile && <div className={dividerCn} />}
+          <div className={dividerCn} />
 
           {/* ── Center: Leave ── */}
           <Tooltip>
@@ -703,13 +699,13 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
                 className={cn(
                   // meet-btn-leave: border-radius needs !important (global * { border-radius: 0 })
                   'meet-btn-leave flex items-center gap-2 shrink-0 border-none cursor-pointer text-[var(--meet-btn-leave-fg)] text-[13px] font-semibold transition-[background,box-shadow] duration-150',
-                  isMobile ? 'h-[38px] px-3 mx-0.5' : 'h-11 px-[18px] mx-0.5',
+                  'h-11 px-[18px] mx-0.5',
                   'bg-[var(--meet-btn-leave-bg)] shadow-[0_2px_12px_color-mix(in_oklab,var(--meet-btn-leave-bg)_45%,transparent)] hover:bg-[var(--meet-btn-leave-hover)]',
                 )}
                 aria-label="Leave meeting"
               >
-                <PhoneOff size={isMobile ? 15 : 16} />
-                {!isMobile && 'Leave'}
+                <PhoneOff size={16} />
+                Leave
               </button>
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={8}>
@@ -717,7 +713,7 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
             </TooltipContent>
           </Tooltip>
 
-          {!isMobile && <div className={dividerCn} />}
+          <div className={dividerCn} />
 
           {/* ── Right: Mic + Speaker/Deafen + Combined Audio Dropdown ── */}
           <div className="flex items-center gap-px">
@@ -726,7 +722,6 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
                 tip={pttTip}
                 active={pttVisible}
                 ptt={pttAvailable && !pttVisible}
-                isMobile={isMobile}
                 className={cn(!pttAvailable && 'opacity-40 cursor-not-allowed')}
                 onPointerDown={(event) => {
                   if (!pttAvailable) return
@@ -754,7 +749,6 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
             <CtrlBtn
               tip={micTip}
               danger={isSelfDeafened || !micUiEnabled}
-              isMobile={isMobile}
               onClick={() => {
                 if (isSelfDeafened) {
                   toggleSelfDeafen()
@@ -766,12 +760,7 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
               {isSelfDeafened || !micUiEnabled ? <MicOff size={iconSize} /> : <Mic size={iconSize} />}
             </CtrlBtn>
 
-            <CtrlBtn
-              tip={isSelfDeafened ? 'Undeafen' : 'Deafen'}
-              danger={isSelfDeafened}
-              isMobile={isMobile}
-              onClick={toggleSelfDeafen}
-            >
+            <CtrlBtn tip={isSelfDeafened ? 'Undeafen' : 'Deafen'} danger={isSelfDeafened} onClick={toggleSelfDeafen}>
               <DeafenHeadphonesIcon size={iconSizeSm} off={isSelfDeafened} />
             </CtrlBtn>
 
