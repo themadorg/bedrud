@@ -28,13 +28,10 @@ func newDBMigrateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := database.Initialize(&cfg.Database); err != nil {
-				return err
-			}
-			defer database.Close()
-			if err := database.RunMigrations(); err != nil {
+			if err := database.OpenCLI(&cfg.Database); err != nil {
 				return fmt.Errorf("migrate: %w", err)
 			}
+			defer database.Close()
 			return clioutput.Success("✓ Database migrations applied", map[string]string{
 				"databaseType": cfg.Database.Type,
 			})
@@ -51,7 +48,7 @@ func newDBStatusCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := database.Initialize(&cfg.Database); err != nil {
+			if err := database.InitializeQuiet(&cfg.Database); err != nil {
 				return fmt.Errorf("connect: %w", err)
 			}
 			defer database.Close()

@@ -21,11 +21,23 @@ func TestValidateUpdateOptions(t *testing.T) {
 	if err := validateUpdateOptions(UpdateOptions{SkipBinary: true}); err != nil {
 		t.Fatal(err)
 	}
+	if err := validateUpdateOptions(UpdateOptions{Nightly: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateUpdateOptions(UpdateOptions{Nightly: true, Source: "latest"}); err != nil {
+		t.Fatal(err)
+	}
 	if err := validateUpdateOptions(UpdateOptions{Self: true, Source: "x"}); err == nil {
 		t.Fatal("expected self+source error")
 	}
 	if err := validateUpdateOptions(UpdateOptions{SkipBinary: true, Source: "x"}); err == nil {
 		t.Fatal("expected skip-binary+source error")
+	}
+	if err := validateUpdateOptions(UpdateOptions{Nightly: true, Self: true}); err == nil {
+		t.Fatal("expected nightly+self error")
+	}
+	if err := validateUpdateOptions(UpdateOptions{Nightly: true, Source: "/tmp/x"}); err == nil {
+		t.Fatal("expected nightly+path error")
 	}
 }
 

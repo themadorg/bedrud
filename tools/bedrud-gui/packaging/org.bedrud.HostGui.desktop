@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Bedrud Host
+Comment=Create and manage Bedrud hosts on Linode
+Exec=bedrud-gui
+Icon=org.bedrud.HostGui
+Terminal=false
+Categories=Network;System;
+StartupNotify=true
+StartupWMClass=org.bedrud.HostGui
+X-AppImage-Name=BedrudHost

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"bedrud/internal/clioutput"
 	"bedrud/internal/install"
@@ -24,6 +25,8 @@ func newUpdateLikeCmd(use, short string) *cobra.Command {
 		skipMigrate  bool
 		skipRestart  bool
 		skipChecksum bool
+		nightly      bool
+		yes          bool
 	)
 
 	cmd := &cobra.Command{
@@ -31,14 +34,25 @@ func newUpdateLikeCmd(use, short string) *cobra.Command {
 		Short: short,
 		Long: `Update an existing Bedrud installation in place.
 
-A SOURCE (or --self / --skip-binary) is required. Running without arguments
-prints this help and does not change the system.
+A SOURCE (or --self / --skip-binary / --nightly) is required. Running without
+arguments prints this help and does not change the system.
 
 SOURCE may be:
   BIN_PATH     Local bare binary (e.g. ./bedrud or /tmp/bedrud)
   ARCHIVE      Local .tar.xz / .tar.gz release archive containing bedrud
-  latest       Download the latest GitHub release for this OS/arch (HTTPS + SHA256)
+  latest       Download the latest *stable* GitHub release (HTTPS + SHA256)
   HTTPS_URL    Download a release asset or binary over HTTPS
+
+"latest" never installs prereleases or nightlies. GitHub /releases/latest
+is used, and the payload is rejected if it is marked prerelease.
+
+GitHub "latest" / "--nightly" asks for confirmation unless you pass -y
+(required when stdin is not a TTY).
+
+  sudo bedrud update latest
+  sudo bedrud update latest -y
+  sudo bedrud update --nightly
+  sudo bedrud update --nightly -y
 
 Preserves configuration, secrets, certificates, and the database.
 Runs versioned install migrations and database schema migrations, refreshes
@@ -63,9 +77,9 @@ run "sudo bedrud update --skip-binary" to apply migrations and restart.
 			if len(args) > 1 {
 				return fmt.Errorf("expected at most one source argument")
 			}
-			if len(args) == 0 && !self && !skipBinary {
+			if len(args) == 0 && !self && !skipBinary && !nightly {
 				_ = cmd.Help()
-				return fmt.Errorf("missing source: path, URL, \"latest\", or --self (or --skip-binary for migrations only)")
+				return fmt.Errorf("missing source: path, URL, \"latest\", --nightly, or --self (or --skip-binary for migrations only)")
 			}
 			if self && len(args) > 0 {
 				return fmt.Errorf("--self cannot be combined with a source argument")
@@ -73,8 +87,14 @@ run "sudo bedrud update --skip-binary" to apply migrations and restart.
 			if skipBinary && (self || len(args) > 0) {
 				return fmt.Errorf("--skip-binary cannot be combined with a source or --self")
 			}
-			if skipChecksum && len(args) == 1 && args[0] == "latest" {
-				return fmt.Errorf("--skip-checksum is not allowed with \"latest\"")
+			if nightly && (self || skipBinary) {
+				return fmt.Errorf("--nightly cannot be combined with --self or --skip-binary")
+			}
+			if nightly && len(args) == 1 && !strings.EqualFold(args[0], "latest") {
+				return fmt.Errorf("--nightly cannot be combined with a local path or URL")
+			}
+			if skipChecksum && ((len(args) == 1 && strings.EqualFold(args[0], "latest")) || nightly) {
+				return fmt.Errorf("--skip-checksum is not allowed with \"latest\" or --nightly")
 			}
 			return nil
 		},
@@ -92,6 +112,8 @@ run "sudo bedrud update --skip-binary" to apply migrations and restart.
 				SkipMigrate:  skipMigrate,
 				SkipRestart:  skipRestart,
 				SkipChecksum: skipChecksum,
+				Nightly:      nightly,
+				Yes:          yes,
 			}
 			if opts.ConfigPath == "" || opts.ConfigPath == defaultConfigPath {
 				opts.ConfigPath = defaultEtcConfig
@@ -109,6 +131,8 @@ run "sudo bedrud update --skip-binary" to apply migrations and restart.
 				"skipMigrate":  skipMigrate,
 				"skipRestart":  skipRestart,
 				"skipChecksum": skipChecksum,
+				"nightly":      nightly,
+				"yes":          yes,
 			})
 		},
 	}
@@ -118,7 +142,9 @@ run "sudo bedrud update --skip-binary" to apply migrations and restart.
 	f.BoolVar(&skipBinary, "skip-binary", false, "Do not replace the installed binary (migrations + restart only)")
 	f.BoolVar(&skipMigrate, "skip-migrate", false, "Skip database migrations")
 	f.BoolVar(&skipRestart, "skip-restart", false, "Do not stop/start init services")
-	f.BoolVar(&skipChecksum, "skip-checksum", false, "Skip SHA256 verification (local/trusted sources only; not with latest)")
+	f.BoolVar(&skipChecksum, "skip-checksum", false, "Skip SHA256 verification (local/trusted sources only; not with latest or --nightly)")
+	f.BoolVar(&nightly, "nightly", false, "Install the latest GitHub prerelease/nightly (not stable)")
+	f.BoolVarP(&yes, "yes", "y", false, "Do not prompt; confirm GitHub latest/nightly update")
 
 	return cmd
 }
