@@ -51,8 +51,13 @@ function fixedIcon(id: MeetingOptionRowId): React.ReactNode | undefined {
   return id in ROW_ICONS ? ROW_ICONS[id as IconRowId] : undefined
 }
 
-/** The private-room row is the one place the icon depends on the label rather than the id. */
-function iconFor(row: MeetingOptionRow): React.ReactNode {
+/**
+ * The private-room row is the one place the icon depends on the label rather than the id.
+ *
+ * Exported because the desktop dropdown in `ControlsBar` draws the same rows; one lookup for both
+ * keeps a new row from picking up an icon in the panel and none in the menu.
+ */
+export function meetingOptionIcon(row: MeetingOptionRow): React.ReactNode {
   if (row.id === 'access' && row.label === 'Private room') return <Lock size={18} className="shrink-0" />
   return deviceIcon(row.id) ?? fixedIcon(row.id)
 }
@@ -100,7 +105,7 @@ export function MeetingOptionsPanel({ rows, expanded, onSelect }: MeetingOptions
                   row.disabled ? 'cursor-not-allowed opacity-40' : 'hover:bg-[var(--meet-control-hover)]',
                 )}
               >
-                {iconFor(row)}
+                {meetingOptionIcon(row)}
                 <span className="flex-1 truncate">{row.label}</span>
                 {row.kind === 'toggle' && row.checked && (
                   <Check size={16} className="shrink-0 text-[var(--meet-btn-muted-fg)]" />

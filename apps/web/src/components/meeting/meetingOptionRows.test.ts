@@ -188,6 +188,19 @@ describe('meetingOptionRows audio groups', () => {
     expect(idsOf(nothingAvailable)).not.toContain('heading:noise')
   })
 
+  it('should disable a noise mode this browser cannot run', () => {
+    const rows = meetingOptionRows({
+      ...nothingAvailable,
+      noiseModes: [
+        { value: 'browser', label: 'Browser' },
+        { value: 'krisp', label: 'Krisp', disabled: true },
+      ],
+      activeNoiseMode: 'browser',
+    })
+    expect(rows.find((row) => row.id === 'noise:krisp')?.disabled).toBe(true)
+    expect(rows.find((row) => row.id === 'noise:browser')?.disabled).toBe(false)
+  })
+
   it('should mark a heading as neither a toggle nor an action', () => {
     const rows = meetingOptionRows(everythingAvailable)
     expect(rows.find((row) => row.id === 'heading:microphone')?.kind).toBe('heading')

@@ -8,6 +8,8 @@ export interface MeetingDeviceOption {
 export interface MeetingNoiseModeOption {
   value: string
   label: string
+  /** True when the instance offers the mode but this browser cannot run it. */
+  disabled?: boolean
 }
 
 /** The rows whose identity is fixed. Device rows carry the device id instead. */
@@ -95,12 +97,12 @@ function pushAudioGroup(
   rows: MeetingOptionRow[],
   headingId: MeetingFixedRowId,
   headingLabel: string,
-  entries: { id: MeetingOptionRowId; label: string; checked: boolean }[],
+  entries: { id: MeetingOptionRowId; label: string; checked: boolean; disabled?: boolean }[],
 ): void {
   if (entries.length === 0) return
   rows.push(heading(headingId, headingLabel))
   for (const entry of entries) {
-    rows.push(toggle(entry.id, entry.label, entry.checked))
+    rows.push({ ...toggle(entry.id, entry.label, entry.checked), disabled: entry.disabled ?? false })
   }
 }
 
@@ -157,6 +159,7 @@ export function meetingOptionRows(input: MeetingOptionsInput): MeetingOptionRow[
       id: `noise:${mode.value}` as const,
       label: mode.label,
       checked: mode.value === input.activeNoiseMode,
+      disabled: mode.disabled,
     })),
   )
 
