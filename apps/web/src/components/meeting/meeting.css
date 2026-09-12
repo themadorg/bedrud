@@ -24,8 +24,14 @@
   --meet-btn-leave-fg: #ffffff;
   --meet-btn-leave-hover: #b91c1c;
   /* Chrome radii; the @layer base exceptions in styles.css apply these over rounded-* utilities. */
-  --meet-controls-bar-radius: 4px;
-  --meet-btn-leave-radius: 3px;
+  /* Android BedrudShapeTokens.controlsBar — the xxl corner, on every width. */
+  --meet-controls-bar-radius: 28px;
+  /* Android MeetEndCallButton uses the pill shape. */
+  --meet-btn-leave-radius: 9999px;
+  /* Dims the call while the options panel is open. Android's ScrimAlpha. */
+  --meet-scrim: rgba(23, 23, 23, 0.32);
+  /* The options panel's ceiling: the visible viewport less the status bar and Android's space12. */
+  --meet-controls-panel-max-height: calc(var(--app-height, 100svh) - 12px - env(safe-area-inset-top, 0px));
   --meet-gallery-icon-radius: 8px;
   --meet-gallery-card-radius: var(--meet-btn-leave-radius);
   --meet-tile-action-bg: rgba(23, 23, 23, 0.54);
@@ -131,6 +137,7 @@
   --meet-sidebar: rgba(10, 10, 22, 0.94);
   --meet-shadow: 0 8px 40px rgba(0, 0, 0, 0.55);
   --meet-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --meet-scrim: rgba(0, 0, 0, 0.32);
   --meet-tile-fallback: #08080f;
   --meet-slider-track: rgba(255, 255, 255, 0.1);
   --meet-slider-thumb: #141422;
