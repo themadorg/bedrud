@@ -11,6 +11,7 @@ function source(fileName: string): string {
 
 const pill = source('MeetingControlsPill.tsx')
 const micPill = source('MeetingMicPill.tsx')
+const controlsRow = source('MeetingCallControlsRow.tsx')
 const controlsBar = source('ControlsBar.tsx')
 
 describe('the controls pill surface', () => {
@@ -46,6 +47,40 @@ describe('the controls pill surface', () => {
 describe('the mic pill', () => {
   it.each(['Speak', 'Muted', 'Push to Talk', 'Talking…'])('should carry the %s label', (label) => {
     expect(micPill).toContain(label)
+  })
+
+  it('should be the row element that gives way when the controls do not fit', () => {
+    // The five controls plus this pill's reserved label are wider than a 375px phone. Whatever gives
+    // way has to be this label: it was the hang-up button, cropped off the end of the row by 11px.
+    const pillButtonClass = micPill.match(/'flex h-12[^']*'/)?.[0]
+    expect(pillButtonClass).toBeDefined()
+    expect(pillButtonClass).not.toContain('shrink-0')
+    expect(pillButtonClass).toContain('min-w-0')
+    expect(pillButtonClass).toContain('overflow-hidden')
+  })
+
+  it('should squeeze the label rather than the icon beside it', () => {
+    // The button shrinking is only useful if the glyph holds its size; otherwise the mic icon is the
+    // first thing to distort.
+    expect(micPill).toContain('<Mic size={18} className="shrink-0" />')
+    expect(micPill).toContain('<MicOff size={18} className="shrink-0" />')
+  })
+})
+
+describe('the call controls row', () => {
+  it('should keep every control inside the pill at a phone width', () => {
+    // Both side clusters size from a zero basis so the mic slot stays centred under the handle. A
+    // zero basis alone lets a cluster be allotted less than its own buttons need, and the overflow
+    // lands on the last control in the row — the one nobody can afford to lose.
+    const clusters = controlsRow.match(/className="flex [^"]*flex-1[^"]*"/g)
+    expect(clusters).toHaveLength(2)
+    for (const cluster of clusters ?? []) {
+      expect(cluster).toContain('min-w-fit')
+    }
+  })
+
+  it('should keep the hang-up button at its own width rather than shrinking it', () => {
+    expect(controlsRow).toContain('h-12 w-14 shrink-0')
   })
 })
 

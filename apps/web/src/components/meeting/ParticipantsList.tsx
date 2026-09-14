@@ -10,8 +10,6 @@ import { isPushToTalkParticipant, shouldShowMicMutedIndicator } from '#/lib/push
 import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
 import { cn } from '@/lib/utils'
 
-import { useFocusTrap } from './useFocusTrap'
-
 /** Above stage WebXDC (body z-15) — same stacking model as unpinned ChatPanel. */
 const OVERLAY_Z = 40
 
@@ -35,23 +33,16 @@ function parseMeta(raw: string | undefined): ParticipantMeta {
 
 export function ParticipantsList({ onClose, adminId }: Props) {
   const participants = useParticipants()
-  const trapRef = useFocusTrap({ enabled: true, onClose })
 
   const panel = (
     <aside
-      ref={trapRef}
-      role="dialog"
-      aria-modal="true"
       aria-label="Participants"
-      data-participants-overlay="true"
       style={{ zIndex: OVERLAY_Z }}
       className={cn(
         'z-40 flex flex-col bg-[var(--meet-sidebar)] shadow-2xl backdrop-blur-2xl',
-        // Mobile: full-screen on visual viewport (iOS Safari toolbar-safe)
-        'fixed left-[var(--app-offset-left,0px)] top-[var(--app-offset-top,0px)] h-[var(--app-height,100svh)] w-[var(--app-width,100svw)] max-h-[var(--app-height,100svh)] max-w-[var(--app-width,100svw)]',
-        'pt-[env(safe-area-inset-top,0px)] pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]',
-        // Desktop: left sidebar — fixed + body portal so it stacks above stage WebXDC (z-15).
-        'lg:fixed lg:inset-y-0 lg:start-0 lg:bottom-0 lg:left-0 lg:top-0 lg:h-full lg:max-h-none lg:w-[min(288px,var(--app-width,100svw))] lg:max-w-none lg:border-e lg:border-[var(--meet-border-subtle)] lg:pb-[calc(88px+env(safe-area-inset-bottom,0px))]',
+        // Fixed and body-portalled so the sidebar stacks above stage WebXDC (z-15).
+        'fixed inset-y-0 start-0 h-full w-[min(288px,var(--app-width,100svw))] border-e border-[var(--meet-border-subtle)]',
+        'pb-[calc(88px+env(safe-area-inset-bottom,0px))]',
       )}
     >
       {/* Header */}

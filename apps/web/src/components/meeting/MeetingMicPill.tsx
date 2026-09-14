@@ -63,7 +63,10 @@ export function MeetingMicPill({
       type="button"
       aria-label={pushToTalk ? 'Push to talk' : micOpen ? 'Mute microphone' : 'Unmute microphone'}
       className={cn(
-        'flex h-12 shrink-0 items-center justify-center gap-2 rounded-full px-3 transition-[background,color,transform] duration-150 active:scale-[0.96]',
+        // The pill is the row's release valve. The five controls plus this pill's reserved label are
+        // wider than a 375px phone, and something has to give: a truncated word is recoverable, a
+        // hang-up button cropped off the end of the row is not. So this shrinks and the rest does not.
+        'flex h-12 min-w-0 items-center justify-center gap-2 overflow-hidden rounded-full px-3 transition-[background,color,transform] duration-150 active:scale-[0.96]',
         MIC_PILL_MAX_WIDTH_CLASS,
         container,
         !available && 'cursor-not-allowed opacity-40',

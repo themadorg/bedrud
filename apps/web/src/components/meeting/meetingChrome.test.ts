@@ -5,19 +5,15 @@ import { describe, expect, it } from 'vitest'
 const meetingPanelsSource = readFileSync(new URL('./MeetingPanels.tsx', import.meta.url), 'utf8')
 
 /** The top-right cluster on phones, which carries the participants and chat toggles. */
-const MOBILE_CLUSTER_CLASS = "'absolute z-[25] flex h-9 items-center gap-2 lg:hidden'"
+const MOBILE_CLUSTER_CLASS = 'absolute z-[25] flex h-9 items-center gap-2 lg:hidden'
 
 describe('the phone meeting chrome', () => {
-  it('should keep the top-right cluster visible while chat is open', () => {
-    // Chat is a sheet that stops short of the header band, so the cluster it was hidden for is no
-    // longer covered — and the chat toggle has to keep showing its active state.
+  it('should keep the top-right cluster visible, since no surface covers it any more', () => {
+    // Chat and the participants list are both sheets now. Both stop short of the header band, so the
+    // cluster stays put and the participants icon keeps showing its active state.
     const clusterLine = meetingPanelsSource.split('\n').find((line) => line.includes(MOBILE_CLUSTER_CLASS))
     expect(clusterLine).toBeDefined()
-    expect(clusterLine).toContain('mobileChromeHidden')
-  })
-
-  it('should hide the top-right cluster under the full-screen participants list', () => {
-    expect(meetingPanelsSource).toContain('const mobileChromeHidden = participantsOpen')
+    expect(clusterLine).not.toContain('mobileChromeHidden')
   })
 
   it('should still hide the controls bar beneath the sheet', () => {
