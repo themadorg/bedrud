@@ -115,7 +115,7 @@ export function ErrorPage({
       {/* Header */}
       <header className="flex items-center gap-2 border-b px-6 py-3">
         <Link to="/" className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center bg-primary">
+          <div className="flex h-6 w-6 items-center justify-center rounded bg-primary">
             <Radio className="h-3 w-3 text-primary-foreground" />
           </div>
           <span className="font-mono text-xs font-semibold tracking-tight">bedrud</span>
@@ -124,8 +124,8 @@ export function ErrorPage({
 
       {/* Body */}
       <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 py-20">
-        {/* Icon in a bordered square */}
-        <div className="flex h-16 w-16 items-center justify-center border text-muted-foreground">
+        {/* Icon in a bordered box with the card corner. */}
+        <div className="flex h-16 w-16 items-center justify-center rounded-xl border text-muted-foreground">
           <Icon className="h-7 w-7" strokeWidth={1.5} />
         </div>
 
@@ -166,7 +166,7 @@ export function ErrorPage({
           {showHome && (
             <Link
               to="/"
-              className="inline-flex h-9 items-center gap-2 bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
             >
               <Home className="h-3.5 w-3.5" />
               Home

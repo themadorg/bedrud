@@ -44,7 +44,7 @@ export function BedrudLogo({ className, showWordmark = true, size = 'sm' }: Bedr
       to="/"
       className={cn('flex items-center gap-2 text-foreground transition-opacity hover:opacity-90', className)}
     >
-      <BedrudMark className={cn(s.box, 'rounded-[4px]')} iconClassName={s.icon} />
+      <BedrudMark className={cn(s.box, 'rounded')} iconClassName={s.icon} />
       {showWordmark ? <span className={cn('font-mono font-bold tracking-wider uppercase', s.text)}>bedrud</span> : null}
     </Link>
   )

@@ -273,7 +273,7 @@ export function ParticipantTile({ participant, totalCount, index, isPinned = fal
 
       {/* Name + mute badge at bottom-left — for video tiles or dense grids */}
       {(showCameraVideo || totalCount > 2) && (
-        <div className="absolute bottom-2 left-2 flex max-w-[calc(100%-50px)] items-center gap-[5px] rounded-[7px] border border-[var(--meet-tile-action-border)] bg-[var(--meet-tile-action-bg)] px-2 py-[3px] backdrop-blur-sm">
+        <div className="absolute bottom-2 left-2 flex max-w-[calc(100%-50px)] items-center gap-[5px] rounded-sm border border-[var(--meet-tile-action-border)] bg-[var(--meet-tile-action-bg)] px-2 py-[3px] backdrop-blur-sm">
           <span className="overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium text-[var(--meet-tile-action-fg)]">
             {displayName}
             {participant.isLocal && <span className="ms-1 text-[11px] text-[var(--meet-btn-muted-fg)]">you</span>}

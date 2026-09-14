@@ -242,18 +242,18 @@ export function RoomInfoPanel({ open, onOpenChange, roomId, elevated = false }: 
         className={cn(
           'meet-dialog flex flex-col gap-0 overflow-hidden p-0 shadow-2xl',
           // Desktop: compact card (settings uses larger for tabs)
-          'sm:max-h-[min(90vh,720px)] sm:w-[min(360px,calc(var(--app-width,100svw)-2rem))] sm:max-w-[min(360px,calc(var(--app-width,100svw)-2rem))]',
+          'lg:max-h-[min(90vh,720px)] lg:w-[min(360px,calc(var(--app-width,100svw)-2rem))] lg:max-w-[min(360px,calc(var(--app-width,100svw)-2rem))]',
           // Mobile full-screen — same shell as settings
-          'max-sm:fixed max-sm:left-[var(--app-offset-left,0px)] max-sm:top-[var(--app-offset-top,0px)] max-sm:h-[var(--app-height,100svh)] max-sm:max-h-[var(--app-height,100svh)] max-sm:w-[var(--app-width,100svw)] max-sm:max-w-[var(--app-width,100svw)] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0',
+          'max-lg:fixed max-lg:left-[var(--app-offset-left,0px)] max-lg:top-[var(--app-offset-top,0px)] max-lg:h-[var(--app-height,100svh)] max-lg:max-h-[var(--app-height,100svh)] max-lg:w-[var(--app-width,100svw)] max-lg:max-w-[var(--app-width,100svw)] max-lg:translate-x-0 max-lg:translate-y-0 max-lg:rounded-none max-lg:border-0',
           // Hide default Dialog X on mobile (we render nav chrome ourselves).
-          'max-sm:[&>button.absolute]:hidden',
+          'max-lg:[&>button.absolute]:hidden',
         )}
       >
         {/* Mobile: settings-style sheet chrome */}
-        <div className="flex min-h-0 flex-1 flex-col sm:hidden">{sheetBody}</div>
+        <div className="flex min-h-0 flex-1 flex-col lg:hidden">{sheetBody}</div>
 
         {/* Desktop: title header + body */}
-        <div className="hidden min-h-0 flex-1 flex-col sm:flex">
+        <div className="hidden min-h-0 flex-1 flex-col lg:flex">
           <RoomInfoDesktopHeader />
           <RoomInfoContent roomId={roomId} active={open} />
         </div>

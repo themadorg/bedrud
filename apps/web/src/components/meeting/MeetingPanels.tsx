@@ -1,11 +1,13 @@
 import { useParticipants, useRoomContext } from '@livekit/components-react'
 import { MessageSquare, Users, Video } from 'lucide-react'
 import { useState } from 'react'
+import { useIsMobile } from '#/lib/use-is-mobile'
 import { cn } from '#/lib/utils'
 import { ChatPanel } from '@/components/meeting/ChatPanel'
 import { ChatToastNotifier } from '@/components/meeting/ChatToastNotifier'
 import { useMeetingChatContext, useMeetingRoomContext } from '@/components/meeting/MeetingContext'
 import { MeetingControls } from '@/components/meeting/MeetingControls'
+import { MeetingInviteSheet } from '@/components/meeting/MeetingInviteSheet'
 import { ParticipantsList } from '@/components/meeting/ParticipantsList'
 import { RoomAccessBadge } from '@/components/meeting/RoomAccessBadge'
 import { RoomAccessDialog } from '@/components/meeting/RoomAccessDialog'
@@ -32,7 +34,6 @@ interface MeetingPanelsProps {
   onToggleInfo: () => void
   participantsOpen: boolean
   onToggleParticipants: () => void
-  onOpenParticipantsFromChat: () => void
   onCloseParticipants: () => void
 }
 
@@ -54,10 +55,10 @@ export function MeetingPanels({
   onToggleInfo,
   participantsOpen,
   onToggleParticipants,
-  onOpenParticipantsFromChat,
   onCloseParticipants,
 }: MeetingPanelsProps) {
   const { stage } = useMeetingStage()
+  const isMobile = useIsMobile()
   const [accessDialogOpen, setAccessDialogOpen] = useState(false)
 
   const closeChat = () => {
@@ -80,14 +81,16 @@ export function MeetingPanels({
   const { chatMessages, systemMessages, sendChat, markRead, votePoll, reactToMessage } = useMeetingChatContext()
   const room = useRoomContext()
   const currentIdentity = room.localParticipant.identity
-  // Full-screen panels on mobile — hide floating chrome while either is open.
-  const mobileOverlayOpen = chatOpen || participantsOpen
+  // Both phone surfaces are sheets now. A sheet covers the bottom half at every height, so the
+  // controls bar below it still has to hide, but the top-right cluster stays — its toggles have to
+  // keep showing their active state, and a sheet stops short of the header band by design.
+  const mobileControlsHidden = chatOpen || participantsOpen
 
   return (
     <>
       {/* Desktop left chrome (participants stay left on desktop; mobile uses top-right icons). */}
       <div
-        className="absolute z-[25] hidden items-center gap-2 sm:flex"
+        className="absolute z-[25] hidden items-center gap-2 lg:flex"
         style={{
           top: 'calc(14px + env(safe-area-inset-top, 0px))',
           left: 'calc(14px + env(safe-area-inset-left, 0px))',
@@ -100,19 +103,19 @@ export function MeetingPanels({
 
       {/* Mobile top-right: participants + chat — vertically centered in the 56px header band. */}
       <div
-        className={cn('absolute z-[25] flex h-9 items-center gap-2 sm:hidden', mobileOverlayOpen && 'hidden')}
+        className="absolute z-[25] flex h-9 items-center gap-2 lg:hidden"
         style={{
           // (56px band − 38px buttons) / 2 = 9px below safe-area
           top: 'calc(env(safe-area-inset-top, 0px) + 9px)',
           right: 'calc(14px + env(safe-area-inset-right, 0px))',
         }}
       >
+        {/* Chat has no toggle here on a phone: it is one of the five controls in the pill. */}
         <ParticipantsToggle isOpen={participantsOpen} onToggle={onToggleParticipants} variant="icon" />
-        <ChatToggle isOpen={chatOpen} onToggle={toggleChat} absolute={false} />
       </div>
 
       {/* Desktop chat — top-right */}
-      <ChatToggle isOpen={chatOpen} onToggle={toggleChat} className="hidden sm:flex" />
+      <ChatToggle isOpen={chatOpen} onToggle={toggleChat} className="hidden lg:flex" />
 
       <RoomAccessDialog open={accessDialogOpen} onOpenChange={setAccessDialogOpen} />
 
@@ -132,12 +135,20 @@ export function MeetingPanels({
           onStuckChange={setChatStuck}
           side={chatSide}
           elevated={chatElevated}
-          participantsOpen={participantsOpen}
-          onOpenParticipantsFromChat={onOpenParticipantsFromChat}
-          onCloseParticipants={onCloseParticipants}
         />
       )}
-      {participantsOpen && !infoOpen && <ParticipantsList adminId={adminId} onClose={onCloseParticipants} />}
+      {/*
+        One surface per width. The phone gets the sheet over the live call; desktop keeps the sidebar,
+        which is not a sheet and never was. A CSS-only split will not do here — the sheet is a modal
+        portal that locks the page behind it, so it must not mount at all on desktop.
+      */}
+      {participantsOpen &&
+        !infoOpen &&
+        (isMobile ? (
+          <MeetingInviteSheet open onClose={onCloseParticipants} adminId={adminId} />
+        ) : (
+          <ParticipantsList adminId={adminId} onClose={onCloseParticipants} />
+        ))}
       <RoomInfoPanel
         open={infoOpen}
         onOpenChange={(open) => !open && onCloseInfo()}
@@ -147,17 +158,18 @@ export function MeetingPanels({
       <ChatToastNotifier chatOpen={chatOpen} />
       <MeetingControls
         onNavigate={navigate}
-        hideOnMobile={mobileOverlayOpen}
+        hideOnMobile={mobileControlsHidden}
         moreExtras={{
           onRoomAccess: () => setAccessDialogOpen(true),
           isPublic,
           roomId,
-          // Desktop header still uses RoomInfoPanel dialog; mobile uses More sub-page.
           onRoomInfo: onToggleInfo,
           onToggleVideoSidebar,
           showVideoSidebarToggle: Boolean(stage),
           videoSidebarOpen,
         }}
+        chatOpen={chatOpen}
+        onToggleChat={toggleChat}
       />
     </>
   )

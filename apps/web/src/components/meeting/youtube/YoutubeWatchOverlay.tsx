@@ -32,7 +32,7 @@ function YoutubeWatchPanel({
 }) {
   return (
     <div className="meet-dialog flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[var(--meet-border)] bg-[var(--meet-bg-panel)] shadow-[var(--meet-shadow)]">
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--meet-border-subtle)] bg-[var(--meet-chrome)] px-2 py-1.5 sm:px-3 sm:py-2">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--meet-border-subtle)] bg-[var(--meet-chrome)] px-2 py-1.5 lg:px-3 lg:py-2">
         <div className="flex min-w-0 items-center gap-2">
           <Film size={16} className="shrink-0 text-red-400" />
           <div className="min-w-0 text-foreground">
@@ -209,7 +209,7 @@ export function YoutubeWatchOverlay() {
 
   return (
     <>
-      <div ref={shellRef} className={cn(meetStageShellClass(layout, 'p-2 max-sm:p-1.5'))}>
+      <div ref={shellRef} className={cn(meetStageShellClass(layout, 'p-2 max-lg:p-1.5'))}>
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">{!expand.expanded ? panel : null}</div>
       </div>
       {expandedSurface}

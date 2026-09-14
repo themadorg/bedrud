@@ -23,7 +23,7 @@ export function AdminOverviewPage() {
   if (isError) {
     return (
       <div className="mx-auto max-w-6xl px-4 pt-8">
-        <div className="border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
           <span className="text-destructive">
             {error instanceof Error ? error.message : 'Failed to load admin overview.'}
           </span>
@@ -68,7 +68,7 @@ export function AdminOverviewPage() {
         <div className="xl:col-span-8">
           {data?.activityTrend && (
             <Suspense
-              fallback={<div className="h-64 border rounded p-4 text-sm text-muted-foreground">Loading chart…</div>}
+              fallback={<div className="h-64 rounded-xl border p-4 text-sm text-muted-foreground">Loading chart…</div>}
             >
               <AdminActivityChart data={data.activityTrend} />
             </Suspense>

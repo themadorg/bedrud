@@ -38,7 +38,7 @@ function PresenceMarker({ color, username }: { color: string; username: string }
       </svg>
       <span
         dir={textDirectionFor(username)}
-        className="meet-rtl-text absolute left-[3px] top-[15px] whitespace-nowrap px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[#1b1b1f]"
+        className="meet-rtl-text absolute left-[3px] top-[15px] whitespace-nowrap rounded-sm px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[#1b1b1f]"
         style={{
           background: color,
           border: '1px solid rgba(255,255,255,0.9)',

@@ -1,16 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { AudioSettingsPanel } from '@/components/settings/AudioSettingsPanel'
 
 export const Route = createFileRoute('/settings/audio')({
   head: () => ({ meta: [{ title: 'Audio — Bedrud' }] }),
   component: AudioSettingsPage,
 })
 
+// The `/settings` layout renders every panel and scrolls to the one this route names, so the route
+// itself carries only its title.
 function AudioSettingsPage() {
-  return (
-    <div className="space-y-3">
-      <h1 className="text-lg font-semibold tracking-tight">Audio</h1>
-      <AudioSettingsPanel />
-    </div>
-  )
+  return null
 }

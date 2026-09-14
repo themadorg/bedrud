@@ -79,7 +79,7 @@ export function WebxdcFrame({
   }
 
   const titleBar = (
-    <div className="flex min-w-0 items-center gap-2 border-b border-border bg-background px-2 py-1.5 sm:px-3 sm:py-2">
+    <div className="flex min-w-0 items-center gap-2 border-b border-border bg-background px-2 py-1.5 lg:px-3 lg:py-2">
       {selfAvatarUrl ? (
         <img
           src={selfAvatarUrl}
@@ -160,8 +160,9 @@ export function WebxdcFrame({
             }
           : {})}
         className={cn(
-          'flex overflow-hidden border border-border bg-background shadow-2xl',
-          expand.expanded && 'border-0',
+          'flex overflow-hidden rounded-xl border border-border bg-background shadow-2xl',
+          // The expanded surface fills the viewport, where a corner would cut into the content.
+          expand.expanded && 'rounded-none border-0',
         )}
         style={expand.shellStyle}
       >

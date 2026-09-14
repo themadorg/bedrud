@@ -22,7 +22,7 @@ function ArchivedRoomDetailPage() {
         <button
           type="button"
           onClick={() => navigate({ to: '/dashboard' })}
-          className="p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          className="rounded-sm p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>

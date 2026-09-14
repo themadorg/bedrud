@@ -12,12 +12,14 @@ import {
   UserCheck,
   Users,
   Video,
+  X,
 } from 'lucide-react'
 import { useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { type DashboardEntry, timeAgo } from '@/lib/dashboard-room-list'
 
 interface Room {
   id: string
@@ -35,35 +37,44 @@ interface Room {
 }
 
 interface Props {
-  room: Room
+  entry: DashboardEntry<Room>
   onJoin: () => void
   onDelete?: () => void
   onSettings?: () => void
+  onRemove?: () => void
 }
 
-export function RoomCard({ room, onJoin, onDelete, onSettings }: Props) {
+export function RoomCard({ entry, onJoin, onDelete, onSettings, onRemove }: Props) {
   const [copied, setCopied] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const capabilities = [
-    room.settings.allowAudio ? { icon: Mic, label: 'Audio' } : null,
-    room.settings.allowVideo ? { icon: Video, label: 'Video' } : null,
-    room.settings.allowChat ? { icon: MessageSquare, label: 'Chat' } : null,
-  ].filter((item): item is { icon: typeof Mic; label: string } => Boolean(item))
+
+  // A recent entry has no server record, so it has no capacity, no visibility and no capabilities
+  // to show. Everything below that reads `room` is skipped for it.
+  const room = entry.kind === 'server' ? entry.room : null
+
+  const capabilities = room
+    ? [
+        room.settings.allowAudio ? { icon: Mic, label: 'Audio' } : null,
+        room.settings.allowVideo ? { icon: Video, label: 'Video' } : null,
+        room.settings.allowChat ? { icon: MessageSquare, label: 'Chat' } : null,
+      ].filter((item): item is { icon: typeof Mic; label: string } => Boolean(item))
+    : []
 
   function copyLink() {
-    void navigator.clipboard.writeText(`${window.location.origin}/m/${room.name}`)
+    void navigator.clipboard.writeText(`${window.location.origin}/m/${entry.name}`)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const capacityLabel = room.maxParticipants > 0 ? `${room.maxParticipants}` : 'Open'
+  const capacityLabel = room && room.maxParticipants > 0 ? `${room.maxParticipants}` : 'Open'
+  const isActive = room?.isActive ?? false
 
   return (
     <Card className="group relative flex flex-col gap-2.5 overflow-hidden p-3 transition-colors hover:border-primary/25">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1">
-            {room.isActive && (
+            {isActive && (
               <Badge
                 variant="outline"
                 className="h-5 gap-1 border-emerald-500/30 bg-emerald-500/10 px-1.5 text-[10px] text-emerald-600 dark:text-emerald-400"
@@ -72,24 +83,29 @@ export function RoomCard({ room, onJoin, onDelete, onSettings }: Props) {
                 Live
               </Badge>
             )}
-            <Badge variant="outline" className="h-5 gap-1 px-1.5 text-[10px]">
-              {room.isPublic ? <Globe className="h-2.5 w-2.5" /> : <Lock className="h-2.5 w-2.5" />}
-              {room.isPublic ? 'Public' : 'Private'}
-            </Badge>
-            {room.settings.e2ee && (
+            {room && (
+              <Badge variant="outline" className="h-5 gap-1 px-1.5 text-[10px]">
+                {room.isPublic ? <Globe className="h-2.5 w-2.5" /> : <Lock className="h-2.5 w-2.5" />}
+                {room.isPublic ? 'Public' : 'Private'}
+              </Badge>
+            )}
+            {room?.settings.e2ee && (
               <Badge className="h-5 gap-1 px-1.5 text-[10px]">
                 <ShieldCheck className="h-2.5 w-2.5" />
                 E2EE
               </Badge>
             )}
-            {room.settings.requireApproval && (
+            {room?.settings.requireApproval && (
               <Badge variant="outline" className="h-5 gap-1 px-1.5 text-[10px]">
                 <UserCheck className="h-2.5 w-2.5" />
                 Approval
               </Badge>
             )}
           </div>
-          <h3 className="mt-1.5 truncate font-mono text-[13px] font-semibold leading-tight">{room.name}</h3>
+          <h3 className="mt-1.5 truncate font-mono text-[13px] font-semibold leading-tight">{entry.name}</h3>
+          {entry.lastJoinedAt !== null && (
+            <p className="mt-0.5 text-[11px] text-muted-foreground/70">{timeAgo(entry.lastJoinedAt)}</p>
+          )}
         </div>
 
         <Button
@@ -108,27 +124,29 @@ export function RoomCard({ room, onJoin, onDelete, onSettings }: Props) {
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1">
-          <Users className="h-3 w-3 shrink-0" />
-          {capacityLabel}
-        </span>
-        {capabilities.map(({ icon: Icon, label }) => (
-          <span key={label} className="inline-flex items-center gap-0.5" title={label}>
-            <Icon className="h-3 w-3 shrink-0" />
-            {label}
+      {room && (
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <Users className="h-3 w-3 shrink-0" />
+            {capacityLabel}
           </span>
-        ))}
-      </div>
+          {capabilities.map(({ icon: Icon, label }) => (
+            <span key={label} className="inline-flex items-center gap-0.5" title={label}>
+              <Icon className="h-3 w-3 shrink-0" />
+              {label}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="flex items-center gap-1.5 pt-0.5">
         <Button
-          variant={room.isActive ? 'default' : 'outline'}
+          variant={isActive ? 'default' : 'outline'}
           size="sm"
           onClick={onJoin}
           className="h-8 flex-1 gap-1.5 text-xs"
         >
-          {room.isActive ? 'Join' : 'Open'}
+          {isActive ? 'Join' : 'Open'}
           <ArrowRight className="h-3.5 w-3.5" />
         </Button>
 
@@ -155,6 +173,23 @@ export function RoomCard({ room, onJoin, onDelete, onSettings }: Props) {
             title="Delete room"
           >
             <Trash2 className="h-3.5 w-3.5 text-destructive" />
+          </Button>
+        )}
+
+        {/* Removing a room from local history drops a row from this device's list and nothing else,
+            so it takes the plain outline treatment rather than the destructive styling Delete
+            carries, and it asks for no confirmation. The Android client's recent card behaves the
+            same way: its swipe action is `secondaryContainer` and fires immediately. */}
+        {onRemove && (
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onRemove}
+            className="h-8 w-8"
+            aria-label="Remove from recent rooms"
+            title="Remove from recent rooms"
+          >
+            <X className="h-3.5 w-3.5 text-muted-foreground" />
           </Button>
         )}
       </div>

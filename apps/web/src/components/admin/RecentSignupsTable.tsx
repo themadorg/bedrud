@@ -43,7 +43,7 @@ interface RecentSignupsTableProps {
 export function RecentSignupsTable({ users, isLoading }: RecentSignupsTableProps) {
   if (isLoading) {
     return (
-      <div className="border">
+      <div className="rounded-xl border overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -77,11 +77,13 @@ export function RecentSignupsTable({ users, isLoading }: RecentSignupsTableProps
   }
 
   if (users.length === 0) {
-    return <div className="border px-5 py-12 text-center text-xs text-muted-foreground">No sign-ups found</div>
+    return (
+      <div className="rounded-xl border px-5 py-12 text-center text-xs text-muted-foreground">No sign-ups found</div>
+    )
   }
 
   return (
-    <div className="border">
+    <div className="rounded-xl border overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>

@@ -24,8 +24,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Bedrud Design Tokens — Rose + Teal (Retro)
-   Sharp corners. Bold colors. No purple.
+   Bedrud Design Tokens — Rose + Teal
+   Rounded corners on the Android client's scale. Bold colors. No purple.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @theme inline {
@@ -50,10 +50,19 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: 4px;
-  --radius-md: 4px;
-  --radius-lg: 4px;
-  --radius-xl: 4px;
+  /* Shape scale, equal to the Android client's BedrudRadius (Shape.kt). */
+  /* chip: sm */
+  --radius-sm: 8px;
+  /* button: md, resolved through --radius so a self-hoster retunes it in theme.css */
+  --radius-md: var(--radius);
+  /* field: md, the same knob as the button corner */
+  --radius-lg: var(--radius);
+  /* card: lg */
+  --radius-xl: 16px;
+  /* xl */
+  --radius-2xl: 20px;
+  /* sheet top, video tile, controls bar: xxl */
+  --radius-3xl: 28px;
 
   /* Primary scale (rose) */
   --color-primary-50: var(--primary-50);
@@ -90,14 +99,11 @@
 @layer base {
   * {
     border-color: var(--border);
-    border-radius: var(--radius, 4px) !important;
     box-sizing: border-box;
   }
   /*
-   * Radius exceptions MUST live in this same @layer base block, after the * rule.
-   * Unlayered `border-radius: … !important` loses to layered !important (layer order
-   * reverses for important declarations).
-   * Tokens: --meet-*-radius in meeting.css.
+   * Meeting chrome radii override any rounded-* utility on the same element, so they keep
+   * !important. Tokens: --meet-*-radius in meeting.css.
    */
   .meet-controls-bar {
     border-radius: var(--meet-controls-bar-radius) !important;
@@ -201,7 +207,7 @@
 .app-scroll::-webkit-scrollbar-thumb,
 .app-scroll-y::-webkit-scrollbar-thumb {
   background: var(--scroll-thumb);
-  border-radius: var(--radius, 4px) !important;
+  border-radius: var(--radius);
 }
 
 .app-scroll::-webkit-scrollbar-thumb:hover,

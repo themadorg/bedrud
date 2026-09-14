@@ -50,7 +50,7 @@ export function GeneralTab({
                 key={id}
                 htmlFor={id}
                 className={cn(
-                  'flex w-full cursor-pointer items-center gap-3 border p-3 h-auto text-left has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring',
+                  'flex w-full cursor-pointer items-center gap-3 rounded-xl border p-3 h-auto text-left has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring',
                   active
                     ? id === 'closed'
                       ? 'border-destructive/40 bg-destructive/5'
@@ -60,7 +60,7 @@ export function GeneralTab({
               >
                 <div
                   className={cn(
-                    'flex h-8 w-8 shrink-0 items-center justify-center',
+                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-sm',
                     active
                       ? id === 'closed'
                         ? 'bg-destructive/10 text-destructive'

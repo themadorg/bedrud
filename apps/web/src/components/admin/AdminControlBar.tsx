@@ -38,7 +38,7 @@ export function AdminControlBar({ table, showTabs = false, advancedFilters = fal
   const currentTab = table.filters.statusTab ?? 'all'
 
   return (
-    <div className="border bg-card">
+    <div className="rounded-xl border bg-card">
       <div className="px-4 py-3 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <DataTableSearch

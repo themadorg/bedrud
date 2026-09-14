@@ -1,7 +1,7 @@
 /*
  * Bedrud Theme — Rose + Teal (Retro)
  *
- * Sharp corners. Bold colors. No purple.
+ * Rounded corners. Bold colors. No purple.
  *
  * Primary · rose — brand CTAs, links, focus rings
  * Accent  · teal  — highlights, badges, secondary actions
@@ -82,7 +82,8 @@
   --input: #e5e5e5;
   --ring: #E11D48;
 
-  --radius: 4px;
+  /* The default corner: buttons and fields. The full scale is in styles.css. */
+  --radius: 12px;
 
   --scroll-track: transparent;
   --scroll-thumb: color-mix(in oklab, var(--foreground) 16%, transparent);

@@ -92,7 +92,7 @@ export function RoomSettingsDialog({ room, open, onOpenChange, onSave }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="gap-0 overflow-hidden border p-0 max-w-[calc(var(--app-width,100svw)-2rem)] sm:max-w-sm">
+      <DialogContent className="gap-0 overflow-hidden border p-0 max-w-[calc(var(--app-width,100svw)-2rem)] lg:max-w-sm">
         <DialogTitle className="sr-only">Room Settings</DialogTitle>
         <DialogDescription className="sr-only">Configure room visibility, capacity, and features</DialogDescription>
         <form onSubmit={handleSubmit}>
@@ -104,7 +104,7 @@ export function RoomSettingsDialog({ room, open, onOpenChange, onSave }: Props) 
 
           {/* Visibility + Capacity — single row */}
           <div className="flex flex-wrap items-center gap-3 border-t px-5 py-3">
-            <div className="flex items-center gap-0.5 border bg-background p-0.5">
+            <div className="flex items-center gap-0.5 rounded-lg border bg-background p-0.5">
               <Button
                 type="button"
                 variant={!isPublic ? 'secondary' : 'ghost'}
@@ -176,7 +176,7 @@ export function RoomSettingsDialog({ room, open, onOpenChange, onSave }: Props) 
 
           {/* Error */}
           {error && (
-            <div className="mx-5 mb-3 flex items-center gap-2 border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            <div className="mx-5 mb-3 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
               {error}
             </div>

@@ -26,7 +26,7 @@ export function DataTableSearch({ value, onChange, placeholder = 'Search…' }: 
   }
 
   return (
-    <div className="flex items-center gap-2 border bg-background px-3 h-8 w-full sm:w-56 focus-within:ring-2 focus-within:ring-ring">
+    <div className="flex items-center gap-2 rounded-lg border bg-background px-3 h-8 w-full sm:w-56 focus-within:ring-2 focus-within:ring-ring">
       <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <Input
         value={local}

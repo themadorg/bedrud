@@ -224,7 +224,7 @@ function AdminRoomsPage() {
 
       {/* Table */}
       {isError ? (
-        <div className="border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
           <span className="text-destructive">{error instanceof Error ? error.message : 'Failed to load rooms.'}</span>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="mr-1.5 h-3 w-3" />
@@ -232,7 +232,7 @@ function AdminRoomsPage() {
           </Button>
         </div>
       ) : (
-        <div className="border overflow-hidden">
+        <div className="rounded-xl border overflow-hidden">
           {isLoading ? (
             <div className="p-8 text-center text-sm text-muted-foreground">Loading rooms…</div>
           ) : table.paginated.length === 0 ? (
@@ -269,7 +269,7 @@ function AdminRoomsPage() {
       {/* Bulk confirm dialog */}
       {confirmBulkAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-background border p-6 max-w-md w-full mx-4 space-y-4">
+          <div className="bg-background rounded-xl border p-6 max-w-md w-full mx-4 space-y-4">
             <h2 className="text-sm font-semibold">
               {confirmBulkAction === 'suspend' ? 'Suspend' : 'Close'} {table.selectedIds.size} room
               {table.selectedIds.size !== 1 ? 's' : ''}?

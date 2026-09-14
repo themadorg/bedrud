@@ -15,7 +15,7 @@ export function Alert({ type, message, className }: AlertProps) {
   return (
     <div
       className={cn(
-        'flex items-center gap-2 border px-3 py-2 text-xs',
+        'flex items-center gap-2 rounded-lg border px-3 py-2 text-xs',
         type === 'success'
           ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
           : 'border-destructive/30 bg-destructive/10 text-destructive',

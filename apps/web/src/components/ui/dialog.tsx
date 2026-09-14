@@ -48,7 +48,7 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed z-50 grid gap-4 border bg-background p-6 shadow-lg duration-200',
+        'fixed z-50 grid gap-4 rounded-3xl border bg-background p-6 shadow-lg duration-200',
         aboveElevatedDock ? 'z-[260]' : elevated && 'z-[220]',
         'left-[calc(var(--app-offset-left,0px)+var(--app-width,100svw)/2)]',
         'top-[calc(var(--app-offset-top,0px)+var(--app-height,100svh)/2)]',
