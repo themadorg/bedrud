@@ -1,6 +1,8 @@
 # 01 — Overview & Units
 
-**Status: in progress.** Every unit gets a spec file and a plan file when it starts; unit 5 is the only one still unwritten.
+**Status: in progress.** Every unit has a spec file and a plan file; the table below links both for each.
+
+Unit 5 was built before units 2 to 4, because those three are meeting-screen work needing a live room and a second participant while unit 5 needs neither. It was stacked on unit 1's branch rather than cut from `master`, since unit 1 is still in review and unit 5 depends on its shape scale and breakpoint.
 
 ## Problem
 
@@ -60,7 +62,7 @@ sheet rather than beside it.
 | 2 | Meeting chat sheet | chat as a bottom sheet over the live call: half on open, full on drag or keyboard, dismissed on a second drag down | done, [08](./08-meeting-chat-sheet.md), [09](./09-meeting-chat-sheet-plan.md) |
 | 3 | Meeting controls pill | floating bottom pill (camera, screen share, mic, chat, hang up), drag handle unfolds room options upward in the same surface, no "more" menu | done, [10](./10-meeting-controls-pill.md), [11](./11-meeting-controls-pill-plan.md) |
 | 4 | Invite sheet | participants and invite as one sheet: avatar grid, count, share targets, room link | done, [12](./12-invite-sheet.md), [13](./13-invite-sheet-plan.md) |
-| 5 | Mobile settings page | one scrolling page of card sections on phones; dashboard alignment (quick-join bar, filter chips) if still needed | planned |
+| 5 | Mobile settings page | one scrolling page of card sections on phones, the settings dialog moved to the shared breakpoint, and the desktop settings route redirected on phones | done, [04](./04-mobile-settings.md), [05](./05-mobile-settings-plan.md) |
 
 ## Verification
 

@@ -338,6 +338,10 @@ desktop already reaches it another way — its own bar button, the header, the l
 menu — add it to `isPhoneOnlyRow` in `meetingOptionRows.ts`, beside the four rows already there.
 `meetingOptionRows.test.ts` pins the desktop menu to exactly the rows it carried before the pill.
 
+## Phone settings
+
+Phone settings live on one scrolling page at `/settings`, one section per panel, each anchored by its route segment so `/settings/audio` and `/settings#audio` reach the same section. The sub-routes carry only their document title. Desktop settings stay at `/dashboard/settings`, and each route redirects the other's visitors. Section headers are `text-xs font-semibold uppercase tracking-wide text-primary`, the web reading of Android's `labelLarge` in the primary colour.
+
 ## Do / Don't
 
 **Do:**

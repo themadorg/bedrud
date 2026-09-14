@@ -309,7 +309,7 @@ export function BedrudSettingsDialog({
       <DialogContent
         overlayClassName={
           dockAboveMobileNav
-            ? 'max-sm:h-[calc(var(--app-height,100svh)-4.5rem-env(safe-area-inset-bottom,0px))]'
+            ? 'max-lg:h-[calc(var(--app-height,100svh)-4.5rem-env(safe-area-inset-bottom,0px))]'
             : undefined
         }
         onPointerDownOutside={dockAboveMobileNav ? (e) => e.preventDefault() : undefined}
@@ -318,19 +318,19 @@ export function BedrudSettingsDialog({
         className={cn(
           'flex flex-col gap-0 overflow-hidden p-0 shadow-2xl',
           variant === 'meeting' ? 'meet-dialog' : 'bg-background',
-          'sm:h-[min(90vh,720px)] sm:w-[min(760px,calc(var(--app-width,100svw)-2rem))] sm:max-w-[min(760px,calc(var(--app-width,100svw)-2rem))]',
+          'lg:h-[min(90vh,720px)] lg:w-[min(760px,calc(var(--app-width,100svw)-2rem))] lg:max-w-[min(760px,calc(var(--app-width,100svw)-2rem))]',
           dockAboveMobileNav
             ? cn(
-                'max-sm:fixed max-sm:left-[var(--app-offset-left,0px)] max-sm:top-[var(--app-offset-top,0px)] max-sm:h-[calc(var(--app-height,100svh)-4.5rem-env(safe-area-inset-bottom,0px))] max-sm:max-h-[calc(var(--app-height,100svh)-4.5rem-env(safe-area-inset-bottom,0px))] max-sm:w-[var(--app-width,100svw)] max-sm:max-w-[var(--app-width,100svw)] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0 max-sm:border-b',
-                variant === 'meeting' ? 'max-sm:border-[var(--meet-border)]' : 'max-sm:border-border',
+                'max-lg:fixed max-lg:left-[var(--app-offset-left,0px)] max-lg:top-[var(--app-offset-top,0px)] max-lg:h-[calc(var(--app-height,100svh)-4.5rem-env(safe-area-inset-bottom,0px))] max-lg:max-h-[calc(var(--app-height,100svh)-4.5rem-env(safe-area-inset-bottom,0px))] max-lg:w-[var(--app-width,100svw)] max-lg:max-w-[var(--app-width,100svw)] max-lg:translate-x-0 max-lg:translate-y-0 max-lg:rounded-none max-lg:border-0 max-lg:border-b',
+                variant === 'meeting' ? 'max-lg:border-[var(--meet-border)]' : 'max-lg:border-border',
               )
-            : 'max-sm:fixed max-sm:left-[var(--app-offset-left,0px)] max-sm:top-[var(--app-offset-top,0px)] max-sm:h-[var(--app-height,100svh)] max-sm:max-h-[var(--app-height,100svh)] max-sm:w-[var(--app-width,100svw)] max-sm:max-w-[var(--app-width,100svw)] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0',
-          'max-sm:[&>button.absolute]:hidden',
+            : 'max-lg:fixed max-lg:left-[var(--app-offset-left,0px)] max-lg:top-[var(--app-offset-top,0px)] max-lg:h-[var(--app-height,100svh)] max-lg:max-h-[var(--app-height,100svh)] max-lg:w-[var(--app-width,100svw)] max-lg:max-w-[var(--app-width,100svw)] max-lg:translate-x-0 max-lg:translate-y-0 max-lg:rounded-none max-lg:border-0',
+          'max-lg:[&>button.absolute]:hidden',
         )}
       >
-        <div className="flex min-h-0 flex-1 flex-col sm:hidden">{listBody}</div>
+        <div className="flex min-h-0 flex-1 flex-col lg:hidden">{listBody}</div>
 
-        <div className="hidden min-h-0 flex-1 flex-col sm:flex">
+        <div className="hidden min-h-0 flex-1 flex-col lg:flex">
           <DialogHeader
             className={cn(
               'shrink-0 border-b px-4 py-3',

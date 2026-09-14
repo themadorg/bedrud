@@ -1,16 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { SecuritySettingsPanel } from '@/components/settings/SecuritySettingsPanel'
 
 export const Route = createFileRoute('/settings/security')({
   head: () => ({ meta: [{ title: 'Security — Bedrud' }] }),
   component: SecuritySettingsPage,
 })
 
+// The `/settings` layout renders every panel and scrolls to the one this route names, so the route
+// itself carries only its title.
 function SecuritySettingsPage() {
-  return (
-    <div className="space-y-3">
-      <h1 className="text-lg font-semibold tracking-tight">Security</h1>
-      <SecuritySettingsPanel />
-    </div>
-  )
+  return null
 }
