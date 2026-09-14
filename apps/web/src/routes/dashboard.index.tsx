@@ -1,19 +1,21 @@
 // TODO oncoming feature
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ArrowRight, Clock, Plus, Search, X } from 'lucide-react'
+import { ArrowRight, Plus, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '#/lib/api'
-import { type RecentRoom, useRecentRoomsStore } from '#/lib/recent-rooms.store'
+import { mergeDashboardRooms, serverRoomsOnly } from '#/lib/dashboard-room-list'
+import { parseJoinInput } from '#/lib/join-input'
+import { useRecentRoomsStore } from '#/lib/recent-rooms.store'
 import { useUserStore } from '#/lib/user.store'
 import { CreateRoomDialog } from '@/components/dashboard/CreateRoomDialog'
+import { FilterChip } from '@/components/dashboard/FilterChip'
 import { RoomCard } from '@/components/dashboard/RoomCard'
 import { RoomSettingsDialog } from '@/components/dashboard/RoomSettingsDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getErrorMessage } from '@/lib/errors'
 
 interface Room {
@@ -41,88 +43,53 @@ export const Route = createFileRoute('/dashboard/')({
   },
 })
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function timeAgo(ts: number): string {
-  const diff = Date.now() - ts
-  const mins = Math.floor(diff / 60_000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
-
 // ── Quick Join Bar ───────────────────────────────────────────────────────────
 
 function QuickJoinBar({ onJoin, onCreate }: { onJoin: (name: string) => void; onCreate: () => void }) {
   const [value, setValue] = useState('')
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const slug = value.trim().toLowerCase().replace(/\s+/g, '-')
-    if (!slug) return
-    onJoin(slug)
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const roomName = parseJoinInput(value)
+    if (!roomName) {
+      toast.error('That does not look like a room name or a meeting link')
+      return
+    }
+    onJoin(roomName)
   }
 
   return (
-    <div className="flex items-center gap-2 max-md:hidden">
+    <div className="flex items-center gap-2">
       <form
         onSubmit={handleSubmit}
         className="flex h-9 flex-1 items-center gap-2 rounded-lg border border-input bg-background px-3 focus-within:ring-2 focus-within:ring-ring"
       >
         <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        {/* Room names are lowercase and have no spaces, so the phone keyboard should not
+            capitalise, correct or spell-check what is typed. This mirrors the Android field's
+            `KeyboardType.Uri` with capitalisation and auto-correct off. */}
         <Input
           value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="Join by room name or invite code..."
+          onChange={(event) => setValue(event.target.value)}
+          placeholder="Join by room name or invite link..."
+          inputMode="url"
           autoComplete="off"
+          autoCapitalize="none"
+          autoCorrect="off"
           spellCheck={false}
           className="h-full flex-1 border-none focus-visible:ring-0 px-0"
         />
-        {value.trim() && (
-          <Button type="submit" size="sm" className="gap-1">
-            Join <ArrowRight className="h-3 w-3" />
-          </Button>
-        )}
-      </form>
-      <Button type="button" variant="default" size="sm" onClick={onCreate}>
-        <Plus className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">New room</span>
-      </Button>
-    </div>
-  )
-}
-
-// ── Recent Room Row ──────────────────────────────────────────────────────────
-
-function RecentRoomRow({ recent, onJoin, onRemove }: { recent: RecentRoom; onJoin: () => void; onRemove: () => void }) {
-  return (
-    <div className="group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-accent/50">
-      <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
-      <button
-        type="button"
-        onClick={onJoin}
-        className="min-w-0 flex-1 truncate text-left font-mono text-sm font-medium hover:underline"
-      >
-        {recent.name}
-      </button>
-      <span className="text-xs text-muted-foreground/50">{timeAgo(recent.joinedAt)}</span>
-      <div className="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
-        <Button
-          variant="ghost"
-          size="icon"
-          type="button"
-          onClick={onRemove}
-          className="h-7 w-7 hover:bg-destructive/10 hover:text-destructive"
-          aria-label="Remove from recent rooms"
-        >
-          <X className="h-3.5 w-3.5" />
+        {/* Disabled rather than hidden while the field is empty: a button that appears as you type
+            shifts the row under your thumb. Android disables it for the same reason. */}
+        <Button type="submit" size="sm" className="gap-1" disabled={!value.trim()}>
+          Join <ArrowRight className="h-3 w-3" />
         </Button>
-      </div>
-      <Button variant="outline" size="sm" type="button" onClick={onJoin} className="h-7 gap-1 px-2.5 text-xs">
-        Join <ArrowRight className="h-3 w-3" />
+      </form>
+      {/* Desktop only: phones create a room from the floating button in the bottom navigation,
+          which is where the Android client puts it too. */}
+      <Button type="button" variant="default" size="sm" onClick={onCreate} className="max-lg:hidden">
+        <Plus className="h-3.5 w-3.5" />
+        New room
       </Button>
     </div>
   )
@@ -171,7 +138,7 @@ function DashboardPage() {
 
   const [createOpen, setCreateOpen] = useState(false)
   const [settingsRoom, setSettingsRoom] = useState<Room | null>(null)
-  const [tab, setTab] = useState<'rooms' | 'recent'>('rooms')
+  const [activeFilter, setActiveFilter] = useState<'all' | 'mine'>('all')
   const [query, setQuery] = useState('')
 
   function handleJoin(roomName: string) {
@@ -179,19 +146,25 @@ function DashboardPage() {
     navigate({ to: '/m/$meetId', params: { meetId: roomName } })
   }
 
+  // The name travels with the id because deleting a room has to reach both places the room is
+  // known: the server list, and this device's history.
   const deleteRoom = useMutation({
-    mutationFn: (roomId: string) => api.delete(`/api/room/${roomId}`),
-    onMutate: async (roomId) => {
+    mutationFn: ({ id }: { id: string; name: string }) => api.delete(`/api/room/${id}`),
+    onMutate: async ({ id }) => {
       await queryClient.cancelQueries({ queryKey: ['rooms'] })
       const prev = queryClient.getQueryData<Room[]>(['rooms'])
-      queryClient.setQueryData<Room[]>(['rooms'], (old) => old?.filter((r) => r.id !== roomId))
+      queryClient.setQueryData<Room[]>(['rooms'], (old) => old?.filter((r) => r.id !== id))
       return { prev }
     },
-    onSuccess: () => {
+    onSuccess: (_result, { name }) => {
+      // Dropping it from the server list alone is not enough. The list merges local history with
+      // server rooms, so a deleted room whose name is still in history comes straight back as a
+      // recent card — in the list it just left, one frame after this toast.
+      removeRecent(name)
       toast.success('Room deleted')
       void queryClient.invalidateQueries({ queryKey: ['rooms'] })
     },
-    onError: (err, _roomId, ctx) => {
+    onError: (err, _variables, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(['rooms'], ctx.prev)
       toast.error(getErrorMessage(err, 'Failed to delete room'))
     },
@@ -219,44 +192,31 @@ function DashboardPage() {
   }
 
   const normalizedQuery = query.trim().toLowerCase()
-  const filtered = (rooms ?? [])
-    .filter((r) => !normalizedQuery || r.name.toLowerCase().includes(normalizedQuery))
-    .sort((a, b) => {
-      if (a.isActive !== b.isActive) return Number(b.isActive) - Number(a.isActive)
-      return a.name.localeCompare(b.name)
-    })
-
-  const filteredRecent = recentRooms
-    .filter((r, i, arr) => arr.findIndex((x) => x.name === r.name) === i)
-    .filter((r) => !normalizedQuery || r.name.toLowerCase().includes(normalizedQuery))
+  const entries = (
+    activeFilter === 'all' ? mergeDashboardRooms(rooms ?? [], recentRooms) : serverRoomsOnly(rooms ?? [], recentRooms)
+  ).filter((entry) => !normalizedQuery || entry.name.toLowerCase().includes(normalizedQuery))
 
   const firstName = user?.name?.split(' ')[0]
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
-      <div className="hidden md:block">
+      <div className="hidden lg:block">
         <h1 className="text-lg font-semibold tracking-tight">{firstName ? `${firstName}'s rooms` : 'Rooms'}</h1>
         <p className="text-sm text-muted-foreground">Create, join, or manage your meeting rooms.</p>
       </div>
 
       <QuickJoinBar onJoin={handleJoin} onCreate={() => setCreateOpen(true)} />
 
-      {/* Tabs + Search */}
+      {/* Chips + Search */}
       <div className="flex items-center justify-between gap-3">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as 'rooms' | 'recent')}>
-          <TabsList>
-            <TabsTrigger value="rooms" className="text-sm gap-1.5">
-              My Rooms
-              {rooms && <span className="text-xs text-muted-foreground">{rooms.length}</span>}
-            </TabsTrigger>
-            <TabsTrigger value="recent" className="text-sm gap-1.5">
-              Recent
-              {recentRooms.length > 0 && <span className="text-xs text-muted-foreground">{recentRooms.length}</span>}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-2">
+          <FilterChip label="All" selected={activeFilter === 'all'} onSelect={() => setActiveFilter('all')} />
+          <FilterChip label="My Rooms" selected={activeFilter === 'mine'} onSelect={() => setActiveFilter('mine')} />
+        </div>
 
-        <div className="flex h-8 w-full max-w-48 items-center gap-2 rounded-lg border border-input bg-background px-2 focus-within:ring-2 focus-within:ring-ring">
+        {/* `min-w-0` lets this box shrink below its content width, so a narrow phone takes the
+            space out of the filter field rather than wrapping the chips beside it. */}
+        <div className="flex h-8 w-full min-w-0 max-w-48 items-center gap-2 rounded-lg border border-input bg-background px-2 focus-within:ring-2 focus-within:ring-ring">
           <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <Input
             value={query}
@@ -269,83 +229,49 @@ function DashboardPage() {
 
       {/* Content */}
       <div className="rounded-xl border bg-card/50">
-        {tab === 'rooms' &&
-          (isLoading ? (
-            <div className="p-2">
-              <SkeletonRows />
-            </div>
-          ) : filtered.length > 0 ? (
-            <div className="grid grid-cols-1 gap-2 p-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filtered.map((room) => (
-                <RoomCard
-                  key={room.id}
-                  room={{
-                    id: room.id,
-                    name: room.name,
-                    isPublic: room.isPublic,
-                    maxParticipants: room.maxParticipants,
-                    isActive: room.isActive,
-                    settings: {
-                      allowChat: true,
-                      allowVideo: true,
-                      allowAudio: true,
-                      requireApproval: false,
-                      e2ee: false,
-                    },
-                  }}
-                  onJoin={() => handleJoin(room.name)}
-                  onDelete={() => deleteRoom.mutate(room.id)}
-                  onSettings={() => setSettingsRoom(room)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="px-4 py-12 text-center">
-              {(rooms?.length ?? 0) > 0 ? (
-                <>
-                  <p className="text-sm font-medium">No rooms match "{query}"</p>
-                  <Button variant="link" type="button" onClick={() => setQuery('')} className="mt-2 text-sm">
-                    Clear filter
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm font-medium">No rooms yet</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Create your first room to get started.</p>
-                  <Button
-                    type="button"
-                    variant="default"
-                    size="sm"
-                    onClick={() => setCreateOpen(true)}
-                    className="mt-3"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    New room
-                  </Button>
-                </>
-              )}
-            </div>
-          ))}
-
-        {tab === 'recent' &&
-          (filteredRecent.length > 0 ? (
-            <div className="divide-y divide-border/50 p-1">
-              {filteredRecent.map((recent) => (
-                <RecentRoomRow
-                  key={recent.name}
-                  recent={recent}
-                  onJoin={() => handleJoin(recent.name)}
-                  onRemove={() => removeRecent(recent.name)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="px-4 py-12 text-center">
-              <Clock className="mx-auto h-5 w-5 text-muted-foreground/30" />
-              <p className="mt-2 text-sm font-medium">No recent rooms</p>
-              <p className="mt-1 text-xs text-muted-foreground">Rooms you join will appear here for quick access.</p>
-            </div>
-          ))}
+        {isLoading ? (
+          <div className="p-2">
+            <SkeletonRows />
+          </div>
+        ) : entries.length > 0 ? (
+          <div className="grid grid-cols-1 gap-2 p-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {entries.map((entry) => (
+              <RoomCard
+                key={entry.key}
+                entry={entry}
+                onJoin={() => handleJoin(entry.name)}
+                onDelete={
+                  entry.kind === 'server' ? () => deleteRoom.mutate({ id: entry.room.id, name: entry.name }) : undefined
+                }
+                onSettings={entry.kind === 'server' ? () => setSettingsRoom(entry.room) : undefined}
+                onRemove={entry.kind === 'recent' ? () => removeRecent(entry.name) : undefined}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="px-4 py-12 text-center">
+            {/* Keyed on the query rather than on whether any room exists anywhere. The My Rooms chip
+                can empty the list while recents still exist, and reporting that against an empty
+                query reads as `No rooms match ""`. */}
+            {normalizedQuery ? (
+              <>
+                <p className="text-sm font-medium">No rooms match "{query}"</p>
+                <Button variant="link" type="button" onClick={() => setQuery('')} className="mt-2 text-sm">
+                  Clear filter
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium">No rooms yet</p>
+                <p className="mt-1 text-xs text-muted-foreground">Create your first room to get started.</p>
+                <Button type="button" variant="default" size="sm" onClick={() => setCreateOpen(true)} className="mt-3">
+                  <Plus className="h-3.5 w-3.5" />
+                  New room
+                </Button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <CreateRoomDialog

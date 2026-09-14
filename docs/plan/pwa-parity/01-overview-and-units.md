@@ -2,7 +2,7 @@
 
 **Status: in progress.** Every unit has a spec file and a plan file; the table below links both for each.
 
-Unit 5 was built before units 2 to 4, because those three are meeting-screen work needing a live room and a second participant while unit 5 needs neither. It was stacked on unit 1's branch rather than cut from `master`, since unit 1 is still in review and unit 5 depends on its shape scale and breakpoint.
+Units 5 and 6 were built before units 2 to 4, because those three are meeting-screen work needing a live room and a second participant while the settings page and the dashboard need neither. Both were stacked on unit 1's branch rather than cut from `master`, since unit 1 is still in review and both depend on its shape scale and breakpoint.
 
 ## Problem
 
@@ -46,6 +46,7 @@ Phone layout applies below 1024px, the `lg` Tailwind breakpoint the dashboard sh
 | `MeetingControlsPanel` (floating pill, handle unfolds options upward) | `MeetingControlsPill`, `components/meeting/MeetingControlsPill.tsx` | built in unit 3 |
 | `MeetingInviteSheet` (avatar grid + share targets) | `MeetingInviteSheet`, on `BedrudSheet` | built in unit 4 |
 | `SettingsContent` (one scrolling page of card sections) | mobile settings page | unit 5 |
+| `QuickJoinBar` + `FilterRow` (dashboard) | quick-join bar + filter chips | unit 6 |
 
 ## Units
 
@@ -63,6 +64,7 @@ sheet rather than beside it.
 | 3 | Meeting controls pill | floating bottom pill (camera, screen share, mic, chat, hang up), drag handle unfolds room options upward in the same surface, no "more" menu | done, [10](./10-meeting-controls-pill.md), [11](./11-meeting-controls-pill-plan.md) |
 | 4 | Invite sheet | participants and invite as one sheet: avatar grid, count, share targets, room link | done, [12](./12-invite-sheet.md), [13](./13-invite-sheet-plan.md) |
 | 5 | Mobile settings page | one scrolling page of card sections on phones, the settings dialog moved to the shared breakpoint, and the desktop settings route redirected on phones | done, [04](./04-mobile-settings.md), [05](./05-mobile-settings-plan.md) |
+| 6 | Dashboard parity | quick-join bar on phones with pasted-link support, filter chips over one merged room list, and the dashboard tree moved to the shared breakpoint | done, [06](./06-dashboard-parity.md), [07](./07-dashboard-parity-plan.md) |
 
 ## Verification
 
