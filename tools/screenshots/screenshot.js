@@ -308,9 +308,11 @@ async function capturePage(browser, { pageDef, viewport, theme, session, expectP
     })
     await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: theme }])
 
+    const captureSession = session && !skipAuth ? session : null
+
     const skipWelcome = Boolean(expectPeople) && pageDef.kind !== 'meeting-welcome'
     await page.evaluateOnNewDocument(
-      ({ themeValue, sessionValue, skipWelcomeValue }) => {
+      ({ themeValue, skipWelcomeValue }) => {
         localStorage.setItem('theme', themeValue)
         localStorage.setItem(
           'experimental-preferences',
@@ -330,38 +332,15 @@ async function capturePage(browser, { pageDef, viewport, theme, session, expectP
             JSON.stringify({ state: { showWelcomeScreen: false }, version: 0 }),
           )
         }
-        if (sessionValue) {
-          localStorage.setItem('auth_remember', '1')
-          localStorage.setItem('auth_at', sessionValue.accessToken)
-        }
       },
       {
         themeValue: theme,
-        sessionValue: skipAuth ? null : session,
         skipWelcomeValue: skipWelcome,
       },
     )
 
-    if (session && !skipAuth) {
-      const origin = new URL(BASE_URL)
-      await page.setCookie(
-        {
-          name: 'access_token',
-          value: session.accessToken,
-          domain: origin.hostname,
-          path: '/',
-          httpOnly: true,
-          sameSite: 'Lax',
-        },
-        {
-          name: 'refresh_token',
-          value: session.refreshToken,
-          domain: origin.hostname,
-          path: '/',
-          httpOnly: true,
-          sameSite: 'Lax',
-        },
-      )
+    if (captureSession) {
+      await injectSession(page, captureSession)
     }
 
     const url = `${BASE_URL}${pageDef.path}`
@@ -389,6 +368,12 @@ async function capturePage(browser, { pageDef, viewport, theme, session, expectP
     if (pageDef.requiresSession && session && !skipAuth) {
       await waitForSignedIn(page, slug)
       await waitForQuiet(page, slug)
+    }
+
+    // After the boot has run, not before: the rotated pair only exists once
+    // /api/auth/refresh has answered. See harvestSession.
+    if (captureSession) {
+      await harvestSession(page, context, captureSession)
     }
 
     const slices = await captureScrollSlices(page, slug, {
@@ -603,6 +588,60 @@ async function waitForQuiet(page, slug) {
   }
 }
 
+/**
+ * Put a session into a page: the token the store reads at boot, and the cookies
+ * the refresh call needs.
+ *
+ * Both capture paths inject the same way and used to spell it out separately,
+ * which is how they came to disagree about nothing yet still have to be changed
+ * together.
+ */
+async function injectSession(page, session) {
+  await page.evaluateOnNewDocument((s) => {
+    localStorage.setItem('auth_remember', '1')
+    localStorage.setItem('auth_at', s.accessToken)
+  }, session)
+
+  const origin = new URL(BASE_URL)
+  const cookie = (name, value) => ({
+    name,
+    value,
+    domain: origin.hostname,
+    path: '/',
+    httpOnly: true,
+    sameSite: 'Lax',
+  })
+  await page.setCookie(cookie('access_token', session.accessToken), cookie('refresh_token', session.refreshToken))
+}
+
+/**
+ * Carry the rotated session forward to the next capture.
+ *
+ * Refresh tokens are single-use: /api/auth/refresh rotates them and the spent
+ * value stops validating. The harness logged in once and injected that one
+ * token into every capture, so the first page's boot consumed it and every page
+ * after got a 401 and fell through to the persisted access token — the gallery
+ * was produced almost entirely by the fallback rather than by the path a
+ * returning browser takes. It stayed invisible only because the fallback works.
+ *
+ * So read back what the page was given: the store writes the new access token
+ * to localStorage, and the server sets the new refresh token as a cookie.
+ *
+ * Logging in per capture is not the alternative. The auth rate limit is ten
+ * requests a minute and a run makes a couple of hundred captures; measured, it
+ * answers `login HTTP 429: too many requests` from the eleventh onwards, and
+ * every capture after that silently falls back to the spent session — the same
+ * defect with more moving parts.
+ */
+async function harvestSession(page, context, session) {
+  const accessToken = await page.evaluate(() => localStorage.getItem('auth_at')).catch(() => null)
+  if (accessToken) session.accessToken = accessToken
+
+  const cookies = await context.cookies().catch(() => [])
+  const refresh = cookies.find((c) => c.name === 'refresh_token')
+  if (refresh?.value) session.refreshToken = refresh.value
+}
+
 async function login(apiUrl, email, password) {
   const res = await fetch(`${apiUrl}/api/auth/login`, {
     method: 'POST',
@@ -760,37 +799,17 @@ async function joinAsPerson(browser, roomName, person, png) {
   await context.overridePermissions(BASE_URL, ['camera', 'microphone'])
   const page = await context.newPage()
   await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 })
-  await page.evaluateOnNewDocument(
-    ({ accessToken }) => {
-      localStorage.setItem('theme', 'dark')
-      localStorage.setItem(
-        'interface-preferences',
-        JSON.stringify({ state: { showWelcomeScreen: false }, version: 0 }),
-      )
-      localStorage.setItem('auth_remember', '1')
-      localStorage.setItem('auth_at', accessToken)
-    },
-    { accessToken: session.accessToken },
-  )
-  const origin = new URL(BASE_URL)
-  await page.setCookie(
-    {
-      name: 'access_token',
-      value: session.accessToken,
-      domain: origin.hostname,
-      path: '/',
-      httpOnly: true,
-      sameSite: 'Lax',
-    },
-    {
-      name: 'refresh_token',
-      value: session.refreshToken,
-      domain: origin.hostname,
-      path: '/',
-      httpOnly: true,
-      sameSite: 'Lax',
-    },
-  )
+  await page.evaluateOnNewDocument(() => {
+    localStorage.setItem('theme', 'dark')
+    localStorage.setItem(
+      'interface-preferences',
+      JSON.stringify({ state: { showWelcomeScreen: false }, version: 0 }),
+    )
+  })
+  // This person's token is fresh and spent once, so it does not have the reuse
+  // problem the main account had — but the injection is the same, and keeping
+  // one copy is what stops the two paths drifting apart.
+  await injectSession(page, session)
   try {
     await page.goto(`${BASE_URL}/m/${roomName}`, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS })
     await enterMeetingFromWelcome(page)

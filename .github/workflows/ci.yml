@@ -247,7 +247,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: latest
+          # Pinned rather than `latest`: dependabot maintains package.json but not
+          # bun.lock, and every job installs with --frozen-lockfile. A bun release
+          # that changes the lockfile format fails the install everywhere at once,
+          # which is what #143 had to be fixed by hand.
+          bun-version: 1.4.2
       - run: bun install --frozen-lockfile
       - run: bun run check
       - run: bun run test
@@ -406,7 +410,11 @@ jobs:
           node-version: "22"
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: latest
+          # Pinned rather than `latest`: dependabot maintains package.json but not
+          # bun.lock, and every job installs with --frozen-lockfile. A bun release
+          # that changes the lockfile format fails the install everywhere at once,
+          # which is what #143 had to be fixed by hand.
+          bun-version: 1.4.2
           cache: true
       - run: bun install --frozen-lockfile
       - name: Sync swagger.json from server
