@@ -324,6 +324,39 @@ func TestUpdateLatestSkipChecksumConflict(t *testing.T) {
 	}
 }
 
+func TestUpdateNightlySkipChecksumConflict(t *testing.T) {
+	_, _ = captureOutput(t)
+	root := NewRootCmd()
+	root.SetArgs([]string{"update", "--nightly", "--skip-checksum"})
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected nightly+skip-checksum error")
+	}
+}
+
+func TestUpdateNightlyWithPathConflict(t *testing.T) {
+	_, _ = captureOutput(t)
+	root := NewRootCmd()
+	root.SetArgs([]string{"update", "--nightly", "/tmp/bedrud"})
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected nightly+path error")
+	}
+}
+
+func TestVersionsListNoRoot(t *testing.T) {
+	t.Setenv("BEDRUD_INSTALL_ROOT", t.TempDir())
+	out, errBuf := captureOutput(t)
+	root := NewRootCmd()
+	root.SetArgs([]string{"versions", "list"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("err=%v stderr=%s", err, errBuf.String())
+	}
+	if !strings.Contains(out.String(), "Install root:") {
+		t.Fatalf("got %q", out.String())
+	}
+}
+
 func TestCompletionBash(t *testing.T) {
 	out, errBuf := captureOutput(t)
 	// GenBash writes to stdout of the command, not clioutput writers — use root with SetOut

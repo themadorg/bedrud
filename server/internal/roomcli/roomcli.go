@@ -250,13 +250,10 @@ func withRepo(configPath string, fn func(*config.Config, *repository.RoomReposit
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
-	if err := database.Initialize(&cfg.Database); err != nil {
+	if err := database.OpenCLI(&cfg.Database); err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
 	defer database.Close()
-	if err := database.RunMigrations(); err != nil {
-		return fmt.Errorf("run migrations: %w", err)
-	}
 	return fn(cfg, repository.NewRoomRepository(database.GetDB()))
 }
 

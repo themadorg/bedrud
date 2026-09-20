@@ -221,9 +221,9 @@ func TestResolveLatest_fullFlow(t *testing.T) {
 		githubLatestURL = oldLatest
 	})
 
-	res, err := resolveLatest(false)
+	res, err := resolveGitHubChannel(false, false)
 	if err != nil {
-		t.Fatalf("resolveLatest: %v", err)
+		t.Fatalf("resolveGitHubChannel stable: %v", err)
 	}
 	if res.Cleanup != nil {
 		defer res.Cleanup()
@@ -249,8 +249,111 @@ func TestResolveLatest_fullFlow(t *testing.T) {
 	t.Cleanup(srv2.Close)
 	httpClient = srv2.Client()
 	githubLatestURL = srv2.URL
-	if _, err := resolveLatest(false); err == nil {
+	if _, err := resolveGitHubChannel(false, false); err == nil {
 		t.Fatal("expected error when SHA256SUMS missing")
+	}
+}
+
+func TestResolveLatestRejectsPrerelease(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"tag_name":"v9.9.9-rc.1","prerelease":true,"assets":[]}`))
+	}))
+	t.Cleanup(srv.Close)
+	oldClient, oldLatest := httpClient, githubLatestURL
+	httpClient = srv.Client()
+	githubLatestURL = srv.URL
+	t.Cleanup(func() {
+		httpClient = oldClient
+		githubLatestURL = oldLatest
+	})
+	if _, err := resolveGitHubChannel(false, false); err == nil {
+		t.Fatal("expected stable channel to reject prerelease")
+	}
+}
+
+func TestResolveNightlyPicksPrerelease(t *testing.T) {
+	assetName, err := releaseAssetName()
+	if err != nil {
+		t.Skip(err)
+	}
+	payload := []byte{0x7f, 'E', 'L', 'F', 'n', 't'}
+	archBytes, err := writeTarXZBytes(map[string][]byte{"bedrud": payload})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(archBytes)
+	sumsBody := fmt.Sprintf("%s  %s\n", hex.EncodeToString(sum[:]), assetName)
+
+	var assetURL, sumsURL string
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/releases") && !strings.Contains(r.URL.Path, "/latest"):
+			_, _ = fmt.Fprintf(w, `[
+				{"tag_name":"v9.9.9","prerelease":false,"draft":false,"assets":[]},
+				{"tag_name":"v9.9.10-nightly","prerelease":true,"draft":false,"assets":[
+					{"name":%q,"browser_download_url":%q},
+					{"name":"SHA256SUMS","browser_download_url":%q}
+				]}
+			]`, assetName, assetURL, sumsURL)
+		case r.URL.Path == "/asset":
+			_, _ = w.Write(archBytes)
+		case r.URL.Path == "/sums":
+			_, _ = w.Write([]byte(sumsBody))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	assetURL = srv.URL + "/asset"
+	sumsURL = srv.URL + "/sums"
+
+	oldClient, oldList := httpClient, githubReleasesURL
+	httpClient = srv.Client()
+	githubReleasesURL = srv.URL + "/repos/themadorg/bedrud/releases"
+	t.Cleanup(func() {
+		httpClient = oldClient
+		githubReleasesURL = oldList
+	})
+
+	res, err := resolveGitHubChannel(false, true)
+	if err != nil {
+		t.Fatalf("nightly: %v", err)
+	}
+	if res.Cleanup != nil {
+		defer res.Cleanup()
+	}
+	if res.Version != "v9.9.10-nightly" {
+		t.Fatalf("version=%q", res.Version)
+	}
+	if res.Channel != "nightly" {
+		t.Fatalf("channel=%q", res.Channel)
+	}
+}
+
+func TestIsStableAndNightlyRelease(t *testing.T) {
+	if isStableRelease(githubRelease{TagName: "v1.0.0", Prerelease: true}) {
+		t.Fatal("prerelease is not stable")
+	}
+	if isStableRelease(githubRelease{TagName: "v1.0.0-nightly"}) {
+		t.Fatal("nightly tag is not stable")
+	}
+	if !isStableRelease(githubRelease{TagName: "v1.2.3"}) {
+		t.Fatal("v1.2.3 should be stable")
+	}
+	if !isNightlyRelease(githubRelease{TagName: "v1.0.0-rc.1", Prerelease: true}) {
+		t.Fatal("prerelease should count as nightly channel")
+	}
+	if isNightlyRelease(githubRelease{TagName: "v1.2.3"}) {
+		t.Fatal("stable should not be nightly")
+	}
+}
+
+func TestConfirmGitHubUpdateYesSkipsPrompt(t *testing.T) {
+	if err := confirmGitHubUpdate(UpdateOptions{Yes: true}, "a", "b", "stable"); err != nil {
+		t.Fatal(err)
+	}
+	if err := confirmGitHubUpdate(UpdateOptions{}, "a", "b", ""); err != nil {
+		t.Fatal(err)
 	}
 }
 

@@ -11,8 +11,14 @@ import (
 
 // RunMigrations performs all database migrations
 func RunMigrations() error {
+	return runMigrations(false)
+}
+
+func runMigrations(quiet bool) error {
 	if os.Getenv("BEDRUD_SKIP_MIGRATE") == "1" {
-		log.Info().Msg("Skipping database migrations (BEDRUD_SKIP_MIGRATE=1)")
+		if !quiet {
+			log.Info().Msg("Skipping database migrations (BEDRUD_SKIP_MIGRATE=1)")
+		}
 		return nil
 	}
 
@@ -202,6 +208,8 @@ func RunMigrations() error {
 		}
 	}
 
-	log.Info().Msg("Database migrations completed successfully")
+	if !quiet {
+		log.Info().Msg("Database migrations completed successfully")
+	}
 	return nil
 }

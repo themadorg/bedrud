@@ -740,6 +740,9 @@ func LinuxUninstall() error {
 	if err := os.RemoveAll(varLogDir); err != nil {
 		errs = append(errs, fmt.Errorf("failed to remove %s: %w", varLogDir, err))
 	}
+	if err := os.RemoveAll(defaultInstallRoot); err != nil {
+		errs = append(errs, fmt.Errorf("failed to remove %s: %w", defaultInstallRoot, err))
+	}
 	if err := removeDocTree(); err != nil {
 		errs = append(errs, err)
 	}

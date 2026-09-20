@@ -10,4 +10,5 @@ var (
 	stopServicesHook    = stopAllInitSystems
 	refreshServicesHook = refreshServices
 	packageManagedHook  = isPackageManaged
+	confirmUpdateHook   = confirmGitHubUpdate
 )
