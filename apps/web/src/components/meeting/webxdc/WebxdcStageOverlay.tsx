@@ -17,7 +17,7 @@ export function WebxdcStageOverlay() {
   if (!session) {
     if (busy) {
       return (
-        <div className={cn(meetStageShellClass(layout, 'p-3 max-sm:p-2'))}>
+        <div className={cn(meetStageShellClass(layout, 'p-3 max-lg:p-2'))}>
           <div className="flex min-h-0 flex-1 items-center justify-center rounded-xl border border-white/[0.08] bg-[#030308]/95 text-sm text-white/60 shadow-2xl backdrop-blur-md">
             Opening mini-app…
           </div>
@@ -32,7 +32,7 @@ export function WebxdcStageOverlay() {
   const selfAvatarUrl = getParticipantAvatarUrl(lp)
 
   return (
-    <div className={cn(meetStageShellClass(layout, 'p-3 max-sm:p-1.5'))}>
+    <div className={cn(meetStageShellClass(layout, 'p-3 max-lg:p-1.5'))}>
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#12121f] shadow-2xl">
         <WebxdcFrame
           roomId={roomId}

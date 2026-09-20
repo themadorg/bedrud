@@ -95,6 +95,8 @@ Use `bg-primary text-primary-foreground` with `rounded-md` or `rounded-lg`:
 **No gradient buttons.** No `linear-gradient(135deg, #6366f1 ...)` on CTAs.
 **No `active:scale-95`** — it feels cheap.
 
+Corners come from the shared scale (`rounded-md` 12px for buttons, `rounded-lg` 12px for fields and inline banners, `rounded-xl` 16px for cards, `rounded-3xl` 28px for sheets, `rounded-sm` 8px for chips and icon-button hover fills, `rounded` 4px for the brand mark, the checkbox square and the tooltip). A hand-rolled control filled with `bg-primary` or `bg-destructive` takes `rounded-lg`, the same 12px the `<Button>` beside it renders; an icon-only button matches its siblings in the same group, or takes `rounded-sm` when it stands alone with a hover fill. A class string that lives in a `.ts` helper counts like one in a `.tsx` file, so any corner sweep runs with `--include="*.ts"` as well. The table with the Android token names is in the root `DESIGN.md`. Never `rounded-[Npx]`.
+
 ---
 
 ## Forms & Inputs
@@ -246,20 +248,107 @@ Shared meeting styles at `components/meeting/meeting.css`:
 - Convert everything else to Tailwind classes
 
 ### CtrlBtn convention (ControlsBar)
-Use `btnIconCn(active, danger, isMobile)` helper that returns Tailwind classes:
+`ControlsBar` is the **desktop** bar; below the breakpoint the meeting draws `MeetingControlsPill`
+instead. `btnIconCn(active, danger, ptt)` therefore carries one size, not a phone branch:
 ```tsx
-function btnIconCn(active = false, danger = false, isMobile = false) {
+function btnIconCn(active = false, danger = false, ptt = false) {
   return cn(
     'flex items-center justify-center shrink-0 border-none cursor-pointer transition-[background,color] duration-150',
-    isMobile ? 'h-[38px] w-[38px] rounded-[10px]' : 'h-11 w-11 rounded-xl',
-    danger
-      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-      : active
-        ? 'bg-primary/25 text-sky-300 hover:bg-primary/30'
-        : 'bg-white/[0.07] text-white/75 hover:bg-white/[0.12]',
+    'h-11 w-11 rounded-xl',
+    ptt
+      ? 'meet-ptt-btn'
+      : danger
+        ? 'bg-[var(--meet-btn-alert-bg)] text-[var(--meet-btn-alert-fg)] hover:bg-[var(--meet-btn-alert-hover)]'
+        : active
+          ? 'bg-[var(--meet-btn-muted-bg)] text-[var(--meet-btn-muted-fg)] hover:bg-[var(--meet-btn-muted-hover)]'
+          : 'bg-[var(--meet-control)] text-[var(--meet-control-fg)] hover:bg-[var(--meet-control-hover)]',
   )
 }
 ```
+
+## Mobile detection
+
+One breakpoint: `MOBILE_BREAKPOINT_PX` (1024, Tailwind `lg`) in `src/lib/use-is-mobile.ts`. Render-time branches use `useIsMobile()`; effects and event handlers use `isMobileViewport()`. CSS uses `lg:` / `max-lg:` for the same line. No component defines its own `matchMedia` width check.
+
+## Phone meeting chat
+
+Below 1024px the in-call chat is a bottom sheet over the live call, not a full-screen surface.
+`BedrudSheet` (`components/ui/BedrudSheet.tsx`) is the app's only bottom sheet; it is built on vaul
+and fixes the corner (`rounded-t-3xl`), the container (`--meet-sidebar`), the handle, the bottom
+safe-area inset and the gutter. Do not add a second sheet primitive, and do not turn those five into
+props.
+
+Two heights: half the visible viewport on open, and `--meet-sheet-max-height` when expanded — the
+visible viewport minus 12px and the top safe-area inset. It expands on a drag up, on a handle tap,
+and when the visible viewport shrinks far enough to be a keyboard (`components/ui/sheetKeyboard.ts`).
+A drag below half dismisses. The drag itself is vaul's and is not reimplemented; there is no
+TypeScript copy of the height, because the stylesheet is the one that draws with it.
+
+Two things about vaul are easy to get wrong, and neither fails loudly:
+
+- The sheet's height is **set**, not capped. vaul measures its fractional snap points against the
+  content's own height, so `max-h` alone leaves the sheet as tall as its content and slides most of
+  it off the bottom of the screen.
+- `--snap-point-height` is **how far vaul has slid the sheet down**, not the height that is showing.
+  It is `0` when the sheet is fully open. The body subtracts it rather than using it as a height, so
+  that the composer stays inside the visible band at every height instead of below the fold.
+
+The handle tap is ours, not vaul's. vaul's own handle closes the sheet when tapped at the last snap
+point rather than stepping back down, so `BedrudSheet` passes `preventCycle` and decides where the
+tap lands in `components/ui/sheetSnapPoints.ts`.
+
+`meeting.css` selects on `[data-chat-overlay="true"]` and `[data-elevated-chat="true"]` **without an
+element qualifier**, because vaul renders a `div` where the desktop panel renders an `aside`.
+Re-adding `aside` to those selectors silently breaks chat's text colours on the sheet;
+`chatMarkers.test.ts` guards it.
+
+Chat carries no meeting controls of its own. The strip of mic, deafen and participant count that
+used to sit inside it existed only because the surface hid the whole call. The meeting's own
+top-right cluster stays visible behind the sheet instead; only the controls bar beneath it hides.
+
+## Phone meeting controls
+
+Below the breakpoint, `ControlsBar` renders `MeetingControlsPill` instead of the desktop bar. One
+surface anchored to the bottom: handle, options panel, controls row. The options unfold *above* the
+controls, so the controls never move.
+
+Five controls, in Android's order: camera, screen share, mic pill, chat, leave. Chat has no
+top-right toggle on a phone — the pill is its only entry point.
+
+Four things are easy to get wrong:
+
+- **The panel is not a sheet.** Do not rebuild it on a bottom-sheet primitive. A sheet puts the
+  options on a second surface carrying its own copy of the controls, which is the bug Android's
+  `MeetingControlsPanel` documents at length.
+- **Only the bar element branches on `useIsMobile()`, never the whole component.** The settings and
+  app-gallery dialogs render after it and are reached from both surfaces; an early return for the
+  phone silently makes those rows do nothing.
+- **The drag threshold lives in `controlsPanelDrag.ts`,** not in the component. `controlsPill.test.ts`
+  fails if a bare `24` appears in `MeetingControlsPill.tsx`.
+- **Audio devices are rows, not a second surface.** Microphones, speakers and noise modes are
+  panel rows with a check on the active one. They used to be a full-screen dialog over the call.
+
+The row list is pure and lives in `meetingOptionRows.ts`; icons come from `meetingOptionIcon` in
+`MeetingOptionsPanel.tsx`, which the desktop `⋯` menu shares. Fixed row ids are a union, so adding
+one fails the type check at the icon map until it is given an icon. Device rows carry their device
+id after a `microphone:` / `speaker:` / `noise:` prefix.
+
+**Both surfaces read one row list, so a new row appears in the desktop `⋯` menu too.** If the
+desktop already reaches it another way — its own bar button, the header, the left chrome, the audio
+menu — add it to `isPhoneOnlyRow` in `meetingOptionRows.ts`, beside the four rows already there.
+`meetingOptionRows.test.ts` pins the desktop menu to exactly the rows it carried before the pill.
+
+## Phone settings
+
+Phone settings live on one scrolling page at `/settings`, one section per panel, each anchored by its route segment so `/settings/audio` and `/settings#audio` reach the same section. The sub-routes carry only their document title. Desktop settings stay at `/dashboard/settings`, and each route redirects the other's visitors. Section headers are `text-xs font-semibold uppercase tracking-wide text-primary`, the web reading of Android's `labelLarge` in the primary colour.
+
+## Phone dashboard
+
+`/dashboard` is one list at every width. The quick-join bar is always visible and resolves its field through `parseJoinInput` in `src/lib/join-input.ts`, which accepts a full meeting URL, a bare `/m/` or `/c/` path, or a plain room name, and returns null for anything else. The "New room" button beside it is desktop-only; phones create from the floating button in `MobileBottomNav`.
+
+Two filter chips, All and My Rooms, replace the tabs the page used to carry. `FilterChip` wears `badgeVariants` so the chip corner stays single-sourced. Under All the list holds server rooms and rooms known only from this device's history, merged and ordered by `mergeDashboardRooms` in `src/lib/dashboard-room-list.ts`; under My Rooms it holds server rooms only. `RoomCard` renders both kinds: a locally known room has no capacity, visibility or capability row, and carries Remove where an owned room carries Settings and Delete.
+
+The admin tree has no phone layout, so `MobileBottomNav` deliberately has no Admin tab even though the Android client shows one.
 
 ## Do / Don't
 

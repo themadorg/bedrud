@@ -23,11 +23,35 @@
   --meet-btn-leave-bg: #dc2626;
   --meet-btn-leave-fg: #ffffff;
   --meet-btn-leave-hover: #b91c1c;
-  /* Subtle chrome radii (global * zeros radius; @layer base exceptions use these) */
-  --meet-controls-bar-radius: 4px;
-  --meet-btn-leave-radius: 3px;
+  /* Chrome radii; the @layer base exceptions in styles.css apply these over rounded-* utilities. */
+  /* Android BedrudShapeTokens.controlsBar — the xxl corner, on every width. */
+  --meet-controls-bar-radius: 28px;
+  /* Android MeetEndCallButton uses the pill shape. */
+  --meet-btn-leave-radius: 9999px;
+  /* Dims the call while the options panel is open. Android's ScrimAlpha. */
+  --meet-scrim: rgba(23, 23, 23, 0.32);
+  /* The options panel's ceiling: the visible viewport less the status bar and Android's space12. */
+  --meet-controls-panel-max-height: calc(var(--app-height, 100svh) - 12px - env(safe-area-inset-top, 0px));
   --meet-gallery-icon-radius: 8px;
-  --meet-gallery-card-radius: var(--meet-btn-leave-radius);
+  /* Android BedrudShapeTokens.card, the shape for cards and selectable tiles. */
+  --meet-gallery-card-radius: 16px;
+  /*
+   * The tallest a bottom sheet may draw. A fully expanded sheet stops short of the top so the room
+   * name and a band of the call stay in view — a sheet that reaches the top of the screen is a
+   * screen again. The 12px matches Android's `Dimens.space12` above the status bar, and
+   * `--app-height` is the *visible* viewport, which `lib/visual-viewport.ts` keeps current.
+   */
+  --meet-sheet-max-height: calc(var(--app-height, 100svh) - 12px - env(safe-area-inset-top, 0px));
+  /*
+   * The invite sheet's sizes, all four from Android's `Dimens`, so the two clients' invite surfaces
+   * measure the same. The grid's ceiling is the load-bearing one: without it a busy room pushes the
+   * share targets and the room link off the bottom, and the half-height sheet the user actually sees
+   * carries a roster and nothing else.
+   */
+  --meet-invite-grid-max-height: 280px;
+  --meet-invite-avatar-size: 44px;
+  --meet-invite-target-size: 56px;
+  --meet-invite-qr-size: 240px;
   --meet-tile-action-bg: rgba(23, 23, 23, 0.54);
   --meet-tile-action-fg: rgba(255, 255, 255, 0.94);
   --meet-tile-action-border: rgba(255, 255, 255, 0.14);
@@ -58,8 +82,13 @@
   --meet-chat-bubble-out-border: transparent;
   --meet-chat-bubble-out-fg: #ffffff;
   --meet-chat-bubble-out-shadow: none;
-  --meet-chat-bubble-radius: var(--meet-controls-bar-radius);
-  --meet-chat-bubble-radius-near: var(--meet-btn-leave-radius);
+  /*
+   * Android BedrudShapeTokens.chatBubble: lg on every corner, tightening to xs on the one another
+   * bubble from the same sender sits against. The tightening is what makes a run of messages read as
+   * one block, so the near corner is the tightest value here and never the loosest.
+   */
+  --meet-chat-bubble-radius: 16px;
+  --meet-chat-bubble-radius-near: 4px;
   --meet-chat-bubble-padding-block: 8px;
   --meet-chat-bubble-padding-inline: 12px;
   --meet-chat-bubble-padding-media: 4px;
@@ -131,6 +160,7 @@
   --meet-sidebar: rgba(10, 10, 22, 0.94);
   --meet-shadow: 0 8px 40px rgba(0, 0, 0, 0.55);
   --meet-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --meet-scrim: rgba(0, 0, 0, 0.32);
   --meet-tile-fallback: #08080f;
   --meet-slider-track: rgba(255, 255, 255, 0.1);
   --meet-slider-thumb: #141422;
@@ -271,7 +301,7 @@
 
 .meet-prejoin-panel {
   width: min(340px, calc(100vw - 32px));
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--meet-border);
   background: var(--meet-bg-panel);
   padding: 32px 28px;
@@ -351,8 +381,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .text-white\/95,
@@ -360,8 +390,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .text-white\/90 {
@@ -372,8 +402,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .text-white\/85,
@@ -381,8 +411,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .text-white\/80 {
@@ -393,8 +423,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .text-white\/75,
@@ -402,8 +432,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .text-white\/70,
@@ -411,8 +441,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .text-white\/65 {
@@ -423,8 +453,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .text-white\/60,
@@ -432,8 +462,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .text-white\/55,
@@ -441,8 +471,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .text-white\/50,
@@ -450,8 +480,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .text-white\/45,
@@ -459,8 +489,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .text-white\/40,
@@ -468,8 +498,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .text-white\/35 {
@@ -480,8 +510,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .border-white\/5,
@@ -489,8 +519,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .border-white\/10,
@@ -498,8 +528,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .border-white\/\[0\.06\],
@@ -507,8 +537,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .border-white\/\[0\.07\],
@@ -516,8 +546,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .border-white\/\[0\.08\],
@@ -525,8 +555,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .border-white\/\[0\.09\],
@@ -534,8 +564,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .border-white\/\[0\.12\] {
@@ -594,8 +624,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .hover\:text-white\/70:hover,
@@ -603,8 +633,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .hover\:text-white\/75:hover,
@@ -612,8 +642,8 @@
     .meet-room,
     .meet-dialog,
     aside[aria-label="Chat"],
-    aside[data-chat-overlay="true"],
-    aside[data-elevated-chat="true"],
+    [data-chat-overlay="true"],
+    [data-elevated-chat="true"],
     [data-screenshare-overlay="true"]
   )
   .hover\:text-white\/80:hover {

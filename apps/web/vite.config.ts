@@ -9,6 +9,9 @@ import { excalidrawAliases } from './src/vendor/excalidraw/aliases'
 
 const appRoot = path.dirname(fileURLToPath(import.meta.url))
 
+// Keeps the route generator away from test files that sit beside the routes they cover.
+const ROUTE_FILE_IGNORE_PATTERN = '\\.test\\.tsx?$'
+
 const DEV_PORT_WEB = 7070
 const DEV_PORT_API = 7071
 // Local make dev only — embedded LiveKit on :7072. Remote debug uses server /livekit (not this proxy).
@@ -175,12 +178,22 @@ const config = defineConfig({
       client: {
         entry: path.join(appRoot, 'src/client.tsx'),
       },
+      // A test file beside a route is not a route. Without this the generator scans it, finds no
+      // `Route` export, and warns on every dev start and every test run.
+      router: {
+        routeFileIgnorePattern: ROUTE_FILE_IGNORE_PATTERN,
+      },
     }),
     viteReact(),
   ],
   test: {
     environment: 'jsdom',
     globals: true,
+    // Node 22 and later define their own `localStorage` and `sessionStorage` accessors on
+    // the global object, which yield `undefined` unless `--localstorage-file` is set. The
+    // jsdom environment leaves an existing global alone, so tests would see Node's empty
+    // accessor instead of jsdom's Storage. Switching Node's Web Storage off restores jsdom's.
+    execArgv: ['--no-experimental-webstorage'],
     setupFiles: [],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     exclude: ['**/node_modules/**', '**/vendor/excalidraw/**'],

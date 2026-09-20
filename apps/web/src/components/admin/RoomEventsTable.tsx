@@ -41,7 +41,7 @@ interface RoomEventsTableProps {
 export function RoomEventsTable({ events, isLoading }: RoomEventsTableProps) {
   if (isLoading) {
     return (
-      <div className="border">
+      <div className="rounded-xl border overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -75,11 +75,13 @@ export function RoomEventsTable({ events, isLoading }: RoomEventsTableProps) {
   }
 
   if (events.length === 0) {
-    return <div className="border px-5 py-12 text-center text-xs text-muted-foreground">No room events found</div>
+    return (
+      <div className="rounded-xl border px-5 py-12 text-center text-xs text-muted-foreground">No room events found</div>
+    )
   }
 
   return (
-    <div className="border">
+    <div className="rounded-xl border overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
@@ -96,7 +98,7 @@ export function RoomEventsTable({ events, isLoading }: RoomEventsTableProps) {
               <TableRow key={`${ev.roomId}-${ev.userId}-${ev.timestamp}-${i}`} className="group">
                 <TableCell className="px-3 py-2.5">
                   <div className="flex items-center gap-2">
-                    <div className={`flex h-7 w-7 items-center justify-center ${color}`}>
+                    <div className={`flex h-7 w-7 items-center justify-center rounded-sm ${color}`}>
                       <Icon className="h-3.5 w-3.5" />
                     </div>
                     <Badge variant="outline" className="text-[10px]">

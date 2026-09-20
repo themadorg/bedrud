@@ -144,7 +144,7 @@ function JoinForm() {
         </Button>
       </form>
       {error && (
-        <div className="flex items-center gap-2 border-s-2 border-destructive bg-destructive/5 px-3 py-2 text-xs text-destructive">
+        <div className="flex items-center gap-2 rounded-lg border-s-2 border-destructive bg-destructive/5 px-3 py-2 text-xs text-destructive">
           <AlertCircle className="h-3 w-3 shrink-0" />
           {error}
         </div>
@@ -220,7 +220,7 @@ function HomeHeader({ onOpenSettings }: { onOpenSettings: () => void }) {
             ) : (
               <Link
                 to="/dashboard"
-                className="bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
+                className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
               >
                 Dashboard
               </Link>
@@ -237,7 +237,7 @@ function HomeHeader({ onOpenSettings }: { onOpenSettings: () => void }) {
             </Link>
             <Link
               to="/auth/register"
-              className="bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
+              className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
             >
               Get started
             </Link>
@@ -316,7 +316,7 @@ function RecentMeetings({
         {rooms.slice(0, 8).map((recent) => (
           <li
             key={recent.name}
-            className="group flex items-center justify-between gap-4 border border-border px-3 py-2.5"
+            className="group flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2.5"
           >
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />

@@ -83,7 +83,7 @@ function ForgotPasswordPage() {
         <div
           role="alert"
           aria-live="assertive"
-          className="border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
         >
           {error}
         </div>

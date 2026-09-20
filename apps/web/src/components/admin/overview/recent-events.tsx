@@ -40,7 +40,7 @@ export function AdminRecentEvents({ events }: RecentEventsProps) {
                 const { icon: Icon, label } = eventMeta(ev)
                 return (
                   <div key={i} className="flex items-center gap-3 px-5 py-2.5">
-                    <div className="flex h-7 w-7 items-center justify-center bg-primary/10 text-primary">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-sm bg-primary/10 text-primary">
                       <Icon className="h-3.5 w-3.5" />
                     </div>
                     <div className="min-w-0 flex-1">

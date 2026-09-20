@@ -23,7 +23,7 @@ function CertStatusIndicator() {
   return (
     <div
       className={cn(
-        'flex items-center gap-2 px-3 py-2 text-xs',
+        'flex items-center gap-2 rounded-lg px-3 py-2 text-xs',
         isError
           ? 'border border-destructive/30 bg-destructive/10 text-destructive'
           : isExpiring
@@ -65,7 +65,7 @@ export function ServerTab({
 
   return (
     <Section title="Server" description="Requires restart to take effect">
-      <div className="mb-3 flex items-center gap-2 border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
+      <div className="mb-3 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
         <RefreshCw className="h-3 w-3 shrink-0" />
         Changes here require a server restart to take effect.
       </div>

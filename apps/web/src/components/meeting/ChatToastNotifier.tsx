@@ -63,7 +63,7 @@ export function ChatToastNotifier({ chatOpen }: ChatToastNotifierProps) {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className="chat-toast flex max-w-[min(340px,calc(var(--app-width,100svw)-32px))] flex-col gap-[5px] rounded-[14px] bg-[#0f0f1c]/96 px-4 py-[13px] shadow-[0_8px_28px_rgba(0,0,0,0.5)] backdrop-blur-lg"
+          className="chat-toast flex max-w-[min(340px,calc(var(--app-width,100svw)-32px))] flex-col gap-[5px] rounded-xl bg-[#0f0f1c]/96 px-4 py-[13px] shadow-[0_8px_28px_rgba(0,0,0,0.5)] backdrop-blur-lg"
           style={{ border: '1px solid color-mix(in oklab, var(--primary) 35%, transparent)' }}
         >
           <span className="text-[13px] font-semibold text-teal-400">{toast.sender}</span>

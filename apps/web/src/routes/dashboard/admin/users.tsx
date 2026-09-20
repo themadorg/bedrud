@@ -202,7 +202,7 @@ function AdminUsersPage() {
 
       {/* Table */}
       {isError ? (
-        <div className="border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
           <span className="text-destructive">{error instanceof Error ? error.message : 'Failed to load users.'}</span>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="mr-1.5 h-3 w-3" />
@@ -210,7 +210,7 @@ function AdminUsersPage() {
           </Button>
         </div>
       ) : (
-        <div className="border overflow-hidden">
+        <div className="rounded-xl border overflow-hidden">
           {isLoading ? (
             <div className="p-8 text-center text-sm text-muted-foreground">Loading users…</div>
           ) : table.paginated.length === 0 ? (
@@ -224,7 +224,7 @@ function AdminUsersPage() {
                     <div className="text-xs text-muted-foreground">{user.email}</div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs px-2 py-0.5 rounded border text-muted-foreground">
+                    <span className="text-xs px-2 py-0.5 rounded-sm border text-muted-foreground">
                       {getRoleLabel(user.accesses)}
                     </span>
                     <Link

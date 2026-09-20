@@ -40,7 +40,7 @@ function ScreenSharePanel({
       data-screenshare-overlay="true"
       className="meet-dialog flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--meet-border)] bg-[var(--meet-bg-panel)] shadow-2xl backdrop-blur-md"
     >
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-2 py-1.5 sm:px-3 sm:py-2">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-2 py-1.5 lg:px-3 lg:py-2">
         <div className="flex min-w-0 items-center gap-2">
           <Monitor size={16} className="shrink-0 text-[var(--meet-accent)]" />
           <div className="min-w-0 text-foreground">
@@ -157,7 +157,7 @@ export function StageScreenShareOverlay() {
 
   if (!trackRef) {
     return (
-      <div className={cn(meetStageShellClass(layout, 'p-3 max-sm:p-2'))}>
+      <div className={cn(meetStageShellClass(layout, 'p-3 max-lg:p-2'))}>
         <div className="meet-dialog flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-xl border border-[var(--meet-border)] bg-[var(--meet-bg-panel)] p-6 text-center shadow-2xl backdrop-blur-md">
           <Monitor size={28} className="mb-3 text-[var(--meet-accent)]" />
           <p className="text-sm font-medium text-[var(--meet-fg-strong)]">
@@ -220,7 +220,7 @@ export function StageScreenShareOverlay() {
 
   return (
     <>
-      <div className={cn(meetStageShellClass(layout, 'p-3 max-sm:p-2'))}>
+      <div className={cn(meetStageShellClass(layout, 'p-3 max-lg:p-2'))}>
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">{!expanded ? panel : null}</div>
       </div>
       {expandedSurface}

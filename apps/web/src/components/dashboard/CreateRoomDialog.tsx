@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { getErrorMessage } from '@/lib/errors'
+import { isMobileViewport } from '@/lib/use-is-mobile'
 import { cn } from '@/lib/utils'
 
 export interface RoomSettings {
@@ -94,7 +95,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
 
   useEffect(() => {
     if (!open) return
-    if (window.matchMedia('(max-width: 767px)').matches) {
+    if (isMobileViewport()) {
       setName(randomRoomName())
     }
   }, [open])
@@ -119,7 +120,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
   }
 
   function handleOpenAutoFocus(e: Event) {
-    if (window.matchMedia('(max-width: 767px)').matches) {
+    if (isMobileViewport()) {
       e.preventDefault()
       return
     }
@@ -147,7 +148,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="gap-0 overflow-hidden border p-0 max-w-[calc(var(--app-width,100svw)-2rem)] sm:max-w-md"
+        className="gap-0 overflow-hidden border p-0 max-w-[calc(var(--app-width,100svw)-2rem)] lg:max-w-md"
         onOpenAutoFocus={handleOpenAutoFocus}
       >
         <DialogTitle className="sr-only">Create Room</DialogTitle>
@@ -210,7 +211,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
                 {/* biome-ignore lint/a11y/noLabelWithoutControl: RadioGroupItem renders native radio button */}
                 <label
                   className={cn(
-                    'flex flex-col items-start gap-1 border p-3 text-left transition-colors cursor-pointer',
+                    'flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors cursor-pointer',
                     !isPublic
                       ? 'border-primary bg-primary/5'
                       : 'border bg-background text-muted-foreground hover:border-foreground/20',
@@ -228,7 +229,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
                 {/* biome-ignore lint/a11y/noLabelWithoutControl: RadioGroupItem renders native radio button */}
                 <label
                   className={cn(
-                    'flex flex-col items-start gap-1 border p-3 text-left transition-colors cursor-pointer',
+                    'flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors cursor-pointer',
                     isPublic
                       ? 'border-primary bg-primary/5'
                       : 'border bg-background text-muted-foreground hover:border-foreground/20',
@@ -329,7 +330,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
 
           {/* ── Error ── */}
           {createError && (
-            <div className="mx-6 mb-4 flex items-center gap-2 border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            <div className="mx-6 mb-4 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
               {createError}
             </div>

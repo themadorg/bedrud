@@ -135,7 +135,7 @@ function AdminRecentSignupsPage() {
                 setDateFrom(e.target.value)
                 setPage(1)
               }}
-              className="h-8 w-36 rounded border bg-background px-2 text-[11px]"
+              className="h-8 w-36 rounded-lg border bg-background px-2 text-[11px]"
             />
           </div>
           <div className="flex items-center gap-1">
@@ -150,7 +150,7 @@ function AdminRecentSignupsPage() {
                 setDateTo(e.target.value)
                 setPage(1)
               }}
-              className="h-8 w-36 rounded border bg-background px-2 text-[11px]"
+              className="h-8 w-36 rounded-lg border bg-background px-2 text-[11px]"
             />
           </div>
         </div>
@@ -163,7 +163,7 @@ function AdminRecentSignupsPage() {
 
       {/* Table */}
       {isError ? (
-        <div className="border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-4 text-sm flex items-center justify-between">
           <span className="text-destructive">
             {error instanceof Error ? error.message : 'Failed to load recent sign-ups.'}
           </span>

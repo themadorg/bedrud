@@ -58,7 +58,7 @@ export function InviteTokensSection() {
   const validCount = tokens.filter((t) => tokenExpiry(t) === 'valid').length
 
   return (
-    <div className="border bg-card/50">
+    <div className="rounded-xl border bg-card/50">
       <div className="flex items-start justify-between gap-3 border-b px-4 py-3 sm:px-5">
         <div className="min-w-0">
           <p className="text-sm font-semibold">Invite tokens</p>
@@ -66,7 +66,7 @@ export function InviteTokensSection() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {validCount > 0 && (
-            <span className="border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+            <span className="rounded-sm border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
               {validCount} active
             </span>
           )}
@@ -81,13 +81,13 @@ export function InviteTokensSection() {
             value={tokenEmail}
             onChange={(e) => setTokenEmail(e.target.value)}
             placeholder="Lock to email (optional)"
-            className="h-8 min-w-0 flex-1 border border-input bg-background px-2.5 text-xs outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
+            className="h-8 min-w-0 flex-1 rounded-lg border border-input bg-background px-2.5 text-xs outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
           />
           <div className="flex gap-2 sm:contents">
             <select
               value={expiresIn}
               onChange={(e) => setExpiresIn(+e.target.value)}
-              className="h-8 w-28 shrink-0 border border-input bg-background px-2.5 text-xs outline-none cursor-pointer text-foreground"
+              className="h-8 w-28 shrink-0 rounded-lg border border-input bg-background px-2.5 text-xs outline-none cursor-pointer text-foreground"
             >
               <option value={24}>24 h</option>
               <option value={72}>72 h</option>
@@ -98,7 +98,7 @@ export function InviteTokensSection() {
               type="button"
               onClick={() => setConfirmGenerate(true)}
               disabled={createToken.isPending}
-              className="inline-flex h-9 flex-1 shrink-0 items-center justify-center gap-1.5 bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 sm:flex-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex h-9 flex-1 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 sm:flex-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {createToken.isPending ? (
                 <>
@@ -114,7 +114,7 @@ export function InviteTokensSection() {
         </div>
 
         {confirmGenerate && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 border bg-muted/30 px-3 py-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2">
             <p className="flex-1 text-xs text-muted-foreground">
               Generate {tokenEmail ? `token for ${tokenEmail}` : 'invite token'}, expires in{' '}
               {expiresIn === 24 ? '24h' : expiresIn === 72 ? '72h' : expiresIn === 168 ? '7 days' : '30 days'}?
@@ -133,7 +133,7 @@ export function InviteTokensSection() {
                   setConfirmGenerate(false)
                   createToken.mutate()
                 }}
-                className="inline-flex items-center gap-1 bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Check className="h-3 w-3" /> Confirm
               </button>
@@ -142,12 +142,16 @@ export function InviteTokensSection() {
         )}
 
         {newToken && (
-          <div className="mt-2 flex items-center gap-2 border border-emerald-500/20 bg-emerald-500/5 px-3 py-2">
+          <div className="mt-2 flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2">
             <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
             <p className="flex-1 break-all font-mono text-[11px] text-emerald-600 dark:text-emerald-400">
               {newToken.token}
             </p>
-            <button type="button" onClick={() => copyToken(newToken)} className="shrink-0 p-1 hover:bg-muted">
+            <button
+              type="button"
+              onClick={() => copyToken(newToken)}
+              className="shrink-0 rounded-sm p-1 hover:bg-muted"
+            >
               {copiedId === newToken.id ? (
                 <Check className="h-3.5 w-3.5 text-emerald-500" />
               ) : (
@@ -210,7 +214,7 @@ export function InviteTokensSection() {
 
                 <span
                   className={cn(
-                    'shrink-0 border px-2 py-0.5 text-[10px] font-semibold',
+                    'shrink-0 rounded-sm border px-2 py-0.5 text-[10px] font-semibold',
                     status === 'valid' &&
                       'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
                     status === 'expired' && 'border-destructive/30 bg-destructive/10 text-destructive',
@@ -225,7 +229,7 @@ export function InviteTokensSection() {
                     type="button"
                     onClick={() => copyToken(tok)}
                     disabled={isInert}
-                    className="p-1.5 hover:bg-muted disabled:pointer-events-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="rounded-sm p-1.5 hover:bg-muted disabled:pointer-events-none focus-visible:ring-2 focus-visible:ring-ring"
                     title="Copy token"
                     aria-label="Copy token"
                   >
@@ -244,7 +248,7 @@ export function InviteTokensSection() {
                           setConfirmDeleteId(null)
                         }}
                         disabled={deleteToken.isPending}
-                        className="bg-destructive px-2 py-0.5 text-[10px] font-semibold text-destructive-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                        className="rounded-lg bg-destructive px-2 py-0.5 text-[10px] font-semibold text-destructive-foreground focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         Del
                       </button>
@@ -261,7 +265,7 @@ export function InviteTokensSection() {
                     <button
                       type="button"
                       onClick={() => setConfirmDeleteId(tok.id)}
-                      className="p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring"
+                      className="rounded-sm p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring"
                       title="Revoke token"
                       aria-label="Revoke token"
                     >

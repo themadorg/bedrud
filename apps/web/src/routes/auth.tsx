@@ -49,7 +49,7 @@ function AuthModeNav() {
   ]
 
   return (
-    <nav aria-label="Account options" className="mb-8 grid grid-cols-2 gap-1 bg-muted p-1">
+    <nav aria-label="Account options" className="mb-8 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
       {modes.map(({ to, label, icon: Icon, active }) => (
         <Link
           key={to}
@@ -57,7 +57,7 @@ function AuthModeNav() {
           search={to === '/auth/login' ? { redirect: undefined } : undefined}
           aria-current={active ? 'page' : undefined}
           className={cn(
-            'flex h-9 items-center justify-center gap-1.5 text-xs font-medium transition-colors',
+            'flex h-9 items-center justify-center gap-1.5 rounded-md text-xs font-medium transition-colors',
             active
               ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
               : 'text-muted-foreground hover:text-foreground',

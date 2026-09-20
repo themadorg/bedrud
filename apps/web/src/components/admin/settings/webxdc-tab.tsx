@@ -108,7 +108,7 @@ function CatalogIcon({
     return (
       <div
         className={cn(
-          'bg-muted text-muted-foreground flex items-center justify-center border border-border',
+          'bg-muted text-muted-foreground flex items-center justify-center rounded-xl border border-border',
           className,
         )}
         aria-hidden
@@ -124,7 +124,7 @@ function CatalogIcon({
       alt=""
       // Decorative — name is shown as text next to the icon.
       title={name}
-      className={cn('border border-border object-cover', className)}
+      className={cn('rounded-xl border border-border object-cover', className)}
       draggable={false}
     />
   )
@@ -510,7 +510,7 @@ export function WebxdcTab({
             onDragOver={onDragOver}
             onDrop={onDrop}
             className={cn(
-              'flex cursor-pointer flex-col items-center justify-center gap-2 border border-dashed px-4 py-6 text-center transition-colors',
+              'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-6 text-center transition-colors',
               dragOver
                 ? 'border-primary bg-primary/5'
                 : 'border-border bg-muted/20 hover:border-primary/40 hover:bg-muted/40',
@@ -565,7 +565,7 @@ export function WebxdcTab({
                 <li key={p.id} className="relative min-w-0">
                   <button
                     type="button"
-                    className="bg-card hover:bg-muted/40 focus-visible:ring-ring flex w-full cursor-pointer flex-col items-center gap-2 border border-border p-3 text-center text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                    className="bg-card hover:bg-muted/40 focus-visible:ring-ring flex w-full cursor-pointer flex-col items-center gap-2 rounded-xl border border-border p-3 text-center text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
                     onClick={() => openEdit(p)}
                     aria-label={`Edit ${p.name}`}
                   >
@@ -586,7 +586,7 @@ export function WebxdcTab({
                   </button>
                   <button
                     type="button"
-                    className="text-destructive hover:bg-destructive/10 absolute top-1.5 right-1.5 z-10 inline-flex h-7 w-7 items-center justify-center"
+                    className="text-destructive hover:bg-destructive/10 absolute top-1.5 right-1.5 z-10 inline-flex h-7 w-7 items-center justify-center rounded-sm"
                     aria-label={`Delete ${p.name}`}
                     disabled={deleteMut.isPending}
                     onClick={(e) => {
@@ -655,7 +655,7 @@ export function WebxdcTab({
                       onChange={(e) => setEditDescription(e.target.value)}
                       maxLength={2000}
                       rows={4}
-                      className="border-border placeholder:text-muted-foreground/40 focus-visible:border-primary flex w-full resize-y border bg-transparent px-2 py-2 text-sm focus-visible:outline-none disabled:opacity-50"
+                      className="border-border placeholder:text-muted-foreground/40 focus-visible:border-primary flex w-full resize-y rounded-lg border bg-transparent px-2 py-2 text-sm focus-visible:outline-none disabled:opacity-50"
                       placeholder="Short blurb shown in the meeting gallery"
                     />
                     <p className="text-muted-foreground text-[11px]">{editDescription.length}/2000</p>

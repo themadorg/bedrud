@@ -16,6 +16,7 @@ import {
 import { ParticipantVideoSidebar } from '@/components/meeting/ParticipantVideoSidebar'
 import { MeetingPresenceCursors } from '@/components/meeting/presence/MeetingPresenceCursors'
 import { useMeetingStage } from '@/components/meeting/stage/MeetingStageContext'
+import { isMobileViewport } from '@/lib/use-is-mobile'
 
 interface MeetingRoomShellProps {
   meetId: string
@@ -24,10 +25,8 @@ interface MeetingRoomShellProps {
 }
 
 export function MeetingRoomShell({ meetId, navigate, children }: MeetingRoomShellProps) {
-  // Desktop: open chat sidebar by default. Mobile: closed — chat is a full-screen modal when opened.
-  const [chatOpen, setChatOpen] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia('(min-width: 640px)').matches : true,
-  )
+  // Desktop: open the chat sidebar by default. Phone: closed, chat opens over the call.
+  const [chatOpen, setChatOpen] = useState(() => !isMobileViewport())
   const [chatStuck, setChatStuck] = useState(false)
   /** Left when opened from expanded WebXDC; right otherwise. */
   const [chatSide, setChatSide] = useState<'left' | 'right'>('right')
@@ -44,7 +43,6 @@ export function MeetingRoomShell({ meetId, navigate, children }: MeetingRoomShel
   const infoOpenRef = useRef(infoOpen)
   const elevatedPanelRef = useRef(elevatedPanel)
   const chatStuckRef = useRef(chatStuck)
-  const participantsFromChatRef = useRef(false)
   chatOpenRef.current = chatOpen
   infoOpenRef.current = infoOpen
   elevatedPanelRef.current = elevatedPanel
@@ -69,7 +67,6 @@ export function MeetingRoomShell({ meetId, navigate, children }: MeetingRoomShel
   }, [chatStuck, clearElevatedChrome])
 
   const toggleParticipants = useCallback(() => {
-    participantsFromChatRef.current = false
     setParticipantsOpen((open) => !open)
     if (!chatStuck) setChatOpen(false)
     setInfoOpen(false)
@@ -77,21 +74,8 @@ export function MeetingRoomShell({ meetId, navigate, children }: MeetingRoomShel
     requestCloseMeetingSettings()
   }, [chatStuck, clearElevatedChrome])
 
-  const openParticipantsFromChat = useCallback(() => {
-    participantsFromChatRef.current = true
-    setParticipantsOpen(true)
-    setChatOpen(true)
-    setInfoOpen(false)
-    clearElevatedChrome()
-    requestCloseMeetingSettings()
-  }, [clearElevatedChrome])
-
   const closeParticipants = useCallback(() => {
     setParticipantsOpen(false)
-    if (participantsFromChatRef.current) {
-      participantsFromChatRef.current = false
-      setChatOpen(true)
-    }
   }, [])
 
   const handleSetChatOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
@@ -311,7 +295,6 @@ export function MeetingRoomShell({ meetId, navigate, children }: MeetingRoomShel
             onToggleInfo={toggleInfo}
             participantsOpen={participantsOpen}
             onToggleParticipants={toggleParticipants}
-            onOpenParticipantsFromChat={openParticipantsFromChat}
             onCloseParticipants={closeParticipants}
           />
         </MeetingViewportPanProvider>

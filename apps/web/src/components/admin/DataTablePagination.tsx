@@ -16,7 +16,7 @@ export function DataTablePagination({ total, page, limit, onPageChange, onLimitC
   const maxPage = Math.max(1, totalPages)
 
   return (
-    <div className="flex items-center justify-between border bg-muted/30 px-4 py-3.5">
+    <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-3.5">
       <p className="text-[11px] text-muted-foreground">
         {total === 0 ? 'No results' : `Page ${Math.min(page, maxPage)} of ${maxPage}`}
       </p>
