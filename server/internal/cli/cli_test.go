@@ -205,7 +205,7 @@ func captureOutput(t *testing.T) (stdout, stderr *bytes.Buffer) {
 func writeTestConfig(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "test.db")
+	dbPath := filepath.ToSlash(filepath.Join(dir, "test.db"))
 	cfgPath := filepath.Join(dir, "config.yaml")
 	content := `auth:
   jwtSecret: "test-jwt-secret-with-enough-length-32"
