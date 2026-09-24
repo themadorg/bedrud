@@ -44,7 +44,7 @@ func resolveTargetVersion(opts UpdateOptions, src resolvedSource) updateTarget {
 	// already installed — not necessarily the binary running this command,
 	// since PATH can resolve to an older one than the package-managed install.
 	if opts.SkipBinary {
-		if v := probeBinaryVersion(resolveInstalledBinary()); v != "" {
+		if v := probeBinaryVersion(runningBinaryPath()); v != "" {
 			return updateTarget{Version: v, Origin: originInstalledBinary}
 		}
 	}

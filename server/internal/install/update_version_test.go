@@ -73,10 +73,10 @@ func TestResolveTargetVersionSelfDoesNotProbe(t *testing.T) {
 }
 
 func TestResolveTargetVersionSkipBinaryPrefersInstalledBinary(t *testing.T) {
-	installed := resolveInstalledBinary()
+	inService := runningBinaryPath()
 	stubProbe(t, func(path string) string {
-		if path != installed {
-			t.Fatalf("probed %q, want the installed binary %q", path, installed)
+		if path != inService {
+			t.Fatalf("probed %q, want the binary in service %q", path, inService)
 		}
 		return "v0.13.0"
 	})
@@ -218,6 +218,13 @@ func TestUpdateCommand(t *testing.T) {
 		{UpdateOptions{Self: true}, "sudo bedrud update --self"},
 		{UpdateOptions{SkipBinary: true}, "sudo bedrud update --skip-binary"},
 		{UpdateOptions{Source: "latest", ConfigPath: "/srv/bedrud.yaml"}, "sudo bedrud update latest --config /srv/bedrud.yaml"},
+		{UpdateOptions{Source: "/tmp/bedrud", SkipChecksum: true}, "sudo bedrud update /tmp/bedrud --skip-checksum"},
+		{UpdateOptions{Source: "latest", SkipMigrate: true}, "sudo bedrud update latest --skip-migrate"},
+		{UpdateOptions{Source: "latest", SkipRestart: true}, "sudo bedrud update latest --skip-restart"},
+		{
+			UpdateOptions{Source: "/tmp/bedrud", ConfigPath: "/srv/bedrud.yaml", SkipChecksum: true, SkipMigrate: true, SkipRestart: true},
+			"sudo bedrud update /tmp/bedrud --config /srv/bedrud.yaml --skip-checksum --skip-migrate --skip-restart",
+		},
 	}
 	for _, c := range cases {
 		if got := updateCommand(c.opts); got != c.want {
@@ -251,5 +258,120 @@ func TestUpdateCheckTextReport(t *testing.T) {
 	check.UpToDate = true
 	if !strings.Contains(check.TextReport(), "Already up to date") {
 		t.Fatalf("missing up-to-date line:\n%s", check.TextReport())
+	}
+}
+
+// TestResolveLocalArchiveIsProbeable covers the regression that made every
+// local archive report an unknown version: members are extracted 0600, so the
+// probe could not run the binary it had just unpacked.
+func TestResolveLocalArchiveIsProbeable(t *testing.T) {
+	dir := t.TempDir()
+	archive := filepath.Join(dir, "bedrud_linux_amd64.tar.xz")
+	data, err := writeTarXZBytes(map[string][]byte{"bedrud": {0x7f, 'E', 'L', 'F', 'v'}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(archive, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	resolved, err := resolveUpdateSource(UpdateOptions{Source: archive})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.Cleanup != nil {
+		defer resolved.Cleanup()
+	}
+
+	st, err := os.Stat(resolved.BinaryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && st.Mode().Perm()&0o100 == 0 {
+		t.Fatalf("extracted binary is not executable: mode %v", st.Mode().Perm())
+	}
+
+	// The probe stub stands in for exec: a fake ELF cannot actually run, but
+	// it must be handed an executable file.
+	stubProbe(t, func(path string) string {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("probe got an unusable path %q: %v", path, err)
+		}
+		if runtime.GOOS != "windows" && info.Mode().Perm()&0o100 == 0 {
+			t.Fatalf("probe got a non-executable file: mode %v", info.Mode().Perm())
+		}
+		return "v0.13.0"
+	})
+
+	got := resolveTargetVersion(UpdateOptions{Version: "v0.12.0", Source: archive}, resolved)
+	if got.Version != "v0.13.0" || got.Origin != originSourceBinary {
+		t.Fatalf("got %+v, want v0.13.0 from %s", got, originSourceBinary)
+	}
+}
+
+func TestCheckTargetVersionRefusesUnverifiedLocalSource(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bedrud")
+	if err := os.WriteFile(bin, []byte{0x7f, 'E', 'L', 'F', 'v'}, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	stubProbe(t, func(string) string {
+		t.Fatal("a check must not execute an unverified source")
+		return ""
+	})
+
+	target, _, note, err := checkTargetVersion(UpdateOptions{Version: "v0.12.0", Source: bin})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target.Version != "" {
+		t.Fatalf("got %+v, want an unknown target", target)
+	}
+	if !strings.Contains(note, "SHA256SUMS") {
+		t.Fatalf("note does not explain why: %q", note)
+	}
+}
+
+func TestCheckTargetVersionProbesWhenOperatorVouches(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bedrud")
+	if err := os.WriteFile(bin, []byte{0x7f, 'E', 'L', 'F', 'v'}, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	stubProbe(t, func(string) string { return "v0.13.0" })
+
+	target, _, note, err := checkTargetVersion(UpdateOptions{Version: "v0.12.0", Source: bin, SkipChecksum: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target.Version != "v0.13.0" || target.Origin != originSourceBinary {
+		t.Fatalf("got %+v, want v0.13.0 from %s", target, originSourceBinary)
+	}
+	if note != "" {
+		t.Fatalf("unexpected note %q", note)
+	}
+}
+
+func TestProbeBinaryVersionCapsOutput(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("probe executes a POSIX shell script")
+	}
+	dir := t.TempDir()
+	fake := filepath.Join(dir, "bedrud")
+	// Floods stdout well past the cap and prints the version line last, so a
+	// version only comes back if the output was buffered without bound.
+	script := "#!/bin/sh\n" +
+		"i=0\n" +
+		"while [ $i -lt 2000 ]; do\n" +
+		"  echo xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n" +
+		"  i=$((i+1))\n" +
+		"done\n" +
+		"echo 'bedrud v0.13.0'\n"
+	if err := os.WriteFile(fake, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if got := probeBinaryVersion(fake); got != "" {
+		t.Fatalf("got %q, want the flooded output dropped at the cap", got)
 	}
 }

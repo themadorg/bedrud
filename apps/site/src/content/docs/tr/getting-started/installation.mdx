@@ -519,8 +519,10 @@ To fetch the binary yourself first, apply it with its absolute path so an
 older `bedrud` earlier in `PATH` cannot run the update instead:
 
 ```bash
-# 1. Get the new binary (example: installer without re-running setup)
-curl -fsSL https://bedrud.org/install.sh | bash -s -- --no-setup
+# 1. Get the new binary (example: installer without re-running setup).
+#    Run the installer as root so it lands in /usr/local/bin — without sudo
+#    it installs to ~/.local/bin and step 2 would re-apply the old binary.
+curl -fsSL https://bedrud.org/install.sh | sudo bash -s -- --no-setup
 
 # 2. Apply binary + migrations + service restart
 sudo /usr/local/bin/bedrud update --self

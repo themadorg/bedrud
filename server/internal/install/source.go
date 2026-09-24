@@ -36,6 +36,10 @@ type resolvedSource struct {
 	Cleanup     func()
 	Version     string // optional, from release tag
 	Description string
+	// Verified reports that a SHA256 checksum actually matched for this
+	// source (or that it is this running executable). A read-only check
+	// refuses to execute anything without it.
+	Verified bool
 }
 
 // resolveUpdateSource turns UpdateOptions into a local binary path.
@@ -55,6 +59,7 @@ func resolveUpdateSource(opts UpdateOptions) (resolvedSource, error) {
 			BinaryPath:  tmp,
 			Cleanup:     cleanup,
 			Description: desc,
+			Verified:    true, // a copy of the process already running
 		}, nil
 	}
 
@@ -100,14 +105,17 @@ func resolveLocalPath(src string, skipChecksum bool) (resolvedSource, error) {
 		return resolvedSource{}, fmt.Errorf("source is a directory: %s", src)
 	}
 
+	verified := false
 	if !skipChecksum {
-		if err := verifyLocalChecksumIfPresent(src); err != nil {
+		var err error
+		verified, err = verifyLocalChecksumIfPresent(src)
+		if err != nil {
 			return resolvedSource{}, err
 		}
 	}
 
 	if isArchivePath(src) {
-		return extractArchiveToResolved(src, fmt.Sprintf("local archive %s", src), "")
+		return extractArchiveToResolved(src, fmt.Sprintf("local archive %s", src), "", verified)
 	}
 
 	// Bare binary
@@ -118,10 +126,11 @@ func resolveLocalPath(src string, skipChecksum bool) (resolvedSource, error) {
 		BinaryPath:  src,
 		Cleanup:     nil,
 		Description: fmt.Sprintf("local binary %s", src),
+		Verified:    verified,
 	}, nil
 }
 
-func extractArchiveToResolved(archivePath, desc, version string) (resolvedSource, error) {
+func extractArchiveToResolved(archivePath, desc, version string, verified bool) (resolvedSource, error) {
 	dir, err := os.MkdirTemp("", "bedrud-update-extract-*")
 	if err != nil {
 		return resolvedSource{}, err
@@ -136,11 +145,18 @@ func extractArchiveToResolved(archivePath, desc, version string) (resolvedSource
 		cleanup()
 		return resolvedSource{}, err
 	}
+	// Members are extracted 0600 so archive mode bits never carry over; the
+	// binary still has to be runnable for the version probe.
+	if err := os.Chmod(bin, 0o700); err != nil {
+		cleanup()
+		return resolvedSource{}, fmt.Errorf("make extracted binary executable: %w", err)
+	}
 	return resolvedSource{
 		BinaryPath:  bin,
 		Cleanup:     cleanup,
 		Version:     version,
 		Description: desc,
+		Verified:    verified,
 	}, nil
 }
 
@@ -195,7 +211,7 @@ func resolveURL(raw string, skipChecksum bool) (resolvedSource, error) {
 	}
 
 	if isArchivePath(dest) {
-		res, err := extractArchiveToResolved(dest, fmt.Sprintf("URL %s", raw), version)
+		res, err := extractArchiveToResolved(dest, fmt.Sprintf("URL %s", raw), version, requireChecksum)
 		if err != nil {
 			cleanupAll()
 			return resolvedSource{}, err
@@ -220,6 +236,7 @@ func resolveURL(raw string, skipChecksum bool) (resolvedSource, error) {
 		Cleanup:     cleanupAll,
 		Version:     version,
 		Description: fmt.Sprintf("URL %s", raw),
+		Verified:    requireChecksum,
 	}, nil
 }
 
@@ -310,7 +327,7 @@ func resolveLatest(skipChecksum bool) (resolvedSource, error) {
 		return resolvedSource{}, err
 	}
 
-	res, err := extractArchiveToResolved(dest, fmt.Sprintf("latest %s (%s)", rel.TagName, assetName), rel.TagName)
+	res, err := extractArchiveToResolved(dest, fmt.Sprintf("latest %s (%s)", rel.TagName, assetName), rel.TagName, true)
 	if err != nil {
 		cleanupAll()
 		return resolvedSource{}, err
@@ -408,7 +425,10 @@ func verifyRemoteFile(localPath, assetName, sumsURL string) error {
 	return nil
 }
 
-func verifyLocalChecksumIfPresent(src string) error {
+// verifyLocalChecksumIfPresent reports whether an adjacent SHA256SUMS actually
+// matched. No sums file (or no line for this asset) is not an error, but it is
+// not a verification either — callers that act on trust must check the bool.
+func verifyLocalChecksumIfPresent(src string) (bool, error) {
 	// Optional: adjacent SHA256SUMS or src.sha256
 	dir := filepath.Dir(src)
 	base := filepath.Base(src)
@@ -425,15 +445,15 @@ func verifyLocalChecksumIfPresent(src string) error {
 		}
 		got, err := fileSHA256(src)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if !strings.EqualFold(got, want) {
-			return fmt.Errorf("checksum mismatch for %s: got %s want %s", base, got, want)
+			return false, fmt.Errorf("checksum mismatch for %s: got %s want %s", base, got, want)
 		}
 		fmt.Println("➜ Checksum verified (local SHA256SUMS):", base)
-		return nil
+		return true, nil
 	}
-	return nil
+	return false, nil
 }
 
 // parseSHA256SUMS finds the hex digest for filename in GNU-style SHA256SUMS content.

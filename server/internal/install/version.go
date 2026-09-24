@@ -1,9 +1,11 @@
 package install
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -123,8 +125,15 @@ func runVersionMigrations(previous, newVersion string) error {
 	return nil
 }
 
-// versionProbeTimeout bounds a version probe so a hung binary cannot stall an update.
-const versionProbeTimeout = 15 * time.Second
+// versionProbeTimeout bounds a version probe so a hung binary cannot stall an
+// update; versionProbeWaitDelay then bounds the wait for a child that keeps
+// the output pipe open past that deadline, and maxVersionProbeOutput caps how
+// much of its output is kept.
+const (
+	versionProbeTimeout   = 15 * time.Second
+	versionProbeWaitDelay = 2 * time.Second
+	maxVersionProbeOutput = 64 << 10
+)
 
 // unknownVersion labels an install whose version could not be determined.
 const unknownVersion = "unknown"
@@ -139,20 +148,46 @@ const unknownVersion = "unknown"
 //
 // Overridable in tests.
 var probeBinaryVersion = func(path string) string {
-	if v := parseVersionJSON(runVersionProbe(path, "version", "--json")); v != "" {
-		return v
-	}
-	return parseVersionText(runVersionProbe(path, "version"))
-}
-
-func runVersionProbe(path string, args ...string) []byte {
+	// One deadline for both attempts: a binary that hangs must not cost the
+	// timeout twice.
 	ctx, cancel := context.WithTimeout(context.Background(), versionProbeTimeout)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, path, args...).Output()
-	if err != nil {
+
+	if v := parseVersionJSON(runVersionProbe(ctx, path, "version", "--json")); v != "" {
+		return v
+	}
+	return parseVersionText(runVersionProbe(ctx, path, "version"))
+}
+
+func runVersionProbe(ctx context.Context, path string, args ...string) []byte {
+	out := &cappedBuffer{max: maxVersionProbeOutput}
+	cmd := exec.CommandContext(ctx, path, args...)
+	cmd.Stdout = out
+	cmd.Stderr = io.Discard
+	// Without this, a child that keeps the pipe open outlives the context.
+	cmd.WaitDelay = versionProbeWaitDelay
+	if err := cmd.Run(); err != nil {
 		return nil
 	}
-	return out
+	return out.buf.Bytes()
+}
+
+// cappedBuffer keeps at most max bytes and silently drops the rest, so a
+// misbehaving binary cannot make the updater buffer without bound. Writes are
+// always reported as complete so the child is never blocked on a short write.
+type cappedBuffer struct {
+	buf bytes.Buffer
+	max int
+}
+
+func (c *cappedBuffer) Write(p []byte) (int, error) {
+	if room := c.max - c.buf.Len(); room > 0 {
+		if len(p) > room {
+			p = p[:room]
+		}
+		c.buf.Write(p)
+	}
+	return len(p), nil
 }
 
 // parseVersionJSON reads the clioutput envelope of "bedrud version --json".

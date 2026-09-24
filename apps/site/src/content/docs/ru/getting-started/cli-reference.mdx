@@ -183,8 +183,10 @@ sudo bedrud update --check
 # Download and install the latest release
 sudo bedrud update latest
 
-# Download the binary first, then apply it with its absolute path
-curl -fsSL https://bedrud.org/install.sh | bash -s -- --no-setup
+# Download the binary first, then apply it with its absolute path.
+# sudo on the installer keeps it in /usr/local/bin; without it the binary
+# lands in ~/.local/bin and the line below would re-apply the old one.
+curl -fsSL https://bedrud.org/install.sh | sudo bash -s -- --no-setup
 sudo /usr/local/bin/bedrud update --self
 
 # Run the new release binary directly

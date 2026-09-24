@@ -150,6 +150,15 @@ func checkTargetVersion(opts UpdateOptions) (updateTarget, string, string, error
 	if resolved.Cleanup != nil {
 		defer resolved.Cleanup()
 	}
+	// Reading the version means running the binary. An update is about to
+	// install and run it anyway, but a check promises to change nothing, so
+	// it executes a local source only once a checksum has matched — or once
+	// the operator has explicitly vouched for it with --skip-checksum.
+	if !resolved.Verified && !opts.SkipChecksum {
+		return updateTarget{}, resolved.Description,
+			"no SHA256SUMS alongside the source, so it is not executed here; " +
+				"add one, pass --skip-checksum, or run the update to read its version", nil
+	}
 	return resolveTargetVersion(opts, resolved), resolved.Description, "", nil
 }
 
@@ -166,6 +175,17 @@ func updateCommand(opts UpdateOptions) string {
 	}
 	if opts.ConfigPath != "" && opts.ConfigPath != etcConfigPath {
 		cmd += " --config " + opts.ConfigPath
+	}
+	// Carry the rest of the flags through: the command has to be the update
+	// the operator asked to check, not a differently-behaving one.
+	if opts.SkipChecksum {
+		cmd += " --skip-checksum"
+	}
+	if opts.SkipMigrate {
+		cmd += " --skip-migrate"
+	}
+	if opts.SkipRestart {
+		cmd += " --skip-restart"
 	}
 	return cmd
 }
