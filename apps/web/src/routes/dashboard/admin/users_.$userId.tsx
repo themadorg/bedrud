@@ -952,8 +952,8 @@ function UserDetailPage() {
                   <span className="space-y-1">
                     <span className="block text-sm font-medium">Generate a new password</span>
                     <span className="block text-xs font-normal text-muted-foreground">
-                      Shown once, here. The user can sign in with it straight away, and every existing session is
-                      signed out.
+                      Shown once, here. The user can sign in with it straight away, and every existing session is signed
+                      out.
                     </span>
                   </span>
                 </Label>
@@ -965,17 +965,14 @@ function UserDetailPage() {
                   <span className="space-y-1">
                     <span className="block text-sm font-medium">Create a reset link</span>
                     <span className="block text-xs font-normal text-muted-foreground">
-                      The user picks their own password. Their current password and sessions keep working until they
-                      do.
+                      The user picks their own password. Their current password and sessions keep working until they do.
                     </span>
                   </span>
                 </Label>
               </RadioGroup>
 
               {resetPassword.isError && (
-                <div
-                  className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-                >
+                <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {getErrorMessage(resetPassword.error, 'Failed to reset password')}
                 </div>
               )}
