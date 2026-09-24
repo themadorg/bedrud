@@ -360,7 +360,9 @@ func TestProbeBinaryVersionCapsOutput(t *testing.T) {
 	dir := t.TempDir()
 	fake := filepath.Join(dir, "bedrud")
 	// Floods stdout well past the cap and prints the version line last, so a
-	// version only comes back if the output was buffered without bound.
+	// version only comes back if the output was buffered without bound. Pair
+	// with TestProbeBinaryVersionSurvivesOutputFlood, which proves hitting the
+	// cap does not fail the probe outright.
 	script := "#!/bin/sh\n" +
 		"i=0\n" +
 		"while [ $i -lt 2000 ]; do\n" +
@@ -373,5 +375,30 @@ func TestProbeBinaryVersionCapsOutput(t *testing.T) {
 	}
 	if got := probeBinaryVersion(fake); got != "" {
 		t.Fatalf("got %q, want the flooded output dropped at the cap", got)
+	}
+}
+
+// TestProbeBinaryVersionSurvivesOutputFlood covers the short-write bug: when
+// the cap is reached, the capped buffer must keep reporting full writes, or
+// io.Copy stops with ErrShortWrite, the child takes SIGPIPE, and the probe
+// throws away a buffer that already holds the version.
+func TestProbeBinaryVersionSurvivesOutputFlood(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("probe executes a POSIX shell script")
+	}
+	dir := t.TempDir()
+	fake := filepath.Join(dir, "bedrud")
+	script := "#!/bin/sh\n" +
+		"echo 'bedrud v0.13.0'\n" +
+		"i=0\n" +
+		"while [ $i -lt 2000 ]; do\n" +
+		"  echo xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n" +
+		"  i=$((i+1))\n" +
+		"done\n"
+	if err := os.WriteFile(fake, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if got := probeBinaryVersion(fake); got != "v0.13.0" {
+		t.Fatalf("got %q, want v0.13.0 — output past the cap must be dropped, not fatal", got)
 	}
 }

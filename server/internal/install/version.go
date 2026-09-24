@@ -181,13 +181,17 @@ type cappedBuffer struct {
 }
 
 func (c *cappedBuffer) Write(p []byte) (int, error) {
+	n := len(p)
 	if room := c.max - c.buf.Len(); room > 0 {
-		if len(p) > room {
-			p = p[:room]
+		kept := p
+		if len(kept) > room {
+			kept = kept[:room]
 		}
-		c.buf.Write(p)
+		c.buf.Write(kept)
 	}
-	return len(p), nil
+	// Report the full length: a short count makes io.Copy stop with
+	// ErrShortWrite, which kills the probe instead of just dropping output.
+	return n, nil
 }
 
 // parseVersionJSON reads the clioutput envelope of "bedrud version --json".
