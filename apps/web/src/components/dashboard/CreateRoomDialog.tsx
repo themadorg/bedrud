@@ -211,7 +211,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
                 {/* biome-ignore lint/a11y/noLabelWithoutControl: RadioGroupItem renders native radio button */}
                 <label
                   className={cn(
-                    'flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors cursor-pointer',
+                    'relative flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors cursor-pointer',
                     !isPublic
                       ? 'border-primary bg-primary/5'
                       : 'border bg-background text-muted-foreground hover:border-foreground/20',
@@ -229,7 +229,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
                 {/* biome-ignore lint/a11y/noLabelWithoutControl: RadioGroupItem renders native radio button */}
                 <label
                   className={cn(
-                    'flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors cursor-pointer',
+                    'relative flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors cursor-pointer',
                     isPublic
                       ? 'border-primary bg-primary/5'
                       : 'border bg-background text-muted-foreground hover:border-foreground/20',
