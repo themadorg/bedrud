@@ -1047,9 +1047,9 @@ jobs:
           generate_release_notes: true
           files: release-assets/*
 
-  # ── Secret availability check ────────────────────────────────
+  # ── Publish destination checks ───────────────────────────────
   check-secrets:
-    name: Check available secrets
+    name: Check publish destinations
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: release
@@ -1062,7 +1062,19 @@ jobs:
       has_winget: ${{ steps.check.outputs.has_winget }}
       has_telegram: ${{ steps.check.outputs.has_telegram }}
     steps:
-      - name: Check secrets
+      # A secret being present is not the same as the destination being ready to
+      # receive a release, and three jobs had been red since v0.11.0 for exactly
+      # that reason: the AUR account does not accept the key, the Homebrew tap
+      # repository does not exist, and the WinGet package was never onboarded.
+      # None of those can be fixed from inside a release, and a tag cannot be
+      # pushed twice — so failing the run reported something nobody could act on
+      # and buried the three jobs that were genuinely broken in code.
+      #
+      # Each destination that can be probed is therefore probed, and one that is
+      # not set up is skipped with a notice naming the one-time step it needs,
+      # the same way Snap has always been skipped when its secret is absent.
+      # A destination that IS set up and then fails still fails the run.
+      - name: Check secrets and destinations
         id: check
         env:
           AUR_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
@@ -1071,13 +1083,71 @@ jobs:
           HOMEBREW_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           WINGET_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
           TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          REPO_OWNER: ${{ github.repository_owner }}
         run: |
-          echo "has_aur=${{ env.AUR_KEY != '' }}" >> "$GITHUB_OUTPUT"
+          # Destinations with nothing to probe beyond the credential itself.
           echo "has_snap=${{ env.SNAP_CREDS != '' }}" >> "$GITHUB_OUTPUT"
           echo "has_choco=${{ env.CHOCO_KEY != '' }}" >> "$GITHUB_OUTPUT"
-          echo "has_homebrew=${{ env.HOMEBREW_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
-          echo "has_winget=${{ env.WINGET_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
           echo "has_telegram=${{ env.TG_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
+          # AUR — the key has to be one aur.archlinux.org accepts. ssh reserves
+          # exit code 255 for its own failures, so any other code means we got
+          # through and the remote command answered.
+          aur=false
+          if [ -n "$AUR_KEY" ]; then
+            install -m 700 -d ~/.ssh
+            printf '%s\n' "$AUR_KEY" > ~/.ssh/aur_probe
+            chmod 600 ~/.ssh/aur_probe
+            ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts 2>/dev/null || true
+
+            rc=0
+            ssh -i ~/.ssh/aur_probe -o BatchMode=yes -o IdentitiesOnly=yes \
+              aur@aur.archlinux.org help >/dev/null 2>&1 || rc=$?
+            rm -f ~/.ssh/aur_probe
+
+            if [ "$rc" -ne 255 ]; then
+              aur=true
+            else
+              echo "::notice::AUR_SSH_PRIVATE_KEY is set but ssh to aur.archlinux.org failed — the key was rejected, or the host was unreachable. Skipping both AUR packages. If the key is the problem, register its public half under SSH keys on the AUR account that maintains bedrud-bin and bedrud-desktop-bin."
+            fi
+          fi
+          echo "has_aur=${aur}" >> "$GITHUB_OUTPUT"
+
+          # Homebrew — the tap is a separate repository and has to exist before
+          # a formula can be pushed into it.
+          brew=false
+          if [ -n "$HOMEBREW_TOKEN" ]; then
+            # curl prints 000 of its own when it cannot reach the API at all, so
+            # the fallback overrides the assignment rather than appending to it.
+            code=$(curl -sS -o /dev/null -w '%{http_code}' \
+              -H "Authorization: Bearer ${HOMEBREW_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO_OWNER}/homebrew-bedrud") || code=000
+            if [ "$code" = "200" ]; then
+              brew=true
+            else
+              echo "::notice::${REPO_OWNER}/homebrew-bedrud is not readable with HOMEBREW_TAP_TOKEN (HTTP ${code}) — skipping the tap. Create that repository, or give the token access to it."
+            fi
+          fi
+          echo "has_homebrew=${brew}" >> "$GITHUB_OUTPUT"
+
+          # WinGet — winget-releaser only updates a package already present in
+          # winget-pkgs, so the first version has to be submitted by hand.
+          winget=false
+          if [ -n "$WINGET_TOKEN" ]; then
+            code=$(curl -sS -o /dev/null -w '%{http_code}' \
+              -H "Authorization: Bearer ${WINGET_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/microsoft/winget-pkgs/contents/manifests/b/Bedrud/BedrudDesktop") || code=000
+            if [ "$code" = "200" ]; then
+              winget=true
+            else
+              echo "::notice::Bedrud.BedrudDesktop is not in microsoft/winget-pkgs (HTTP ${code}) — skipping WinGet. Submit one version by hand and this job takes over from the next release."
+            fi
+          fi
+          echo "has_winget=${winget}" >> "$GITHUB_OUTPUT"
+
+          echo "probed: aur=${aur} homebrew=${brew} winget=${winget}"
 
   # ── Telegram notification ─────────────────────────────────────
   telegram:
@@ -1247,7 +1317,15 @@ jobs:
         with:
           pkgname: bedrud-bin
           pkgbuild: packages/aur/bedrud-server/PKGBUILD
-          assets: packages/aur/bedrud-server/.SRCINFO
+          # bedrud-bin.install travels with the PKGBUILD: it carries
+          # `install=bedrud-bin.install`, and makepkg refuses to generate
+          # .SRCINFO when that file is not beside it — "install file
+          # (bedrud-bin.install) does not exist or is not a regular file".
+          # Only PKGBUILD and the paths named here are copied into the AUR
+          # checkout, so leaving it out stopped this job before it ever pushed.
+          assets: |
+            packages/aur/bedrud-server/.SRCINFO
+            packages/aur/bedrud-server/bedrud-bin.install
           commit_username: bedrud-bot
           commit_email: info@bedrud.org
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
@@ -1336,12 +1414,12 @@ jobs:
           cd ..
 
           # Update manifest with local binary path
-          cp packages/flatpak/orgbedrud.Desktop.yml flatpak-manifest.yml
-          cp packages/flatpak/orgbedrud.Desktop.desktop flatpak-src/
+          cp packages/flatpak/ir.bedrud.Desktop.yml flatpak-manifest.yml
+          cp packages/flatpak/ir.bedrud.Desktop.desktop flatpak-src/
           cp apps/web/public/logo512.png flatpak-src/bedrud.png
-          cp packages/flatpak/orgbedrud.Desktop.desktop \
-            flatpak-src/orgbedrud.Desktop.desktop
-          cp packages/flatpak/orgbedrud.Desktop.metainfo.xml flatpak-src/
+          cp packages/flatpak/ir.bedrud.Desktop.desktop \
+            flatpak-src/ir.bedrud.Desktop.desktop
+          cp packages/flatpak/ir.bedrud.Desktop.metainfo.xml flatpak-src/
 
           # Replace extra-data sources with local file source
           python3 - << 'PYEOF'
@@ -1353,13 +1431,13 @@ jobs:
                   mod['sources'] = [
                       {'type': 'file', 'path': 'flatpak-src/bedrud-desktop',
                        'dest-filename': 'bedrud-desktop'},
-                      {'type': 'file', 'path': 'flatpak-src/orgbedrud.Desktop.desktop',
-                       'dest-filename': 'orgbedrud.Desktop.desktop'},
+                      {'type': 'file', 'path': 'flatpak-src/ir.bedrud.Desktop.desktop',
+                       'dest-filename': 'ir.bedrud.Desktop.desktop'},
                       {'type': 'file', 'path': 'flatpak-src/bedrud.png',
                        'dest-filename': 'bedrud.png'},
                       {'type': 'file',
-                       'path': 'flatpak-src/orgbedrud.Desktop.metainfo.xml',
-                       'dest-filename': 'orgbedrud.Desktop.metainfo.xml'},
+                       'path': 'flatpak-src/ir.bedrud.Desktop.metainfo.xml',
+                       'dest-filename': 'ir.bedrud.Desktop.metainfo.xml'},
                   ]
           with open('flatpak-manifest.yml', 'w') as f:
               yaml.dump(m, f, default_flow_style=False)
@@ -1370,7 +1448,7 @@ jobs:
           flatpak-builder --force-clean --repo=flatpak-repo \
             build-flatpak flatpak-manifest.yml
           flatpak build-bundle flatpak-repo \
-            bedrud-desktop-linux-x86_64.flatpak orgbedrud.Desktop
+            bedrud-desktop-linux-x86_64.flatpak ir.bedrud.Desktop
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -1435,7 +1513,21 @@ jobs:
         working-directory: packages/chocolatey/bedrud-desktop
         run: |
           choco pack
-          choco push bedrud-desktop.*.nupkg `
+
+          # `choco push` takes one file, and PowerShell does not expand a
+          # wildcard into a native command's arguments — `bedrud-desktop.*.nupkg`
+          # reached choco verbatim, which answered "File specified is either not
+          # found or not a .nupkg file". The pack above had already succeeded, so
+          # the only thing missing was resolving the name it wrote.
+          $pkg = Get-ChildItem -Filter 'bedrud-desktop.*.nupkg' |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $pkg) {
+            throw "choco pack produced no .nupkg in $(Get-Location)"
+          }
+
+          Write-Host "Pushing $($pkg.Name)"
+          choco push $pkg.FullName `
             --source "https://push.chocolatey.org/" `
             --api-key "$env:CHOCO_API_KEY"
 
