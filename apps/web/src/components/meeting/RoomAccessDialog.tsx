@@ -74,7 +74,7 @@ export function RoomAccessDialog({ open, onOpenChange, aboveElevatedDock = false
             <label
               htmlFor="room-access-private"
               className={cn(
-                'flex flex-col items-start gap-1.5 rounded-lg border p-3 text-left transition-colors',
+                'relative flex flex-col items-start gap-1.5 rounded-lg border p-3 text-left transition-colors',
                 !selected
                   ? 'border-primary/40 bg-primary/10 text-[var(--meet-fg-strong)]'
                   : 'border-[var(--meet-border)] bg-[var(--meet-surface-muted)] text-[var(--meet-fg-muted)]',
@@ -105,7 +105,7 @@ export function RoomAccessDialog({ open, onOpenChange, aboveElevatedDock = false
             <label
               htmlFor="room-access-public"
               className={cn(
-                'flex flex-col items-start gap-1.5 rounded-lg border p-3 text-left transition-colors',
+                'relative flex flex-col items-start gap-1.5 rounded-lg border p-3 text-left transition-colors',
                 selected
                   ? 'border-primary/40 bg-primary/10 text-[var(--meet-fg-strong)]'
                   : 'border-[var(--meet-border)] bg-[var(--meet-surface-muted)] text-[var(--meet-fg-muted)]',
