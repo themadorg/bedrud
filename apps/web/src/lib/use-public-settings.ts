@@ -3,6 +3,8 @@ import { api } from '#/lib/api'
 
 export interface PublicSettings {
   serverName: string
+  /** Build version of the running binary, e.g. `v0.4.1` or `dev`. */
+  version?: string
   registrationEnabled: boolean
   tokenRegistrationOnly: boolean
   guestLoginEnabled: boolean
