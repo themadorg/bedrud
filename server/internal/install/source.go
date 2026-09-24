@@ -145,12 +145,6 @@ func extractArchiveToResolved(archivePath, desc, version string, verified bool) 
 		cleanup()
 		return resolvedSource{}, err
 	}
-	// Members are extracted 0600 so archive mode bits never carry over; the
-	// binary still has to be runnable for the version probe.
-	if err := os.Chmod(bin, 0o700); err != nil {
-		cleanup()
-		return resolvedSource{}, fmt.Errorf("make extracted binary executable: %w", err)
-	}
 	return resolvedSource{
 		BinaryPath:  bin,
 		Cleanup:     cleanup,
