@@ -83,7 +83,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
   const [createError, setCreateError] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [maxParticipants, setMaxParticipants] = useState(20)
-  const [isPublic, setIsPublic] = useState(false)
+  const [isPublic, setIsPublic] = useState(true)
   const [settings, setSettings] = useState<RoomSettings>(DEFAULT_SETTINGS)
   const [roomHost, setRoomHost] = useState('localhost:7070')
   const [showMore, setShowMore] = useState(false)
@@ -109,7 +109,7 @@ export function CreateRoomDialog({ open, onOpenChange, onCreate, isAdmin }: Prop
     setCreateError(null)
     setName('')
     setMaxParticipants(20)
-    setIsPublic(false)
+    setIsPublic(true)
     setSettings(DEFAULT_SETTINGS)
     setShowMore(false)
   }
