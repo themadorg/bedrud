@@ -136,7 +136,7 @@ jobs:
           BEDRUD_SCREENSHOT_EMAIL: screenshots@bedrud.local
           BEDRUD_SCREENSHOT_PASSWORD: Screenshot1!
         run: bash tools/screenshots/ci-capture.sh
-      - uses: withastro/action@e84f40bd8d2caa9e768ec82ad30dd81f0b280853 # v6
+      - uses: withastro/action@3eafd002e65cc31b4f0eae0bb05450d521562247 # v6
         with:
           package-manager: bun@latest
           path: apps/site
