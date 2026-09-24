@@ -177,8 +177,11 @@ func updateCommand(opts UpdateOptions) string {
 		cmd += " --config " + opts.ConfigPath
 	}
 	// Carry the rest of the flags through: the command has to be the update
-	// the operator asked to check, not a differently-behaving one.
-	if opts.SkipChecksum {
+	// the operator asked to check, not a differently-behaving one. The one
+	// exception is --skip-checksum against "latest", which the command
+	// refuses: a bare "update --check" checks the latest release, so carrying
+	// the flag through would print a command that cannot run.
+	if opts.SkipChecksum && !strings.EqualFold(strings.TrimSpace(opts.Source), "latest") {
 		cmd += " --skip-checksum"
 	}
 	if opts.SkipMigrate {

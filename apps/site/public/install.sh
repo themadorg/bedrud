@@ -1424,7 +1424,7 @@ else
     echo "  earlier in PATH cannot run the update instead:"
     echo ""
     echo "    sudo ${INSTALL_DIR}/${BINARY_NAME} update --check --self   # what it would install"
-    echo "    sudo ${INSTALL_DIR}/${BINARY_NAME} update --self    # apply it"
+    echo "    sudo ${INSTALL_DIR}/${BINARY_NAME} update --self           # apply it"
     echo ""
   fi
   if $READY; then

@@ -219,6 +219,10 @@ func TestUpdateCommand(t *testing.T) {
 		{UpdateOptions{SkipBinary: true}, "sudo bedrud update --skip-binary"},
 		{UpdateOptions{Source: "latest", ConfigPath: "/srv/bedrud.yaml"}, "sudo bedrud update latest --config /srv/bedrud.yaml"},
 		{UpdateOptions{Source: "/tmp/bedrud", SkipChecksum: true}, "sudo bedrud update /tmp/bedrud --skip-checksum"},
+		// "update --check --skip-checksum" synthesises latest, and the update
+		// command refuses --skip-checksum there, so it must not be printed.
+		{UpdateOptions{Source: "latest", SkipChecksum: true}, "sudo bedrud update latest"},
+		{UpdateOptions{Source: "LATEST", SkipChecksum: true}, "sudo bedrud update LATEST"},
 		{UpdateOptions{Source: "latest", SkipMigrate: true}, "sudo bedrud update latest --skip-migrate"},
 		{UpdateOptions{Source: "latest", SkipRestart: true}, "sudo bedrud update latest --skip-restart"},
 		{
