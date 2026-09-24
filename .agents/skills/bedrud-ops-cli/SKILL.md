@@ -171,14 +171,19 @@ Entry APIs: **`LinuxInstall` / `LinuxUninstall` / `LinuxUpdate`** (not Debian*).
 ### `LinuxUpdate(opts)` flow
 
 1. Require existing config (`/etc/bedrud/config.yaml` or `--config`)
-2. Stop bedrud/livekit
-3. Replace binary (skip package-managed `/usr/bin` when self is already that path; else `/usr/local/bin`)
-4. Run versioned install migrations (`versionMigrations`) when previous → new crosses them
-5. `database.RunMigrations` (unless `--skip-migrate`)
-6. `refreshServices` — rewrite units from LiveKit topology, enable+start
-7. Write `/var/lib/bedrud/version`
+2. Resolve source + target version (`resolveTargetVersion`), print the banner before any change
+3. Stop bedrud/livekit
+4. Replace binary (skip package-managed `/usr/bin` when self is already that path; else `/usr/local/bin`)
+5. Run versioned install migrations (`versionMigrations`) when previous → new crosses them
+6. `database.RunMigrations` (unless `--skip-migrate`)
+7. `refreshServices` — rewrite units from LiveKit topology, enable+start
+8. Write `/var/lib/bedrud/version` (target version, else probed from the installed binary)
 
-Flags: `--skip-binary`, `--skip-migrate`, `--skip-restart`. CLI: `update` ≡ `upgrade`.
+Flags: `--check` (report target version, change nothing), `--self`, `--skip-binary`, `--skip-migrate`, `--skip-restart`, `--skip-checksum`. CLI: `update` ≡ `upgrade`.
+
+Version reporting: the target version comes from the release tag, from the running
+executable for `--self`/`--skip-binary`, or from `probeBinaryVersion` running
+`<binary> version --json` — never from the binary executing the command.
 
 ### `InstallConfig`
 

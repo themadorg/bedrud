@@ -508,19 +508,32 @@ Upgrade an existing server install **without** wiping config, secrets, certifica
 
 ### Binary / release install
 
+The shortest path downloads and applies the latest release in one step:
+
+```bash
+sudo bedrud update --check    # what it would install — changes nothing
+sudo bedrud update latest     # download, verify, and apply it
+```
+
+To fetch the binary yourself first, apply it with its absolute path so an
+older `bedrud` earlier in `PATH` cannot run the update instead:
+
 ```bash
 # 1. Get the new binary (example: installer without re-running setup)
 curl -fsSL https://bedrud.org/install.sh | bash -s -- --no-setup
 
 # 2. Apply binary + migrations + service restart
-sudo bedrud update
+sudo /usr/local/bin/bedrud update --self
 ```
 
 Or run the new release binary directly:
 
 ```bash
-sudo ./bedrud update
+sudo ./bedrud update --self
 ```
+
+Every form prints the installed version and the version it is moving to before
+it stops anything, so you can cancel if the numbers are not what you expect.
 
 ### Package manager
 

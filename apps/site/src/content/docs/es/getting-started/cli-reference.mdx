@@ -155,30 +155,40 @@ bedrud upgrade  [flags]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--config` | `/etc/bedrud/config.yaml` | Path to existing install config |
+| `--check` | `false` | Report the target version and exit without changing anything |
+| `--self` | `false` | Install from the running executable |
 | `--skip-binary` | `false` | Do not replace the installed binary (migrations + restart only) |
 | `--skip-migrate` | `false` | Skip database migrations |
 | `--skip-restart` | `false` | Do not stop/start init services |
+| `--skip-checksum` | `false` | Skip SHA256 verification (local/trusted sources only; never with `latest`) |
 | `--json` | `false` | Machine-readable JSON output |
 
 **What it does:**
 1. Verifies an existing install (`/etc/bedrud/config.yaml` or `--config`)
-2. Stops `bedrud` and `livekit` services
-3. Replaces the installed binary with this executable (skips overwrite for package-managed `/usr/bin/bedrud` when the running binary is already that path; otherwise installs to `/usr/local/bin`)
-4. Runs versioned install-state migrations when upgrading across releases that need them
-5. Runs database AutoMigrate (same as `bedrud db migrate` / server startup)
-6. Rewrites init unit files so `ExecStart` matches the binary path and LiveKit topology
-7. Enables and restarts services
-8. Records the new version in `/var/lib/bedrud/version`
+2. Resolves the source and reports the version it installs — before anything is stopped or replaced
+3. Stops `bedrud` and `livekit` services
+4. Replaces the installed binary with the resolved source (skips overwrite for package-managed `/usr/bin/bedrud` when the running binary is already that path; otherwise installs to `/usr/local/bin`)
+5. Runs versioned install-state migrations when upgrading across releases that need them
+6. Runs database AutoMigrate (same as `bedrud db migrate` / server startup)
+7. Rewrites init unit files so `ExecStart` matches the binary path and LiveKit topology
+8. Enables and restarts services
+9. Records the installed version in `/var/lib/bedrud/version` (read back from the binary when the source carries no release tag)
 
 **Typical workflows:**
 
 ```bash
-# Download latest binary, then upgrade in place
+# See what an update would install — changes nothing
+sudo bedrud update --check
+
+# Download and install the latest release
+sudo bedrud update latest
+
+# Download the binary first, then apply it with its absolute path
 curl -fsSL https://bedrud.org/install.sh | bash -s -- --no-setup
-sudo bedrud update
+sudo /usr/local/bin/bedrud update --self
 
 # Run the new release binary directly
-sudo ./bedrud update
+sudo ./bedrud update --self
 
 # Package manager already replaced the binary — only migrate + restart
 sudo bedrud update --skip-binary
@@ -186,7 +196,7 @@ sudo bedrud update --skip-binary
 
 **Does not:** rewrite config secrets, regenerate TLS certs, or remove data. For a clean reinstall use `bedrud install --fresh`.
 
-**Implementation:** `server/internal/install/update.go`, `version.go`, `services.go`
+**Implementation:** `server/internal/install/update.go`, `update_check.go`, `update_version.go`, `version.go`, `services.go`
 
 **Related docs:** [Installation Guide - Updating](/es/docs/getting-started/installation#updating) • [Appliance Mode](/es/docs/guides/appliance)
 

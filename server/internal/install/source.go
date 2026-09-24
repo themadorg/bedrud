@@ -223,6 +223,42 @@ func resolveURL(raw string, skipChecksum bool) (resolvedSource, error) {
 	}, nil
 }
 
+// githubRelease is the subset of the GitHub release payload the updater needs.
+type githubRelease struct {
+	TagName string `json:"tag_name"`
+	Assets  []struct {
+		Name               string `json:"name"`
+		BrowserDownloadURL string `json:"browser_download_url"`
+	} `json:"assets"`
+}
+
+// fetchLatestRelease reads the latest release metadata (tag + asset URLs)
+// without downloading any asset, so a version check stays cheap.
+func fetchLatestRelease() (githubRelease, error) {
+	var rel githubRelease
+
+	req, err := http.NewRequest(http.MethodGet, githubLatestURL, nil)
+	if err != nil {
+		return rel, err
+	}
+	req.Header.Set("User-Agent", httpUserAgent)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return rel, fmt.Errorf("github latest: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return rel, fmt.Errorf("github latest: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&rel); err != nil {
+		return rel, fmt.Errorf("decode release JSON: %w", err)
+	}
+	return rel, nil
+}
+
 func resolveLatest(skipChecksum bool) (resolvedSource, error) {
 	if skipChecksum {
 		return resolvedSource{}, fmt.Errorf("--skip-checksum is not allowed with \"latest\" (checksum required)")
@@ -233,32 +269,9 @@ func resolveLatest(skipChecksum bool) (resolvedSource, error) {
 		return resolvedSource{}, err
 	}
 
-	req, err := http.NewRequest(http.MethodGet, githubLatestURL, nil)
+	rel, err := fetchLatestRelease()
 	if err != nil {
 		return resolvedSource{}, err
-	}
-	req.Header.Set("User-Agent", httpUserAgent)
-	req.Header.Set("Accept", "application/vnd.github+json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return resolvedSource{}, fmt.Errorf("github latest: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return resolvedSource{}, fmt.Errorf("github latest: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-
-	var rel struct {
-		TagName string `json:"tag_name"`
-		Assets  []struct {
-			Name               string `json:"name"`
-			BrowserDownloadURL string `json:"browser_download_url"`
-		} `json:"assets"`
-	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&rel); err != nil {
-		return resolvedSource{}, fmt.Errorf("decode release JSON: %w", err)
 	}
 
 	var assetURL, sumsURL string

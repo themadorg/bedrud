@@ -19,6 +19,7 @@ func newUpgradeCmd() *cobra.Command {
 
 func newUpdateLikeCmd(use, short string) *cobra.Command {
 	var (
+		check        bool
 		self         bool
 		skipBinary   bool
 		skipMigrate  bool
@@ -32,7 +33,8 @@ func newUpdateLikeCmd(use, short string) *cobra.Command {
 		Long: `Update an existing Bedrud installation in place.
 
 A SOURCE (or --self / --skip-binary) is required. Running without arguments
-prints this help and does not change the system.
+prints this help and does not change the system. With --check, a bare
+"bedrud update --check" reports the latest release without changing anything.
 
 SOURCE may be:
   BIN_PATH     Local bare binary (e.g. ./bedrud or /tmp/bedrud)
@@ -52,6 +54,8 @@ Examples:
   sudo bedrud update latest
   sudo bedrud update https://github.com/themadorg/bedrud/releases/download/v1.2.3/bedrud_linux_amd64.tar.xz
   sudo bedrud update --self
+  sudo bedrud update --check            # what would an update install? (no changes)
+  sudo bedrud update --check /tmp/bedrud_linux_amd64.tar.xz
   sudo bedrud update --skip-binary   # package already replaced binary (apt/dnf)
 
 update and upgrade are identical.
@@ -63,7 +67,7 @@ run "sudo bedrud update --skip-binary" to apply migrations and restart.
 			if len(args) > 1 {
 				return fmt.Errorf("expected at most one source argument")
 			}
-			if len(args) == 0 && !self && !skipBinary {
+			if len(args) == 0 && !self && !skipBinary && !check {
 				_ = cmd.Help()
 				return fmt.Errorf("missing source: path, URL, \"latest\", or --self (or --skip-binary for migrations only)")
 			}
@@ -83,6 +87,11 @@ run "sudo bedrud update --skip-binary" to apply migrations and restart.
 			if len(args) == 1 {
 				source = args[0]
 			}
+			if check && source == "" && !self && !skipBinary {
+				// A bare "update --check" asks the obvious question:
+				// is there a newer release than the installed one?
+				source = "latest"
+			}
 			opts := install.UpdateOptions{
 				Version:      Version,
 				ConfigPath:   resolveConfigPath(defaultEtcConfig),
@@ -97,11 +106,20 @@ run "sudo bedrud update --skip-binary" to apply migrations and restart.
 				opts.ConfigPath = defaultEtcConfig
 			}
 
+			if check {
+				result, err := install.LinuxUpdateCheck(opts)
+				if err != nil {
+					return fmt.Errorf("%s --check: %w", use, err)
+				}
+				clioutput.Println(result.TextReport())
+				return clioutput.Success("", result)
+			}
+
 			if err := install.LinuxUpdate(opts); err != nil {
 				return fmt.Errorf("%s: %w", use, err)
 			}
 			return clioutput.Success("✓ Bedrud "+use+"d successfully", map[string]any{
-				"version":      Version,
+				"version":      install.InstalledVersion(),
 				"configPath":   opts.ConfigPath,
 				"source":       source,
 				"self":         self,
@@ -114,6 +132,7 @@ run "sudo bedrud update --skip-binary" to apply migrations and restart.
 	}
 
 	f := cmd.Flags()
+	f.BoolVar(&check, "check", false, "Report the target version and exit without changing anything")
 	f.BoolVar(&self, "self", false, "Install from this running executable")
 	f.BoolVar(&skipBinary, "skip-binary", false, "Do not replace the installed binary (migrations + restart only)")
 	f.BoolVar(&skipMigrate, "skip-migrate", false, "Skip database migrations")

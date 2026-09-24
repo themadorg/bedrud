@@ -1,9 +1,13 @@
 package install
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
+	"time"
 
 	"golang.org/x/mod/semver"
 )
@@ -31,6 +35,13 @@ var versionMigrations = []versionMigration{
 	// 		return os.MkdirAll("/var/lib/bedrud/webxdc", 0o755)
 	// 	},
 	// },
+}
+
+// InstalledVersion returns the version recorded for the current install, or
+// "" when the install has none. It is the value the last update wrote, not the
+// version of the binary running this call.
+func InstalledVersion() string {
+	return readInstalledVersion()
 }
 
 func readInstalledVersion() string {
@@ -110,4 +121,63 @@ func runVersionMigrations(previous, newVersion string) error {
 		fmt.Printf("➜ Applied %d versioned install migration(s)\n", applied)
 	}
 	return nil
+}
+
+// versionProbeTimeout bounds a version probe so a hung binary cannot stall an update.
+const versionProbeTimeout = 15 * time.Second
+
+// unknownVersion labels an install whose version could not be determined.
+const unknownVersion = "unknown"
+
+// probeBinaryVersion asks a bedrud binary for its own compiled-in version.
+//
+// This is the only source of truth for local files and archives, which carry no
+// release tag. It returns "" when the binary cannot be executed (foreign
+// architecture, noexec mount, a build without the subcommand) so callers fall
+// back to whatever else they know. Only probe binaries that already passed
+// checksum verification — this executes them.
+//
+// Overridable in tests.
+var probeBinaryVersion = func(path string) string {
+	if v := parseVersionJSON(runVersionProbe(path, "version", "--json")); v != "" {
+		return v
+	}
+	return parseVersionText(runVersionProbe(path, "version"))
+}
+
+func runVersionProbe(path string, args ...string) []byte {
+	ctx, cancel := context.WithTimeout(context.Background(), versionProbeTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, path, args...).Output()
+	if err != nil {
+		return nil
+	}
+	return out
+}
+
+// parseVersionJSON reads the clioutput envelope of "bedrud version --json".
+func parseVersionJSON(out []byte) string {
+	if len(out) == 0 {
+		return ""
+	}
+	var payload struct {
+		Data struct {
+			Version string `json:"version"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out, &payload); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(payload.Data.Version)
+}
+
+// parseVersionText reads the plain "bedrud <version>" line of "bedrud version".
+func parseVersionText(out []byte) string {
+	for _, line := range strings.Split(string(out), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && fields[0] == "bedrud" {
+			return fields[1]
+		}
+	}
+	return ""
 }

@@ -62,39 +62,21 @@ func LinuxUpdate(opts UpdateOptions) error {
 		cfgPath = etcConfigPath
 	}
 
-	if _, err := os.Stat(cfgPath); err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf(
-				"no existing installation found at %s\n\n"+
-					"Run a full install first:\n"+
-					"  sudo bedrud install\n"+
-					"Or specify the config path:\n"+
-					"  sudo bedrud update --config /path/to/config.yaml",
-				cfgPath,
-			)
-		}
-		return fmt.Errorf("stat config: %w", err)
+	if err := requireExistingInstall(cfgPath); err != nil {
+		return err
 	}
 
-	newVersion := opts.Version
-	if newVersion == "" {
-		newVersion = "dev"
-	}
 	previousVersion := readInstalledVersion()
 	if previousVersion == "" {
-		previousVersion = "unknown"
+		previousVersion = unknownVersion
 	}
 
-	fmt.Println("➜ Bedrud update")
-	fmt.Println("  Previous version:", previousVersion)
-	fmt.Println("  New version:     ", newVersion)
-	fmt.Println("  Config:          ", cfgPath)
-
-	// Resolve binary source before stopping services so network/checksum
-	// failures leave the running install untouched.
+	// Resolve the binary source before anything is printed, stopped, or
+	// replaced: the version this update moves to comes from the source, not
+	// from the binary that happens to be running the command. Resolving first
+	// also keeps network/checksum failures away from a running install.
 	var (
 		srcBinary string
-		cleanup   func()
 		srcMeta   resolvedSource
 	)
 	if !opts.SkipBinary {
@@ -104,16 +86,19 @@ func LinuxUpdate(opts UpdateOptions) error {
 			return err
 		}
 		srcBinary = srcMeta.BinaryPath
-		cleanup = srcMeta.Cleanup
-		if cleanup != nil {
-			defer cleanup()
+		if srcMeta.Cleanup != nil {
+			defer srcMeta.Cleanup()
 		}
-		if srcMeta.Version != "" {
-			newVersion = srcMeta.Version
-			fmt.Println("  Source version: ", newVersion)
-		}
-		fmt.Println("  Source:         ", srcMeta.Description)
 	}
+
+	target := resolveTargetVersion(opts, srcMeta)
+	newVersion := target.Version
+
+	fmt.Println("➜ Bedrud update")
+	fmt.Println(updateField("Installed version", previousVersion))
+	fmt.Println(updateField("Target version", describeTargetVersion(previousVersion, newVersion)))
+	fmt.Println(updateField("Source", describeUpdateSource(opts, srcMeta)))
+	fmt.Println(updateField("Config", cfgPath))
 
 	// Ensure runtime layout still exists (partial upgrades / moved data).
 	for _, dir := range []string{etcDir, varLibDir, varLibDir + "/certs", varLogDir} {
@@ -160,6 +145,19 @@ func LinuxUpdate(opts UpdateOptions) error {
 		if err := runChownR("bedrud:bedrud", dir); err != nil {
 			fmt.Printf("⚠ Warning: chown %s: %v\n", dir, err)
 		}
+	}
+
+	// Last resort when no source carried a version (e.g. a cross-built binary
+	// that could not be probed before install): ask the binary now in place.
+	if newVersion == "" {
+		if v := probeBinaryVersion(targetBin); v != "" {
+			newVersion = v
+			fmt.Println("➜ Installed binary reports version:", newVersion)
+		}
+	}
+	if newVersion == "" {
+		newVersion = unknownVersion
+		fmt.Println("⚠ Warning: could not determine the installed version; recording", unknownVersion)
 	}
 
 	// Versioned install-state migrations (config/data layout).
