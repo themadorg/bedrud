@@ -98,7 +98,9 @@ func (c UpdateCheck) TextReport() string {
 // explaining an unknown version.
 func checkTargetVersion(opts UpdateOptions) (updateTarget, string, string, error) {
 	if opts.SkipBinary {
-		return updateTarget{Version: strings.TrimSpace(opts.Version), Origin: originSelf},
+		// Same resolution as the apply path, so a check never reports a
+		// different version than the update that follows it.
+		return resolveTargetVersion(opts, resolvedSource{}),
 			describeUpdateSource(opts, resolvedSource{}), "", nil
 	}
 

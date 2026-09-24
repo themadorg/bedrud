@@ -181,9 +181,10 @@ Entry APIs: **`LinuxInstall` / `LinuxUninstall` / `LinuxUpdate`** (not Debian*).
 
 Flags: `--check` (report target version, change nothing), `--self`, `--skip-binary`, `--skip-migrate`, `--skip-restart`, `--skip-checksum`. CLI: `update` ≡ `upgrade`.
 
-Version reporting: the target version comes from the release tag, from the running
-executable for `--self`/`--skip-binary`, or from `probeBinaryVersion` running
-`<binary> version --json` — never from the binary executing the command.
+Version reporting: the target version comes from the release tag, from the installed
+binary for `--skip-binary`, from the running executable for `--self`, or from
+`probeBinaryVersion` running `<binary> version --json` — never from the binary
+executing the command.
 
 ### `InstallConfig`
 

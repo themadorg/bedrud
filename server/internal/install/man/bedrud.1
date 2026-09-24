@@ -94,10 +94,12 @@ A source is required: a local binary path, a release archive
 .IP
 Before anything is stopped or replaced, the installed version and the
 version being installed are printed. The target version comes from the
-source: a release tag, the running executable for
-.BR \-\-self " / " \-\-skip\-binary ,
-or the resolved binary's own version output. It is never taken from the
-binary running the command.
+source: a release tag, the binary already installed for
+.BR \-\-skip\-binary ,
+the running executable for
+.BR \-\-self ,
+or the resolved binary's own version output. For any other source it is
+never taken from the binary running the command.
 .IP
 .B \-\-check
 resolves and reports that target version, then exits without changing

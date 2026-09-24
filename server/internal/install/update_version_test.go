@@ -57,20 +57,63 @@ func TestResolveTargetVersionUnknownWhenProbeFails(t *testing.T) {
 	}
 }
 
-func TestResolveTargetVersionSelfAndSkipBinary(t *testing.T) {
+func TestResolveTargetVersionSelfDoesNotProbe(t *testing.T) {
 	stubProbe(t, func(string) string {
 		t.Fatal("must not probe when the running executable is the source")
 		return ""
 	})
 
-	for _, opts := range []UpdateOptions{
-		{Version: "v0.13.0", Self: true},
-		{Version: "v0.13.0", SkipBinary: true},
-	} {
-		got := resolveTargetVersion(opts, resolvedSource{BinaryPath: "/tmp/bedrud"})
-		if got.Version != "v0.13.0" || got.Origin != originSelf {
-			t.Fatalf("got %+v, want v0.13.0 from %s", got, originSelf)
+	got := resolveTargetVersion(
+		UpdateOptions{Version: "v0.13.0", Self: true},
+		resolvedSource{BinaryPath: "/tmp/bedrud"},
+	)
+	if got.Version != "v0.13.0" || got.Origin != originSelf {
+		t.Fatalf("got %+v, want v0.13.0 from %s", got, originSelf)
+	}
+}
+
+func TestResolveTargetVersionSkipBinaryPrefersInstalledBinary(t *testing.T) {
+	installed := resolveInstalledBinary()
+	stubProbe(t, func(path string) string {
+		if path != installed {
+			t.Fatalf("probed %q, want the installed binary %q", path, installed)
 		}
+		return "v0.13.0"
+	})
+
+	// The package manager replaced the installed binary; the bedrud running
+	// this command may be an older one earlier in PATH.
+	got := resolveTargetVersion(UpdateOptions{Version: "v0.12.0", SkipBinary: true}, resolvedSource{})
+	if got.Version != "v0.13.0" || got.Origin != originInstalledBinary {
+		t.Fatalf("got %+v, want v0.13.0 from %s", got, originInstalledBinary)
+	}
+}
+
+func TestResolveTargetVersionSkipBinaryFallsBackToRunningVersion(t *testing.T) {
+	stubProbe(t, func(string) string { return "" })
+
+	got := resolveTargetVersion(UpdateOptions{Version: "v0.12.0", SkipBinary: true}, resolvedSource{})
+	if got.Version != "v0.12.0" || got.Origin != originSelf {
+		t.Fatalf("got %+v, want v0.12.0 from %s", got, originSelf)
+	}
+}
+
+func TestCheckTargetVersionSkipBinaryMatchesApplyPath(t *testing.T) {
+	stubProbe(t, func(string) string { return "v0.13.0" })
+
+	opts := UpdateOptions{Version: "v0.12.0", SkipBinary: true}
+	target, source, note, err := checkTargetVersion(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := resolveTargetVersion(opts, resolvedSource{}); target != want {
+		t.Fatalf("check reported %+v, apply would use %+v", target, want)
+	}
+	if note != "" {
+		t.Fatalf("unexpected note %q", note)
+	}
+	if !strings.Contains(source, "--skip-binary") {
+		t.Fatalf("got source %q", source)
 	}
 }
 

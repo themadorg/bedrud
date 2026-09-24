@@ -24,19 +24,29 @@ type updateTarget struct {
 
 // Origins reported by resolveTargetVersion.
 const (
-	originReleaseTag   = "release tag"
-	originSelf         = "this executable"
-	originSourceBinary = "source binary"
+	originReleaseTag      = "release tag"
+	originSelf            = "this executable"
+	originSourceBinary    = "source binary"
+	originInstalledBinary = "installed binary"
 )
 
 // resolveTargetVersion decides which version an update installs, in order of
-// authority: the release tag of the resolved source, the running executable
-// when it is itself the source (--self / --skip-binary), then the resolved
-// binary's own answer. It never falls back to the running binary's version for
-// a foreign source — that is what made "New version" echo the installed one.
+// authority: the release tag of the resolved source, the binary already on
+// disk for --skip-binary, the running executable when it is itself the source
+// (--self), then the resolved binary's own answer. It never falls back to the
+// running binary's version for a foreign source — that is what made "New
+// version" echo the installed one.
 func resolveTargetVersion(opts UpdateOptions, src resolvedSource) updateTarget {
 	if v := strings.TrimSpace(src.Version); v != "" {
 		return updateTarget{Version: v, Origin: originReleaseTag}
+	}
+	// --skip-binary installs nothing, so the version in play is whatever is
+	// already installed — not necessarily the binary running this command,
+	// since PATH can resolve to an older one than the package-managed install.
+	if opts.SkipBinary {
+		if v := probeBinaryVersion(resolveInstalledBinary()); v != "" {
+			return updateTarget{Version: v, Origin: originInstalledBinary}
+		}
 	}
 	if opts.Self || opts.SkipBinary {
 		if v := strings.TrimSpace(opts.Version); v != "" {
