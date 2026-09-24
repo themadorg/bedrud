@@ -83,6 +83,58 @@ func TestCreateRoom_Success(t *testing.T) {
 	}
 }
 
+func TestCreateRoom_DefaultsToPublic(t *testing.T) {
+	app, _, _ := setupCreateRoomTestApp(t)
+
+	// No isPublic field at all — the room should come back public.
+	body, _ := json.Marshal(map[string]interface{}{"name": "default-visibility"})
+	req := httptest.NewRequest(http.MethodPost, "/room/create", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
+	if result["isPublic"] != true {
+		t.Fatalf("expected an omitted isPublic to create a public room, got %v", result["isPublic"])
+	}
+}
+
+func TestCreateRoom_ExplicitPrivateIsHonoured(t *testing.T) {
+	app, _, _ := setupCreateRoomTestApp(t)
+
+	// An explicit false has to survive the public default.
+	body, _ := json.Marshal(map[string]interface{}{"name": "kept-private", "isPublic": false})
+	req := httptest.NewRequest(http.MethodPost, "/room/create", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
+	if result["isPublic"] != false {
+		t.Fatalf("expected an explicit isPublic false to stay private, got %v", result["isPublic"])
+	}
+}
+
 func TestCreateRoom_AutoGenerateName(t *testing.T) {
 	app, _, _ := setupCreateRoomTestApp(t)
 
