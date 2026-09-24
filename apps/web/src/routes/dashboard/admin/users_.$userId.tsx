@@ -4,9 +4,12 @@ import {
   Activity,
   ArrowLeft,
   Calendar,
+  Check,
   Clock,
+  Copy,
   Globe,
   Hash,
+  KeyRound,
   Lock,
   LogOut,
   Mail,
@@ -42,6 +45,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
@@ -79,6 +83,24 @@ interface UserDetail {
   accesses: string[] | null
   createdAt: string
 }
+
+/** The two ways an admin can recover an account, mirroring the server's `mode` field. */
+type ResetMode = 'password' | 'link'
+
+/**
+ * Result of a password reset. `password` is present for the `password` mode only, and only in
+ * this one response — it is hashed on arrival, so nothing can show it again.
+ */
+interface ResetPasswordResult {
+  mode: ResetMode
+  message: string
+  password?: string
+  resetUrl?: string
+  expiresAt?: string
+}
+
+/** Providers that authenticate with a password, and so have one to reset. */
+const PASSWORD_PROVIDERS = ['local', 'passkey']
 
 interface Room {
   id: string
@@ -158,6 +180,20 @@ function UserDetailPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [confirmEmail, setConfirmEmail] = useState('')
   const [forceLogoutDialogOpen, setForceLogoutDialogOpen] = useState(false)
+  const [resetDialogOpen, setResetDialogOpen] = useState(false)
+  const [resetMode, setResetMode] = useState<ResetMode>('password')
+  const [resetResult, setResetResult] = useState<ResetPasswordResult | null>(null)
+  const [resetCopied, setResetCopied] = useState(false)
+
+  // Closing drops the result, so a generated password does not linger in the DOM once the admin
+  // is done with it, and reopening starts from the choice rather than a stale secret. The dialog
+  // handles its own Escape, so this stays out of the keydown listener below.
+  function closeResetDialog() {
+    setResetDialogOpen(false)
+    setResetResult(null)
+    setResetCopied(false)
+    setResetMode('password')
+  }
 
   useEffect(() => {
     if (!deleteDialogOpen && !forceLogoutDialogOpen) return
@@ -238,9 +274,33 @@ function UserDetailPage() {
     },
   })
 
+  const resetPassword = useMutation({
+    mutationFn: (mode: ResetMode) =>
+      api.post<ResetPasswordResult>(`/api/admin/users/${userId}/reset-password`, { mode }),
+    onSuccess: (result) => {
+      setResetResult(result)
+      setResetCopied(false)
+      // The password mode revokes sessions, which the session list on this page reports.
+      queryClient.invalidateQueries({ queryKey: ['admin', 'user', userId] })
+    },
+    // Reported inline in the dialog rather than as a toast, the way the force-logout dialog
+    // does it — the failure belongs next to the button that caused it.
+  })
+
   const user = data?.user
   const rooms = data?.rooms ?? []
   const currentRole = user ? detectRole(user.accesses) : 'user'
+  // An OAuth account signs in through its provider, so neither mode would produce a credential
+  // its login consults. The server rejects those too; this keeps the button from offering it.
+  const canResetPassword = !!user && PASSWORD_PROVIDERS.includes(user.provider)
+  const resetSecret = resetResult?.mode === 'link' ? resetResult.resetUrl : resetResult?.password
+
+  function copyResetSecret() {
+    if (!resetSecret) return
+    void navigator.clipboard.writeText(resetSecret)
+    setResetCopied(true)
+    setTimeout(() => setResetCopied(false), 2000)
+  }
 
   const activeRooms = rooms.filter((r) => r.isActive).length
   const publicRooms = rooms.filter((r) => r.isPublic).length
@@ -406,6 +466,18 @@ function UserDetailPage() {
                         <LogOut className="h-3.5 w-3.5" />
                         Logout
                       </Button>
+                      {canResetPassword && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          type="button"
+                          onClick={() => setResetDialogOpen(true)}
+                          aria-label="Reset password"
+                        >
+                          <KeyRound className="h-3.5 w-3.5" />
+                          Password
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -817,6 +889,115 @@ function UserDetailPage() {
           ← Back to all users
         </Link>
       </p>
+
+      {/* Password reset dialog: pick a mode, then read back the one-time result */}
+      <Dialog open={resetDialogOpen} onOpenChange={(open) => !open && closeResetDialog()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset password</DialogTitle>
+            <DialogDescription>Recover an account whose owner cannot sign in</DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-lg bg-muted p-3 text-sm">
+            <p className="font-medium text-foreground">{user?.name || '—'}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{user?.email}</p>
+          </div>
+
+          {resetResult ? (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="reset-result" className="text-xs font-medium">
+                  {resetResult.mode === 'password' ? 'New password' : 'Reset link'}
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="reset-result"
+                    readOnly
+                    value={resetSecret ?? ''}
+                    className="font-mono text-xs"
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    type="button"
+                    onClick={copyResetSecret}
+                    aria-label={resetCopied ? 'Copied' : 'Copy to clipboard'}
+                  >
+                    {resetCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground">{resetResult.message}</p>
+
+              {resetResult.expiresAt && (
+                <p className="text-xs text-muted-foreground">
+                  Expires {new Date(resetResult.expiresAt).toLocaleString()}
+                </p>
+              )}
+            </div>
+          ) : (
+            <>
+              <RadioGroup
+                value={resetMode}
+                onValueChange={(value) => setResetMode(value as ResetMode)}
+                className="gap-2"
+              >
+                <Label
+                  htmlFor="reset-mode-password"
+                  className="flex cursor-pointer items-start gap-3 rounded-lg border p-3"
+                >
+                  <RadioGroupItem value="password" id="reset-mode-password" className="mt-0.5 shrink-0" />
+                  <span className="space-y-1">
+                    <span className="block text-sm font-medium">Generate a new password</span>
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      Shown once, here. The user can sign in with it straight away, and every existing session is
+                      signed out.
+                    </span>
+                  </span>
+                </Label>
+                <Label
+                  htmlFor="reset-mode-link"
+                  className="flex cursor-pointer items-start gap-3 rounded-lg border p-3"
+                >
+                  <RadioGroupItem value="link" id="reset-mode-link" className="mt-0.5 shrink-0" />
+                  <span className="space-y-1">
+                    <span className="block text-sm font-medium">Create a reset link</span>
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      The user picks their own password. Their current password and sessions keep working until they
+                      do.
+                    </span>
+                  </span>
+                </Label>
+              </RadioGroup>
+
+              {resetPassword.isError && (
+                <div
+                  className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                >
+                  {getErrorMessage(resetPassword.error, 'Failed to reset password')}
+                </div>
+              )}
+            </>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeResetDialog}>
+              {resetResult ? 'Done' : 'Cancel'}
+            </Button>
+            {!resetResult && (
+              <Button onClick={() => resetPassword.mutate(resetMode)} disabled={resetPassword.isPending}>
+                {resetPassword.isPending
+                  ? 'Working...'
+                  : resetMode === 'password'
+                    ? 'Generate password'
+                    : 'Create link'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Force logout confirmation dialog */}
       <Dialog open={forceLogoutDialogOpen} onOpenChange={(open) => !open && setForceLogoutDialogOpen(false)}>
