@@ -1,3 +1,16 @@
+# Line endings
+#
+# The repository is LF-only, and the working tree is too: what ships is
+# Linux-side — install.sh piped to bash, systemd units, Debian maintainer
+# scripts — and the man page plus example configs are embedded into the binary
+# straight from the working tree by //go:embed. A CRLF checkout on Windows
+# would carry those endings into a build, so pin the working tree rather than
+# leaving it to each contributor's core.autocrlf.
+#
+# No file here needs CRLF: there are no .bat/.cmd files, and the .ps1 scripts
+# run fine with LF.
+* text=auto eol=lf
+
 # GitHub Linguist language detection overrides
 #
 # The marketing/docs site (apps/site) contains a large number of .md and .mdx

@@ -215,6 +215,7 @@ Regen: `make swagger-gen` (needs `swag` CLI).
 - **Privileged ports:** HTTP side defaults to `:80` (manual TLS dual-listen + ACME challenge/redirect); ACME HTTPS defaults to `:443` when `port` empty. Non-root can't bind. Fix: set `httpPort: "8080"` / `SERVER_HTTP_PORT=8080` (and `port` for ACME HTTPS if needed) — honored for all TLS modes including ACME — or `sudo setcap 'cap_net_bind_service=+ep' $(which bedrud)` (re-run after each binary update). HTTP-01 still needs public port 80 on the edge (proxy map or DNS-01).
 - **Site search index:** Auto-generated before dev/build. Don't edit `public/search-index-*.json`.
 - **Site sidebar:** Manual in `src/content/docs/sidebar.ts`. Adding doc page? Add sidebar entry too.
+- **Line endings:** LF everywhere, pinned by `.gitattributes` (`* text=auto eol=lf`) and `.editorconfig`. A CRLF working tree silently breaks multi-line bulk edits and would embed CRLF into the binary via `//go:embed` (man page, example configs). Cloned earlier and still CRLF? See CONTRIBUTING.md → Code Style.
 
 ---
 
