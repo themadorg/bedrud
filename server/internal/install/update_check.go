@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"runtime"
 	"strings"
 )
@@ -58,7 +59,7 @@ func LinuxUpdateCheck(opts UpdateOptions) (UpdateCheck, error) {
 		VersionOrigin:    target.Origin,
 		Source:           source,
 		ConfigPath:       cfgPath,
-		Command:          updateCommand(opts),
+		Command:          updateCommand(opts, selfBinaryPath()),
 		UpToDate:         target.Version != "" && installed != unknownVersion && target.Version == installed,
 	}, nil
 }
@@ -162,19 +163,41 @@ func checkTargetVersion(opts UpdateOptions) (updateTarget, string, string, error
 	return resolveTargetVersion(opts, resolved), resolved.Description, "", nil
 }
 
-// updateCommand is the command that applies what the check reported.
-func updateCommand(opts UpdateOptions) string {
-	cmd := "sudo bedrud update"
+// shellSafe matches values that survive a shell unquoted.
+var shellSafe = regexp.MustCompile(`^[A-Za-z0-9_@%+=:,./-]+$`)
+
+// shellQuote renders s so the printed command survives a copy-paste into a
+// POSIX shell. Plain values are left bare to keep the line readable.
+func shellQuote(s string) string {
+	if s != "" && shellSafe.MatchString(s) {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// updateCommand is the command that applies what the check reported. self is
+// the path of the running executable, or "" when it cannot be determined.
+func updateCommand(opts UpdateOptions, self string) string {
+	// --self reinstalls the binary that runs the command, so the command has
+	// to name the one the check just probed. A bare "bedrud" is resolved
+	// through PATH — and under sudo through secure_path, which does not carry
+	// ~/.local/bin at all — so it can quietly apply an older binary instead.
+	binary := "bedrud"
+	if opts.Self && self != "" {
+		binary = self
+	}
+
+	cmd := "sudo " + shellQuote(binary) + " update"
 	switch {
 	case opts.SkipBinary:
 		cmd += " --skip-binary"
 	case opts.Self:
 		cmd += " --self"
 	case strings.TrimSpace(opts.Source) != "":
-		cmd += " " + strings.TrimSpace(opts.Source)
+		cmd += " " + shellQuote(strings.TrimSpace(opts.Source))
 	}
 	if opts.ConfigPath != "" && opts.ConfigPath != etcConfigPath {
-		cmd += " --config " + opts.ConfigPath
+		cmd += " --config " + shellQuote(opts.ConfigPath)
 	}
 	// Carry the rest of the flags through: the command has to be the update
 	// the operator asked to check, not a differently-behaving one. The one
@@ -191,6 +214,16 @@ func updateCommand(opts UpdateOptions) string {
 		cmd += " --skip-restart"
 	}
 	return cmd
+}
+
+// selfBinaryPath is the absolute path of the running executable, or "" when
+// the OS cannot name it.
+func selfBinaryPath() string {
+	self, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return self
 }
 
 // requireExistingInstall fails with install guidance when no config is present.

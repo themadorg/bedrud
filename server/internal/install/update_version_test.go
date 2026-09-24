@@ -2,8 +2,10 @@ package install
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -231,9 +233,102 @@ func TestUpdateCommand(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		if got := updateCommand(c.opts); got != c.want {
+		if got := updateCommand(c.opts, ""); got != c.want {
 			t.Fatalf("got %q, want %q", got, c.want)
 		}
+	}
+}
+
+func TestUpdateCommandSelfNamesTheProbedBinary(t *testing.T) {
+	// PATH — and sudo's secure_path in particular — can resolve "bedrud" to an
+	// older binary than the one the check probed, which is exactly what the
+	// installer warns about before printing these commands.
+	got := updateCommand(UpdateOptions{Self: true}, "/home/u/.local/bin/bedrud")
+	if want := "sudo /home/u/.local/bin/bedrud update --self"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+
+	// No usable path: fall back rather than print something wrong.
+	if got := updateCommand(UpdateOptions{Self: true}, ""); got != "sudo bedrud update --self" {
+		t.Fatalf("got %q", got)
+	}
+
+	// A path needing quoting is quoted like any other value.
+	got = updateCommand(UpdateOptions{Self: true}, "/home/my user/bedrud")
+	if want := "sudo '/home/my user/bedrud' update --self"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestShellQuote(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"/tmp/bedrud", "/tmp/bedrud"},
+		{"latest", "latest"},
+		{"", "''"},
+		{"/tmp/my builds/bedrud", "'/tmp/my builds/bedrud'"},
+		{"/tmp/bedrud (1).tar.xz", "'/tmp/bedrud (1).tar.xz'"},
+		{"/tmp/it's/bedrud", `'/tmp/it'\''s/bedrud'`},
+		{"/tmp/$(id).tar.xz", "'/tmp/$(id).tar.xz'"},
+	}
+	for _, c := range cases {
+		if got := shellQuote(c.in); got != c.want {
+			t.Fatalf("shellQuote(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+// TestUpdateCommandIsPasteable runs the printed command through a real shell
+// and checks the arguments it parses into, so a value with a space or a
+// parenthesis cannot silently split or fail to parse.
+func TestUpdateCommandIsPasteable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs a POSIX shell")
+	}
+	cases := []struct {
+		name string
+		opts UpdateOptions
+		want []string
+	}{
+		{
+			"space in source",
+			UpdateOptions{Source: "/tmp/my builds/bedrud"},
+			[]string{"update", "/tmp/my builds/bedrud"},
+		},
+		{
+			"parentheses in source",
+			UpdateOptions{Source: "/tmp/bedrud_linux_amd64 (1).tar.xz"},
+			[]string{"update", "/tmp/bedrud_linux_amd64 (1).tar.xz"},
+		},
+		{
+			"quote in source",
+			UpdateOptions{Source: "/tmp/it's here/bedrud"},
+			[]string{"update", "/tmp/it's here/bedrud"},
+		},
+		{
+			"space in config path",
+			UpdateOptions{Source: "latest", ConfigPath: "/etc/my bedrud/config.yaml"},
+			[]string{"update", "latest", "--config", "/etc/my bedrud/config.yaml"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cmd := updateCommand(c.opts, "")
+			args, ok := strings.CutPrefix(cmd, "sudo bedrud ")
+			if !ok {
+				t.Fatalf("unexpected command shape: %q", cmd)
+			}
+			// printf stands in for the binary, so the shell hands back exactly
+			// the arguments the pasted line would pass.
+			out, err := exec.Command("sh", "-c", "printf '%s\n' "+args).Output()
+			if err != nil {
+				t.Fatalf("pasting %q failed: %v", cmd, err)
+			}
+			got := strings.Split(strings.TrimSuffix(string(out), "\n"), "\n")
+			if !slices.Equal(got, c.want) {
+				t.Fatalf("pasting %q produced %q, want %q", cmd, got, c.want)
+			}
+		})
 	}
 }
 
