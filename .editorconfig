@@ -1,0 +1,9 @@
+# Keeps editors from reintroducing CRLF; see .gitattributes.
+# Indentation and line width stay with each toolchain's own config
+# (biome.json, gofmt, ruff), so they are deliberately not set here.
+root = true
+
+[*]
+end_of_line = lf
+charset = utf-8
+insert_final_newline = true

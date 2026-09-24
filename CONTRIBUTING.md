@@ -56,6 +56,16 @@ See the [Development Workflow](docs/guides/development.md) for detailed setup in
 | Swift            | Xcode defaults          |
 | Python           | ruff                    |
 
+All files use LF line endings, pinned by `.gitattributes` and `.editorconfig`
+— nothing in the repository needs CRLF. If you cloned before that was in place
+and your working tree still has CRLF files, refresh it once from a clean tree
+(this discards uncommitted changes):
+
+```bash
+git add --renormalize .
+git rm --cached -r . -q && git reset --hard
+```
+
 ## Pull Request Process
 
 1. **Branch naming:** `feature/description`, `fix/description`, or `docs/description`
