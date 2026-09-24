@@ -526,6 +526,7 @@ func run() error {
 	adminGroup.Put("/users/:id/accesses", usersHandler.UpdateUserAccesses)
 	adminGroup.Post("/users/:id/force-logout", usersHandler.ForceLogout)
 	adminGroup.Put("/users/:id/password", usersHandler.SetUserPassword)
+	adminGroup.Post("/users/:id/reset-password", usersHandler.AdminResetPassword)
 	adminGroup.Get("/stats", roomHandler.GetAdminStats)
 	adminGroup.Get("/overview", overviewHandler.GetOverview)
 	adminGroup.Get("/rooms", roomHandler.AdminListRooms)
