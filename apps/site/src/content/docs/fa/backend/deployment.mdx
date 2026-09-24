@@ -23,12 +23,14 @@ The installer handles security automatically:
 In-place upgrade (preserves config and database):
 
 ```bash
-sudo bedrud update
-# alias:
-sudo bedrud upgrade
+sudo bedrud update --check    # what it would install — changes nothing
+sudo bedrud update latest     # download, verify, and apply the latest release
+
+# "upgrade" is an alias for "update"
+sudo bedrud upgrade latest
 ```
 
-Replaces the binary with the running executable, runs versioned install migrations and DB AutoMigrate, refreshes init units, and restarts services. See [Updating](/fa/docs/getting-started/installation#updating).
+Prints the installed version and the version it is moving to before stopping anything, then replaces the binary, runs versioned install migrations and DB AutoMigrate, refreshes init units, and restarts services. See [Updating](/fa/docs/getting-started/installation#updating).
 
 ## Uninstallation
 

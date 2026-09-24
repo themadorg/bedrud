@@ -21,7 +21,7 @@ Common forms:
 [\fIflags\fR...]
 .PP
 .B bedrud update
-\fIsource\fR | \fB\-\-self\fR | \fB\-\-skip\-binary\fR
+[\fB\-\-check\fR] \fIsource\fR | \fB\-\-self\fR | \fB\-\-skip\-binary\fR
 .SH DESCRIPTION
 .B bedrud
 is a single executable that runs a video meeting API server, serves an
@@ -91,6 +91,19 @@ A source is required: a local binary path, a release archive
 (use the running executable), or
 .BR \-\-skip\-binary
 (migrations and restart only after a package manager replaced the binary).
+.IP
+Before anything is stopped or replaced, the installed version and the
+version being installed are printed. The target version comes from the
+source: a release tag, the running executable for
+.BR \-\-self " / " \-\-skip\-binary ,
+or the resolved binary's own version output. It is never taken from the
+binary running the command.
+.IP
+.B \-\-check
+resolves and reports that target version, then exits without changing
+anything. A bare
+.B "bedrud update \-\-check"
+reports the latest release without downloading it.
 .IP
 After a successful update, database migrations run (unless skipped),
 service units are refreshed, example configs under
@@ -187,6 +200,14 @@ Install on a Linux host (interactive when a TTY is present):
 .nf
 .RS
 sudo bedrud install
+.RE
+.fi
+.PP
+Report what an update would install, without changing anything:
+.PP
+.nf
+.RS
+sudo bedrud update \-\-check
 .RE
 .fi
 .PP
