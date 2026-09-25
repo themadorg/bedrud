@@ -1,6 +1,14 @@
-import { AlertCircle, Check, Loader2, Lock, LogIn } from 'lucide-react'
-import React, { useState } from 'react'
+import { AlertCircle, Check, Fingerprint, Loader2, Lock, LogIn } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
 import { api } from '#/lib/api'
+import {
+  listPasskeys,
+  type PasskeySummary,
+  passkeyErrorMessage,
+  passkeysSupported,
+  registerPasskey,
+} from '#/lib/passkey'
+import { getPublicSettings } from '#/lib/use-public-settings'
 import { useUserStore } from '#/lib/user.store'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -113,6 +121,103 @@ function AccountForm({
         Save
       </Button>
     </form>
+  )
+}
+
+function formatAddedDate(iso: string) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function PasskeysCard() {
+  const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
+  // Both unknown until mounted: the server render has no browser or settings to ask.
+  const [browserHasPasskeys, setBrowserHasPasskeys] = useState(false)
+  const [passkeysOff, setPasskeysOff] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setBrowserHasPasskeys(passkeysSupported())
+    getPublicSettings()
+      .then((s) => {
+        if (!cancelled) setPasskeysOff(s.passkeysEnabled === false)
+      })
+      .catch(() => {})
+    listPasskeys()
+      .then((list) => {
+        if (!cancelled) setPasskeys(list)
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function handleAdd() {
+    setAdding(true)
+    setStatus(null)
+    try {
+      await registerPasskey()
+      setPasskeys(await listPasskeys())
+      setLoadFailed(false)
+      setStatus({ type: 'success', message: 'Passkey added.' })
+    } catch (err) {
+      setStatus({ type: 'error', message: passkeyErrorMessage(err, 'Could not add a passkey') })
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  // The administrator has turned passkey sign-in off, so there is nothing to manage here.
+  if (passkeysOff) return null
+
+  return (
+    <Card>
+      <CardHeader className="border-b px-5 py-3">
+        <CardTitle className="text-sm font-semibold">Passkeys</CardTitle>
+        <CardDescription className="text-xs text-muted-foreground">
+          Sign in with your fingerprint, face, or screen lock instead of a password
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 p-5">
+        {loadFailed ? (
+          <Alert type="error" message="Could not load your passkeys." />
+        ) : passkeys === null ? (
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" /> Loading passkeys…
+          </p>
+        ) : passkeys.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No passkeys yet.</p>
+        ) : (
+          <ul className="divide-y rounded-lg border">
+            {passkeys.map((pk) => (
+              <li key={pk.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                <span className="flex items-center gap-2 text-xs font-medium">
+                  <Fingerprint className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  {pk.name || 'Passkey'}
+                </span>
+                <span className="text-xs text-muted-foreground">Added {formatAddedDate(pk.createdAt)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {status && <Alert {...status} />}
+        {browserHasPasskeys ? (
+          <Button variant="default" size="sm" onClick={() => void handleAdd()} disabled={adding} className="gap-1.5">
+            {adding ? <Loader2 className="h-3 w-3 animate-spin" /> : <Fingerprint className="h-3 w-3" />}
+            Add a passkey
+          </Button>
+        ) : (
+          <p className="text-xs text-muted-foreground">This browser cannot create passkeys.</p>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -231,6 +336,8 @@ export function SecuritySettingsPanel() {
           )}
         </CardContent>
       </Card>
+
+      <PasskeysCard />
 
       <Card>
         <CardHeader className="border-b px-5 py-3">
