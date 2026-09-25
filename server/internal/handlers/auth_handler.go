@@ -1612,6 +1612,10 @@ func (h *AuthHandler) PasskeySignupBegin(c *fiber.Ctx) error {
 	})
 }
 
+// errInviteTokenSpent reports that a passkey signup's invite token was used by
+// another signup between begin and finish.
+var errInviteTokenSpent = errors.New("invite token already used")
+
 // @Summary Finish passkey signup
 // @Description Complete FIDO2/WebAuthn registration for a new user.
 // @Tags auth
@@ -1620,6 +1624,7 @@ func (h *AuthHandler) PasskeySignupBegin(c *fiber.Ctx) error {
 // @Param request body object true "WebAuthn registration response"
 // @Success 200 {object} auth.LoginResponse
 // @Failure 400 {object} auth.ErrorResponse
+// @Failure 409 {object} auth.ErrorResponse
 // @Router /auth/passkey/signup/finish [post]
 func (h *AuthHandler) PasskeySignupFinish(c *fiber.Ctx) error {
 	var input struct {
@@ -1660,7 +1665,24 @@ func (h *AuthHandler) PasskeySignupFinish(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid attestationObject encoding"})
 	}
 
-	loginResponse, err := h.authService.FinishSignupPasskey(userID, email, name, challenge, clientData, attestation, h.getRPID(c), h.getOrigin(c))
+	// Spend the invite token before the user is written, as Register does: every signup
+	// begun with the same token passes the begin check, so only the atomic MarkUsed can
+	// decide which of them gets the account. The attestation is verified first, so a
+	// failed ceremony does not burn the token.
+	var claimInvite func() error
+	if tokenID := extra["inviteToken"]; tokenID != "" && h.inviteTokenRepo != nil {
+		claimInvite = func() error {
+			if err := h.inviteTokenRepo.MarkUsed(tokenID, userID); err != nil {
+				return errInviteTokenSpent
+			}
+			return nil
+		}
+	}
+
+	loginResponse, err := h.authService.FinishSignupPasskey(userID, email, name, challenge, clientData, attestation, h.getRPID(c), h.getOrigin(c), claimInvite)
+	if errors.Is(err, errInviteTokenSpent) {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Invite token already used or invalid"})
+	}
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -1674,16 +1696,6 @@ func (h *AuthHandler) PasskeySignupFinish(c *fiber.Ctx) error {
 			"message":              "Please check your email to verify your account",
 			"email":                loginResponse.User.Email,
 		})
-	}
-
-	// Mark invite token used if passkey signup required one
-	if tokenID := extra["inviteToken"]; tokenID != "" && h.inviteTokenRepo != nil {
-		if err := h.inviteTokenRepo.MarkUsed(tokenID, loginResponse.User.ID); err != nil {
-			log.Error().Err(err).Str("tokenID", tokenID).Msg("Failed to mark passkey invite token as used")
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Signup succeeded but failed to record token usage",
-			})
-		}
 	}
 
 	h.challengeStore.Delete("passkey_signup:" + challengeID)
