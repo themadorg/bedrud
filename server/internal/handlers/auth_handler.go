@@ -1292,6 +1292,38 @@ func webauthnAuthenticatorSelection() fiber.Map {
 	}
 }
 
+// passkeySummary is the public view of a stored passkey: no credential ID or key material.
+type passkeySummary struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// @Summary List passkeys
+// @Description List the passkeys registered to the authenticated user.
+// @Tags auth
+// @Produce json
+// @Success 200 {object} object
+// @Failure 500 {object} auth.ErrorResponse
+// @Router /auth/passkeys [get]
+func (h *AuthHandler) ListPasskeys(c *fiber.Ctx) error {
+	claims := c.Locals("user").(*auth.Claims)
+	passkeys, err := h.authService.ListPasskeys(claims.UserID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(internalError(err))
+	}
+
+	out := make([]passkeySummary, 0, len(passkeys))
+	for i := range passkeys {
+		out = append(out, passkeySummary{
+			ID:        passkeys[i].ID,
+			Name:      passkeys[i].Name,
+			CreatedAt: passkeys[i].CreatedAt,
+		})
+	}
+	return c.JSON(fiber.Map{"passkeys": out})
+}
+
 // @Summary Begin passkey registration
 // @Description Start FIDO2/WebAuthn registration ceremony for the authenticated user.
 // @Tags auth
@@ -1304,6 +1336,21 @@ func (h *AuthHandler) PasskeyRegisterBegin(c *fiber.Ctx) error {
 	challenge, err := h.authService.BeginRegisterPasskey(claims.UserID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(internalError(err))
+	}
+
+	// Existing passkeys go in excludeCredentials, so an authenticator that already holds one for
+	// this account refuses to make a second instead of silently replacing it on the device and
+	// leaving a stale record here.
+	existing, err := h.authService.ListPasskeys(claims.UserID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(internalError(err))
+	}
+	exclude := make([]fiber.Map, 0, len(existing))
+	for i := range existing {
+		exclude = append(exclude, fiber.Map{
+			"type": "public-key",
+			"id":   base64.RawURLEncoding.EncodeToString(existing[i].CredentialID),
+		})
 	}
 
 	h.challengeStore.Set("passkey_register:"+claims.UserID, challenge, claims.UserID, nil)
@@ -1321,6 +1368,7 @@ func (h *AuthHandler) PasskeyRegisterBegin(c *fiber.Ctx) error {
 		},
 		"pubKeyCredParams":       webauthnCredParams(),
 		"authenticatorSelection": webauthnAuthenticatorSelection(),
+		"excludeCredentials":     exclude,
 	})
 }
 

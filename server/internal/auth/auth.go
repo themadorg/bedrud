@@ -735,6 +735,11 @@ func (s *AuthService) ListPasskeyCredentialIDsByEmail(email string) ([][]byte, e
 	return ids, nil
 }
 
+// ListPasskeys returns the passkeys registered to a user.
+func (s *AuthService) ListPasskeys(userID string) ([]models.Passkey, error) {
+	return s.passkeyRepo.GetPasskeysByUserID(userID)
+}
+
 func (s *AuthService) FinishLoginPasskey(challengeStr string, credentialID, clientDataJSON, authenticatorData, signature []byte, rpID, origin string) (*LoginResponse, error) {
 	challenge, err := base64.RawURLEncoding.DecodeString(challengeStr)
 	if err != nil {
