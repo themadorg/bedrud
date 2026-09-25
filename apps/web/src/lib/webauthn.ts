@@ -29,4 +29,5 @@ export interface PublicKeyCredentialCreationOptionsJSON {
   timeout?: number
   attestation?: AttestationConveyancePreference
   authenticatorSelection?: AuthenticatorSelectionCriteria
+  excludeCredentials?: Array<{ id: string; type: 'public-key' }>
 }

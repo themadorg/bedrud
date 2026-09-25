@@ -609,7 +609,10 @@ func (s *AuthService) FinishRegisterPasskey(userID, challengeStr string, clientD
 	return s.passkeyRepo.CreatePasskey(passkey)
 }
 
-func (s *AuthService) FinishSignupPasskey(userID, email, name, challengeStr string, clientDataJSON, attestationObject []byte, rpID, origin string) (*LoginResponse, error) {
+// FinishSignupPasskey verifies the attestation and creates the user with its passkey.
+// beforeCreate, when non-nil, runs once the attestation and email checks pass and before
+// the user is written; an error from it aborts the signup and is returned unchanged.
+func (s *AuthService) FinishSignupPasskey(userID, email, name, challengeStr string, clientDataJSON, attestationObject []byte, rpID, origin string, beforeCreate func() error) (*LoginResponse, error) {
 	challenge, err := base64.RawURLEncoding.DecodeString(challengeStr)
 	if err != nil {
 		return nil, err
@@ -634,6 +637,12 @@ func (s *AuthService) FinishSignupPasskey(userID, email, name, challengeStr stri
 	existing, _ := s.GetUserByEmail(email)
 	if existing != nil {
 		return nil, errors.New("email already registered")
+	}
+
+	if beforeCreate != nil {
+		if err := beforeCreate(); err != nil {
+			return nil, err
+		}
 	}
 
 	// Create user + passkey in single transaction
@@ -724,6 +733,11 @@ func (s *AuthService) ListPasskeyCredentialIDsByEmail(email string) ([][]byte, e
 		}
 	}
 	return ids, nil
+}
+
+// ListPasskeys returns the passkeys registered to a user.
+func (s *AuthService) ListPasskeys(userID string) ([]models.Passkey, error) {
+	return s.passkeyRepo.GetPasskeysByUserID(userID)
 }
 
 func (s *AuthService) FinishLoginPasskey(challengeStr string, credentialID, clientDataJSON, authenticatorData, signature []byte, rpID, origin string) (*LoginResponse, error) {
