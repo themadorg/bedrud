@@ -29,8 +29,20 @@ updates:
       - dependency-name: "gorm.io/driver/postgres"
         versions: ["1.6.1", "1.6.2"]
 
-  # Web frontend (npm/bun)
-  - package-ecosystem: "npm"
+  # Web frontend (bun)
+  #
+  # The "bun" ecosystem, not "npm": the web app is installed with bun and every
+  # CI job runs `bun install --frozen-lockfile`, so a bump that edits
+  # package.json without apps/web/bun.lock fails at install. The npm ecosystem
+  # does not maintain bun.lock, which is why #175 could never go green — see the
+  # note above the pinned bun version in ci.yml. The bun ecosystem updates both
+  # files in the same commit.
+  #
+  # Trade-off: the bun ecosystem covers version updates only. Dependabot alerts
+  # still fire for this directory, but it will not raise security-update PRs the
+  # way the npm ecosystem did — and those PRs carried the same lockfile drift,
+  # so they could not have merged either.
+  - package-ecosystem: "bun"
     directory: "/apps/web"
     schedule:
       interval: "weekly"
@@ -42,6 +54,13 @@ updates:
         patterns:
           - "*"
     open-pull-requests-limit: 5
+    # apps/web/bunfig.toml sets minimumReleaseAge = 604800, so bun refuses any
+    # version published less than 7 days ago and the install fails before a
+    # single test runs. Hold the same line here so a version is never proposed
+    # before bun will install it. The extra day keeps the boundary from
+    # depending on how each side rounds its own unit (days here, seconds there).
+    cooldown:
+      default-days: 8
 
   # Android (Gradle) — now tracked in the bedrud-android repo's own dependabot config
 
