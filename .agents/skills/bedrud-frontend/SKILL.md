@@ -332,7 +332,7 @@ Full → `bedrud-fe-admin`.
 | Area | Path | Highlights |
 |------|------|------------|
 | Root | `components/` | `ErrorPage`, `ErrorBoundary`, `ThemeToggle` |
-| Auth | `components/auth/` | `PasskeyButton`, `OAuthButtons` |
+| Auth | `components/auth/` | `OAuthButtons`, `PasskeyOffer` (WebAuthn calls in `lib/passkey.ts`) |
 | Dashboard | `components/dashboard/` | `RoomCard`, `CreateRoomDialog`, `RoomSettingsDialog` |
 | Settings | `components/settings/` | `BedrudSettingsDialog` + profile/audio/video/security/experimental/appearance panels (`tone`: default \| meeting) |
 | Admin | `components/admin/` | DataTable*, overview/*, settings tabs, QueueStats, RecordingsTable stub |

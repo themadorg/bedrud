@@ -110,6 +110,7 @@ Health redirects: `/health` → `/api/health`, `/ready` → `/api/ready`. Ready 
 | `ResendVerification` | POST | `/auth/verify/resend` | Resend rate limit | Resend verification email |
 | `ForgotPassword` | POST | `/auth/forgot-password` | Rate limit | Start reset |
 | `ResetPassword` | POST | `/auth/reset-password` | Rate limit | Complete reset |
+| `ListPasskeys` | GET | `/auth/passkeys` | Protected | Caller's passkeys (id, name, createdAt) |
 | `PasskeyRegisterBegin` | POST | `/auth/passkey/register/begin` | Protected + verified | WebAuthn reg start |
 | `PasskeyRegisterFinish` | POST | `/auth/passkey/register/finish` | Protected + verified | WebAuthn reg complete |
 | `PasskeyLoginBegin` | POST | `/auth/passkey/login/begin` | Rate limit | WebAuthn login start |

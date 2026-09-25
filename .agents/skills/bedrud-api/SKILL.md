@@ -134,7 +134,8 @@ Providers from `ConfiguredProviders()` when secrets set: `google`, `github`, `tw
 
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
-| POST | `/api/auth/passkey/register/begin` | P+EV | creation options |
+| GET | `/api/auth/passkeys` | P | `{passkeys:[{id,name,createdAt}]}` (no key material) |
+| POST | `/api/auth/passkey/register/begin` | P+EV | creation options (+ `excludeCredentials`) |
 | POST | `/api/auth/passkey/register/finish` | P+EV | `{clientDataJSON,attestationObject}` |
 | POST | `/api/auth/passkey/login/begin` | AuthRate | request options |
 | POST | `/api/auth/passkey/login/finish` | AuthRate | → `LoginResponse` |
