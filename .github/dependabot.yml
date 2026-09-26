@@ -61,16 +61,23 @@ updates:
     # depending on how each side rounds its own unit (days here, seconds there).
     cooldown:
       default-days: 8
-    # jsdom 30.1.0 broke vitest's environment setup: catchWindowErrors calls
-    # window.addEventListener and jsdom answers with "TypeError:
-    # 'addEventListener' called on an object that is not a valid instance of
-    # EventTarget", which kills the worker before each test file runs. It does
-    # not surface as failing tests — the suite silently shrinks from 79 files
-    # and 479 tests to 15 and 128, with the rest reported as errors at the end.
-    # 30.1.1 has the same problem.
+    # jsdom 30.1.0 and 30.1.1 break the test suite when vitest runs under
+    # Bun's runtime: catchWindowErrors calls window.addEventListener and jsdom
+    # answers with "TypeError: 'addEventListener' called on an object that is
+    # not a valid instance of EventTarget", killing the worker before each test
+    # file runs. The run shrinks from 79 files and 479 tests to 15 and 128, and
+    # reports the rest as errors at the end.
+    #
+    # The runtime is half the trigger. node_modules/.bin/vitest is a
+    # `#!/usr/bin/env node` script, so the same jsdom is green wherever node is
+    # on PATH and red where bun is the only toolchain installed — the setup
+    # AGENTS.md describes. #193 settles that by running `bun --bun vitest run`,
+    # matching the build, so the web test job exercises the Bun path and fails
+    # on these releases rather than passing over them.
     #
     # Only the two broken releases are held. A later one is proposed as usual,
-    # and the web test job catches the regression again if it is still there.
+    # and with #193 merged the web test job is what catches it if the
+    # regression survives.
     ignore:
       - dependency-name: "jsdom"
         versions: ["30.1.0", "30.1.1"]
