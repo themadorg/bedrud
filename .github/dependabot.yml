@@ -61,6 +61,19 @@ updates:
     # depending on how each side rounds its own unit (days here, seconds there).
     cooldown:
       default-days: 8
+    # jsdom 30.1.0 broke vitest's environment setup: catchWindowErrors calls
+    # window.addEventListener and jsdom answers with "TypeError:
+    # 'addEventListener' called on an object that is not a valid instance of
+    # EventTarget", which kills the worker before each test file runs. It does
+    # not surface as failing tests — the suite silently shrinks from 79 files
+    # and 479 tests to 15 and 128, with the rest reported as errors at the end.
+    # 30.1.1 has the same problem.
+    #
+    # Only the two broken releases are held. A later one is proposed as usual,
+    # and the web test job catches the regression again if it is still there.
+    ignore:
+      - dependency-name: "jsdom"
+        versions: ["30.1.0", "30.1.1"]
 
   # Android (Gradle) — now tracked in the bedrud-android repo's own dependabot config
 
