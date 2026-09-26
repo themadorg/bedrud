@@ -16,7 +16,7 @@
     "format": "biome format --write .",
     "pwa-icons": "node scripts/pwa-icons.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "bun --bun vitest run"
   },
   "dependencies": {
     "@braintree/sanitize-url": "7.1.2",
