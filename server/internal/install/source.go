@@ -36,6 +36,10 @@ type resolvedSource struct {
 	Cleanup     func()
 	Version     string // optional, from release tag
 	Description string
+	// Verified reports that a SHA256 checksum actually matched for this
+	// source (or that it is this running executable). A read-only check
+	// refuses to execute anything without it.
+	Verified bool
 }
 
 // resolveUpdateSource turns UpdateOptions into a local binary path.
@@ -55,6 +59,7 @@ func resolveUpdateSource(opts UpdateOptions) (resolvedSource, error) {
 			BinaryPath:  tmp,
 			Cleanup:     cleanup,
 			Description: desc,
+			Verified:    true, // a copy of the process already running
 		}, nil
 	}
 
@@ -100,14 +105,17 @@ func resolveLocalPath(src string, skipChecksum bool) (resolvedSource, error) {
 		return resolvedSource{}, fmt.Errorf("source is a directory: %s", src)
 	}
 
+	verified := false
 	if !skipChecksum {
-		if err := verifyLocalChecksumIfPresent(src); err != nil {
+		var err error
+		verified, err = verifyLocalChecksumIfPresent(src)
+		if err != nil {
 			return resolvedSource{}, err
 		}
 	}
 
 	if isArchivePath(src) {
-		return extractArchiveToResolved(src, fmt.Sprintf("local archive %s", src), "")
+		return extractArchiveToResolved(src, fmt.Sprintf("local archive %s", src), "", verified)
 	}
 
 	// Bare binary
@@ -118,10 +126,11 @@ func resolveLocalPath(src string, skipChecksum bool) (resolvedSource, error) {
 		BinaryPath:  src,
 		Cleanup:     nil,
 		Description: fmt.Sprintf("local binary %s", src),
+		Verified:    verified,
 	}, nil
 }
 
-func extractArchiveToResolved(archivePath, desc, version string) (resolvedSource, error) {
+func extractArchiveToResolved(archivePath, desc, version string, verified bool) (resolvedSource, error) {
 	dir, err := os.MkdirTemp("", "bedrud-update-extract-*")
 	if err != nil {
 		return resolvedSource{}, err
@@ -141,6 +150,7 @@ func extractArchiveToResolved(archivePath, desc, version string) (resolvedSource
 		Cleanup:     cleanup,
 		Version:     version,
 		Description: desc,
+		Verified:    verified,
 	}, nil
 }
 
@@ -195,7 +205,7 @@ func resolveURL(raw string, skipChecksum bool) (resolvedSource, error) {
 	}
 
 	if isArchivePath(dest) {
-		res, err := extractArchiveToResolved(dest, fmt.Sprintf("URL %s", raw), version)
+		res, err := extractArchiveToResolved(dest, fmt.Sprintf("URL %s", raw), version, requireChecksum)
 		if err != nil {
 			cleanupAll()
 			return resolvedSource{}, err
@@ -220,7 +230,44 @@ func resolveURL(raw string, skipChecksum bool) (resolvedSource, error) {
 		Cleanup:     cleanupAll,
 		Version:     version,
 		Description: fmt.Sprintf("URL %s", raw),
+		Verified:    requireChecksum,
 	}, nil
+}
+
+// githubRelease is the subset of the GitHub release payload the updater needs.
+type githubRelease struct {
+	TagName string `json:"tag_name"`
+	Assets  []struct {
+		Name               string `json:"name"`
+		BrowserDownloadURL string `json:"browser_download_url"`
+	} `json:"assets"`
+}
+
+// fetchLatestRelease reads the latest release metadata (tag + asset URLs)
+// without downloading any asset, so a version check stays cheap.
+func fetchLatestRelease() (githubRelease, error) {
+	var rel githubRelease
+
+	req, err := http.NewRequest(http.MethodGet, githubLatestURL, nil)
+	if err != nil {
+		return rel, err
+	}
+	req.Header.Set("User-Agent", httpUserAgent)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return rel, fmt.Errorf("github latest: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return rel, fmt.Errorf("github latest: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&rel); err != nil {
+		return rel, fmt.Errorf("decode release JSON: %w", err)
+	}
+	return rel, nil
 }
 
 func resolveLatest(skipChecksum bool) (resolvedSource, error) {
@@ -233,32 +280,9 @@ func resolveLatest(skipChecksum bool) (resolvedSource, error) {
 		return resolvedSource{}, err
 	}
 
-	req, err := http.NewRequest(http.MethodGet, githubLatestURL, nil)
+	rel, err := fetchLatestRelease()
 	if err != nil {
 		return resolvedSource{}, err
-	}
-	req.Header.Set("User-Agent", httpUserAgent)
-	req.Header.Set("Accept", "application/vnd.github+json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return resolvedSource{}, fmt.Errorf("github latest: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return resolvedSource{}, fmt.Errorf("github latest: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-
-	var rel struct {
-		TagName string `json:"tag_name"`
-		Assets  []struct {
-			Name               string `json:"name"`
-			BrowserDownloadURL string `json:"browser_download_url"`
-		} `json:"assets"`
-	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&rel); err != nil {
-		return resolvedSource{}, fmt.Errorf("decode release JSON: %w", err)
 	}
 
 	var assetURL, sumsURL string
@@ -297,7 +321,7 @@ func resolveLatest(skipChecksum bool) (resolvedSource, error) {
 		return resolvedSource{}, err
 	}
 
-	res, err := extractArchiveToResolved(dest, fmt.Sprintf("latest %s (%s)", rel.TagName, assetName), rel.TagName)
+	res, err := extractArchiveToResolved(dest, fmt.Sprintf("latest %s (%s)", rel.TagName, assetName), rel.TagName, true)
 	if err != nil {
 		cleanupAll()
 		return resolvedSource{}, err
@@ -395,7 +419,10 @@ func verifyRemoteFile(localPath, assetName, sumsURL string) error {
 	return nil
 }
 
-func verifyLocalChecksumIfPresent(src string) error {
+// verifyLocalChecksumIfPresent reports whether an adjacent SHA256SUMS actually
+// matched. No sums file (or no line for this asset) is not an error, but it is
+// not a verification either — callers that act on trust must check the bool.
+func verifyLocalChecksumIfPresent(src string) (bool, error) {
 	// Optional: adjacent SHA256SUMS or src.sha256
 	dir := filepath.Dir(src)
 	base := filepath.Base(src)
@@ -412,15 +439,15 @@ func verifyLocalChecksumIfPresent(src string) error {
 		}
 		got, err := fileSHA256(src)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if !strings.EqualFold(got, want) {
-			return fmt.Errorf("checksum mismatch for %s: got %s want %s", base, got, want)
+			return false, fmt.Errorf("checksum mismatch for %s: got %s want %s", base, got, want)
 		}
 		fmt.Println("➜ Checksum verified (local SHA256SUMS):", base)
-		return nil
+		return true, nil
 	}
-	return nil
+	return false, nil
 }
 
 // parseSHA256SUMS finds the hex digest for filename in GNU-style SHA256SUMS content.

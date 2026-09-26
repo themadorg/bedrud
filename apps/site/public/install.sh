@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # bedrud installer — curl -fsSL https://bedrud.org/install.sh | bash
 set -euo pipefail
 
@@ -1418,6 +1418,15 @@ else
     echo ""
   fi
   printf "${GREEN}${BOLD}bedrud installed!${RESET}\n\n"
+  if [[ "$os" == "linux" && -f /etc/bedrud/config.yaml ]]; then
+    echo "  Existing installation detected at /etc/bedrud/config.yaml."
+    echo "  Apply this build to it with the absolute path, so an older bedrud"
+    echo "  earlier in PATH cannot run the update instead:"
+    echo ""
+    echo "    sudo ${INSTALL_DIR}/${BINARY_NAME} update --check --self   # what it would install"
+    echo "    sudo ${INSTALL_DIR}/${BINARY_NAME} update --self           # apply it"
+    echo ""
+  fi
   if $READY; then
     echo "  Get started:"
     echo ""

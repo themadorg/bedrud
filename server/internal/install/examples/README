@@ -24,6 +24,7 @@ Quick start
 Docs: https://bedrud.org/  and  https://themadorg.github.io/bedrud/
 
 Update the server binary:
+  sudo bedrud update --check             # what it would install, no changes
   sudo bedrud update --self              # use this running binary
   sudo bedrud update /path/to/bedrud     # bare binary
   sudo bedrud update latest              # GitHub latest (checksum verified)

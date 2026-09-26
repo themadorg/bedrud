@@ -118,6 +118,15 @@ func safeExtractArchive(archivePath, destDir string) (binaryPath string, err err
 		if err != nil {
 			return "", err
 		}
+		// The binary has to be runnable for the version probe. Chmod through
+		// the open handle, not the path: the archive-controlled name never
+		// reaches a second filesystem operation.
+		if base := filepath.Base(target); base == "bedrud" || base == "bedrud.exe" {
+			if err := out.Chmod(0o700); err != nil {
+				_ = out.Close()
+				return "", fmt.Errorf("make extracted %s executable: %w", base, err)
+			}
+		}
 		n, copyErr := io.Copy(out, io.LimitReader(tr, hdr.Size+1))
 		_ = out.Close()
 		if copyErr != nil {

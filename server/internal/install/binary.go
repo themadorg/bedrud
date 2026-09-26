@@ -18,18 +18,49 @@ func resolveInstalledBinary() string {
 		return binaryLocalPath
 	}
 	// Fall back to systemd unit ExecStart if present
-	if data, err := os.ReadFile("/etc/systemd/system/bedrud.service"); err == nil {
-		for _, line := range strings.Split(string(data), "\n") {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "ExecStart=") {
-				fields := strings.Fields(strings.TrimPrefix(line, "ExecStart="))
-				if len(fields) > 0 {
-					return fields[0]
-				}
-			}
-		}
+	if p := execStartBinary(); p != "" {
+		return p
 	}
 	return binaryLocalPath
+}
+
+// execStartBinary returns the binary the systemd unit is configured to run,
+// or "" when there is no unit or no ExecStart in it.
+func execStartBinary() string {
+	data, err := os.ReadFile("/etc/systemd/system/bedrud.service")
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "ExecStart=") {
+			continue
+		}
+		fields := strings.Fields(strings.TrimPrefix(line, "ExecStart="))
+		if len(fields) > 0 {
+			return fields[0]
+		}
+	}
+	return ""
+}
+
+// runningBinaryPath returns the binary a --skip-binary run should read its
+// version from: the one the service unit actually starts, when that unit
+// exists and points somewhere real.
+//
+// resolveInstalledBinary prefers /usr/bin, but the updater creates the
+// divergent state itself — it installs to /usr/local/bin when /usr/bin is
+// package-managed and repoints ExecStart there. With --skip-restart the unit
+// is not refreshed either, so ExecStart is the only thing that says which
+// binary is in service. Deliberately separate from resolveInstalledBinary,
+// which also decides the install target and the package-managed check.
+func runningBinaryPath() string {
+	if p := execStartBinary(); p != "" {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return resolveInstalledBinary()
 }
 
 // isPackageManaged reports whether the installed binary is owned by a package manager

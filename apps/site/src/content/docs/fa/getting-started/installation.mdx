@@ -464,7 +464,7 @@ Services restart automatically after package upgrade.
 
 ### Binary Download
 
-Download the latest release and re-run install. Without `--fresh`, the installer refreshes the binary and services and **does not overwrite** existing `config.yaml` / `livekit.yaml`. For a binary-only upgrade prefer `bedrud update`. A clean wipe uses `--fresh`:
+Download the latest release and re-run install. Without `--fresh`, the installer refreshes the binary and services and **does not overwrite** existing `config.yaml` / `livekit.yaml`. For a binary-only upgrade prefer `bedrud update latest`. A clean wipe uses `--fresh`:
 
 ```bash
 curl -fsSL -o bedrud.tar.xz https://github.com/themadorg/bedrud/releases/latest/download/bedrud_linux_amd64.tar.xz
@@ -508,19 +508,34 @@ Upgrade an existing server install **without** wiping config, secrets, certifica
 
 ### Binary / release install
 
+The shortest path downloads and applies the latest release in one step:
+
 ```bash
-# 1. Get the new binary (example: installer without re-running setup)
-curl -fsSL https://bedrud.org/install.sh | bash -s -- --no-setup
+sudo bedrud update --check    # what it would install — changes nothing
+sudo bedrud update latest     # download, verify, and apply it
+```
+
+To fetch the binary yourself first, apply it with its absolute path so an
+older `bedrud` earlier in `PATH` cannot run the update instead:
+
+```bash
+# 1. Get the new binary (example: installer without re-running setup).
+#    Run the installer as root so it lands in /usr/local/bin — without sudo
+#    it installs to ~/.local/bin and step 2 would re-apply the old binary.
+curl -fsSL https://bedrud.org/install.sh | sudo bash -s -- --no-setup
 
 # 2. Apply binary + migrations + service restart
-sudo bedrud update
+sudo /usr/local/bin/bedrud update --self
 ```
 
 Or run the new release binary directly:
 
 ```bash
-sudo ./bedrud update
+sudo ./bedrud update --self
 ```
+
+Every form prints the installed version and the version it is moving to before
+it stops anything, so you can cancel if the numbers are not what you expect.
 
 ### Package manager
 
