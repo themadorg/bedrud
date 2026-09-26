@@ -247,10 +247,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          # Pinned rather than `latest`: dependabot maintains package.json but not
-          # bun.lock, and every job installs with --frozen-lockfile. A bun release
-          # that changes the lockfile format fails the install everywhere at once,
-          # which is what #143 had to be fixed by hand.
+          # Pinned rather than `latest`: every job installs with
+          # --frozen-lockfile, so a bun release that changes the lockfile format
+          # fails the install everywhere at once, which is what #143 had to be
+          # fixed by hand. Dependabot now keeps bun.lock in step with
+          # package.json through the bun ecosystem (see .github/dependabot.yml).
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
       - run: bun run check
@@ -410,10 +411,11 @@ jobs:
           node-version: "22"
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          # Pinned rather than `latest`: dependabot maintains package.json but not
-          # bun.lock, and every job installs with --frozen-lockfile. A bun release
-          # that changes the lockfile format fails the install everywhere at once,
-          # which is what #143 had to be fixed by hand.
+          # Pinned rather than `latest`: every job installs with
+          # --frozen-lockfile, so a bun release that changes the lockfile format
+          # fails the install everywhere at once, which is what #143 had to be
+          # fixed by hand. Dependabot now keeps bun.lock in step with
+          # package.json through the bun ecosystem (see .github/dependabot.yml).
           bun-version: 1.4.2
           cache: true
       - run: bun install --frozen-lockfile

@@ -29,8 +29,20 @@ updates:
       - dependency-name: "gorm.io/driver/postgres"
         versions: ["1.6.1", "1.6.2"]
 
-  # Web frontend (npm/bun)
-  - package-ecosystem: "npm"
+  # Web frontend (bun)
+  #
+  # The "bun" ecosystem, not "npm": the web app is installed with bun and every
+  # CI job runs `bun install --frozen-lockfile`, so a bump that edits
+  # package.json without apps/web/bun.lock fails at install. The npm ecosystem
+  # does not maintain bun.lock, which is why #175 could never go green — see the
+  # note above the pinned bun version in ci.yml. The bun ecosystem updates both
+  # files in the same commit.
+  #
+  # Trade-off: the bun ecosystem covers version updates only. Dependabot alerts
+  # still fire for this directory, but it will not raise security-update PRs the
+  # way the npm ecosystem did — and those PRs carried the same lockfile drift,
+  # so they could not have merged either.
+  - package-ecosystem: "bun"
     directory: "/apps/web"
     schedule:
       interval: "weekly"
@@ -42,6 +54,37 @@ updates:
         patterns:
           - "*"
     open-pull-requests-limit: 5
+    # apps/web/bunfig.toml sets minimumReleaseAge = 604800, so bun refuses any
+    # version published less than 7 days ago and the install fails before a
+    # single test runs. Hold the same line here so a version is never proposed
+    # before bun will install it. The extra day keeps the boundary from
+    # depending on how each side rounds its own unit (days here, seconds there).
+    cooldown:
+      default-days: 8
+    # jsdom 30.1.0 and 30.1.1 break the test suite when vitest runs under
+    # Bun's runtime: catchWindowErrors calls window.addEventListener and jsdom
+    # answers with "TypeError: 'addEventListener' called on an object that is
+    # not a valid instance of EventTarget", killing the worker before each test
+    # file runs. The run shrinks from 79 files and 479 tests to 15 and 128, and
+    # reports the rest as errors at the end.
+    #
+    # The runtime is half the trigger. node_modules/.bin/vitest is a
+    # `#!/usr/bin/env node` script, so the same jsdom is green wherever node is
+    # on PATH and red where bun is the only toolchain installed — the setup
+    # AGENTS.md describes. #193 makes that explicit by running
+    # `bun --bun vitest run`, matching the build; once it lands the web test
+    # job exercises the Bun path and fails on these releases instead of passing
+    # over them.
+    #
+    # Upstream: oven-sh/bun#43671, open at the time of writing. The hold pins
+    # around a confirmed defect rather than a guess, and that issue closing is
+    # what makes it liftable.
+    #
+    # Only the two broken releases are held — 30.1.1 is the current latest, so
+    # this is the whole broken set, and a later release is proposed as usual.
+    ignore:
+      - dependency-name: "jsdom"
+        versions: ["30.1.0", "30.1.1"]
 
   # Android (Gradle) — now tracked in the bedrud-android repo's own dependabot config
 
