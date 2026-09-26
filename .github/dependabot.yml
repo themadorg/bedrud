@@ -71,13 +71,17 @@ updates:
     # The runtime is half the trigger. node_modules/.bin/vitest is a
     # `#!/usr/bin/env node` script, so the same jsdom is green wherever node is
     # on PATH and red where bun is the only toolchain installed — the setup
-    # AGENTS.md describes. #193 settles that by running `bun --bun vitest run`,
-    # matching the build, so the web test job exercises the Bun path and fails
-    # on these releases rather than passing over them.
+    # AGENTS.md describes. #193 makes that explicit by running
+    # `bun --bun vitest run`, matching the build; once it lands the web test
+    # job exercises the Bun path and fails on these releases instead of passing
+    # over them.
     #
-    # Only the two broken releases are held. A later one is proposed as usual,
-    # and with #193 merged the web test job is what catches it if the
-    # regression survives.
+    # Upstream: oven-sh/bun#43671, open at the time of writing. The hold pins
+    # around a confirmed defect rather than a guess, and that issue closing is
+    # what makes it liftable.
+    #
+    # Only the two broken releases are held — 30.1.1 is the current latest, so
+    # this is the whole broken set, and a later release is proposed as usual.
     ignore:
       - dependency-name: "jsdom"
         versions: ["30.1.0", "30.1.1"]
