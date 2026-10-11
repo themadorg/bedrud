@@ -91,7 +91,7 @@ AudioPreferences: {
   autoGainControl: boolean    // default true
   inputGain: number           // 0–300, default 100
   noiseGate: number           // 0–100, default 0
-  mutedBeepEnabled: boolean   // default true
+  mutedBeepEnabled: boolean   // default false
   mutedBeepInterval: number   // ms, default 3000
   pushToTalkEnabled: boolean  // default false
   pushToTalkKey: string       // KeyboardEvent.code, default 'Space' (DEFAULT_PUSH_TO_TALK_KEY)

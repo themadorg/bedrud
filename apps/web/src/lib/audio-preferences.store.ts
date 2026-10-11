@@ -10,7 +10,7 @@ export interface AudioPreferences {
   autoGainControl: boolean
   inputGain: number // 0–300 (percent), default 100 = unity
   noiseGate: number // 0–100 (percent), default 0 = off
-  mutedBeepEnabled: boolean // play a beep when talking while muted
+  mutedBeepEnabled: boolean // play a beep when talking while muted; off until the user asks for it
   mutedBeepInterval: number // ms between beeps, default 3000
   pushToTalkEnabled: boolean
   pushToTalkKey: string // KeyboardEvent.code, default Space
@@ -54,7 +54,7 @@ export const useAudioPreferencesStore = create<AudioPreferencesStore>()(
       autoGainControl: true,
       inputGain: 100,
       noiseGate: 0,
-      mutedBeepEnabled: true,
+      mutedBeepEnabled: false,
       mutedBeepInterval: 3000,
       pushToTalkEnabled: false,
       pushToTalkKey: DEFAULT_PUSH_TO_TALK_KEY,

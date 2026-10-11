@@ -88,20 +88,20 @@ function useMutedMicMonitor() {
   const pushToTalkEnabled = useAudioPreferencesStore((s) => s.pushToTalkEnabled)
   const mutedBeepEnabled = useAudioPreferencesStore((s) => s.mutedBeepEnabled)
   const mutedBeepInterval = useAudioPreferencesStore((s) => s.mutedBeepInterval)
-  // Use refs so the tick loop always reads the latest values without restarting
-  const beepEnabledRef = useRef(mutedBeepEnabled)
+  // The interval lives in a ref so changing it does not restart the tick loop. The enabled flag
+  // does not: turning the reminder off has to release the monitoring stream, not just stay quiet.
   const beepIntervalRef = useRef(mutedBeepInterval)
-  useEffect(() => {
-    beepEnabledRef.current = mutedBeepEnabled
-  }, [mutedBeepEnabled])
   useEffect(() => {
     beepIntervalRef.current = mutedBeepInterval
   }, [mutedBeepInterval])
 
   useEffect(() => {
-    // Only monitor when mic is disabled and user is NOT deafened
-    // (deafened users intentionally silenced everything — don't nag them).
-    if (isMicrophoneEnabled || isSelfDeafened || pushToTalkEnabled) return
+    // Only monitor when the reminder is on, the mic is disabled, and the user is NOT deafened
+    // (deafened users intentionally silenced everything — don't nag them). The reminder belongs in
+    // this guard rather than in the tick: without it, a second capture stream, an AudioContext and
+    // a frame loop ran for the rest of the meeting to compute an RMS nothing would act on, and
+    // that is now the default case.
+    if (!mutedBeepEnabled || isMicrophoneEnabled || isSelfDeafened || pushToTalkEnabled) return
 
     let cancelled = false
     let stream: MediaStream | null = null
@@ -136,7 +136,7 @@ function useMutedMicMonitor() {
         for (let i = 0; i < data.length; i++) sum += data[i] * data[i]
         const rms = Math.sqrt(sum / data.length)
 
-        if (beepEnabledRef.current && rms > SPEECH_THRESHOLD && Date.now() - lastBeepAt > beepIntervalRef.current) {
+        if (rms > SPEECH_THRESHOLD && Date.now() - lastBeepAt > beepIntervalRef.current) {
           lastBeepAt = Date.now()
           playMutedBeep()
         }
@@ -154,5 +154,5 @@ function useMutedMicMonitor() {
       })
       ac?.close()
     }
-  }, [isMicrophoneEnabled, isSelfDeafened, pushToTalkEnabled])
+  }, [mutedBeepEnabled, isMicrophoneEnabled, isSelfDeafened, pushToTalkEnabled])
 }
