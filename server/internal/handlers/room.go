@@ -181,11 +181,13 @@ type AdminUpdateRoomSettingsInput struct {
 }
 
 type CreateRoomRequest struct {
-	Name            string              `json:"name"`
-	MaxParticipants int                 `json:"maxParticipants"`
-	IsPublic        bool                `json:"isPublic"`
-	Mode            string              `json:"mode"`
-	Settings        models.RoomSettings `json:"settings"`
+	Name            string `json:"name"`
+	MaxParticipants int    `json:"maxParticipants"`
+	// IsPublic is a pointer so that an omitted field stays distinguishable from an
+	// explicit false: rooms default to public, and only an explicit false makes one private.
+	IsPublic *bool               `json:"isPublic"`
+	Mode     string              `json:"mode"`
+	Settings models.RoomSettings `json:"settings"`
 }
 
 type JoinRoomRequest struct {
@@ -311,6 +313,12 @@ func (h *RoomHandler) CreateRoom(c *fiber.Ctx) error {
 	// Default room settings: recordings enabled, other settings from request or zero
 	req.Settings.RecordingsAllowed = true
 
+	// Rooms are public unless the caller asks for a private one.
+	isPublic := true
+	if req.IsPublic != nil {
+		isPublic = *req.IsPublic
+	}
+
 	// Normalize: trim whitespace, lowercase
 	req.Name = strings.TrimSpace(strings.ToLower(req.Name))
 
@@ -385,7 +393,7 @@ func (h *RoomHandler) CreateRoom(c *fiber.Ctx) error {
 		log.Error().Err(err).Str("room", req.Name).Msg("LiveKit CreateRoom failed")
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to create media room"})
 	}
-	room, err := h.roomRepo.CreateRoom(claims.UserID, req.Name, req.IsPublic, req.Mode, req.MaxParticipants, &req.Settings)
+	room, err := h.roomRepo.CreateRoom(claims.UserID, req.Name, isPublic, req.Mode, req.MaxParticipants, &req.Settings)
 	if err != nil {
 		// Clean up orphaned LiveKit room on DB failure
 		if _, delErr := h.client.DeleteRoom(ctx, &livekit.DeleteRoomRequest{Room: req.Name}); delErr != nil {
