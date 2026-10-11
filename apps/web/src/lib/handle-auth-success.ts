@@ -23,10 +23,23 @@ export interface AuthResponse {
  */
 export function useHandleAuthSuccess() {
   const navigate = useNavigate()
+  const storeSession = useStoreAuthSession()
+
+  return (res: AuthResponse, redirectTo?: string) => {
+    storeSession(res)
+    navigate({ to: redirectTo ?? '/dashboard' })
+  }
+}
+
+/**
+ * Hook that returns a function storing a successful auth response's tokens and user without
+ * navigating, for pages that have one more step to show before leaving.
+ */
+export function useStoreAuthSession() {
   const setTokens = useAuthStore((s) => s.setTokens)
   const setUser = useUserStore((s) => s.setUser)
 
-  return (res: AuthResponse, redirectTo?: string) => {
+  return (res: AuthResponse) => {
     setTokens(res.tokens)
     setUser({
       id: res.user.id,
@@ -38,6 +51,5 @@ export function useHandleAuthSuccess() {
       accesses: res.user.accesses ?? [],
       avatarUrl: res.user.avatarUrl,
     })
-    navigate({ to: redirectTo ?? '/dashboard' })
   }
 }

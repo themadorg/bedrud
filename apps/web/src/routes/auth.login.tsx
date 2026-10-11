@@ -3,11 +3,17 @@ import { Eye, EyeOff, Fingerprint, Loader2, MailCheck } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { FormattedMessage } from 'react-intl'
 import { ApiError, api } from '#/lib/api'
-import { useAuthStore } from '#/lib/auth.store'
+import { type AuthResponse, useStoreAuthSession } from '#/lib/handle-auth-success'
+import {
+  autofillPasskeyLogin,
+  loginWithPasskey,
+  passkeyAutofillSupported,
+  passkeyErrorMessage,
+  shouldOfferPasskey,
+} from '#/lib/passkey'
 import { getPublicSettings, type PublicSettings } from '#/lib/use-public-settings'
-import { useUserStore } from '#/lib/user.store'
 import { OAuthButtons } from '@/components/auth/OAuthButtons'
-import { loginWithPasskey } from '@/components/auth/PasskeyButton'
+import { PasskeyOffer } from '@/components/auth/PasskeyOffer'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,16 +28,12 @@ export const Route = createFileRoute('/auth/login')({
   component: LoginPage,
 })
 
-interface AuthResponse {
-  user: { id: string; email: string; name: string; provider: string; accesses: string[] | null; avatarUrl?: string }
-  tokens: { accessToken: string; refreshToken: string }
-}
+const EMAIL_PATTERN = /\S+@\S+\.\S+/
 
 function LoginPage() {
   const navigate = useNavigate()
   const { redirect } = Route.useSearch()
-  const setTokens = useAuthStore((s) => s.setTokens)
-  const setUser = useUserStore((s) => s.setUser)
+  const storeSession = useStoreAuthSession()
 
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -40,6 +42,8 @@ function LoginPage() {
   const [email, setEmail] = useState('')
   const [settings, setSettings] = useState<PublicSettings | null>(null)
   const [passkeyLoading, setPasskeyLoading] = useState(false)
+  // Set after a password sign-in on an account with no passkey yet: the user id to offer one to.
+  const [passkeyOfferFor, setPasskeyOfferFor] = useState<string | null>(null)
 
   // Email verification state
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
@@ -47,6 +51,7 @@ function LoginPage() {
   const [resending, setResending] = useState(false)
   const cooldownInterval = useRef<ReturnType<typeof setInterval> | null>(null)
   const cancelledRef = useRef(false)
+  const autofill = useRef<AbortController | null>(null)
 
   useEffect(() => {
     cancelledRef.current = false
@@ -62,6 +67,50 @@ function LoginPage() {
   const showPasskey = settings?.passkeysEnabled !== false
   const oauthProviders = settings?.oauthProviders ?? []
 
+  function leave() {
+    navigate({ to: redirect ?? '/dashboard' })
+  }
+
+  // Stores the session, then leaves — unless this was a password sign-in on an account with no
+  // passkey, in which case adding one is offered first.
+  async function completeSignIn(res: AuthResponse, viaPassword: boolean) {
+    autofill.current?.abort()
+    storeSession(res)
+    if (viaPassword && showPasskey && (await shouldOfferPasskey(res.user.id))) {
+      setPasskeyOfferFor(res.user.id)
+      return
+    }
+    leave()
+  }
+
+  // Lists saved passkeys in the email field's autofill until one is picked, the page is left, or
+  // the passkey button takes over — a browser serves one WebAuthn request at a time.
+  function startPasskeyAutofill() {
+    autofill.current?.abort()
+    const controller = new AbortController()
+    autofill.current = controller
+    void (async () => {
+      if (!(await passkeyAutofillSupported()) || controller.signal.aborted) return
+      try {
+        const res = await autofillPasskeyLogin(controller.signal)
+        if (res) await completeSignIn(res, false)
+      } catch (err) {
+        if (controller.signal.aborted) return
+        setError(passkeyErrorMessage(err, 'Passkey sign-in failed'))
+        startPasskeyAutofill()
+      }
+    })()
+  }
+  const startPasskeyAutofillRef = useRef(startPasskeyAutofill)
+  startPasskeyAutofillRef.current = startPasskeyAutofill
+
+  // Held until the settings arrive, so a server with passkeys turned off is never asked.
+  useEffect(() => {
+    if (!settings || settings.passkeysEnabled === false) return
+    startPasskeyAutofillRef.current()
+    return () => autofill.current?.abort()
+  }, [settings])
+
   function startCooldown(seconds: number) {
     setResendCooldown(seconds)
     if (cooldownInterval.current) clearInterval(cooldownInterval.current)
@@ -76,28 +125,13 @@ function LoginPage() {
     }, 1000)
   }
 
-  function handleSuccess(res: AuthResponse) {
-    setTokens(res.tokens)
-    setUser({
-      id: res.user.id,
-      email: res.user.email,
-      name: res.user.name,
-      provider: res.user.provider,
-      isSuperAdmin: res.user.accesses?.includes('superadmin') ?? false,
-      isAdmin: (res.user.accesses?.includes('admin') || res.user.accesses?.includes('superadmin')) ?? false,
-      accesses: res.user.accesses ?? [],
-      avatarUrl: res.user.avatarUrl,
-    })
-    navigate({ to: redirect ?? '/dashboard' })
-  }
-
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     const email = ((fd.get('username') as string) || '').trim()
     const password = fd.get('password') as string
     const errs: typeof fieldErrors = {}
-    if (!email || !/\S+@\S+\.\S+/.test(email)) errs.email = 'Enter a valid email'
+    if (!email || !EMAIL_PATTERN.test(email)) errs.email = 'Enter a valid email'
     if (!password || password.length < 12) errs.password = 'At least 12 characters'
     if (Object.keys(errs).length) {
       setFieldErrors(errs)
@@ -108,7 +142,7 @@ function LoginPage() {
     setIsLoading(true)
     try {
       const res = await api.post<AuthResponse>('/api/auth/login', { email, password })
-      handleSuccess(res)
+      await completeSignIn(res, true)
     } catch (err) {
       if (err instanceof ApiError && err.parsedBody?.requiresVerification) {
         setUnverifiedEmail(err.parsedBody.email as string)
@@ -139,23 +173,24 @@ function LoginPage() {
   }
 
   async function handlePasskeyLogin() {
-    const trimmed = email.trim()
-    if (!trimmed || !/\S+@\S+\.\S+/.test(trimmed)) {
-      setFieldErrors({ email: 'Enter your email to sign in with passkey' })
-      setError('')
-      return
-    }
+    autofill.current?.abort()
     setPasskeyLoading(true)
     setError('')
     setFieldErrors({})
     try {
-      const res = await loginWithPasskey(trimmed)
-      handleSuccess(res)
+      const trimmed = email.trim()
+      const res = await loginWithPasskey(EMAIL_PATTERN.test(trimmed) ? trimmed : undefined)
+      await completeSignIn(res, false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Passkey login failed')
+      setError(passkeyErrorMessage(err, 'Passkey sign-in failed'))
+      startPasskeyAutofill()
     } finally {
       setPasskeyLoading(false)
     }
+  }
+
+  if (passkeyOfferFor) {
+    return <PasskeyOffer userId={passkeyOfferFor} onDone={leave} />
   }
 
   // ── Email verification interstitial ──────────────────────────────────
@@ -245,19 +280,6 @@ function LoginPage() {
           {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
         </div>
 
-        {showPasskey && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void handlePasskeyLogin()}
-            disabled={passkeyLoading || isLoading}
-            className="h-10 w-full gap-2 text-sm"
-          >
-            {passkeyLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Fingerprint className="h-4 w-4" />}
-            {passkeyLoading ? 'Authenticating…' : 'Use passkey'}
-          </Button>
-        )}
-
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label htmlFor="current-password">
@@ -308,17 +330,32 @@ function LoginPage() {
         </Button>
       </form>
 
-      {oauthProviders.length > 0 && (
-        <>
+      {/* Passkey and OAuth are ways in on their own, not steps of the form above. */}
+      {showPasskey || oauthProviders.length > 0 ? (
+        <div className="space-y-4">
           <div className="relative">
             <Separator />
             <span className="absolute inset-0 flex items-center justify-center">
-              <span className="bg-background px-3 text-xs text-muted-foreground">or continue with</span>
+              <span className="bg-background px-3 text-xs text-muted-foreground">or</span>
             </span>
           </div>
-          <OAuthButtons availableProviders={oauthProviders} />
-        </>
-      )}
+          <div className="space-y-2">
+            {showPasskey && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handlePasskeyLogin()}
+                disabled={passkeyLoading || isLoading}
+                className="w-full gap-2"
+              >
+                {passkeyLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Fingerprint className="h-4 w-4" />}
+                {passkeyLoading ? 'Waiting for passkey…' : 'Sign in with a passkey'}
+              </Button>
+            )}
+            {oauthProviders.length > 0 && <OAuthButtons availableProviders={oauthProviders} />}
+          </div>
+        </div>
+      ) : null}
 
       {settings?.guestLoginEnabled === false ? null : (
         <p className="text-center text-sm text-muted-foreground">

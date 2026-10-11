@@ -203,12 +203,13 @@ Deactivated users → 403.
 
 | Method | Path | Auth / Limit | Req | Res | Status |
 |--------|------|--------------|-----|-----|--------|
-| POST | `/api/auth/passkey/register/begin` | Protected + EmailVerified | — | `{challenge, user:{id,name,displayName}, rp:{id,name}}` | 200 / 500 |
+| GET | `/api/auth/passkeys` | Protected | — | `{passkeys:[{id, name, createdAt}]}` (no credential ID or key) | 200 / 401 / 500 |
+| POST | `/api/auth/passkey/register/begin` | Protected + EmailVerified | — | `{challenge, user:{id,name,displayName}, rp:{id,name}, excludeCredentials}` | 200 / 500 |
 | POST | `/api/auth/passkey/register/finish` | Protected + EmailVerified | `{clientDataJSON, attestationObject}` base64url | `{"message":"Passkey registered successfully"}` | 200 / 400 |
 | POST | `/api/auth/passkey/login/begin` | AuthRate | — | `{challenge, rpId}` | 200 / 500 |
 | POST | `/api/auth/passkey/login/finish` | AuthRate | `{credentialId, clientDataJSON, authenticatorData, signature}` base64url | `LoginResponse` | 200 / 400 / 401 / 403 |
 | POST | `/api/auth/passkey/signup/begin` | AuthRate | `{email, name, inviteToken?}` | creation options | 200 / 400 / 403 / 500 |
-| POST | `/api/auth/passkey/signup/finish` | AuthRate | `{clientDataJSON, attestationObject}` | `LoginResponse` or verification gate | 200 / 400 / 500 |
+| POST | `/api/auth/passkey/signup/finish` | AuthRate | `{clientDataJSON, attestationObject}` | `LoginResponse` or verification gate | 200 / 400 / 409 / 500 |
 
 ### Notes
 

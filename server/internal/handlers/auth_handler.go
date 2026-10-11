@@ -1292,6 +1292,38 @@ func webauthnAuthenticatorSelection() fiber.Map {
 	}
 }
 
+// passkeySummary is the public view of a stored passkey: no credential ID or key material.
+type passkeySummary struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// @Summary List passkeys
+// @Description List the passkeys registered to the authenticated user.
+// @Tags auth
+// @Produce json
+// @Success 200 {object} object
+// @Failure 500 {object} auth.ErrorResponse
+// @Router /auth/passkeys [get]
+func (h *AuthHandler) ListPasskeys(c *fiber.Ctx) error {
+	claims := c.Locals("user").(*auth.Claims)
+	passkeys, err := h.authService.ListPasskeys(claims.UserID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(internalError(err))
+	}
+
+	out := make([]passkeySummary, 0, len(passkeys))
+	for i := range passkeys {
+		out = append(out, passkeySummary{
+			ID:        passkeys[i].ID,
+			Name:      passkeys[i].Name,
+			CreatedAt: passkeys[i].CreatedAt,
+		})
+	}
+	return c.JSON(fiber.Map{"passkeys": out})
+}
+
 // @Summary Begin passkey registration
 // @Description Start FIDO2/WebAuthn registration ceremony for the authenticated user.
 // @Tags auth
@@ -1304,6 +1336,21 @@ func (h *AuthHandler) PasskeyRegisterBegin(c *fiber.Ctx) error {
 	challenge, err := h.authService.BeginRegisterPasskey(claims.UserID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(internalError(err))
+	}
+
+	// Existing passkeys go in excludeCredentials, so an authenticator that already holds one for
+	// this account refuses to make a second instead of silently replacing it on the device and
+	// leaving a stale record here.
+	existing, err := h.authService.ListPasskeys(claims.UserID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(internalError(err))
+	}
+	exclude := make([]fiber.Map, 0, len(existing))
+	for i := range existing {
+		exclude = append(exclude, fiber.Map{
+			"type": "public-key",
+			"id":   base64.RawURLEncoding.EncodeToString(existing[i].CredentialID),
+		})
 	}
 
 	h.challengeStore.Set("passkey_register:"+claims.UserID, challenge, claims.UserID, nil)
@@ -1321,6 +1368,7 @@ func (h *AuthHandler) PasskeyRegisterBegin(c *fiber.Ctx) error {
 		},
 		"pubKeyCredParams":       webauthnCredParams(),
 		"authenticatorSelection": webauthnAuthenticatorSelection(),
+		"excludeCredentials":     exclude,
 	})
 }
 
@@ -1612,6 +1660,10 @@ func (h *AuthHandler) PasskeySignupBegin(c *fiber.Ctx) error {
 	})
 }
 
+// errInviteTokenSpent reports that a passkey signup's invite token was used by
+// another signup between begin and finish.
+var errInviteTokenSpent = errors.New("invite token already used")
+
 // @Summary Finish passkey signup
 // @Description Complete FIDO2/WebAuthn registration for a new user.
 // @Tags auth
@@ -1620,6 +1672,7 @@ func (h *AuthHandler) PasskeySignupBegin(c *fiber.Ctx) error {
 // @Param request body object true "WebAuthn registration response"
 // @Success 200 {object} auth.LoginResponse
 // @Failure 400 {object} auth.ErrorResponse
+// @Failure 409 {object} auth.ErrorResponse
 // @Router /auth/passkey/signup/finish [post]
 func (h *AuthHandler) PasskeySignupFinish(c *fiber.Ctx) error {
 	var input struct {
@@ -1660,7 +1713,24 @@ func (h *AuthHandler) PasskeySignupFinish(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid attestationObject encoding"})
 	}
 
-	loginResponse, err := h.authService.FinishSignupPasskey(userID, email, name, challenge, clientData, attestation, h.getRPID(c), h.getOrigin(c))
+	// Spend the invite token before the user is written, as Register does: every signup
+	// begun with the same token passes the begin check, so only the atomic MarkUsed can
+	// decide which of them gets the account. The attestation is verified first, so a
+	// failed ceremony does not burn the token.
+	var claimInvite func() error
+	if tokenID := extra["inviteToken"]; tokenID != "" && h.inviteTokenRepo != nil {
+		claimInvite = func() error {
+			if err := h.inviteTokenRepo.MarkUsed(tokenID, userID); err != nil {
+				return errInviteTokenSpent
+			}
+			return nil
+		}
+	}
+
+	loginResponse, err := h.authService.FinishSignupPasskey(userID, email, name, challenge, clientData, attestation, h.getRPID(c), h.getOrigin(c), claimInvite)
+	if errors.Is(err, errInviteTokenSpent) {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Invite token already used or invalid"})
+	}
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -1674,16 +1744,6 @@ func (h *AuthHandler) PasskeySignupFinish(c *fiber.Ctx) error {
 			"message":              "Please check your email to verify your account",
 			"email":                loginResponse.User.Email,
 		})
-	}
-
-	// Mark invite token used if passkey signup required one
-	if tokenID := extra["inviteToken"]; tokenID != "" && h.inviteTokenRepo != nil {
-		if err := h.inviteTokenRepo.MarkUsed(tokenID, loginResponse.User.ID); err != nil {
-			log.Error().Err(err).Str("tokenID", tokenID).Msg("Failed to mark passkey invite token as used")
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Signup succeeded but failed to record token usage",
-			})
-		}
 	}
 
 	h.challengeStore.Delete("passkey_signup:" + challengeID)

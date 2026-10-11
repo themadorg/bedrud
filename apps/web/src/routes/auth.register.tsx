@@ -1,12 +1,11 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Eye, EyeOff, Fingerprint, KeyRound, Loader2, MailCheck } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { ApiError, api } from '#/lib/api'
-import type { AuthResponse } from '#/lib/handle-auth-success'
-import { useHandleAuthSuccess } from '#/lib/handle-auth-success'
+import { type AuthResponse, useStoreAuthSession } from '#/lib/handle-auth-success'
+import { passkeyErrorMessage, passkeysSupported, shouldOfferPasskey, signupWithPasskey } from '#/lib/passkey'
 import { getPublicSettings, type PublicSettings } from '#/lib/use-public-settings'
-import { cn } from '#/lib/utils'
-import { signupWithPasskey } from '@/components/auth/PasskeyButton'
+import { PasskeyOffer } from '@/components/auth/PasskeyOffer'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,8 +15,13 @@ export const Route = createFileRoute('/auth/register')({
   component: RegisterPage,
 })
 
+/** How the new account will sign in: a password (the default form) or a passkey only. */
+type SignupMethod = 'password' | 'passkey'
+
 function RegisterPage() {
-  const handleAuthSuccess = useHandleAuthSuccess()
+  const navigate = useNavigate()
+  const storeSession = useStoreAuthSession()
+  const [method, setMethod] = useState<SignupMethod>('password')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -29,9 +33,13 @@ function RegisterPage() {
     inviteToken?: string
   }>({})
   const [settings, setSettings] = useState<PublicSettings | null>(null)
-  const [usePasskey, setUsePasskey] = useState(false)
+  // Checked after mount: the server render has no browser to ask.
+  const [browserHasPasskeys, setBrowserHasPasskeys] = useState(false)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [inviteToken, setInviteToken] = useState('')
+  // Set after a password signup that signed straight in: the user id to offer a passkey to.
+  const [passkeyOfferFor, setPasskeyOfferFor] = useState<string | null>(null)
 
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
   const [resendCooldown, setResendCooldown] = useState(0)
@@ -39,6 +47,7 @@ function RegisterPage() {
   const cooldownInterval = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
+    setBrowserHasPasskeys(passkeysSupported())
     getPublicSettings()
       .then(setSettings)
       .catch(() =>
@@ -81,48 +90,48 @@ function RegisterPage() {
   }
 
   const requiresToken = settings?.tokenRegistrationOnly === true
+  const passkeysOn = settings?.passkeysEnabled !== false
 
-  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const fd = new FormData(e.currentTarget)
-    const trimmedName = name.trim()
-    const trimmedEmail = email.trim()
-    const password = fd.get('password') as string
-    const confirm = fd.get('confirm') as string
-    const inviteToken = ((fd.get('inviteToken') as string) ?? '').trim()
+  function leave() {
+    navigate({ to: '/dashboard' })
+  }
 
-    const errs: typeof fieldErrors = {}
-    if (trimmedName.length < 2) errs.name = 'At least 2 characters'
-    if (!trimmedEmail || !/\S+@\S+\.\S+/.test(trimmedEmail)) errs.email = 'Enter a valid email'
-
-    if (usePasskey) {
-      if (Object.keys(errs).length) {
-        setFieldErrors(errs)
-        return
-      }
-      setFieldErrors({})
-      setError('')
-      setIsLoading(true)
-      try {
-        const res = await signupWithPasskey(trimmedName, trimmedEmail)
-        if ('requiresVerification' in res && res.requiresVerification) {
-          setRegisteredEmail(res.email)
-          startCooldown(120)
-          return
-        }
-        if (!('user' in res) || !('tokens' in res)) return
-        handleAuthSuccess(res)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Passkey signup failed')
-      } finally {
-        setIsLoading(false)
-      }
+  // Stores the session, then leaves — unless the account was just made with a password, in which
+  // case adding a passkey is offered first.
+  async function completeSignup(res: AuthResponse, viaPassword: boolean) {
+    storeSession(res)
+    if (viaPassword && passkeysOn && (await shouldOfferPasskey(res.user.id))) {
+      setPasskeyOfferFor(res.user.id)
       return
     }
+    leave()
+  }
 
+  function switchMethod(next: SignupMethod) {
+    setMethod(next)
+    setError('')
+    setFieldErrors({})
+  }
+
+  // Checks shared by both methods; the password method adds its own on top.
+  function validateCommon() {
+    const errs: typeof fieldErrors = {}
+    if (name.trim().length < 2) errs.name = 'At least 2 characters'
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail || !/\S+@\S+\.\S+/.test(trimmedEmail)) errs.email = 'Enter a valid email'
+    if (requiresToken && !inviteToken.trim()) errs.inviteToken = 'Invite token is required'
+    return errs
+  }
+
+  async function handlePasswordSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const fd = new FormData(e.currentTarget)
+    const password = fd.get('password') as string
+    const confirm = fd.get('confirm') as string
+
+    const errs = validateCommon()
     if (password.length < 12) errs.password = 'At least 12 characters'
     if (password !== confirm) errs.confirm = 'Passwords do not match'
-    if (requiresToken && !inviteToken) errs.inviteToken = 'Invite token is required'
     if (Object.keys(errs).length) {
       setFieldErrors(errs)
       return
@@ -132,8 +141,8 @@ function RegisterPage() {
     setError('')
     setIsLoading(true)
     try {
-      const body: Record<string, string> = { name: trimmedName, email: trimmedEmail, password }
-      if (inviteToken) body.inviteToken = inviteToken
+      const body: Record<string, string> = { name: name.trim(), email: email.trim(), password }
+      if (inviteToken.trim()) body.inviteToken = inviteToken.trim()
       const res = await api.post<AuthResponse | { requiresVerification: boolean; message: string; email: string }>(
         '/api/auth/register',
         body as any,
@@ -145,9 +154,36 @@ function RegisterPage() {
         return
       }
 
-      handleAuthSuccess(res as AuthResponse)
+      await completeSignup(res as AuthResponse, true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function handlePasskeySubmit(e: React.SyntheticEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const errs = validateCommon()
+    if (Object.keys(errs).length) {
+      setFieldErrors(errs)
+      return
+    }
+
+    setFieldErrors({})
+    setError('')
+    setIsLoading(true)
+    try {
+      const res = await signupWithPasskey(name.trim(), email.trim(), inviteToken.trim() || undefined)
+      if ('requiresVerification' in res && res.requiresVerification) {
+        setRegisteredEmail(res.email)
+        startCooldown(120)
+        return
+      }
+      if (!('user' in res) || !('tokens' in res)) return
+      await completeSignup(res, false)
+    } catch (err) {
+      setError(passkeyErrorMessage(err, 'Passkey signup failed'))
     } finally {
       setIsLoading(false)
     }
@@ -172,6 +208,10 @@ function RegisterPage() {
 
   function clearField(field: keyof typeof fieldErrors) {
     setFieldErrors((p) => ({ ...p, [field]: undefined }))
+  }
+
+  if (passkeyOfferFor) {
+    return <PasskeyOffer userId={passkeyOfferFor} onDone={leave} />
   }
 
   // ── Check email screen ──────────────────────────────────────────
@@ -249,13 +289,84 @@ function RegisterPage() {
     )
   }
 
+  const passkeyMode = method === 'passkey'
+
+  // Name, email and invite token belong to both methods, and their values carry across a switch.
+  const nameField = (
+    <div className="space-y-1.5">
+      <Label htmlFor="reg-name">Full name</Label>
+      <Input
+        id="reg-name"
+        name="name"
+        value={name}
+        placeholder="Jane Smith"
+        autoComplete="name"
+        autoFocus
+        required
+        onChange={(e) => {
+          setName(e.target.value)
+          clearField('name')
+        }}
+      />
+      {fieldErrors.name && <p className="text-xs text-destructive">{fieldErrors.name}</p>}
+    </div>
+  )
+
+  const emailField = (
+    <div className="space-y-1.5">
+      <Label htmlFor="reg-username">Email</Label>
+      <Input
+        id="reg-username"
+        name="username"
+        type="email"
+        inputMode="email"
+        value={email}
+        placeholder="you@example.com"
+        autoComplete="username"
+        required
+        onChange={(e) => {
+          setEmail(e.target.value)
+          clearField('email')
+        }}
+      />
+      {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
+    </div>
+  )
+
+  const inviteField = requiresToken ? (
+    <div className="space-y-1.5">
+      <Label htmlFor="reg-invite" className="flex items-center gap-1.5">
+        <KeyRound className="h-3.5 w-3.5" style={{ color: 'var(--accent-500)' }} />
+        Invite token <span className="text-destructive">*</span>
+      </Label>
+      <Input
+        id="reg-invite"
+        name="inviteToken"
+        value={inviteToken}
+        placeholder="Paste your invite token…"
+        autoComplete="off"
+        spellCheck={false}
+        onChange={(e) => {
+          setInviteToken(e.target.value)
+          clearField('inviteToken')
+        }}
+      />
+      {fieldErrors.inviteToken && <p className="text-xs text-destructive">{fieldErrors.inviteToken}</p>}
+      <p className="text-xs text-muted-foreground">Registration on this instance requires an invite token.</p>
+    </div>
+  ) : null
+
   return (
     <div className="space-y-7">
       <div className="space-y-2">
         <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Account</p>
-        <h1 className="min-h-8 text-2xl font-semibold tracking-tight">Create an account</h1>
+        <h1 className="min-h-8 text-2xl font-semibold tracking-tight">
+          {passkeyMode ? 'Create an account with a passkey' : 'Create an account'}
+        </h1>
         <p className="min-h-10 text-sm text-muted-foreground">
-          Create your account to host rooms and manage your profile.
+          {passkeyMode
+            ? 'No password to remember: you sign in with your fingerprint, face, or screen lock.'
+            : 'Create your account to host rooms and manage your profile.'}
         </p>
       </div>
 
@@ -269,148 +380,118 @@ function RegisterPage() {
         </div>
       )}
 
-      <form method="post" action="#" onSubmit={handleSubmit} className="space-y-4" autoComplete="on" noValidate>
-        <div className="space-y-1.5">
-          <Label htmlFor="reg-name">Full name</Label>
-          <Input
-            id="reg-name"
-            name="name"
-            value={name}
-            placeholder="Jane Smith"
-            autoComplete="name"
-            autoFocus
-            required
-            onChange={(e) => {
-              setName(e.target.value)
-              clearField('name')
-            }}
-          />
-          {fieldErrors.name && <p className="text-xs text-destructive">{fieldErrors.name}</p>}
-        </div>
+      {passkeyMode ? (
+        <form
+          method="post"
+          action="#"
+          onSubmit={handlePasskeySubmit}
+          className="space-y-4"
+          autoComplete="on"
+          noValidate
+        >
+          {nameField}
+          {emailField}
+          {inviteField}
+          <Button type="submit" className="w-full gap-2" disabled={isLoading}>
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Fingerprint className="h-4 w-4" />}
+            {isLoading ? 'Waiting for passkey…' : 'Create account with a passkey'}
+          </Button>
+        </form>
+      ) : (
+        <form
+          method="post"
+          action="#"
+          onSubmit={handlePasswordSubmit}
+          className="space-y-4"
+          autoComplete="on"
+          noValidate
+        >
+          {nameField}
+          {emailField}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="reg-username">Email</Label>
-          <Input
-            id="reg-username"
-            name="username"
-            type="email"
-            inputMode="email"
-            value={email}
-            placeholder="you@example.com"
-            autoComplete="username webauthn"
-            required
-            onChange={(e) => {
-              setEmail(e.target.value)
-              clearField('email')
-            }}
-          />
-          {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
-        </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="new-password">Password</Label>
+            <div className="relative">
+              <Input
+                id="new-password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="At least 12 characters"
+                autoComplete="new-password"
+                className="pe-10"
+                required
+                onChange={() => clearField('password')}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute end-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                tabIndex={-1}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </Button>
+            </div>
+            {fieldErrors.password && <p className="text-xs text-destructive">{fieldErrors.password}</p>}
+          </div>
 
-        {settings?.passkeysEnabled !== false && (
+          <div className="space-y-1.5">
+            <Label htmlFor="new-password-confirm">Confirm password</Label>
+            <Input
+              id="new-password-confirm"
+              name="confirm"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="••••••••"
+              autoComplete="new-password"
+              required
+              onChange={() => clearField('confirm')}
+            />
+            {fieldErrors.confirm && <p className="text-xs text-destructive">{fieldErrors.confirm}</p>}
+          </div>
+
+          {inviteField}
+
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="me-2 h-4 w-4 animate-spin" /> Creating account…
+              </>
+            ) : (
+              'Create account'
+            )}
+          </Button>
+        </form>
+      )}
+
+      {/* The other method is a separate path, offered only after the form, never inside it. */}
+      {passkeyMode ? (
+        <p className="text-center text-sm text-muted-foreground">
           <Button
             type="button"
-            variant={usePasskey ? 'default' : 'outline'}
-            onClick={() => {
-              setUsePasskey((v) => !v)
-              setError('')
-              setFieldErrors((p) => ({
-                ...p,
-                password: undefined,
-                confirm: undefined,
-                inviteToken: undefined,
-              }))
-            }}
-            aria-pressed={usePasskey}
-            className={cn(
-              'h-10 w-full gap-2 text-sm',
-              usePasskey && 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary',
-            )}
+            variant="link"
+            onClick={() => switchMethod('password')}
+            disabled={isLoading}
+            className="h-auto p-0 font-medium"
           >
-            <Fingerprint className="h-4 w-4" />
-            {usePasskey ? 'Using passkey' : 'Use passkey'}
+            Use a password instead
           </Button>
-        )}
-
-        {!usePasskey && (
-          <>
-            <div className="space-y-1.5">
-              <Label htmlFor="new-password">Password</Label>
-              <div className="relative">
-                <Input
-                  id="new-password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="At least 12 characters"
-                  autoComplete="new-password"
-                  className="pe-10"
-                  required
-                  onChange={() => clearField('password')}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute end-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                  tabIndex={-1}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-              {fieldErrors.password && <p className="text-xs text-destructive">{fieldErrors.password}</p>}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="new-password-confirm">Confirm password</Label>
-              <Input
-                id="new-password-confirm"
-                name="confirm"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
-                autoComplete="new-password"
-                required
-                onChange={() => clearField('confirm')}
-              />
-              {fieldErrors.confirm && <p className="text-xs text-destructive">{fieldErrors.confirm}</p>}
-            </div>
-
-            {requiresToken && (
-              <div className="space-y-1.5">
-                <Label htmlFor="reg-invite" className="flex items-center gap-1.5">
-                  <KeyRound className="h-3.5 w-3.5" style={{ color: 'var(--accent-500)' }} />
-                  Invite token <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="reg-invite"
-                  name="inviteToken"
-                  placeholder="Paste your invite token…"
-                  autoComplete="off"
-                  spellCheck={false}
-                  onChange={() => clearField('inviteToken')}
-                />
-                {fieldErrors.inviteToken && <p className="text-xs text-destructive">{fieldErrors.inviteToken}</p>}
-                <p className="text-xs text-muted-foreground">Registration on this instance requires an invite token.</p>
-              </div>
-            )}
-          </>
-        )}
-
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? (
-            <>
-              <Loader2 className="me-2 h-4 w-4 animate-spin" /> {usePasskey ? 'Setting up…' : 'Creating account…'}
-            </>
-          ) : usePasskey ? (
-            <>
-              <Fingerprint className="me-2 h-4 w-4" /> Create account with Passkey
-            </>
-          ) : (
-            'Create account'
-          )}
-        </Button>
-      </form>
+        </p>
+      ) : passkeysOn && browserHasPasskeys ? (
+        <p className="text-center text-sm text-muted-foreground">
+          Rather not have a password?{' '}
+          <Button
+            type="button"
+            variant="link"
+            onClick={() => switchMethod('passkey')}
+            disabled={isLoading}
+            className="h-auto p-0 font-medium"
+          >
+            Sign up with a passkey
+          </Button>
+        </p>
+      ) : null}
 
       {settings?.guestLoginEnabled === false ? null : (
         <p className="text-center text-sm text-muted-foreground">

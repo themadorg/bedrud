@@ -323,6 +323,7 @@ func run() error {
 	api.Put("/auth/preferences", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), preferencesHandler.UpdatePreferences)
 
 	// Passkey routes
+	api.Get("/auth/passkeys", middleware.Protected(), authHandler.ListPasskeys)
 	api.Post("/auth/passkey/register/begin", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.PasskeyRegisterBegin)
 	api.Post("/auth/passkey/register/finish", middleware.Protected(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.PasskeyRegisterFinish)
 	api.Post("/auth/passkey/login/begin", middleware.AuthRateLimiter(cfg.RateLimit), authHandler.PasskeyLoginBegin)
