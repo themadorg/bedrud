@@ -37,9 +37,16 @@ const BEEP_INTERVALS: { value: number; label: string }[] = [
   { value: 120000, label: '2 min' },
 ]
 
+/**
+ * `relative` is load-bearing. The segment holds its radio input as an `sr-only` child, which is
+ * `position: absolute`: with no positioned label around it the input resolves its containing block
+ * to the settings dialog itself, so once the panel is scrolled the input sits past the dialog's
+ * bottom edge. Clicking a segment then focuses it, and the browser scrolls the dialog — which is
+ * `overflow-hidden`, so nothing can scroll it back — to bring the input into view.
+ */
 function modeSegmentClass(active: boolean, meeting: boolean, disabled: boolean) {
   return cn(
-    'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium transition-colors',
+    'relative flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium transition-colors',
     active
       ? meeting
         ? 'bg-[var(--meet-btn-muted-bg)] text-[var(--meet-btn-muted-fg)]'
