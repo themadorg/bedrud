@@ -283,14 +283,20 @@ func ValidateVerificationToken(tokenString string, cfg *config.Config) (userID, 
 	return claims.UserID, claims.Email, nil
 }
 
+// ResetTokenTTL is how long a password reset token stays valid. Callers that have to tell a
+// recipient when their link dies read it from here rather than recomputing the fallback.
+func ResetTokenTTL(cfg *config.Config) time.Duration {
+	if cfg.Auth.ResetTokenTTLHours > 0 {
+		return time.Duration(cfg.Auth.ResetTokenTTLHours) * time.Hour
+	}
+	return 1 * time.Hour
+}
+
 // GenerateResetToken creates a short-lived JWT with purpose="password_reset" containing the userID and email.
 // Uses same HMAC-SHA256 signing key as access tokens. TTL defaults to 1 hour, configurable.
 // passwordChangedAt is embedded in the token so ValidateResetToken can detect reuse after a password change.
 func GenerateResetToken(userID, email string, passwordChangedAt *time.Time, cfg *config.Config) (string, error) {
-	ttl := 1 * time.Hour
-	if cfg.Auth.ResetTokenTTLHours > 0 {
-		ttl = time.Duration(cfg.Auth.ResetTokenTTLHours) * time.Hour
-	}
+	ttl := ResetTokenTTL(cfg)
 	var pca *int64
 	if passwordChangedAt != nil {
 		u := passwordChangedAt.Unix()

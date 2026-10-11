@@ -84,6 +84,25 @@ func HashPassword(password string) (string, error) {
 	return string(hashed), nil
 }
 
+// MinGeneratedPasswordLength is the floor for a password this package mints. It matches the
+// minimum the login and reset paths accept, so a generated credential is never one the app
+// would go on to refuse.
+const MinGeneratedPasswordLength = 12
+
+// GenerateRandomPassword returns a URL-safe password of exactly n characters drawn from
+// crypto/rand, raising n to MinGeneratedPasswordLength when the caller asks for less.
+func GenerateRandomPassword(n int) (string, error) {
+	if n < MinGeneratedPasswordLength {
+		n = MinGeneratedPasswordLength
+	}
+	raw := make([]byte, n)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	// n raw bytes encode to at least n characters, so the slice is always in range.
+	return base64.RawURLEncoding.EncodeToString(raw)[:n], nil
+}
+
 // VerifyPassword checks a password against a stored hash.
 // It first tries bcrypt(sha256(password)) for new-style hashes, then falls back
 // to bcrypt(password) for pre-migration hashes.

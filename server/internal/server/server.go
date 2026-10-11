@@ -565,6 +565,7 @@ func Run(configPath, version string) error {
 	adminGroup.Put("/users/:id/accesses", usersHandler.UpdateUserAccesses)
 	adminGroup.Post("/users/:id/force-logout", usersHandler.ForceLogout)
 	adminGroup.Put("/users/:id/password", usersHandler.SetUserPassword)
+	adminGroup.Post("/users/:id/reset-password", usersHandler.AdminResetPassword)
 	adminGroup.Get("/rooms", roomHandler.AdminListRooms)
 	adminGroup.Get("/rooms/events", roomHandler.ListRoomEvents)
 	adminGroup.Post("/rooms/:roomId/token", roomHandler.AdminGenerateToken)

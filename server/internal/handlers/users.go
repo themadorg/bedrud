@@ -503,6 +503,147 @@ func (h *UsersHandler) SetUserPassword(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Password updated successfully"})
 }
 
+// Reset modes accepted by AdminResetPassword.
+const (
+	// resetModePassword mints a password and returns it to the admin once.
+	resetModePassword = "password"
+	// resetModeLink mints the reset URL the forgot-password email would carry, for the admin
+	// to hand to the user.
+	resetModeLink = "link"
+	// generatedPasswordLength sits well above MinPasswordLength, so a value handed to an admin
+	// always satisfies the policy the login path enforces.
+	generatedPasswordLength = 20
+)
+
+// AdminResetPasswordRequest selects which of the two reset paths to take.
+type AdminResetPasswordRequest struct {
+	Mode string `json:"mode" example:"password"`
+}
+
+// AdminResetPassword recovers a locked-out account, in whichever of two ways the admin picks.
+//
+// The "password" mode replaces the password and returns the plaintext once, for an admin who
+// has a channel to the user and wants them able to sign in immediately. The "link" mode leaves
+// the password alone and returns the same single-use reset URL the forgot-password email
+// carries, for an admin who would rather not learn the user's credential at all.
+//
+// @Summary Reset a user's password (admin)
+// @Description Recover a user who cannot sign in. With mode "password" the server generates a new password, stores it, revokes the user's sessions and returns the plaintext once — it is never retrievable again. With mode "link" the password is untouched and the response carries a single-use reset URL the user completes themselves. Superadmin only, and only for local and passkey accounts.
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID"
+// @Param request body AdminResetPasswordRequest true "Reset mode: password or link"
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{} "Generated password, or reset link and its expiry"
+// @Failure 400 {object} ErrorResponse "Unknown mode, or an account with no password to reset"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 404 {object} ErrorResponse "User not found"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /admin/users/{id}/reset-password [post]
+func (h *UsersHandler) AdminResetPassword(c *fiber.Ctx) error {
+	claims, ok := c.Locals("user").(*auth.Claims)
+	if !ok || claims == nil || !containsAccess(claims.Accesses, "superadmin") {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Insufficient permissions"})
+	}
+
+	var input AdminResetPasswordRequest
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
+	}
+	if input.Mode != resetModePassword && input.Mode != resetModeLink {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": fmt.Sprintf("mode must be %q or %q", resetModePassword, resetModeLink),
+		})
+	}
+
+	userID := c.Params("id")
+	user, err := h.userRepo.GetUserByID(userID)
+	if err != nil || user == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+	}
+
+	// Only password-backed accounts have a password to reset. An OAuth user signs in through
+	// their provider, so either mode would hand out a credential their login never consults.
+	// This is the same provider test ForgotPassword applies before sending a reset email.
+	if user.Provider != models.ProviderLocal && user.Provider != models.ProviderPasskey {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": fmt.Sprintf("Cannot reset the password of a %s account", user.Provider),
+		})
+	}
+
+	if input.Mode == resetModeLink {
+		return h.respondWithResetLink(c, claims, user)
+	}
+	return h.respondWithGeneratedPassword(c, claims, user)
+}
+
+// respondWithGeneratedPassword stores a fresh password and returns the plaintext once. The
+// plaintext is never persisted and never logged, so the response body is the only copy.
+func (h *UsersHandler) respondWithGeneratedPassword(c *fiber.Ctx, claims *auth.Claims, user *models.User) error {
+	password, err := auth.GenerateRandomPassword(generatedPasswordLength)
+	if err != nil {
+		log.Error().Err(err).Str("userID", user.ID).Msg("AdminResetPassword: failed to generate password")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to generate password"})
+	}
+
+	hashed, err := auth.HashPassword(password)
+	if err != nil {
+		log.Error().Err(err).Str("userID", user.ID).Msg("AdminResetPassword: failed to hash password")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to hash password"})
+	}
+
+	if err := h.userRepo.UpdatePassword(user.ID, hashed); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+		}
+		log.Error().Err(err).Str("userID", user.ID).Msg("AdminResetPassword: failed to store password")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update password"})
+	}
+
+	// UpdatePassword clears the refresh token; the ban set is what stops access tokens that
+	// were already issued. ForceLogout pairs them the same way.
+	auth.BanUser(user.ID)
+
+	log.Info().Str("adminID", claims.UserID).Str("targetUserID", user.ID).
+		Msg("Admin replaced user password with a generated one")
+
+	return c.JSON(fiber.Map{
+		"mode":     resetModePassword,
+		"password": password,
+		"message":  "Password replaced and existing sessions revoked. This password is shown once.",
+	})
+}
+
+// respondWithResetLink mints the reset token the forgot-password email carries and returns its
+// URL for the admin to pass on. The stored password is untouched, so the user keeps their
+// current sessions until they finish the flow themselves.
+func (h *UsersHandler) respondWithResetLink(c *fiber.Ctx, claims *auth.Claims, user *models.User) error {
+	cfg := config.Get()
+
+	token, err := auth.GenerateResetToken(user.ID, user.Email, user.PasswordChangedAt, cfg)
+	if err != nil {
+		log.Error().Err(err).Str("userID", user.ID).Msg("AdminResetPassword: failed to generate reset token")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to generate reset link"})
+	}
+
+	frontendURL := frontendBaseURL(cfg)
+	if frontendURL == "" && cfg.Server.Domain != "" {
+		frontendURL = fmt.Sprintf("https://%s", strings.TrimRight(cfg.Server.Domain, "/"))
+	}
+
+	log.Info().Str("adminID", claims.UserID).Str("targetUserID", user.ID).
+		Msg("Admin generated a password reset link")
+
+	return c.JSON(fiber.Map{
+		"mode":      resetModeLink,
+		"resetUrl":  frontendURL + "/auth/reset-password?token=" + token,
+		"expiresAt": time.Now().Add(auth.ResetTokenTTL(cfg)).Format(time.RFC3339),
+		"message":   "Reset link created. It expires, and it stops working once the password changes.",
+	})
+}
+
 // ForceLogout revokes all sessions by clearing the stored refresh token and blocking
 // existing access tokens at the shared middleware ban set (process-local).
 // @Summary Force logout a user
