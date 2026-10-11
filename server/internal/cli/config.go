@@ -102,22 +102,21 @@ func newConfigSetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set <key> <value>",
 		Short: "Write a single config value by dotted key and save to disk",
-		Args:  cobra.ExactArgs(2),
+		Long: `Write a single config value by dotted key and save to disk.
+
+Only the addressed key is rewritten: every other key keeps its exact
+spelling, order and comments, and the result is parsed back before it
+replaces the file on disk.`,
+		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := resolveConfigPath(defaultEtcConfig)
-			v := viper.New()
-			v.SetConfigFile(path)
-			v.SetConfigType("yaml")
-			if err := v.ReadInConfig(); err != nil {
-				return fmt.Errorf("read config: %w", err)
-			}
-			v.Set(args[0], coerce(args[1]))
-			if err := v.WriteConfigAs(path); err != nil {
-				return fmt.Errorf("write config: %w", err)
+			key, err := setConfigValue(path, args[0], args[1])
+			if err != nil {
+				return err
 			}
 			return clioutput.Success(
-				fmt.Sprintf("✓ Set %s = %s in %s", args[0], args[1], path),
-				map[string]string{"key": args[0], "value": args[1], "path": path},
+				fmt.Sprintf("✓ Set %s = %s in %s", key, args[1], path),
+				map[string]string{"key": key, "value": args[1], "path": path},
 			)
 		},
 	}
@@ -170,19 +169,6 @@ func newConfigValidateCmd() *cobra.Command {
 		},
 	}
 	return cmd
-}
-
-// coerce attempts to turn a CLI string into the closest scalar type
-// (bool / int) so YAML round-trips remain stable.
-func coerce(s string) any {
-	low := strings.ToLower(s)
-	switch low {
-	case "true":
-		return true
-	case "false":
-		return false
-	}
-	return s
 }
 
 func maskSecrets(cfg *config.Config) map[string]any {
