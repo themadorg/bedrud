@@ -131,28 +131,38 @@ describe('livekit-publish', () => {
     expect(livekitConnectOptionsForHost('debug.example.com', true)?.rtcConfig?.iceTransportPolicy).toBe('relay')
   })
 
-  it('rewrites TURNS port 443 to 5349', () => {
-    expect(normalizeTurnsTlsPort('turns:debug.example.com:443?transport=tcp')).toBe(
+  it('rewrites TURNS port 443 to 5349 only for TURN on the signaling host', () => {
+    expect(normalizeTurnsTlsPort('turns:debug.example.com:443?transport=tcp', 'debug.example.com')).toBe(
       'turns:debug.example.com:5349?transport=tcp',
     )
-    expect(normalizeTurnsTlsPort('turns:debug.example.com:5349?transport=tcp')).toBe(
+    expect(normalizeTurnsTlsPort('turns:debug.example.com:5349?transport=tcp', 'debug.example.com')).toBe(
       'turns:debug.example.com:5349?transport=tcp',
+    )
+    expect(normalizeTurnsTlsPort('turns:turn.example.net:443?transport=tcp', 'debug.example.com')).toBe(
+      'turns:turn.example.net:443?transport=tcp',
+    )
+    expect(normalizeTurnsTlsPort('turns:debug.example.com:443?transport=tcp')).toBe(
+      'turns:debug.example.com:443?transport=tcp',
     )
   })
 
-  it('filters ICE servers to TURNS/TCP only and fixes port 443', () => {
-    const filtered = filterIceServersToTurnsTls([
-      {
-        urls: [
-          'turn:debug.example.com:3478?transport=udp',
-          'turns:debug.example.com:443?transport=tcp',
-          'turns:debug.example.com:5349?transport=tcp',
-        ],
-      },
-    ])
-    expect(filtered[0]?.urls).toEqual([
-      'turns:debug.example.com:5349?transport=tcp',
-      'turns:debug.example.com:5349?transport=tcp',
+  it('filters ICE servers to TURNS/TCP only and fixes port 443 on the signaling host', () => {
+    const filtered = filterIceServersToTurnsTls(
+      [
+        {
+          urls: [
+            'turn:debug.example.com:3478?transport=udp',
+            'turns:debug.example.com:443?transport=tcp',
+            'turns:debug.example.com:5349?transport=tcp',
+          ],
+        },
+        { urls: ['turn:turn.example.net:3478?transport=udp', 'turns:turn.example.net:443?transport=tcp'] },
+      ],
+      'debug.example.com',
+    )
+    expect(filtered.map((server) => server.urls)).toEqual([
+      ['turns:debug.example.com:5349?transport=tcp', 'turns:debug.example.com:5349?transport=tcp'],
+      ['turns:turn.example.net:443?transport=tcp'],
     ])
   })
 

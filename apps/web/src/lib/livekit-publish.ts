@@ -277,19 +277,27 @@ function shouldForceLiveKitIceRelay(): boolean {
   return import.meta.env.VITE_LIVEKIT_ICE_RELAY === '1'
 }
 
-function normalizeIceServerUrls(iceServers: RTCIceServer[]): RTCIceServer[] {
+/** Hostname of the current LiveKit signaling URL; the TURNS port rewrite applies only to TURN on it. */
+let liveKitSignalHostname: string | null = null
+
+function normalizeIceServerUrls(iceServers: RTCIceServer[], signalHostname: string | null): RTCIceServer[] {
   return iceServers.map((server) => {
     const urls = Array.isArray(server.urls) ? server.urls : [server.urls]
     return {
       ...server,
-      urls: urls.map((url) => (typeof url === 'string' ? normalizeTurnsTlsPort(url) : url)),
+      urls: urls.map((url) => (typeof url === 'string' ? normalizeTurnsTlsPort(url, signalHostname) : url)),
     }
   })
 }
 
-/** LiveKit may advertise turns:host:443 (HTTPS entrypoint); embedded TURN TLS listens on 5349. */
-export function normalizeTurnsTlsPort(url: string): string {
-  return url.replace(/^turns:([^:/?]+):443(?=[/?]|$)/, 'turns:$1:5349')
+/**
+ * LiveKit may advertise turns:<signal host>:443 (HTTPS entrypoint); embedded TURN TLS listens on 5349.
+ * A TURN server on another host keeps 443, which is often the only port a browser proxy/VPN passes.
+ */
+export function normalizeTurnsTlsPort(url: string, signalHostname?: string | null): string {
+  const match = /^turns:([^:/?]+):443(?=[/?]|$)/.exec(url)
+  if (!match || !signalHostname || match[1].toLowerCase() !== signalHostname.toLowerCase()) return url
+  return `turns:${match[1]}:5349${url.slice(match[0].length)}`
 }
 
 /** Parse hostname from a LiveKit server URL (ws/wss or bare host:port). */
@@ -307,12 +315,12 @@ export function livekitHostnameFromUrl(livekitUrl: string): string | null {
 let remoteTransportPatchInstalled = false
 
 /** Keep only TURN/TLS (TCP) — UDP TURN relay breaks SCTP data channels through VPN/TUN. */
-export function filterIceServersToTurnsTls(iceServers: RTCIceServer[]): RTCIceServer[] {
+export function filterIceServersToTurnsTls(iceServers: RTCIceServer[], signalHostname?: string | null): RTCIceServer[] {
   const filtered: RTCIceServer[] = []
   for (const server of iceServers) {
     const urls = (Array.isArray(server.urls) ? server.urls : [server.urls])
       .filter((url): url is string => typeof url === 'string' && url.startsWith('turns:'))
-      .map(normalizeTurnsTlsPort)
+      .map((url) => normalizeTurnsTlsPort(url, signalHostname))
     if (urls.length > 0) filtered.push({ ...server, urls })
   }
   return filtered.length > 0 ? filtered : iceServers
@@ -338,8 +346,8 @@ export function ensureRemoteLiveKitTransportPatch(): void {
     const forceRelay = config.iceTransportPolicy === 'relay' || this.rtcConfig?.iceTransportPolicy === 'relay'
     if (config.iceServers?.length) {
       config.iceServers = forceRelay
-        ? filterIceServersToTurnsTls(config.iceServers)
-        : normalizeIceServerUrls(config.iceServers)
+        ? filterIceServersToTurnsTls(config.iceServers, liveKitSignalHostname)
+        : normalizeIceServerUrls(config.iceServers, liveKitSignalHostname)
     }
     if (!forceRelay) {
       return config
@@ -362,6 +370,7 @@ function relayRtcConnectOptions(): RoomConnectOptions {
  */
 export function livekitConnectOptionsForHost(hostname: string, preferRelay = false): RoomConnectOptions | undefined {
   if (isLocalLiveKitHostname(hostname)) return undefined
+  liveKitSignalHostname = hostname
   ensureRemoteLiveKitTransportPatch()
   if (preferRelay || shouldForceLiveKitIceRelay()) {
     return relayRtcConnectOptions()
