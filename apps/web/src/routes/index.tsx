@@ -6,6 +6,7 @@ import { useAuthStore } from '#/lib/auth.store'
 import { formatJoinRoomError } from '#/lib/errors'
 import { isGuestToken } from '#/lib/jwt-user'
 import { type RecentRoom, useRecentRoomsStore } from '#/lib/recent-rooms.store'
+import { getPublicSettings } from '#/lib/use-public-settings'
 import type { User } from '#/lib/user.store'
 import { isGuestUser, useUserStore } from '#/lib/user.store'
 import { cn } from '#/lib/utils'
@@ -365,13 +366,34 @@ function HomePage() {
   const recentRooms = useRecentRoomsStore((s) => s.rooms)
   const removeRecent = useRecentRoomsStore((s) => s.remove)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // null while the public settings are still loading — the join form stays hidden
+  // until we know whether an anonymous visitor is allowed to join at all.
+  const [guestJoinBlocked, setGuestJoinBlocked] = useState<boolean | null>(null)
 
   useEffect(() => {
     if (!tokens || user) return
     void loadUserIfNeeded()
   }, [tokens, user])
 
+  useEffect(() => {
+    let cancelled = false
+    getPublicSettings()
+      .then((s) => {
+        if (cancelled) return
+        setGuestJoinBlocked(!s.registrationEnabled || s.tokenRegistrationOnly || !s.guestLoginEnabled)
+      })
+      .catch(() => {
+        if (!cancelled) setGuestJoinBlocked(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const showRecent = guest && recentRooms.length > 0
+  // Signed-in visitors always keep the form; anonymous ones only get it on
+  // instances that still accept guests (open registration + guest login on).
+  const showJoin = Boolean(tokens) || guestJoinBlocked === false
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
@@ -405,10 +427,12 @@ function HomePage() {
               </p>
             </div>
 
-            <div className="max-w-md space-y-3">
-              <JoinForm />
-              <JoinHint guest={guest} />
-            </div>
+            {showJoin ? (
+              <div className="max-w-md space-y-3">
+                <JoinForm />
+                <JoinHint guest={guest} />
+              </div>
+            ) : null}
           </div>
 
           {showRecent ? (
