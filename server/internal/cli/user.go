@@ -2,6 +2,8 @@ package cli
 
 import (
 	"fmt"
+	"io"
+	"strings"
 
 	"bedrud/internal/usercli"
 
@@ -30,19 +32,30 @@ func newUserCmd() *cobra.Command {
 
 func newUserCreateCmd() *cobra.Command {
 	var email, password, name string
-	var admin bool
+	var admin, passwordStdin bool
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a new local user",
+		Long: `Create a new local user.
+
+--password puts the secret in the process list, where any local shell can
+read it while the command runs. Prefer --password-stdin:
+
+  printf '%s' "$PASSWORD" | bedrud user create --email you@example.com --name You --password-stdin`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if email == "" || password == "" || name == "" {
-				return fmt.Errorf("--email, --password and --name are required")
+			if email == "" || name == "" {
+				return fmt.Errorf("--email and --name are required")
+			}
+			password, err := resolvePasswordInput(cmd, password, passwordStdin)
+			if err != nil {
+				return err
 			}
 			return usercli.CreateUser(resolveConfigPath(defaultEtcConfig), email, password, name, admin)
 		},
 	}
 	cmd.Flags().StringVar(&email, "email", "", "User email")
-	cmd.Flags().StringVar(&password, "password", "", "User password")
+	cmd.Flags().StringVar(&password, "password", "", "User password (visible in the process list; prefer --password-stdin)")
+	cmd.Flags().BoolVar(&passwordStdin, "password-stdin", false, "Read the password from stdin")
 	cmd.Flags().StringVar(&name, "name", "", "User display name")
 	cmd.Flags().BoolVar(&admin, "admin", false, "Create user as superadmin")
 	_ = cmd.MarkFlagRequired("email")
@@ -133,20 +146,31 @@ func newUserInfoCmd() *cobra.Command {
 
 func newUserPasswordCmd() *cobra.Command {
 	var email, password string
+	var passwordStdin bool
 	cmd := &cobra.Command{
 		Use:   "password",
 		Short: "Set a user's password (invalidates active sessions)",
+		Long: `Set a user's password (invalidates active sessions).
+
+--password puts the secret in the process list, where any local shell can
+read it while the command runs. Prefer --password-stdin:
+
+  printf '%s' "$NEW_PASSWORD" | bedrud user password --email you@example.com --password-stdin`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if email == "" || password == "" {
-				return fmt.Errorf("--email and --password are required")
+			if email == "" {
+				return fmt.Errorf("--email is required")
+			}
+			password, err := resolvePasswordInput(cmd, password, passwordStdin)
+			if err != nil {
+				return err
 			}
 			return usercli.SetUserPassword(resolveConfigPath(defaultEtcConfig), email, password)
 		},
 	}
 	cmd.Flags().StringVar(&email, "email", "", "User email")
-	cmd.Flags().StringVar(&password, "password", "", "New password")
+	cmd.Flags().StringVar(&password, "password", "", "New password (visible in the process list; prefer --password-stdin)")
+	cmd.Flags().BoolVar(&passwordStdin, "password-stdin", false, "Read the new password from stdin")
 	_ = cmd.MarkFlagRequired("email")
-	_ = cmd.MarkFlagRequired("password")
 	return cmd
 }
 
@@ -155,6 +179,10 @@ func newUserResetPasswordCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "reset-password",
 		Short: "Generate a random password and print it (invalidates active sessions)",
+		Long: `Generate a random password and print it (invalidates active sessions).
+
+Only the hash is stored, so the printed password is the only copy: record it
+before the terminal scrolls away. With --json it is also in data.password.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if email == "" {
 				return fmt.Errorf("--email is required")
@@ -165,6 +193,27 @@ func newUserResetPasswordCmd() *cobra.Command {
 	cmd.Flags().StringVar(&email, "email", "", "User email")
 	_ = cmd.MarkFlagRequired("email")
 	return cmd
+}
+
+// resolvePasswordInput picks the password source, preferring stdin so the
+// secret never reaches the process list. An empty flag with no --password-stdin
+// is an error: silently falling back to a generated password is how an account
+// ends up locked behind a value nobody printed.
+func resolvePasswordInput(cmd *cobra.Command, password string, fromStdin bool) (string, error) {
+	if fromStdin {
+		if password != "" {
+			return "", fmt.Errorf("--password and --password-stdin are mutually exclusive")
+		}
+		data, err := io.ReadAll(cmd.InOrStdin())
+		if err != nil {
+			return "", fmt.Errorf("read password from stdin: %w", err)
+		}
+		password = strings.TrimRight(string(data), "\r\n")
+	}
+	if password == "" {
+		return "", fmt.Errorf("--password or --password-stdin is required")
+	}
+	return password, nil
 }
 
 func newUserEnableCmd() *cobra.Command {

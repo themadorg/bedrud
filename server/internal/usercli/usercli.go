@@ -327,15 +327,35 @@ func SetUserPassword(configPath, email, newPassword string) error {
 		if err := repo.ClearRefreshToken(user.ID); err != nil {
 			return fmt.Errorf("invalidate sessions: %w", err)
 		}
-		data := map[string]any{
-			"email":     email,
-			"generated": generated,
-		}
-		if generated {
-			data["password"] = newPassword
-		}
-		return clioutput.Success(fmt.Sprintf("✓ Password updated for %s", email), data)
+		return reportPasswordChange(email, newPassword, generated)
 	})
+}
+
+// reportPasswordChange writes the outcome of a password change.
+//
+// A generated password is printed explicitly: clioutput.Success prints only its
+// message in text mode and drops the data payload, so without this the reset
+// would leave the account behind a value nobody holds. A password the operator
+// supplied is never echoed — they already have it, and repeating it only widens
+// where it ends up.
+func reportPasswordChange(email, password string, generated bool) error {
+	data := map[string]any{
+		"email":     email,
+		"generated": generated,
+	}
+	message := fmt.Sprintf("✓ Password updated for %s", email)
+	if generated {
+		data["password"] = password
+		message = fmt.Sprintf("✓ Password reset for %s", email)
+	}
+	if err := clioutput.Success(message, data); err != nil {
+		return err
+	}
+	if generated {
+		clioutput.Printf("  New password: %s\n", password)
+		clioutput.Println("  Shown once and stored only as a hash — record it now.")
+	}
+	return nil
 }
 
 func SetUserActive(configPath, email string, active bool) error {
