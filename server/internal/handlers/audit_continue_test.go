@@ -793,7 +793,7 @@ func TestGetSettings_SecretsMasked(t *testing.T) {
 	s.JWTSecret = "super-secret-value-not-for-clients"
 	s.SessionSecret = "session-secret-value"
 	_ = settingsRepo.SaveSettings(s)
-	h := NewAdminHandler(settingsRepo, nil, nil, nil)
+	h := NewAdminHandler(settingsRepo, nil, nil, nil, "test")
 	app := fiber.New()
 	app.Get("/admin/settings", h.GetSettings)
 	req := httptest.NewRequest(http.MethodGet, "/admin/settings", http.NoBody)
@@ -819,7 +819,7 @@ func TestGetPublicSettings_NoSecrets(t *testing.T) {
 	s.JWTSecret = "super-secret-value-not-for-clients"
 	_ = settingsRepo.SaveSettings(s)
 	config.SetForTest(&config.Config{Auth: config.AuthConfig{JWTSecret: "x"}})
-	h := NewAdminHandler(settingsRepo, nil, nil, nil)
+	h := NewAdminHandler(settingsRepo, nil, nil, nil, "test")
 	app := fiber.New()
 	app.Get("/public/settings", h.GetPublicSettings)
 	req := httptest.NewRequest(http.MethodGet, "/public/settings", http.NoBody)

@@ -28,7 +28,7 @@ func setupAdminTestApp(t *testing.T) (*fiber.App, *repository.SettingsRepository
 	inviteTokenRepo := repository.NewInviteTokenRepository(db)
 	webhookRepo := repository.NewWebhookRepository(db)
 	recordingRepo := repository.NewRecordingRepository(db)
-	adminHandler := NewAdminHandler(settingsRepo, inviteTokenRepo, webhookRepo, recordingRepo)
+	adminHandler := NewAdminHandler(settingsRepo, inviteTokenRepo, webhookRepo, recordingRepo, "test")
 
 	app := fiber.New()
 	// Inject admin claims for all routes
@@ -106,6 +106,35 @@ func TestAdminHandler_GetPublicSettings(t *testing.T) {
 	}
 	if _, ok := result["chatUploadMaxDimension"]; !ok {
 		t.Fatal("expected 'chatUploadMaxDimension' in public settings response")
+	}
+	if result["version"] != "test" {
+		t.Fatalf("expected version 'test' in public settings response, got %v", result["version"])
+	}
+}
+
+// A binary built without the version ldflag must still report something printable,
+// otherwise the dashboard would show an empty version label.
+func TestAdminHandler_GetPublicSettings_VersionFallback(t *testing.T) {
+	config.SetForTest(&config.Config{})
+	db := testutil.SetupTestDB(t)
+	handler := NewAdminHandler(repository.NewSettingsRepository(db), nil, nil, nil, "")
+
+	app := fiber.New()
+	app.Get("/public/settings", handler.GetPublicSettings)
+
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/public/settings", http.NoBody), -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result["version"] != versionDefault {
+		t.Fatalf("expected version %q, got %v", versionDefault, result["version"])
 	}
 }
 

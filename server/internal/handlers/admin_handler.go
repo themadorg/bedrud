@@ -246,6 +246,8 @@ type AdminHandler struct {
 	webhookRepo     *repository.WebhookRepository
 	// TODO oncoming feature
 	recordingRepo *repository.RecordingRepository
+	// version is the build version this instance reports to every visitor.
+	version string
 }
 
 func NewAdminHandler(
@@ -253,8 +255,12 @@ func NewAdminHandler(
 	itr *repository.InviteTokenRepository,
 	wr *repository.WebhookRepository,
 	rr *repository.RecordingRepository,
+	version string,
 ) *AdminHandler {
-	return &AdminHandler{settingsRepo: sr, inviteTokenRepo: itr, webhookRepo: wr, recordingRepo: rr}
+	if version == "" {
+		version = versionDefault
+	}
+	return &AdminHandler{settingsRepo: sr, inviteTokenRepo: itr, webhookRepo: wr, recordingRepo: rr, version: version}
 }
 
 // GetSettings returns effective system settings with secrets masked.
@@ -316,6 +322,7 @@ func (h *AdminHandler) GetPublicSettings(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{
 		"serverName":               s.ServerName,
+		"version":                  h.version,
 		"registrationEnabled":      s.RegistrationEnabled,
 		"tokenRegistrationOnly":    s.TokenRegistrationOnly,
 		"guestLoginEnabled":        s.GuestLoginEnabled,

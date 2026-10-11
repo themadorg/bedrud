@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, useRouterState } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { loadRegisteredUser, requireRegisteredUser } from '#/lib/require-registered-user'
+import { AppVersion } from '@/components/AppVersion'
 import { MobileOnlyGate } from '@/components/dashboard/MobileOnlyGate'
 import { AppearanceSettingsPanel } from '@/components/settings/AppearanceSettingsPanel'
 import { AudioSettingsPanel } from '@/components/settings/AudioSettingsPanel'
@@ -80,6 +81,8 @@ function SettingsLayout() {
             <SettingsSectionPanel id={id} />
           </section>
         ))}
+
+        <AppVersion className="text-center" />
       </div>
 
       {/* Renders the matched sub-route so its document title applies; the sub-routes draw nothing. */}

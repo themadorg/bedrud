@@ -8,6 +8,7 @@ import { useRecentRoomsStore } from '#/lib/recent-rooms.store'
 import { loadRegisteredUser, requireRegisteredUser } from '#/lib/require-registered-user'
 import type { User as BedrudUser } from '#/lib/user.store'
 import { useUserStore } from '#/lib/user.store'
+import { AppVersion } from '@/components/AppVersion'
 import { MobileBottomNav } from '@/components/dashboard/MobileBottomNav'
 import { HomeSettingsDialog } from '@/components/settings/HomeSettingsDialog'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -132,6 +133,7 @@ function SidebarContent({
             <LogOut className="h-4 w-4" />
           </Button>
         </div>
+        <AppVersion className="px-2 pt-1" />
       </div>
     </>
   )

@@ -507,7 +507,7 @@ func run() error {
 
 	// Initialize handlers
 	usersHandler := handlers.NewUsersHandler(userRepo, roomRepo, passkeyRepo, prefsRepo, cleanupSvc, verifEventRepo)
-	adminHandler := handlers.NewAdminHandler(settingsRepo, inviteTokenRepo, webhookRepo, recordingRepo)
+	adminHandler := handlers.NewAdminHandler(settingsRepo, inviteTokenRepo, webhookRepo, recordingRepo, "dev")
 	certHandler := handlers.NewCertHandler(cfg)
 	overviewHandler := handlers.NewAdminOverviewHandler(roomRepo, userRepo, settingsRepo, &cfg.LiveKit, lkClient, database.GetDB(), time.Now(), "dev")
 
