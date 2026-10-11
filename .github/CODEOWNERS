@@ -4,8 +4,8 @@
 # lives under .github/, so a narrower rule lets it be edited — a reviewer quietly removed,
 # say — with one ordinary approval and no code owner involved.
 #
-# All three have admin on this repository. Carlos-Adams is a code owner of .github/ in
+# Both have admin on this repository. Carlos-Adams is a code owner of .github/ in
 # bedrud-android but is deliberately absent here: they have read access only, and GitHub
 # ignores code owners without write access, so listing them would look like coverage that
 # does not exist.
-/.github/ @omidz4t @narseh-ir @mamaru-a
+/.github/ @omidz4t @narseh-ir
