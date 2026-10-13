@@ -168,14 +168,14 @@ jobs:
           tar -cJf bedrud_${{ matrix.suffix }}.tar.xz bedrud
           rm bedrud
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: server-${{ matrix.suffix }}
           path: |
             dist/bedrud_${{ matrix.suffix }}.tar.xz
             dist/bedrud_${{ matrix.suffix }}
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: server-deb-${{ matrix.deb_arch }}
           path: bedrud_${{ matrix.deb_arch }}.deb
@@ -209,7 +209,7 @@ jobs:
           mkdir -p ../../dist
           tar -cJf ../../dist/web.tar.xz -C dist .
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: web-bundle
           path: dist/web.tar.xz
@@ -248,7 +248,7 @@ jobs:
             name: macos-arm64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # v1
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
           toolchain: stable
           targets: ${{ matrix.target }}
@@ -328,19 +328,19 @@ jobs:
           ARCH="${ARCH_TOOL}" APPIMAGE_EXTRACT_AND_RUN=1 \
             ./appimagetool AppDir "bedrud-desktop-${{ matrix.name }}.AppImage"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: runner.os == 'Linux'
         with:
           name: bedrud-desktop-${{ matrix.name }}-portable
           path: bedrud-desktop-${{ matrix.name }}.tar.xz
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: runner.os == 'Linux'
         with:
           name: bedrud-desktop-${{ matrix.name }}-deb
           path: bedrud-desktop-${{ matrix.name }}.deb
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: runner.os == 'Linux'
         with:
           name: bedrud-desktop-${{ matrix.name }}-appimage
@@ -364,13 +364,13 @@ jobs:
           makensis /DARCH=${{ matrix.nsis_arch }} bedrud.nsi
           Move-Item "bedrud-desktop-setup-${{ matrix.nsis_arch }}.exe" "${{ github.workspace }}\bedrud-desktop-${{ matrix.name }}-setup.exe"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: runner.os == 'Windows'
         with:
           name: bedrud-desktop-${{ matrix.name }}-portable
           path: bedrud-desktop-${{ matrix.name }}.zip
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: runner.os == 'Windows'
         with:
           name: bedrud-desktop-${{ matrix.name }}-setup
@@ -388,13 +388,13 @@ jobs:
           hdiutil create -volname "Bedrud Desktop" -srcfolder dmg-staging -ov -format UDZO \
             "bedrud-desktop-${{ matrix.name }}.dmg"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: runner.os == 'macOS'
         with:
           name: bedrud-desktop-${{ matrix.name }}-portable
           path: bedrud-desktop-${{ matrix.name }}.tar.gz
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: runner.os == 'macOS'
         with:
           name: bedrud-desktop-${{ matrix.name }}-dmg
@@ -411,7 +411,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: artifacts
           pattern: "{server-*,web-*,bedrud-desktop-*}"
