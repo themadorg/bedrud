@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"errors"
 	"strings"
 
 	"bedrud/config"
@@ -10,6 +11,7 @@ import (
 	"bedrud/internal/models"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog/log"
 )
 
@@ -42,6 +44,11 @@ func Protected() fiber.Handler {
 		}
 
 		claims, err := auth.ValidateToken(token, config.Get())
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Token expired",
+			})
+		}
 		if err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Invalid token",
