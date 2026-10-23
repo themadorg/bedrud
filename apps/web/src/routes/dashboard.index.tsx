@@ -1,7 +1,7 @@
 // TODO oncoming feature
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ArrowRight, Plus, Search } from 'lucide-react'
+import { ArrowRight, Link, Plus, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '#/lib/api'
@@ -65,7 +65,8 @@ function QuickJoinBar({ onJoin, onCreate }: { onJoin: (name: string) => void; on
         onSubmit={handleSubmit}
         className="flex h-9 flex-1 items-center gap-2 rounded-lg border border-input bg-background px-3 focus-within:ring-2 focus-within:ring-ring"
       >
-        <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        {/* A link, not a magnifier: the field joins the room it names and filters nothing. */}
+        <Link className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         {/* Room names are lowercase and have no spaces, so the phone keyboard should not
             capitalise, correct or spell-check what is typed. This mirrors the Android field's
             `KeyboardType.Uri` with capitalisation and auto-correct off. */}
