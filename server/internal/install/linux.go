@@ -22,6 +22,7 @@ import (
 const (
 	loopbackIPv4 = "127.0.0.1"
 	loopbackIPv6 = "::1"
+	allIPv4      = "0.0.0.0"
 )
 
 type installConfigYAML struct {
@@ -120,6 +121,15 @@ func derivePublicEndpoints(cfg *InstallConfig) publicEndpoints {
 			scheme = "http"
 		}
 		endpoints.FrontendURL = scheme + "://" + cfg.Domain
+	}
+	// The proxy terminates TLS on the public domain and reaches the server over loopback or the LAN.
+	if cfg.behindProxy() {
+		endpoints.ServerHost = allIPv4
+		endpoints.LiveKitHost = fmt.Sprintf("https://%s/livekit", hostForLK)
+		if cfg.Domain != "" {
+			endpoints.CORSOrigins = "https://" + cfg.Domain
+			endpoints.FrontendURL = "https://" + cfg.Domain
+		}
 	}
 
 	if cfg.ExternalLKURL != "" {
@@ -508,7 +518,7 @@ func LinuxInstall(cfg *InstallConfig) error {
 	}
 	fmt.Println("  Access URL: ", accessURL)
 	if cfg.Domain != "" {
-		fmt.Println("  Domain URL: ", fmt.Sprintf("%s://%s", protocol, cfg.Domain))
+		fmt.Println("  Domain URL: ", endpoints.FrontendURL)
 	}
 	if cfg.EnableWebxdc && configYAML.Webxdc.Enabled {
 		fmt.Println("  WebXDC:          enabled (experimental)")
