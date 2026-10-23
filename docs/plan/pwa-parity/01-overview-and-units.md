@@ -22,6 +22,7 @@ Someone who installs the web app on a phone should recognise the Android app in 
 - **Pixel parity with Compose.** Same shapes, same placement, same behaviour; not the same pixels.
 - **Material 3 on the web.** No `material-web`, no MUI, no second design system next to shadcn.
 - **A service worker.** Install works from the manifest alone on current Chrome and iOS Safari. A video-meeting app has no useful offline mode, and caching `/api` under an authenticated session is a hazard. An offline fallback page can be added later without touching anything here.
+- **The expressive loading indicator.** Android shows a morphing shape while a screen loads; the web keeps its spinners and skeleton pulses, which `apps/web/AGENTS.md` allows where it rules out other animation.
 - **Native-only capabilities.** A call surviving the app being backgrounded on iOS, dialer and telecom integration, proximity screen-off, and screen share on iOS Safari (no `getDisplayMedia`) are out of reach for a PWA and are not simulated.
 
 ## Settled decisions
