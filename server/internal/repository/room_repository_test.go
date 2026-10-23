@@ -186,6 +186,40 @@ func TestRoomRepository_GetRoomByName_PrefersActiveOverArchived(t *testing.T) {
 	}
 }
 
+// assertReactivationRejectsTakenName suspends a room, lets a new room take its
+// name, then reactivates the first one the way the admin endpoint and the room
+// CLI do. Only idx_rooms_active_name stands in the way there, so the violation
+// has to come back as ErrRoomNameTaken rather than a raw driver error the
+// handler reports as a 500. Shared by both dialects because each driver words
+// that error differently.
+func assertReactivationRejectsTakenName(t *testing.T, repo *RoomRepository, db *gorm.DB) {
+	t.Helper()
+
+	db.Create(&models.User{ID: testUserIDRoom, Email: "user@ex.com", Name: "Creator", Provider: "local", IsActive: true})
+	suspended, err := repo.CreateRoom(testUserIDRoom, "standup", false, "standard", 0, &models.RoomSettings{})
+	if err != nil {
+		t.Fatalf("create first room: %v", err)
+	}
+	suspended.IsActive = false
+	if err := repo.UpdateRoom(suspended); err != nil {
+		t.Fatalf("suspend first room: %v", err)
+	}
+	if _, err := repo.CreateRoom(testUserIDRoom, "standup", false, "standard", 0, &models.RoomSettings{}); err != nil {
+		t.Fatalf("a suspended room's name should be reusable: %v", err)
+	}
+
+	suspended.IsActive = true
+	err = repo.UpdateRoom(suspended)
+	if !errors.Is(err, models.ErrRoomNameTaken) {
+		t.Fatalf("reactivating onto a taken name: expected ErrRoomNameTaken, got %v", err)
+	}
+}
+
+func TestRoomRepository_UpdateRoom_ReactivationOntoTakenNameIsRejected(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	assertReactivationRejectsTakenName(t, NewRoomRepository(db), db)
+}
+
 func TestRoomRepository_AddParticipant(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := NewRoomRepository(db)

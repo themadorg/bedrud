@@ -24,6 +24,18 @@ func NewRoomRepository(db *gorm.DB) *RoomRepository {
 	return &RoomRepository{db: db}
 }
 
+// isUniqueViolation reports whether err is the database rejecting a duplicate
+// key. Each driver words that error differently, so the dialect translates it
+// rather than the message being matched. Translation stays local here instead
+// of being enabled in the GORM config, which would change every error callers
+// elsewhere already compare against.
+func (r *RoomRepository) isUniqueViolation(err error) bool {
+	if translator, ok := r.db.Dialector.(gorm.ErrorTranslator); ok {
+		err = translator.Translate(err)
+	}
+	return errors.Is(err, gorm.ErrDuplicatedKey)
+}
+
 // CreateRoom creates a new room with default admin permissions for creator.
 // If name is empty, a random URL-safe name is generated.
 // The name is validated to contain only lowercase letters, numbers, and hyphens.
@@ -97,8 +109,8 @@ func (r *RoomRepository) CreateRoom(createdBy, name string, isPublic bool, mode 
 			"settings_recordings_allowed": newRoom.Settings.RecordingsAllowed,
 		}).Error; err != nil {
 			newRoom = nil
-			// Catch unique constraint violations (TOCTOU race safety net)
-			if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique") || strings.Contains(err.Error(), "UNIQUE") {
+			// idx_rooms_active_name catches the race the check above cannot.
+			if r.isUniqueViolation(err) {
 				return models.ErrRoomNameTaken
 			}
 			return err
@@ -972,8 +984,15 @@ func (r *RoomRepository) GetUserParticipationsPaginated(userID string, p UserPar
 	return participants, total, err
 }
 
+// UpdateRoom saves every field of room. Reactivating a room whose name another
+// active room now holds is rejected by idx_rooms_active_name and returns
+// ErrRoomNameTaken.
 func (r *RoomRepository) UpdateRoom(room *models.Room) error {
-	return r.db.Save(room).Error
+	err := r.db.Save(room).Error
+	if err != nil && r.isUniqueViolation(err) {
+		return models.ErrRoomNameTaken
+	}
+	return err
 }
 
 func (r *RoomRepository) CountActiveParticipants() (int64, error) {
