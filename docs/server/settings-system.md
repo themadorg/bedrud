@@ -129,7 +129,7 @@ These are returned to frontend via public settings — not enforced server-side 
 | `welcomeSoundMaxPeakDbfs` | -1 | Reject clips whose sample peak reaches this level |
 | `welcomeSoundMaxLoudnessLufs` | -20 | Reject clips louder than this integrated loudness |
 
-Public settings return `welcomeSound: {enabled, maxBytes, maxDurationSeconds}`. Upload and playback are not wired yet; see [the design](../plan/welcome-sound/01-design.md).
+Public settings return `welcomeSound: {enabled, maxBytes, maxDurationSeconds}`. The upload API enforces these limits; the web profile UI and meeting playback are not wired yet. See [the design](../plan/welcome-sound/01-design.md).
 
 ### Recordings (planned)
 

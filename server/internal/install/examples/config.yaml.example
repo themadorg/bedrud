@@ -105,6 +105,13 @@ chat:
   maxMessageCount: 10000
   messageTTLHours: 2160
 
+# Profile welcome sound limits (the feature itself is off until enabled in the admin panel).
+welcomeSound:
+  maxBytes: 32768
+  maxDurationSeconds: 7
+  maxPeakDbfs: -1
+  maxLoudnessLufs: -20
+
 queue:
   pollInterval: 500
   maxAttempts: 3
