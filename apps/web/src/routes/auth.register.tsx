@@ -2,10 +2,12 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { Eye, EyeOff, Fingerprint, KeyRound, Loader2, MailCheck } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { ApiError, api } from '#/lib/api'
+import { getErrorMessage } from '#/lib/errors'
 import type { AuthResponse } from '#/lib/handle-auth-success'
 import { useHandleAuthSuccess } from '#/lib/handle-auth-success'
 import { getPublicSettings, type PublicSettings } from '#/lib/use-public-settings'
 import { cn } from '#/lib/utils'
+import { isPasskeyCancelled, passkeyErrorMessage } from '#/lib/webauthn'
 import { signupWithPasskey } from '@/components/auth/PasskeyButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -113,7 +115,8 @@ function RegisterPage() {
         if (!('user' in res) || !('tokens' in res)) return
         handleAuthSuccess(res)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Passkey signup failed')
+        if (isPasskeyCancelled(err)) return
+        setError(passkeyErrorMessage(err, 'Passkey signup failed'))
       } finally {
         setIsLoading(false)
       }
@@ -147,7 +150,7 @@ function RegisterPage() {
 
       handleAuthSuccess(res as AuthResponse)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed')
+      setError(getErrorMessage(err, 'Registration failed'))
     } finally {
       setIsLoading(false)
     }

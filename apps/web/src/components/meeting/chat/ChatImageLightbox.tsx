@@ -2,6 +2,7 @@ import { Download, Minus, Plus, X } from 'lucide-react'
 import { type PointerEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuthStore } from '#/lib/auth.store'
+import { isOnServer } from './chatImageOrigin'
 
 const MIN_ZOOM = 1
 const MAX_ZOOM = 4
@@ -79,9 +80,10 @@ export function ChatImageLightbox({ url, onClose }: Props) {
       } else {
         const fullUrl = url.startsWith('http') ? url : `${window.location.origin}${url}`
         const headers: Record<string, string> = {}
+        const onServer = isOnServer(fullUrl)
         const token = useAuthStore.getState().tokens?.accessToken
-        if (token) headers.Authorization = `Bearer ${token}`
-        const res = await fetch(fullUrl, { credentials: 'include', headers })
+        if (token && onServer) headers.Authorization = `Bearer ${token}`
+        const res = await fetch(fullUrl, { credentials: onServer ? 'include' : 'omit', headers })
         if (!res.ok) throw new Error('Download failed')
         blob = await res.blob()
         const ext = url.split('.').pop()?.split('?')[0] || 'png'

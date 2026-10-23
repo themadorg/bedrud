@@ -1,9 +1,32 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { NetworkError } from './api'
 import { getErrorMessage } from './errors'
 
 const fallback = 'Something went wrong'
 
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
 describe('getErrorMessage', () => {
+  it('names a request that never reached the server', () => {
+    expect(getErrorMessage(new NetworkError(), fallback)).toBe("Couldn't reach the server")
+  })
+
+  it('says there is no connection when the browser is offline', () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+
+    expect(getErrorMessage(new NetworkError(), fallback)).toBe('No internet connection')
+  })
+
+  it("never shows a built-in error's own text", () => {
+    // Both are English and technical, written for a developer rather than the reader.
+    expect(getErrorMessage(new TypeError("Cannot read properties of undefined (reading 'id')"), fallback)).toBe(
+      fallback,
+    )
+    expect(getErrorMessage(new DOMException('The operation is insecure.', 'SecurityError'), fallback)).toBe(fallback)
+  })
+
   it('reads message, error and detail from a JSON body', () => {
     expect(getErrorMessage(new Error('{"message":"name is required"}'), fallback)).toBe('name is required')
     expect(getErrorMessage(new Error('{"error":"room name taken"}'), fallback)).toBe('room name taken')

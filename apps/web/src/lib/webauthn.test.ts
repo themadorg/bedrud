@@ -1,5 +1,39 @@
 import { describe, expect, it } from 'vitest'
-import { base64ToBuffer, bufferToBase64 } from './webauthn'
+import { NetworkError } from './api'
+import { base64ToBuffer, bufferToBase64, isPasskeyCancelled, passkeyErrorMessage } from './webauthn'
+
+describe('passkeyErrorMessage', () => {
+  it('names a passkey this device already holds', () => {
+    expect(
+      passkeyErrorMessage(
+        new DOMException('The authenticator was previously registered.', 'InvalidStateError'),
+        'failed',
+      ),
+    ).toBe('This device already has a passkey for this account')
+  })
+
+  it('names any other failure the way every other request does', () => {
+    expect(passkeyErrorMessage(new NetworkError(), 'failed')).toBe("Couldn't reach the server")
+    expect(passkeyErrorMessage(new DOMException('The operation is insecure.', 'SecurityError'), 'failed')).toBe(
+      'failed',
+    )
+  })
+})
+
+describe('isPasskeyCancelled', () => {
+  it('treats a closed passkey picker as cancelled', () => {
+    expect(
+      isPasskeyCancelled(new DOMException('The operation either timed out or was not allowed.', 'NotAllowedError')),
+    ).toBe(true)
+    expect(isPasskeyCancelled(new DOMException('The operation was aborted.', 'AbortError'))).toBe(true)
+  })
+
+  it('reports every other failure as a failure', () => {
+    expect(isPasskeyCancelled(new DOMException('Already registered.', 'InvalidStateError'))).toBe(false)
+    expect(isPasskeyCancelled(new Error('NotAllowedError'))).toBe(false)
+    expect(isPasskeyCancelled(null)).toBe(false)
+  })
+})
 
 function bytes(...values: number[]): ArrayBuffer {
   return new Uint8Array(values).buffer

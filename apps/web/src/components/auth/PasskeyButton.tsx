@@ -5,8 +5,10 @@ import { api } from '#/lib/api'
 import {
   base64ToBuffer,
   bufferToBase64,
+  isPasskeyCancelled,
   type PublicKeyCredentialCreationOptionsJSON,
   type PublicKeyCredentialRequestOptionsJSON,
+  passkeyErrorMessage,
 } from '#/lib/webauthn'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -120,7 +122,8 @@ export function PasskeyButton({ onSuccess, mode = 'both', compact = false, class
       const res = await loginWithPasskey()
       onSuccess(res)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Passkey login failed')
+      if (isPasskeyCancelled(e)) return
+      setError(passkeyErrorMessage(e, 'Passkey login failed'))
     } finally {
       setIsLoading(false)
     }
@@ -137,7 +140,8 @@ export function PasskeyButton({ onSuccess, mode = 'both', compact = false, class
       }
       onSuccess(res as AuthResponse)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Passkey signup failed')
+      if (isPasskeyCancelled(e)) return
+      setError(passkeyErrorMessage(e, 'Passkey signup failed'))
     } finally {
       setIsLoading(false)
     }

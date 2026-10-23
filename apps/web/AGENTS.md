@@ -168,6 +168,22 @@ Hover lift (`hover:-translate-y-0.5`) is acceptable on room cards only.
 
 Parse raw JSON error bodies before displaying. Show the `error` or `message` field — never raw `{"error":"..."}` strings in the UI.
 
+A failure is never reported by its own text. A catch that shows a message goes through `getErrorMessage(err, fallback)` in `src/lib/errors.ts`, not `err.message`. The sign-in, sign-up, password-reset and verification pages do; the meeting join, admin and WebXDC screens still read `err.message` and are moved over as they are touched. It reports:
+
+- the **server's own explanation** when it sent one, since its wording beats any written here;
+- **"Couldn't reach the server"**, or **"No internet connection"** when the browser is offline, for a request that never arrived. `api.ts` turns the browser's own fetch failure, which differs per engine ("Failed to fetch", "Load failed"), into a `NetworkError`;
+- the call's own **fallback** for anything else. A built-in error's text (a `TypeError`, a `DOMException`) is English and technical and never reaches the reader.
+
+A passkey ceremony reports through `passkeyErrorMessage` in `src/lib/webauthn.ts`, and closing the passkey picker (`isPasskeyCancelled`) is not reported at all, since it was the reader's own choice.
+
+### Session refresh
+
+Only the server refusing the session signs the reader out: a 4xx from `/api/auth/refresh` other than 408 and 429, or a success without a token pair. A refresh that never reaches the server, or meets a 5xx, a timeout or rate limiting, fails the call that needed it and keeps the session. `initialize()` keeps a persisted session through the same failures on page load, so an installed app opened offline or during an outage stays signed in. `refusesSession` in `src/lib/auth.store.ts` is the one place that decides.
+
+### Chat images and the account token
+
+A chat image's address is whatever the sender wrote. Only an image whose scheme, host and port are the account's server's own (`isOnServer` in `components/meeting/chat/chatImageOrigin.ts`) is fetched with the viewer's token and cookies; any other image is fetched without them.
+
 ---
 
 ## Status Indicators

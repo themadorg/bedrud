@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowLeft, Loader2, MailCheck } from 'lucide-react'
 import { useState } from 'react'
-import { ApiError, api } from '#/lib/api'
+import { api } from '#/lib/api'
+import { getErrorMessage } from '#/lib/errors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -30,11 +31,7 @@ function ForgotPasswordPage() {
       await api.post('/api/auth/forgot-password', { email })
       setSent(true)
     } catch (err) {
-      if (err instanceof ApiError && err.parsedBody?.error) {
-        setError(err.parsedBody.error as string)
-      } else {
-        setError(err instanceof Error ? err.message : 'Something went wrong')
-      }
+      setError(getErrorMessage(err, 'Something went wrong'))
     } finally {
       setIsLoading(false)
     }
