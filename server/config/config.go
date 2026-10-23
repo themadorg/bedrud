@@ -72,24 +72,24 @@ type WebxdcGalleryConfig struct {
 }
 
 type ServerConfig struct {
-	Port           string    `yaml:"port"`
-	HTTPPort       string    `yaml:"httpPort"`
-	Host           string    `yaml:"host"`
-	ReadTimeout    ConfigInt `yaml:"readTimeout"`
-	WriteTimeout   ConfigInt `yaml:"writeTimeout"`
-	EnableTLS      bool      `yaml:"enableTLS" env:"SERVER_ENABLE_TLS"`
-	DisableTLS     bool      `yaml:"disableTLS"`
-	CertFile       string    `yaml:"certFile" env:"SERVER_CERT_FILE"`
-	KeyFile        string    `yaml:"keyFile" env:"SERVER_KEY_FILE"`
-	Domain         string    `yaml:"domain" env:"SERVER_DOMAIN"`
-	Email          string    `yaml:"email" env:"SERVER_EMAIL"`
-	UseACME        bool      `yaml:"useACME" env:"SERVER_USE_ACME"`
+	Port         string    `yaml:"port"`
+	HTTPPort     string    `yaml:"httpPort"`
+	Host         string    `yaml:"host"`
+	ReadTimeout  ConfigInt `yaml:"readTimeout"`
+	WriteTimeout ConfigInt `yaml:"writeTimeout"`
+	EnableTLS    bool      `yaml:"enableTLS" env:"SERVER_ENABLE_TLS"`
+	DisableTLS   bool      `yaml:"disableTLS"`
+	CertFile     string    `yaml:"certFile" env:"SERVER_CERT_FILE"`
+	KeyFile      string    `yaml:"keyFile" env:"SERVER_KEY_FILE"`
+	Domain       string    `yaml:"domain" env:"SERVER_DOMAIN"`
+	Email        string    `yaml:"email" env:"SERVER_EMAIL"`
+	UseACME      bool      `yaml:"useACME" env:"SERVER_USE_ACME"`
 	// ACME configures Let's Encrypt challenges. When empty/default, HTTP-01 is used.
 	// Set challenge to "dns-01" with dnsProvider "cloudflare" for free wildcards
 	// (*.domain) required by WebXDC subdomain hosts.
-	ACME ACMEConfig `yaml:"acme"`
-	TrustedProxies []string `yaml:"trustedProxies"`
-	ProxyHeader    string   `yaml:"proxyHeader"`
+	ACME           ACMEConfig `yaml:"acme"`
+	TrustedProxies []string   `yaml:"trustedProxies"`
+	ProxyHeader    string     `yaml:"proxyHeader"`
 	// BehindProxy enables trusted-proxy mode. Set to true when running
 	// behind Cloudflare, nginx, or any reverse proxy that terminates TLS.
 	BehindProxy bool `yaml:"behindProxy"`
@@ -248,11 +248,11 @@ type LiveKitConfig struct {
 	Host string `yaml:"host"`
 	// HostLocal is the browser signaling URL when the app is opened on localhost
 	// (e.g. ws://localhost:7070/livekit via the Vite /livekit proxy in remote debug).
-	HostLocal     string `yaml:"hostLocal"`
-	InternalHost  string `yaml:"internalHost"`
-	APIKey        string `yaml:"apiKey"`
-	APISecret     string `yaml:"apiSecret"`
-	ConfigPath    string `yaml:"configPath"`
+	HostLocal    string `yaml:"hostLocal"`
+	InternalHost string `yaml:"internalHost"`
+	APIKey       string `yaml:"apiKey"`
+	APISecret    string `yaml:"apiSecret"`
+	ConfigPath   string `yaml:"configPath"`
 	// SkipTLSVerify skips TLS verification for the LiveKit API client (self-signed certs).
 	// Env: LIVEKIT_SKIP_TLS_VERIFY
 	SkipTLSVerify bool `yaml:"skipTLSVerify" env:"LIVEKIT_SKIP_TLS_VERIFY"`
@@ -267,9 +267,13 @@ type LiveKitConfig struct {
 	NodeIP string `yaml:"nodeIP"`
 }
 
+// DefaultTokenDurationHours is the access token lifetime used when
+// auth.tokenDuration is missing or not positive.
+const DefaultTokenDurationHours = 24
+
 type AuthConfig struct {
 	JWTSecret           string       `yaml:"jwtSecret"`
-	TokenDuration       ConfigInt    `yaml:"tokenDuration"` // in hours
+	TokenDuration       ConfigInt    `yaml:"tokenDuration"` // in hours, default 24
 	Google              OAuth2Config `yaml:"google"`
 	Github              OAuth2Config `yaml:"github"`
 	Twitter             OAuth2Config `yaml:"twitter"`
@@ -644,6 +648,12 @@ func Load(configPath string) (*Config, error) {
 			if n, err := strconv.Atoi(v); err == nil {
 				config.Auth.UnverifiedAccountTTLHours = n
 			}
+		}
+		// A zero duration would issue access tokens that are expired on arrival.
+		if config.Auth.TokenDuration <= 0 {
+			log.Warn().Int("tokenDuration", config.Auth.TokenDuration.Int()).Int("default", DefaultTokenDurationHours).
+				Msg("auth.tokenDuration missing or not positive; using default")
+			config.Auth.TokenDuration = DefaultTokenDurationHours
 		}
 
 		// CORS environment variable overrides

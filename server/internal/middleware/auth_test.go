@@ -128,6 +128,29 @@ func TestProtected_Real_InvalidToken(t *testing.T) {
 	}
 }
 
+func TestProtected_Real_ExpiredToken(t *testing.T) {
+	cfg := getTestConfig()
+	expiredCfg := *cfg
+	expiredCfg.Auth.TokenDuration = -1
+	token, _ := auth.GenerateToken("u3", "u3@ex.com", "U3", "local", []string{"user"}, &expiredCfg, nil)
+
+	app := fiber.New()
+	app.Use(Protected())
+	app.Get("/test", func(c *fiber.Ctx) error { return c.SendString("ok") })
+
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+	req.Header.Set("Authorization", testBearerPrefix+token)
+	resp, _ := app.Test(req)
+	defer resp.Body.Close()
+	if resp.StatusCode != fiber.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != `{"error":"Token expired"}` {
+		t.Fatalf("expected Token expired error, got %s", string(body))
+	}
+}
+
 func TestProtected_Real_NoBearerPrefix(t *testing.T) {
 	cfg := getTestConfig()
 	token, _ := auth.GenerateToken("u2", "u2@ex.com", "U2", "local", []string{"user"}, cfg, nil)

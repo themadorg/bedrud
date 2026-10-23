@@ -510,3 +510,36 @@ database:
 		t.Fatal("expected LiveKit.SkipTLSVerify false from env")
 	}
 }
+
+func TestLoad_TokenDurationDefault(t *testing.T) {
+	cases := []struct {
+		name string
+		line string
+		want int
+	}{
+		{name: "missing", line: "", want: DefaultTokenDurationHours},
+		{name: "zero", line: "  tokenDuration: 0\n", want: DefaultTokenDurationHours},
+		{name: "negative", line: "  tokenDuration: -5\n", want: DefaultTokenDurationHours},
+		{name: "explicit", line: "  tokenDuration: 48\n", want: 48},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ResetLoadForTest()
+			t.Cleanup(ResetLoadForTest)
+
+			path := t.TempDir() + "/config.yaml"
+			yamlBody := "auth:\n  jwtSecret: \"test-jwt-secret-at-least-32-chars!!\"\n" + testCase.line
+			if err := os.WriteFile(path, []byte(yamlBody), 0o600); err != nil {
+				t.Fatalf("write config: %v", err)
+			}
+
+			cfg, err := Load(path)
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if got := cfg.Auth.TokenDuration.Int(); got != testCase.want {
+				t.Fatalf("TokenDuration: got %d, want %d", got, testCase.want)
+			}
+		})
+	}
+}
