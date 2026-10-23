@@ -175,7 +175,7 @@ Registered today:
 ## `internal/scheduler/scheduler.go` — gocron Tasks
 
 ```go
-Initialize(db, roomRepo, userRepo, recordingRepo, lkCfg, serverCfg, recStore, recCfg)
+Initialize(db, roomRepo, userRepo, recordingRepo, lkCfg, serverCfg, recStore, recCfg, settingsRepo, uploadTracker)
 Stop()
 ```
 
@@ -188,6 +188,7 @@ Stop()
 | Hourly | `CleanupBlockedTokens` |
 | Hourly | `auth.PruneRevokedTokens` |
 | Daily 03:00 | Queue: done >7d / failed >30d |
+| Daily 03:15 | **Chat upload TTL** — `cleanupExpiredChatUploads`: reads effective `ChatMessageTTLHours` each run (admin changes apply without restart); `<=0` = keep forever; `uploadTracker.DeleteOlderThan(now − TTL)`. Server stores no chat messages, so uploads are all it deletes. Registered only when `settingsRepo` + `uploadTracker` are non-nil |
 | Daily 03:00 | **Stale recordings** — `recordingRepo.DeleteStaleRecordings(now-7d)` when `recordingRepo != nil` |
 | Daily 09:00 | TLS cert expiry — renew self-signed if ≤`CertWarnDays` (30) or expired (only when non-ACME TLS) |
 | Every `CleanupIntervalHours` (default 24) | **Recording retention** — if `recCfg.RetentionHours > 0` && `recStore != nil` |
@@ -325,6 +326,7 @@ MIME allowlist: png/jpeg/gif/webp. Filename = SHA256 + ext. Disk paths: `/upload
 NewChatUploadTracker(db, chatDir, deleter)
 Record(roomID, userID, fileHash, ext, fileSize, backend) error
 DeleteByRoom(roomID) error  // cross-room refcount on file_hash; S3/disk/inline
+DeleteOlderThan(cutoff) (int64, error)  // rows with created_at < cutoff; keeps an object a newer row with the same room/user/hash still uses
 GetUserUploadBytes(userID) (int64, error)
 GetTotalUploadBytes() (int64, error)  // 60s cache
 ```
