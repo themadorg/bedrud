@@ -1,9 +1,13 @@
 import { useLocalParticipant, useRoomContext } from '@livekit/components-react'
-import { RoomEvent } from 'livekit-client'
+import { type Participant, RoomEvent } from 'livekit-client'
 import { useEffect, useRef } from 'react'
 import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
-import { closeCtx, playChat, playJoin, playLeave, playMutedBeep } from '#/lib/meeting-sounds'
+import { resolveAvatarUrl } from '#/lib/avatar-url'
+import { closeCtx, playChat, playJoin, playLeave, playMutedBeep, playWelcome } from '#/lib/meeting-sounds'
+import { getPublicSettings } from '#/lib/use-public-settings'
+import { chooseJoinSound, type JoinSound } from './joinSound'
 import { useMeetingChatContext, useMeetingRoomContext } from './MeetingContext'
+import { fetchMeetingParticipantProfile } from './meetingParticipantProfile'
 
 /**
  * Invisible component that plays notification sounds for meeting events:
@@ -36,9 +40,67 @@ export function MeetingSoundEffects() {
     }
   }, [])
 
+  const { roomId, isSelfDeafened, isServerDeafened } = useMeetingRoomContext()
+  const deafenedRef = useRef(false)
+  deafenedRef.current = isSelfDeafened || isServerDeafened
+  const welcomeSoundsEnabledRef = useRef(false)
+  // Outlives LiveKit reconnects, so a flapping peer gets the chime instead of their clip again.
+  const welcomePlayedAtRef = useRef(new Map<string, number>())
+  const welcomePlayingRef = useRef(false)
+
   useEffect(() => {
-    const onConnect = () => {
-      if (mountedRef.current) playJoin()
+    void getPublicSettings()
+      .then((settings) => {
+        welcomeSoundsEnabledRef.current = settings.welcomeSound?.enabled ?? false
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    function play(sound: JoinSound, identity: string, welcomeSoundUrl?: string) {
+      if (sound === 'chime') playJoin()
+      if (sound !== 'welcome' || !welcomeSoundUrl) return
+      welcomePlayedAtRef.current.set(identity, Date.now())
+      welcomePlayingRef.current = true
+      playWelcome(welcomeSoundUrl)
+        .catch(() => playJoin())
+        .finally(() => {
+          welcomePlayingRef.current = false
+        })
+    }
+
+    // Reads the live state at the moment of deciding, since the profile fetch takes time.
+    function decide(identity: string, joinedAt: number, welcomeSoundUrl?: string): JoinSound {
+      const now = Date.now()
+      return chooseJoinSound({
+        mode: useAudioPreferencesStore.getState().joinSoundMode,
+        deafened: deafenedRef.current,
+        welcomeSoundsEnabled: welcomeSoundsEnabledRef.current,
+        welcomeSoundUrl,
+        lastPlayedAt: welcomePlayedAtRef.current.get(identity),
+        welcomePlaying: welcomePlayingRef.current,
+        waitedMs: now - joinedAt,
+        now,
+      })
+    }
+
+    async function onParticipantJoined(participant: Participant) {
+      const { identity } = participant
+      const joinedAt = Date.now()
+      // Only fetch the profile when its clip could actually play.
+      const clipPossible =
+        useAudioPreferencesStore.getState().joinSoundMode === 'welcome' && welcomeSoundsEnabledRef.current
+      if (!clipPossible) {
+        play(decide(identity, joinedAt), identity)
+        return
+      }
+      const profile = await fetchMeetingParticipantProfile(roomId, identity)
+      const welcomeSoundUrl = resolveAvatarUrl(profile?.welcomeSoundUrl)
+      play(decide(identity, joinedAt, welcomeSoundUrl), identity, welcomeSoundUrl)
+    }
+
+    const onConnect = (participant: Participant) => {
+      if (mountedRef.current) void onParticipantJoined(participant)
     }
     const onDisconnect = () => {
       if (mountedRef.current) playLeave()
@@ -50,7 +112,7 @@ export function MeetingSoundEffects() {
       room.off(RoomEvent.ParticipantConnected, onConnect)
       room.off(RoomEvent.ParticipantDisconnected, onDisconnect)
     }
-  }, [room])
+  }, [room, roomId])
 
   // ── Chat message sound ───────────────────────────────────────
   const chatLenRef = useRef(chatMessages.length)
