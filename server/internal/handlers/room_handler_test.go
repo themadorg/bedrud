@@ -254,6 +254,72 @@ func TestGuestJoinRoom_NullByteInName(t *testing.T) {
 	}
 }
 
+// Guest join must follow the same registration policy as /auth/guest-login (#47).
+func TestGuestJoinRoom_RegistrationSetting(t *testing.T) {
+	tests := []struct {
+		name                string
+		registrationEnabled bool
+		wantStatus          int
+		wantError           string
+	}{
+		{name: "should refuse guest join when registration is closed", registrationEnabled: false, wantStatus: http.StatusForbidden, wantError: "Registration is currently disabled"},
+		{name: "should allow guest join when registration is open", registrationEnabled: true, wantStatus: http.StatusOK},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			config.SetForTest(&config.Config{
+				Auth: config.AuthConfig{JWTSecret: "guest-join-test-secret-key-32bytes!", TokenDuration: 1},
+			})
+			db := testutil.SetupTestDB(t)
+			roomRepo := repository.NewRoomRepository(db)
+			userRepo := repository.NewUserRepository(db)
+			settingsRepo := repository.NewSettingsRepository(db)
+			lkCfg := config.LiveKitConfig{Host: "http://localhost:9999", APIKey: "test-key", APISecret: "test-secret"}
+			handler := NewRoomHandler(testutil.NewMockRoomService(), &lkCfg, &config.ChatConfig{}, roomRepo, userRepo, nil, settingsRepo, nil, nil, nil)
+
+			settings, err := settingsRepo.GetSettings()
+			if err != nil {
+				t.Fatal(err)
+			}
+			settings.RegistrationEnabled = testCase.registrationEnabled
+			settings.GuestLoginEnabled = true
+			if err := settingsRepo.SaveSettings(settings); err != nil {
+				t.Fatal(err)
+			}
+
+			db.Create(&models.User{ID: "owner", Email: "owner@ex.com", Name: "Owner", Provider: "local", IsActive: true, Accesses: models.StringArray{"user"}})
+			if _, err := roomRepo.CreateRoom("owner", "registration-room", true, "standard", 0, &models.RoomSettings{}); err != nil {
+				t.Fatal(err)
+			}
+
+			app := fiber.New()
+			app.Post("/rooms/guest-join", handler.GuestJoinRoom)
+
+			body, _ := json.Marshal(map[string]string{"roomName": "registration-room", "guestName": "Guest User"})
+			req := httptest.NewRequest(http.MethodPost, "/rooms/guest-join", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := app.Test(req, -1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			respBody, _ := io.ReadAll(resp.Body)
+			if resp.StatusCode != testCase.wantStatus {
+				t.Fatalf("expected %d, got %d: %s", testCase.wantStatus, resp.StatusCode, string(respBody))
+			}
+			if testCase.wantError != "" {
+				var payload map[string]string
+				if err := json.Unmarshal(respBody, &payload); err != nil {
+					t.Fatal(err)
+				}
+				if payload["error"] != testCase.wantError {
+					t.Fatalf("expected error %q, got %q", testCase.wantError, payload["error"])
+				}
+			}
+		})
+	}
+}
+
 func TestRoomHandler_DeleteRoom_NotFound(t *testing.T) {
 	app, _, _ := setupRoomTestApp(t)
 
