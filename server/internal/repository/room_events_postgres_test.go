@@ -240,3 +240,10 @@ func TestPostgres_RoomEvents_TimestampsParse(t *testing.T) {
 		}
 	}
 }
+
+// pgx reports a unique violation as SQLSTATE 23505, worded nothing like
+// SQLite's "UNIQUE constraint failed", so the mapping is checked on both.
+func TestPostgres_UpdateRoom_ReactivationOntoTakenNameIsRejected(t *testing.T) {
+	repo, db := newPostgresRoomRepo(t)
+	assertReactivationRejectsTakenName(t, repo, db)
+}
