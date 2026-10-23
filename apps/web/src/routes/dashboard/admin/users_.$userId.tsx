@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import {
   Activity,
+  AlertCircle,
   ArrowLeft,
   Calendar,
   Clock,
@@ -22,6 +23,7 @@ import type { CSSProperties } from 'react'
 import { useEffect, useState } from 'react'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { toast } from 'sonner'
+import { AlertConfirmDialog } from '#/components/admin/AlertConfirmDialog'
 import { ProviderBadge } from '#/components/admin/ProviderBadge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
@@ -60,9 +62,9 @@ function getRoleBadgeStyle(access: string): CSSProperties {
         color: 'var(--accent-400)',
       }
     case 'moderator':
-      return { borderColor: '#f59e0b30', background: '#f59e0b15', color: '#fbbf24' }
+      return { borderColor: 'var(--border)', background: 'var(--secondary)', color: 'var(--secondary-foreground)' }
     case 'guest':
-      return { borderColor: '#a855f730', background: '#a855f715', color: '#c084fc' }
+      return { borderColor: 'var(--border)', color: 'var(--muted-foreground)' }
     default:
       return {}
   }
@@ -124,7 +126,13 @@ function StatCard({
   color: string
 }) {
   return (
-    <div className="rounded-xl border p-4" style={{ borderColor: `${color}25`, background: `${color}07` }}>
+    <div
+      className="rounded-xl border p-4"
+      style={{
+        borderColor: `color-mix(in oklab, ${color} 25%, transparent)`,
+        background: `color-mix(in oklab, ${color} 4%, transparent)`,
+      }}
+    >
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-xl font-bold tracking-tight" style={{ color }}>
@@ -158,6 +166,7 @@ function UserDetailPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [confirmEmail, setConfirmEmail] = useState('')
   const [forceLogoutDialogOpen, setForceLogoutDialogOpen] = useState(false)
+  const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false)
 
   useEffect(() => {
     if (!deleteDialogOpen && !forceLogoutDialogOpen) return
@@ -198,7 +207,10 @@ function UserDetailPage() {
 
   const toggleStatus = useMutation({
     mutationFn: (active: boolean) => api.put(`/api/admin/users/${userId}/status`, { active }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'user', userId] }),
+    onSuccess: () => {
+      setDeactivateDialogOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['admin', 'user', userId] })
+    },
     onError: (err) => toast.error(getErrorMessage(err, 'Failed to update user status')),
   })
 
@@ -368,13 +380,15 @@ function UserDetailPage() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => toggleStatus.mutate(!user.isActive)}
+                      // Deactivating locks the person out, so it asks first; re-activating only
+                      // restores access and stays a single tap.
+                      onClick={() => (user.isActive ? setDeactivateDialogOpen(true) : toggleStatus.mutate(true))}
                       disabled={toggleStatus.isPending}
-                      style={
+                      className={cn(
                         user.isActive
-                          ? { background: '#10b98115', color: '#10b981', borderColor: '#10b98130' }
-                          : { background: '#ef444415', color: '#f87171', borderColor: '#ef444430' }
-                      }
+                          ? 'border-transparent bg-accent-container text-accent-container-foreground hover:bg-accent-container/80 hover:text-accent-container-foreground'
+                          : 'border-warning/30 bg-warning/10 text-warning hover:bg-warning/15 hover:text-warning',
+                      )}
                     >
                       {user.isActive ? (
                         <>
@@ -396,11 +410,6 @@ function UserDetailPage() {
                         size="sm"
                         type="button"
                         onClick={() => setForceLogoutDialogOpen(true)}
-                        style={{
-                          background: '#f59e0b15',
-                          color: '#fbbf24',
-                          borderColor: '#f59e0b30',
-                        }}
                         aria-label="Force logout"
                       >
                         <LogOut className="h-3.5 w-3.5" />
@@ -414,11 +423,7 @@ function UserDetailPage() {
                           setConfirmEmail('')
                           setDeleteDialogOpen(true)
                         }}
-                        style={{
-                          background: '#ef444415',
-                          color: '#f87171',
-                          borderColor: '#ef444430',
-                        }}
+                        className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15 hover:text-destructive"
                         aria-label="Delete user"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -447,8 +452,7 @@ function UserDetailPage() {
                 {!user.isActive && (
                   <Badge
                     variant="outline"
-                    className="text-[10px] font-semibold px-2 py-0.5"
-                    style={{ background: '#ef444415', color: '#f87171', borderColor: '#ef444430' }}
+                    className="border-warning/30 bg-warning/10 px-2 py-0.5 text-[10px] font-semibold text-warning"
                   >
                     banned
                   </Badge>
@@ -492,9 +496,14 @@ function UserDetailPage() {
           {/* ── Stats row ──────────────────────────────────── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <StatCard value={rooms.length} label="Rooms created" icon={Video} color="var(--primary)" />
-            <StatCard value={activeRooms} label="Currently live" icon={Activity} color="#10b981" />
+            <StatCard value={activeRooms} label="Currently live" icon={Activity} color="var(--success-500)" />
             <StatCard value={publicRooms} label="Public rooms" icon={Globe} color="var(--primary)" />
-            <StatCard value={`${daysSince(user.createdAt)}d`} label="Member for" icon={Users} color="#f59e0b" />
+            <StatCard
+              value={`${daysSince(user.createdAt)}d`}
+              label="Member for"
+              icon={Users}
+              color="var(--accent-600)"
+            />
           </div>
 
           {/* ── Tabs: Rooms / Room Sessions ──────────────── */}
@@ -607,7 +616,7 @@ function UserDetailPage() {
                             <Link
                               to="/dashboard/admin/rooms/$roomId"
                               params={{ roomId: room.id }}
-                              className="text-sm font-mono font-medium hover:text-indigo-400 transition-colors truncate"
+                              className="text-sm font-mono font-medium hover:text-primary transition-colors truncate"
                             >
                               {room.name}
                             </Link>
@@ -632,7 +641,10 @@ function UserDetailPage() {
                               className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
                               style={
                                 room.isActive
-                                  ? { background: '#10b98115', color: '#10b981' }
+                                  ? {
+                                      background: 'var(--accent-container)',
+                                      color: 'var(--accent-container-foreground)',
+                                    }
                                   : { background: 'var(--muted)', color: 'var(--muted-foreground)' }
                               }
                             >
@@ -676,14 +688,8 @@ function UserDetailPage() {
                   </div>
                 ) : sessionsQuery.isError ? (
                   <div className="flex flex-col items-center gap-3 py-10">
-                    <div
-                      className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
-                      style={{
-                        borderColor: '#ef444430',
-                        background: '#ef444415',
-                        color: '#f87171',
-                      }}
-                    >
+                    <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
                       {sessionsQuery.error instanceof Error ? sessionsQuery.error.message : 'Failed to load sessions'}
                     </div>
                     <Button variant="outline" size="sm" onClick={() => sessionsQuery.refetch()}>
@@ -722,7 +728,7 @@ function UserDetailPage() {
                               <Link
                                 to="/dashboard/admin/rooms/$roomId"
                                 params={{ roomId: s.roomId }}
-                                className="text-sm font-mono font-medium hover:text-indigo-400 transition-colors truncate"
+                                className="text-sm font-mono font-medium hover:text-primary transition-colors truncate"
                               >
                                 {s.roomName || s.roomId.slice(0, 8)}
                               </Link>
@@ -740,7 +746,7 @@ function UserDetailPage() {
                               </span>
                               <span className="text-xs text-muted-foreground whitespace-nowrap">
                                 {s.isActive ? (
-                                  <span className="flex items-center gap-1 text-emerald-400">
+                                  <span className="flex items-center gap-1 text-teal-700 dark:text-teal-400">
                                     <Activity className="h-2.5 w-2.5 animate-pulse" />
                                     {formatDuration(s.durationSeconds)}
                                   </span>
@@ -752,7 +758,10 @@ function UserDetailPage() {
                                 {s.isActive ? (
                                   <span
                                     className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                    style={{ background: '#10b98115', color: '#10b981' }}
+                                    style={{
+                                      background: 'var(--accent-container)',
+                                      color: 'var(--accent-container-foreground)',
+                                    }}
                                   >
                                     Active
                                   </span>
@@ -837,27 +846,17 @@ function UserDetailPage() {
           </p>
 
           {forceLogout.isError && (
-            <div
-              className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
-              style={{
-                borderColor: '#ef444430',
-                background: '#ef444415',
-                color: '#f87171',
-              }}
-            >
+            <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 shrink-0" />
               {forceLogout.error instanceof Error ? forceLogout.error.message : 'Failed to revoke sessions'}
             </div>
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setForceLogoutDialogOpen(false)}>
+            <Button variant="ghost" onClick={() => setForceLogoutDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={() => forceLogout.mutate()}
-              disabled={forceLogout.isPending}
-              style={{ background: '#f59e0b' }}
-            >
+            <Button variant="secondary" onClick={() => forceLogout.mutate()} disabled={forceLogout.isPending}>
               {forceLogout.isPending ? 'Revoking...' : 'Revoke sessions'}
             </Button>
           </DialogFooter>
@@ -896,20 +895,14 @@ function UserDetailPage() {
           </div>
 
           {deleteUser.isError && (
-            <div
-              className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
-              style={{
-                borderColor: '#ef444430',
-                background: '#ef444415',
-                color: '#f87171',
-              }}
-            >
+            <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 shrink-0" />
               {deleteUser.error instanceof Error ? deleteUser.error.message : 'Failed to delete user'}
             </div>
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+            <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>
               Cancel
             </Button>
             <Button
@@ -922,6 +915,16 @@ function UserDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertConfirmDialog
+        open={deactivateDialogOpen}
+        onOpenChange={setDeactivateDialogOpen}
+        title={`Ban ${user?.name || user?.email || 'this user'}?`}
+        description="They are signed out and cannot sign in until re-activated."
+        confirmLabel="Ban"
+        onConfirm={() => toggleStatus.mutate(false)}
+        isLoading={toggleStatus.isPending}
+      />
     </div>
   )
 }

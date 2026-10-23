@@ -198,7 +198,7 @@ export function WebxdcTab({
 
   const openEdit = (p: CatalogPackage) => {
     if (!SAFE_PACKAGE_ID.test(p.id)) {
-      toast.error('Invalid package id')
+      toast.warning('Invalid package id')
       return
     }
     setEditPkg(p)
@@ -241,12 +241,12 @@ export function WebxdcTab({
     async (files: FileList | File[]) => {
       const list = Array.from(files).filter(isAllowedXdcFile)
       if (list.length === 0) {
-        toast.error('Only .xdc or .zip packages are accepted')
+        toast.warning('Only .xdc or .zip packages are accepted')
         return
       }
       const rejected = Array.from(files).length - list.length
       if (rejected > 0) {
-        toast.message(`Skipped ${rejected} non-.xdc file${rejected === 1 ? '' : 's'}`)
+        toast.warning(`Skipped ${rejected} non-.xdc file${rejected === 1 ? '' : 's'}`)
       }
 
       setUploading(true)

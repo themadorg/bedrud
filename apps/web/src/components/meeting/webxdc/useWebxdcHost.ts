@@ -227,7 +227,7 @@ export function useWebxdcHost(iframeRef: React.RefObject<HTMLIFrameElement | nul
       if (!update.notify) return
       const text = update.notify[selfAddr] ?? update.notify['*']
       if (text?.trim()) {
-        toast.message(selfName ? `${selfName}: ${text.trim()}` : text.trim(), { duration: 6000 })
+        toast.info(selfName ? `${selfName}: ${text.trim()}` : text.trim(), { duration: 6000 })
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           try {
             new Notification('Bedrud mini-app', { body: text.trim() })

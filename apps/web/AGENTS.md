@@ -95,7 +95,7 @@ Use `bg-primary text-primary-foreground` with `rounded-md` or `rounded-lg`:
 **No gradient buttons.** No `linear-gradient(135deg, #6366f1 ...)` on CTAs.
 **No `active:scale-95`** — it feels cheap.
 
-Corners come from the shared scale (`rounded-md` 12px for buttons, `rounded-lg` 12px for fields and inline banners, `rounded-xl` 16px for cards, `rounded-3xl` 28px for sheets, `rounded-sm` 8px for chips and icon-button hover fills, `rounded` 4px for the brand mark, the checkbox square and the tooltip). A hand-rolled control filled with `bg-primary` or `bg-destructive` takes `rounded-lg`, the same 12px the `<Button>` beside it renders; an icon-only button matches its siblings in the same group, or takes `rounded-sm` when it stands alone with a hover fill. A class string that lives in a `.ts` helper counts like one in a `.tsx` file, so any corner sweep runs with `--include="*.ts"` as well. The table with the Android token names is in the root `DESIGN.md`. Never `rounded-[Npx]`.
+Corners come from the shared scale (`rounded-md` 12px for buttons, `rounded-lg` 12px for fields and inline banners, `rounded-xl` 16px for cards, menus and toasts, `rounded-3xl` 28px for sheets, `rounded-full` for badges, `rounded-sm` 8px for filter chips and icon-button hover fills, `rounded` 4px for the brand mark, the checkbox square and the tooltip). A hand-rolled control filled with `bg-primary` or `bg-destructive` takes `rounded-lg`, the same 12px the `<Button>` beside it renders; an icon-only button matches its siblings in the same group, or takes `rounded-sm` when it stands alone with a hover fill. A class string that lives in a `.ts` helper counts like one in a `.tsx` file, so any corner sweep runs with `--include="*.ts"` as well. The table with the Android token names is in the root `DESIGN.md`. Never `rounded-[Npx]`.
 
 ---
 
@@ -176,7 +176,12 @@ Parse raw JSON error bodies before displaying. Show the `error` or `message` fie
 |---|---|
 | Live / active | `<span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />` |
 | Inactive | `<span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" />` |
-| Admin badge | `border border-destructive/30 bg-destructive/10 text-destructive` |
+| Label beside a name ("Admin") | `<Badge>` — a pill on `bg-accent-container text-accent-container-foreground` |
+| Banned / restricted | `border border-warning/30 bg-warning/10 text-warning` — never the error red, since nothing failed |
+
+Red is for real errors and irreversible actions only, and an error always comes with words. Toasts go
+through `@/components/ui/sonner`; which kind a message takes is listed under Toasts in the root
+`DESIGN.md`.
 
 ---
 
@@ -346,7 +351,7 @@ Phone settings live on one scrolling page at `/settings`, one section per panel,
 
 `/dashboard` is one list at every width. The quick-join bar is always visible and resolves its field through `parseJoinInput` in `src/lib/join-input.ts`, which accepts a full meeting URL, a bare `/m/` or `/c/` path, or a plain room name, and returns null for anything else. The "New room" button beside it is desktop-only; phones create from the floating button in `MobileBottomNav`.
 
-Two filter chips, All and My Rooms, replace the tabs the page used to carry. `FilterChip` wears `badgeVariants` so the chip corner stays single-sourced. Under All the list holds server rooms and rooms known only from this device's history, merged and ordered by `mergeDashboardRooms` in `src/lib/dashboard-room-list.ts`; under My Rooms it holds server rooms only. `RoomCard` renders both kinds: a locally known room has no capacity, visibility or capability row, and carries Remove where an owned room carries Settings and Delete.
+Two filter chips, All and My Rooms, replace the tabs the page used to carry. `FilterChip` wears `badgeVariants` with `shape: 'chip'` so the chip corner stays single-sourced. Under All the list holds server rooms and rooms known only from this device's history, merged and ordered by `mergeDashboardRooms` in `src/lib/dashboard-room-list.ts`; under My Rooms it holds server rooms only. `RoomCard` renders both kinds: a locally known room has no capacity, visibility or capability row, and carries Remove where an owned room carries Settings and Delete.
 
 The admin tree has no phone layout, so `MobileBottomNav` deliberately has no Admin tab even though the Android client shows one.
 

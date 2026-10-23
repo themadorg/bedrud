@@ -19,7 +19,7 @@ export function WhiteboardExperimentalGate() {
     acknowledgeDisclaimer()
     if (pendingOpen) {
       const err = confirmStartWhiteboard()
-      if (err) toast.error(err)
+      if (err) toast.warning(err)
       return
     }
     acceptWhiteboard()

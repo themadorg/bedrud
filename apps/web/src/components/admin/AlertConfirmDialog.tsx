@@ -16,7 +16,8 @@ interface AlertConfirmDialogProps {
   description: string | ReactNode
   confirmLabel: string
   onConfirm: () => void
-  variant?: 'destructive' | 'default'
+  /** Destructive for an action that loses something; secondary for one that loses nothing. */
+  variant?: 'destructive' | 'secondary'
   isLoading?: boolean
 }
 
@@ -38,15 +39,10 @@ export function AlertConfirmDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancel
           </Button>
-          <Button
-            type="button"
-            variant={variant === 'destructive' ? 'destructive' : 'default'}
-            onClick={onConfirm}
-            disabled={isLoading}
-          >
+          <Button type="button" variant={variant} onClick={onConfirm} disabled={isLoading}>
             {isLoading ? 'Processing…' : confirmLabel}
           </Button>
         </DialogFooter>

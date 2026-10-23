@@ -106,13 +106,13 @@ export function WebxdcWatchProvider({ children }: { children: ReactNode }) {
   const sharePackage = useCallback(
     async (packageId: string, name?: string) => {
       if (!webxdcReady) {
-        toast.error('WebXDC is not enabled', {
+        toast.warning('WebXDC is not enabled', {
           description: 'Enable server webxdc + Settings → Experimental → WebXDC mini-apps',
         })
         return
       }
       if (!claimStage) {
-        toast.error('Stage is not ready', { description: 'Reload the meeting and try again.' })
+        toast.warning('Stage is not ready', { description: 'Reload the meeting and try again.' })
         return
       }
       setBusy(true)
@@ -146,7 +146,7 @@ export function WebxdcWatchProvider({ children }: { children: ReactNode }) {
   const shareFile = useCallback(
     async (file: File) => {
       if (!webxdcReady) {
-        toast.error('WebXDC is not enabled', {
+        toast.warning('WebXDC is not enabled', {
           description: 'Enable server webxdc + Settings → Experimental → WebXDC mini-apps',
         })
         return

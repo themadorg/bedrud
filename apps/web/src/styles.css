@@ -47,6 +47,15 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-warning: var(--warning-500);
+  --color-success: var(--success-500);
+  --color-recording: var(--recording);
+  --color-accent-container: var(--accent-container);
+  --color-accent-container-foreground: var(--accent-container-foreground);
+  --color-inverse-surface: var(--inverse-surface);
+  --color-inverse-foreground: var(--inverse-foreground);
+  --color-inverse-error: var(--inverse-error);
+  --color-inverse-warning: var(--inverse-warning);
+  --color-inverse-success: var(--inverse-success);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -421,4 +430,27 @@ button:has(> svg):not([aria-label]):not([aria-labelledby]) {
   border-radius: 50% !important;
   clip-path: circle(50% at 50% 50%) !important;
   overflow: hidden;
+}
+
+/*
+ * Toasts — one inverse bar for every kind, as the Android client's BedrudSnackbarHost draws it.
+ * Sonner injects its own unlayered stylesheet, so these overrides stay unlayered and lead with
+ * `:root` to outrank its `[data-sonner-toaster][data-sonner-theme=…]` defaults. The icon, not the
+ * bar, says which kind a message is.
+ */
+:root [data-sonner-toaster][data-sonner-theme] {
+  --normal-bg: var(--inverse-surface);
+  --normal-border: var(--inverse-surface);
+  --normal-text: var(--inverse-foreground);
+  --border-radius: var(--radius-xl);
+}
+
+:root [data-sonner-toast][data-styled='true'] [data-close-button] {
+  color: var(--inverse-foreground);
+  border-color: color-mix(in oklab, var(--inverse-foreground) 24%, transparent);
+}
+
+/* Only an error carries a close button; every other kind goes away on its own. */
+:root [data-sonner-toast]:not([data-type='error']) [data-close-button] {
+  display: none;
 }
