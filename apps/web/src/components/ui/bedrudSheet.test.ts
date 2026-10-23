@@ -45,6 +45,10 @@ describe('BedrudSheetHandle', () => {
     expect(handleSource).toMatch(/\brounded-full\b/)
   })
 
+  it('should share the pill with the controls pill, at the alpha both Android handles use', () => {
+    expect(handleSource).toMatch(/export const HANDLE_PILL_CLASS = '[^']*\bopacity-55\b/)
+  })
+
   it('should give the pill a target that meets the touch minimum', () => {
     expect(handleSource).toMatch(/\bh-12\b/)
   })

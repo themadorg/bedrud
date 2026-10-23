@@ -1,11 +1,15 @@
 import { Drawer } from 'vaul'
 
-/** The drawn pill: Android's `Dimens.meetingHandleWidth` × `meetingHandleHeight`. */
-const HANDLE_PILL_CLASS = 'h-1 w-8 rounded-full bg-[var(--meet-fg-muted)]'
+/**
+ * The drawn pill: Android's `Dimens.meetingHandleWidth` × `meetingHandleHeight`, at the 0.55 alpha
+ * both Android handles draw. Exported for the controls pill, which is no drawer and so cannot host a
+ * `Drawer.Handle`.
+ */
+export const HANDLE_PILL_CLASS = 'h-1 w-8 rounded-full bg-[var(--meet-fg-muted)] opacity-55'
 
 /**
- * The grab bar every sheet in the app wears, and the one the call's controls bar already draws for
- * itself. One handle, one shape.
+ * The grab bar every sheet in the app wears, sharing its pill with the call's controls bar. One
+ * handle, one shape.
  *
  * The pill is 32 × 4 as on Android, but the target around it is a 48px full-width strip rather than
  * Android's 28dp padded box: WCAG 2.5.8 asks for 44px, and a drag target that is hard to catch is

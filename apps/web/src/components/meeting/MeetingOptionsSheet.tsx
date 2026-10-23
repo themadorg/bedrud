@@ -15,7 +15,9 @@ import {
   Video,
   Volume2,
 } from 'lucide-react'
+import { useState } from 'react'
 import type { MeetingFixedRowId, MeetingOptionRow, MeetingOptionRowId } from '@/components/meeting/meetingOptionRows'
+import { BedrudSheet, SHEET_SNAP_POINTS } from '@/components/ui/BedrudSheet'
 import { cn } from '@/lib/utils'
 
 /** The fixed rows that draw an icon. Headings draw none, so they are excluded. */
@@ -62,29 +64,44 @@ export function meetingOptionIcon(row: MeetingOptionRow): React.ReactNode {
   return deviceIcon(row.id) ?? fixedIcon(row.id)
 }
 
-interface MeetingOptionsPanelProps {
+interface MeetingOptionsSheetProps {
+  open: boolean
+  onClose: () => void
   rows: MeetingOptionRow[]
-  expanded: boolean
   onSelect: (id: MeetingOptionRowId) => void
 }
 
 /**
- * The room options, unfolded above the controls inside the same surface. Collapsed it has no
- * height and no tab stops; it is not unmounted, so the height transition has something to animate
- * from.
+ * The phone's room options, as an ordinary titled `BedrudSheet` over the call, mirroring Android's
+ * "More options" sheet.
+ *
+ * They used to unfold out of the controls pill. Android dropped that in #262 because the grown pill
+ * read as a custom surface beside every other sheet in the app: floating, outlined, rounded on all
+ * sides and untitled. The sheet carries only the options, never a copy of the call controls.
  */
-export function MeetingOptionsPanel({ rows, expanded, onSelect }: MeetingOptionsPanelProps) {
+export function MeetingOptionsSheet({ open, onClose, rows, onSelect }: MeetingOptionsSheetProps) {
+  const [snapPoint, setSnapPoint] = useState<number | string | null>(SHEET_SNAP_POINTS[0])
+
+  // Toggles leave the sheet open so the flip is visible; rows that lead somewhere else close it on
+  // the way. The row list says which is which.
+  const selectRow = (row: MeetingOptionRow) => {
+    if (row.kind === 'action') onClose()
+    onSelect(row.id)
+  }
+
   return (
-    <div
-      // 320ms opening, 260ms closing — Android's two durations, which differ on purpose.
-      className={cn(
-        'w-full overflow-hidden transition-[max-height,opacity] ease-[cubic-bezier(0.4,0,0.2,1)]',
-        expanded ? 'opacity-100 duration-[320ms]' : 'max-h-0 opacity-0 duration-[260ms]',
-      )}
-      style={expanded ? { maxHeight: 'var(--meet-controls-panel-max-height)' } : undefined}
-      aria-hidden={!expanded}
+    <BedrudSheet
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose()
+      }}
+      label="More options"
+      activeSnapPoint={snapPoint}
+      onSnapPointChange={setSnapPoint}
     >
-      <ul className="max-h-[calc(var(--meet-controls-panel-max-height)-6rem)] list-none overflow-y-auto px-2 py-1">
+      <span className="shrink-0 pb-2 text-base font-semibold text-[var(--meet-fg-strong)]">More options</span>
+      {/* The web can offer a dozen rows, more than half a sheet holds, so the list scrolls. */}
+      <ul className="meet-scroll -mx-3 min-h-0 flex-1 list-none overflow-y-auto pb-2">
         {rows.map((row) =>
           row.kind === 'heading' ? (
             <li
@@ -97,8 +114,8 @@ export function MeetingOptionsPanel({ rows, expanded, onSelect }: MeetingOptions
             <li key={row.id}>
               <button
                 type="button"
-                disabled={row.disabled || !expanded}
-                onClick={() => onSelect(row.id)}
+                disabled={row.disabled}
+                onClick={() => selectRow(row)}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-md px-3 py-3 text-left text-[14px] transition-colors duration-150',
                   row.checked ? 'text-[var(--meet-btn-muted-fg)]' : 'text-[var(--meet-fg-strong)]',
@@ -115,6 +132,6 @@ export function MeetingOptionsPanel({ rows, expanded, onSelect }: MeetingOptions
           ),
         )}
       </ul>
-    </div>
+    </BedrudSheet>
   )
 }
