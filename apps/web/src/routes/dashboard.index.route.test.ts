@@ -46,4 +46,9 @@ describe('the dashboard route', () => {
     expect(dashboardRouteSource).toContain('removeRecent(name)')
     expect(dashboardRouteSource).toMatch(/deleteRoom\.mutate\(\{ id: entry\.room\.id, name: entry\.name \}\)/)
   })
+
+  // Nothing failed when the field names no room, so the message is a warning, not an error.
+  it('should report input that names no room as a warning', () => {
+    expect(dashboardRouteSource).toContain("toast.warning('That does not look like a room name or a meeting link')")
+  })
 })

@@ -52,7 +52,7 @@ function QuickJoinBar({ onJoin, onCreate }: { onJoin: (name: string) => void; on
     event.preventDefault()
     const roomName = parseJoinInput(value)
     if (!roomName) {
-      toast.error('That does not look like a room name or a meeting link')
+      toast.warning('That does not look like a room name or a meeting link')
       return
     }
     onJoin(roomName)

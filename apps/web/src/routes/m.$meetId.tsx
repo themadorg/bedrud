@@ -262,10 +262,10 @@ function MeetingPage() {
       checkUserStatus().then((exists) => {
         if (cancelledRef.current) return
         if (exists) {
-          toast.success('Room closed', { id: toastId, description: 'This room is no longer available.' })
+          toast.warning('Room closed', { id: toastId, description: 'This room is no longer available.' })
           navigate({ to: home })
         } else {
-          toast.error('Account deleted', { id: toastId, description: 'Your account has been deleted.' })
+          toast.warning('Account deleted', { id: toastId, description: 'Your account has been deleted.' })
           useAuthStore.getState().clear()
           setTimeout(() => {
             if (!cancelledRef.current) navigate({ to: '/auth/login', search: { redirect: undefined } })
@@ -273,7 +273,7 @@ function MeetingPage() {
         }
       })
     } else {
-      toast.error('Room closed', { description: 'This room is no longer available.' })
+      toast.warning('Room closed', { description: 'This room is no longer available.' })
       navigate({ to: home })
     }
   }, [navigate])
@@ -283,7 +283,7 @@ function MeetingPage() {
       if (isCurrentUserDeleted) {
         deletionTypeRef.current = 'user_deleted'
         redirectTargetRef.current = { to: '/auth/login', search: { redirect: undefined } }
-        toast.error('Account deleted', { description: message || 'Your account has been deleted.' })
+        toast.warning('Account deleted', { description: message || 'Your account has been deleted.' })
         return
       }
 
@@ -293,7 +293,7 @@ function MeetingPage() {
       const home = guest ? '/' : '/dashboard'
       redirectTargetRef.current = { to: home, search: { redirect: undefined } }
       setWasRoomDeleted(true)
-      toast.error('Room closed', { description: message || 'This room has been closed.' })
+      toast.warning('Room closed', { description: message || 'This room has been closed.' })
       navigate({ to: home })
     },
     [navigate],

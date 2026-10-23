@@ -163,7 +163,7 @@ export function WebxdcAppsDialog({ open, onOpenChange, roomId, selfName, userId 
 
   const shareToMeeting = async (entry: WebxdcGalleryEntry) => {
     if (!watch?.sharePackage) {
-      toast.error('Stage is not ready', { description: 'Reload the meeting and try again.' })
+      toast.warning('Stage is not ready', { description: 'Reload the meeting and try again.' })
       return
     }
     setImportingId(entry.id)
@@ -174,7 +174,7 @@ export function WebxdcAppsDialog({ open, onOpenChange, roomId, selfName, userId 
         return
       }
       if (!entry.xdcUrl) {
-        toast.error('This catalog entry has no download URL')
+        toast.warning('This catalog entry has no download URL')
         return
       }
       const pkg = await importWebxdcGalleryApp(roomId, {

@@ -521,7 +521,7 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
             return
           }
           const error = requestStartWhiteboard()
-          if (error) toast.error(error)
+          if (error) toast.warning(error)
           return
         }
         case 'youtube':
@@ -565,7 +565,7 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
     try {
       const claimError = claimStage('screenshare')
       if (claimError) {
-        toast.error(claimError)
+        toast.warning(claimError)
         return
       }
       await localParticipant?.setScreenShareEnabled(true, SCREEN_SHARE_CAPTURE_OPTIONS)
@@ -651,7 +651,7 @@ export function ControlsBar({ onLeave, moreExtras, chatOpen, onToggleChat }: Pro
                     try {
                       const err = claimStage('screenshare')
                       if (err) {
-                        toast.error(err)
+                        toast.warning(err)
                         return
                       }
                       await localParticipant?.setScreenShareEnabled(true, SCREEN_SHARE_CAPTURE_OPTIONS)
