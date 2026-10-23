@@ -267,9 +267,13 @@ type LiveKitConfig struct {
 	NodeIP string `yaml:"nodeIP"`
 }
 
+// DefaultTokenDurationHours is the access token lifetime used when
+// auth.tokenDuration is missing or not positive.
+const DefaultTokenDurationHours = 24
+
 type AuthConfig struct {
 	JWTSecret           string       `yaml:"jwtSecret"`
-	TokenDuration       ConfigInt    `yaml:"tokenDuration"` // in hours
+	TokenDuration       ConfigInt    `yaml:"tokenDuration"` // in hours, default 24
 	Google              OAuth2Config `yaml:"google"`
 	Github              OAuth2Config `yaml:"github"`
 	Twitter             OAuth2Config `yaml:"twitter"`
@@ -644,6 +648,12 @@ func Load(configPath string) (*Config, error) {
 			if n, err := strconv.Atoi(v); err == nil {
 				config.Auth.UnverifiedAccountTTLHours = n
 			}
+		}
+		// A zero duration would issue access tokens that are expired on arrival.
+		if config.Auth.TokenDuration <= 0 {
+			log.Warn().Int("tokenDuration", config.Auth.TokenDuration.Int()).Int("default", DefaultTokenDurationHours).
+				Msg("auth.tokenDuration missing or not positive; using default")
+			config.Auth.TokenDuration = DefaultTokenDurationHours
 		}
 
 		// CORS environment variable overrides

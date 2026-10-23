@@ -112,7 +112,7 @@ HTTP listener, TLS, proxy, and capacity limits.
 |-------|-----|-------------|
 | `jwtSecret` | `JWT_SECRET` | HMAC-SHA256 signing secret (min 32 chars recommended) |
 | `sessionSecret` | — | Gorilla session store secret for OAuth |
-| `tokenDuration` | — | Access token lifetime (hours) |
+| `tokenDuration` | — | Access token lifetime (hours). Default `24` when missing or not positive |
 | `frontendURL` | `AUTH_FRONTEND_URL` | Frontend base URL for redirects |
 | `passkeyChallengeTTL` | `AUTH_PASSKEY_CHALLENGE_TTL` | WebAuthn challenge expiry (minutes) |
 | `requireEmailVerification` | `AUTH_REQUIRE_EMAIL_VERIFICATION` | Gate local auth behind email verification |
