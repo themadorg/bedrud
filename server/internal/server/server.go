@@ -316,10 +316,11 @@ func Run(configPath, version string) error {
 
 	api := app.Group("/api")
 
+	settingsRepo := repository.NewSettingsRepository(database.GetDB())
+	settingsRepo.SetConfig(cfg)
+
 	// Health & readiness
-	api.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"status": "healthy", "time": time.Now().Unix()})
-	})
+	api.Get("/health", handlers.Health(settingsRepo, version))
 	api.Get("/ready", func(c *fiber.Ctx) error {
 		if sqlDB, err := database.GetDB().DB(); err != nil || sqlDB.Ping() != nil {
 			return c.Status(503).JSON(fiber.Map{"status": "not_ready", "error": "database unavailable"})
@@ -330,8 +331,6 @@ func Run(configPath, version string) error {
 	app.Get("/ready", func(c *fiber.Ctx) error { return c.Redirect("/api/ready") })
 
 	passkeyRepo := repository.NewPasskeyRepository(database.GetDB())
-	settingsRepo := repository.NewSettingsRepository(database.GetDB())
-	settingsRepo.SetConfig(cfg)
 	inviteTokenRepo := repository.NewInviteTokenRepository(database.GetDB())
 	prefsRepo := repository.NewUserPreferencesRepository(database.GetDB())
 	webhookRepo := repository.NewWebhookRepository(database.GetDB())
@@ -380,14 +379,14 @@ func Run(configPath, version string) error {
 		queueConcurrency = 1
 	}
 	queueWorker := queue.NewWorker(database.GetDB(), map[string]queue.Handler{
-		"user_delete":        queue.NewUserDeleteHandler(cleanupSvc, userRepo, passkeyRepo, prefsRepo, roomRepo),
-		"room_delete":        queue.NewRoomDeleteHandler(cleanupSvc, roomRepo),
-		"room_suspend":       queue.NewRoomSuspendHandler(cleanupSvc, roomRepo),
-		"chat_upload_s3":     queue.NewChatUploadS3Handler(uploadStore, uploadTracker),
-		"send_email":         queue.NewSendEmailHandler(&cfg.Email),
-		"dispatch_webhook":   queue.NewDispatchWebhookHandler(),
-		"process_recording":  queue.NewProcessRecordingHandler(recordingRepo, webhookRepo, cfg.LiveKit.Host, cfg.LiveKit.InternalHost, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, recordingStore),
-		"recording_delete":   queue.NewRecordingDeleteHandler(recordingRepo),
+		"user_delete":       queue.NewUserDeleteHandler(cleanupSvc, userRepo, passkeyRepo, prefsRepo, roomRepo),
+		"room_delete":       queue.NewRoomDeleteHandler(cleanupSvc, roomRepo),
+		"room_suspend":      queue.NewRoomSuspendHandler(cleanupSvc, roomRepo),
+		"chat_upload_s3":    queue.NewChatUploadS3Handler(uploadStore, uploadTracker),
+		"send_email":        queue.NewSendEmailHandler(&cfg.Email),
+		"dispatch_webhook":  queue.NewDispatchWebhookHandler(),
+		"process_recording": queue.NewProcessRecordingHandler(recordingRepo, webhookRepo, cfg.LiveKit.Host, cfg.LiveKit.InternalHost, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, recordingStore),
+		"recording_delete":  queue.NewRecordingDeleteHandler(recordingRepo),
 	}, queue.WorkerOptions{
 		Interval:    time.Duration(cfg.Queue.PollInterval.Int64()) * time.Millisecond,
 		Concurrency: queueConcurrency,
@@ -473,7 +472,6 @@ func Run(configPath, version string) error {
 	api.Put("/room/:roomId/settings", append(requireAuthMut, middleware.RejectGuest(), roomHandler.UpdateSettings)...)
 	api.Delete("/room/:roomId", append(requireAuthMut, middleware.RejectGuest(), roomHandler.DeleteRoom)...)
 	api.Post("/room/:roomId/chat/upload", append(requireAuthMut, middleware.APIRateLimiter(cfg.RateLimit), roomHandler.UploadChatImage)...)
-
 
 	// TODO oncoming feature: recording routes
 	// api.Post("/rooms/:id/recording/start", ...)

@@ -51,7 +51,7 @@ Authorization: Bearer <access_token>
 
 | Method | Path | Response |
 |--------|------|----------|
-| GET | `/api/health` | `{"status":"healthy","time":<unix>}` |
+| GET | `/api/health` | `{"status":"healthy","time":<unix>,"version":"…","serverName":"…"}` |
 | GET | `/api/ready` | 200 ready / 503 if DB unavailable |
 
 ---

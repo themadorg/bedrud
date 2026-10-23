@@ -10,7 +10,7 @@ Authoritative list of HTTP routes registered in `internal/server/server.go`. All
 
 | Method | Path | Auth | Handler |
 |--------|------|------|---------|
-| GET | `/api/health` | none | Inline — `{"status":"healthy"}` |
+| GET | `/api/health` | none | `handlers.Health` — status, time, version, serverName |
 | GET | `/api/ready` | none | Inline — DB ping, 503 if unavailable |
 | GET | `/health` | none | 307 → `/api/health` |
 | GET | `/ready` | none | 307 → `/api/ready` |

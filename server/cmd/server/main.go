@@ -261,7 +261,7 @@ func run() error {
 	// ===============================
 	api := app.Group("/api")
 
-	api.Get("/health", healthCheck)
+	api.Get("/health", handlers.Health(settingsRepo, "dev"))
 	api.Get("/ready", readinessCheck)
 
 	if os.Getenv("DISABLE_API_DOCS") == "" {
@@ -660,26 +660,6 @@ func run() error {
 
 	log.Info().Msg("Shutting down server...")
 	return app.Shutdown()
-}
-
-// @Summary Health check endpoint
-// @Description Get the health status of the service
-// @Tags health
-// @Produce json
-// @Success 200 {object} map[string]interface{}
-// @Router /health [get]
-// @Router /api/health [get]
-// Health check handler
-func healthCheck(c *fiber.Ctx) error {
-	log.Info().
-		Str("path", c.Path()).
-		Str("ip", c.IP()).
-		Msg("Health check request received")
-
-	return c.JSON(fiber.Map{
-		"status": "healthy",
-		"time":   time.Now().Unix(),
-	})
 }
 
 // @Summary Readiness check endpoint
