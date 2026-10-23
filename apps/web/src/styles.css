@@ -47,6 +47,15 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-warning: var(--warning-500);
+  --color-success: var(--success-500);
+  --color-recording: var(--recording);
+  --color-accent-container: var(--accent-container);
+  --color-accent-container-foreground: var(--accent-container-foreground);
+  --color-inverse-surface: var(--inverse-surface);
+  --color-inverse-foreground: var(--inverse-foreground);
+  --color-inverse-error: var(--inverse-error);
+  --color-inverse-warning: var(--inverse-warning);
+  --color-inverse-success: var(--inverse-success);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

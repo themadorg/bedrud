@@ -40,8 +40,22 @@
 
   /* Status */
   --success-500:     #16A34A;
-  --warning-500:     #D97706;
-  --destructive-500: #DC2626;
+  --warning-500:     #B45309;
+  /* A step darker than the red ramp's middle, so the error role reads apart from the rose primary. */
+  --destructive-500: #B91C1C;
+  /* Recording is red by convention, not because anything failed, so it keeps its own token. */
+  --recording:       #B91C1C;
+
+  /* Teal accent container — badges beside a name */
+  --accent-container:            #CCFBF1;
+  --accent-container-foreground: #134E4A;
+
+  /* Inverse surface — toasts, dark in light theme. Status icons take the other theme's tone. */
+  --inverse-surface:    #1C1917;
+  --inverse-foreground: #F5F0EE;
+  --inverse-error:      #EF4444;
+  --inverse-warning:    #FBBF24;
+  --inverse-success:    #5EEAD4;
 
   /* Foreground / chrome — neutral light surfaces (no warm stone cast) */
   --fg-1: #171717;
@@ -75,7 +89,7 @@
   --accent: #ecfdf9;
   --accent-foreground: #115e59;
 
-  --destructive: #DC2626;
+  --destructive: #B91C1C;
   --destructive-foreground: #FFFFFF;
 
   --border: #e5e5e5;
@@ -133,8 +147,21 @@
   --accent: #1C1917;
   --accent-foreground: #FAFAF9;
 
-  --destructive: #F87171;
+  /* A step lighter than the light theme's red; #F87171 sat a step away from the rose primary. */
+  --destructive: #EF4444;
   --destructive-foreground: #0C0A09;
+  --recording: #EF4444;
+
+  --warning-500: #FBBF24;
+
+  --accent-container: #115E59;
+  --accent-container-foreground: #CCFBF1;
+
+  --inverse-surface: #F5F5F4;
+  --inverse-foreground: #1C1917;
+  --inverse-error: #B91C1C;
+  --inverse-warning: #B45309;
+  --inverse-success: #0D9488;
 
   --border: #292524;
   --input: #292524;
