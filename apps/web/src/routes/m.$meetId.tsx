@@ -191,6 +191,8 @@ function LiveKitTransportDiagnostics({
 
 export const Route = createFileRoute('/m/$meetId')({
   ssr: false,
+  // A chat link to another room navigates here in place; a fresh page drops the old room's join and call state.
+  remountDeps: ({ params }) => params.meetId,
   head: () => ({ meta: [{ title: 'Meeting — Bedrud' }] }),
   component: MeetingPage,
 })
