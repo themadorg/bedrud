@@ -244,10 +244,14 @@ export function EmailTab({
 
         {/* Send Test Email */}
         <div className="space-y-3 pt-2">
-          <Field label="Send Test Email" hint="Send a real test email to verify SMTP config works end-to-end.">
+          <Field
+            label="Send Test Email"
+            hint="Sends a real email right away through the saved mail settings — the same path verification and reset emails use. Save your changes first."
+          >
             <div className="flex gap-2">
               <Input
                 type="email"
+                aria-label="Test email recipient"
                 placeholder="admin@example.com"
                 value={testEmailTo}
                 onChange={(e) => {
@@ -267,6 +271,7 @@ export function EmailTab({
             </div>
             {testResult && (
               <div
+                role={testResult.ok ? 'status' : 'alert'}
                 className={cn(
                   'mt-2 rounded-lg border px-3 py-2 text-xs',
                   testResult.ok
