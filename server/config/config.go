@@ -26,6 +26,30 @@ type Config struct {
 	Email     EmailConfig     `yaml:"email"`
 	// Webxdc is experimental mini-apps in meetings (opt-in; requires domain).
 	Webxdc WebxdcConfig `yaml:"webxdc"`
+	// WelcomeSound holds the default limits for profile welcome sounds.
+	WelcomeSound WelcomeSoundConfig `yaml:"welcomeSound"`
+}
+
+// Built-in welcome sound limits, used when neither config.yaml nor the admin panel sets one.
+const (
+	DefaultWelcomeSoundMaxBytes           = 32 * 1024
+	DefaultWelcomeSoundMaxDurationSeconds = 7
+	DefaultWelcomeSoundMaxPeakDbfs        = -1.0
+	DefaultWelcomeSoundMaxLoudnessLufs    = -20.0
+)
+
+// WelcomeSoundConfig sets default upload limits for profile welcome sounds.
+// The feature switch itself lives in the admin panel (off by default).
+// A zero value means "use the built-in default".
+type WelcomeSoundConfig struct {
+	// MaxBytes is the largest accepted upload. Env: WELCOME_SOUND_MAX_BYTES
+	MaxBytes int `yaml:"maxBytes" env:"WELCOME_SOUND_MAX_BYTES"`
+	// MaxDurationSeconds is the longest accepted clip. Env: WELCOME_SOUND_MAX_DURATION_SECONDS
+	MaxDurationSeconds int `yaml:"maxDurationSeconds" env:"WELCOME_SOUND_MAX_DURATION_SECONDS"`
+	// MaxPeakDbfs rejects clips whose sample peak reaches this level. Env: WELCOME_SOUND_MAX_PEAK_DBFS
+	MaxPeakDbfs float64 `yaml:"maxPeakDbfs" env:"WELCOME_SOUND_MAX_PEAK_DBFS"`
+	// MaxLoudnessLufs rejects clips whose integrated loudness is above this level. Env: WELCOME_SOUND_MAX_LOUDNESS_LUFS
+	MaxLoudnessLufs float64 `yaml:"maxLoudnessLufs" env:"WELCOME_SOUND_MAX_LOUDNESS_LUFS"`
 }
 
 // WebxdcConfig controls experimental WebXDC mini-apps (default off).
@@ -72,24 +96,24 @@ type WebxdcGalleryConfig struct {
 }
 
 type ServerConfig struct {
-	Port           string    `yaml:"port"`
-	HTTPPort       string    `yaml:"httpPort"`
-	Host           string    `yaml:"host"`
-	ReadTimeout    ConfigInt `yaml:"readTimeout"`
-	WriteTimeout   ConfigInt `yaml:"writeTimeout"`
-	EnableTLS      bool      `yaml:"enableTLS" env:"SERVER_ENABLE_TLS"`
-	DisableTLS     bool      `yaml:"disableTLS"`
-	CertFile       string    `yaml:"certFile" env:"SERVER_CERT_FILE"`
-	KeyFile        string    `yaml:"keyFile" env:"SERVER_KEY_FILE"`
-	Domain         string    `yaml:"domain" env:"SERVER_DOMAIN"`
-	Email          string    `yaml:"email" env:"SERVER_EMAIL"`
-	UseACME        bool      `yaml:"useACME" env:"SERVER_USE_ACME"`
+	Port         string    `yaml:"port"`
+	HTTPPort     string    `yaml:"httpPort"`
+	Host         string    `yaml:"host"`
+	ReadTimeout  ConfigInt `yaml:"readTimeout"`
+	WriteTimeout ConfigInt `yaml:"writeTimeout"`
+	EnableTLS    bool      `yaml:"enableTLS" env:"SERVER_ENABLE_TLS"`
+	DisableTLS   bool      `yaml:"disableTLS"`
+	CertFile     string    `yaml:"certFile" env:"SERVER_CERT_FILE"`
+	KeyFile      string    `yaml:"keyFile" env:"SERVER_KEY_FILE"`
+	Domain       string    `yaml:"domain" env:"SERVER_DOMAIN"`
+	Email        string    `yaml:"email" env:"SERVER_EMAIL"`
+	UseACME      bool      `yaml:"useACME" env:"SERVER_USE_ACME"`
 	// ACME configures Let's Encrypt challenges. When empty/default, HTTP-01 is used.
 	// Set challenge to "dns-01" with dnsProvider "cloudflare" for free wildcards
 	// (*.domain) required by WebXDC subdomain hosts.
-	ACME ACMEConfig `yaml:"acme"`
-	TrustedProxies []string `yaml:"trustedProxies"`
-	ProxyHeader    string   `yaml:"proxyHeader"`
+	ACME           ACMEConfig `yaml:"acme"`
+	TrustedProxies []string   `yaml:"trustedProxies"`
+	ProxyHeader    string     `yaml:"proxyHeader"`
 	// BehindProxy enables trusted-proxy mode. Set to true when running
 	// behind Cloudflare, nginx, or any reverse proxy that terminates TLS.
 	BehindProxy bool `yaml:"behindProxy"`
@@ -248,11 +272,11 @@ type LiveKitConfig struct {
 	Host string `yaml:"host"`
 	// HostLocal is the browser signaling URL when the app is opened on localhost
 	// (e.g. ws://localhost:7070/livekit via the Vite /livekit proxy in remote debug).
-	HostLocal     string `yaml:"hostLocal"`
-	InternalHost  string `yaml:"internalHost"`
-	APIKey        string `yaml:"apiKey"`
-	APISecret     string `yaml:"apiSecret"`
-	ConfigPath    string `yaml:"configPath"`
+	HostLocal    string `yaml:"hostLocal"`
+	InternalHost string `yaml:"internalHost"`
+	APIKey       string `yaml:"apiKey"`
+	APISecret    string `yaml:"apiSecret"`
+	ConfigPath   string `yaml:"configPath"`
 	// SkipTLSVerify skips TLS verification for the LiveKit API client (self-signed certs).
 	// Env: LIVEKIT_SKIP_TLS_VERIFY
 	SkipTLSVerify bool `yaml:"skipTLSVerify" env:"LIVEKIT_SKIP_TLS_VERIFY"`
@@ -689,6 +713,28 @@ func Load(configPath string) (*Config, error) {
 		if v := os.Getenv("CHAT_MESSAGE_TTL_HOURS"); v != "" {
 			if i, err := strconv.Atoi(v); err == nil {
 				config.Chat.MessageTTLHours = i
+			}
+		}
+
+		// Welcome sound limit environment variable overrides
+		if v := os.Getenv("WELCOME_SOUND_MAX_BYTES"); v != "" {
+			if i, err := strconv.Atoi(v); err == nil {
+				config.WelcomeSound.MaxBytes = i
+			}
+		}
+		if v := os.Getenv("WELCOME_SOUND_MAX_DURATION_SECONDS"); v != "" {
+			if i, err := strconv.Atoi(v); err == nil {
+				config.WelcomeSound.MaxDurationSeconds = i
+			}
+		}
+		if v := os.Getenv("WELCOME_SOUND_MAX_PEAK_DBFS"); v != "" {
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				config.WelcomeSound.MaxPeakDbfs = f
+			}
+		}
+		if v := os.Getenv("WELCOME_SOUND_MAX_LOUDNESS_LUFS"); v != "" {
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				config.WelcomeSound.MaxLoudnessLufs = f
 			}
 		}
 
