@@ -7,7 +7,7 @@ import { useAuthStore } from '#/lib/auth.store'
 import { useRecentRoomsStore } from '#/lib/recent-rooms.store'
 import { loadRegisteredUser, requireRegisteredUser } from '#/lib/require-registered-user'
 import type { User as BedrudUser } from '#/lib/user.store'
-import { useUserStore } from '#/lib/user.store'
+import { canOpenAdmin, useUserStore } from '#/lib/user.store'
 import { MobileBottomNav } from '@/components/dashboard/MobileBottomNav'
 import { HomeSettingsDialog } from '@/components/settings/HomeSettingsDialog'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -94,7 +94,7 @@ function SidebarContent({
           <NavLink key={item.to} {...item} onClick={onNavClick} />
         ))}
 
-        {user?.isAdmin && (
+        {canOpenAdmin(user) && (
           <div className="mt-3">
             <div className="mb-1 flex items-center gap-2 px-2">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40">Admin</p>

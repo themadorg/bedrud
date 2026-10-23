@@ -47,6 +47,11 @@ export function applyProfileUpdate(current: User | null, updated: ServerUser): U
   return user
 }
 
+/** The server's `/admin` group answers superadmins only. */
+export function canOpenAdmin(user: User | null | undefined): boolean {
+  return user?.isSuperAdmin ?? false
+}
+
 export function isGuestUser(user: User | null | undefined): boolean {
   if (!user) return false
   return user.provider === 'guest' || (user.accesses?.includes('guest') ?? false)

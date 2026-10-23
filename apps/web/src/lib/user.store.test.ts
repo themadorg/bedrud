@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyProfileUpdate, type ServerUser, toUser } from '#/lib/user.store'
+import { applyProfileUpdate, canOpenAdmin, type ServerUser, toUser } from '#/lib/user.store'
 
 const serverUser: ServerUser = {
   id: 'user-1',
@@ -58,5 +58,23 @@ describe('applyProfileUpdate', () => {
 
   it('should map the update alone when no user is stored', () => {
     expect(applyProfileUpdate(null, serverUser)).toEqual(toUser(serverUser))
+  })
+})
+
+describe('canOpenAdmin', () => {
+  it('should return true for a superadmin', () => {
+    expect(canOpenAdmin(toUser({ ...serverUser, accesses: ['superadmin'] }))).toBe(true)
+  })
+
+  it('should return false for an admin who is not a superadmin', () => {
+    expect(canOpenAdmin(toUser({ ...serverUser, accesses: ['admin'] }))).toBe(false)
+  })
+
+  it('should return false for a moderator', () => {
+    expect(canOpenAdmin(toUser({ ...serverUser, accesses: ['moderator'] }))).toBe(false)
+  })
+
+  it('should return false when no user is loaded', () => {
+    expect(canOpenAdmin(null)).toBe(false)
   })
 })
