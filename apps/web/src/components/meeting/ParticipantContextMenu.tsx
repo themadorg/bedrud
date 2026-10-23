@@ -132,6 +132,7 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
     key: string
     path: string
     label: string
+    name: string
     description: string
   } | null>(null)
 
@@ -232,12 +233,13 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
           key: action,
           path,
           label: action === 'promote' ? 'Promote' : action === 'demote' ? 'Demote' : action === 'kick' ? 'Kick' : 'Ban',
+          name: participant.name || 'this participant',
           description: el.dataset.description || '',
         })
         onClose?.()
       }
     },
-    [onClose],
+    [onClose, participant.name],
   )
 
   return (
@@ -527,7 +529,7 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
       <AlertConfirmDialog
         open={pendingAdminAction !== null}
         onOpenChange={(open) => !open && setPendingAdminAction(null)}
-        title={pendingAdminAction ? `${pendingAdminAction.label} participant?` : ''}
+        title={pendingAdminAction ? `${pendingAdminAction.label} ${pendingAdminAction.name}?` : ''}
         description={pendingAdminAction?.description || ''}
         confirmLabel={pendingAdminAction?.label || 'Confirm'}
         onConfirm={() => {
@@ -536,7 +538,8 @@ export function ParticipantMenuContent({ participant, Item, Separator, Label, on
           }
           setPendingAdminAction(null)
         }}
-        variant="destructive"
+        // Promoting or demoting loses nothing; removing someone from the call does.
+        variant={pendingAdminAction?.key === 'kick' || pendingAdminAction?.key === 'ban' ? 'destructive' : 'secondary'}
       />
     </>
   )

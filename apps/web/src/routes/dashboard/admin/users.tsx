@@ -103,7 +103,7 @@ function AdminUsersPage() {
     promote: {
       title: `Promote ${table.selectedIds.size} user${table.selectedIds.size !== 1 ? 's' : ''}?`,
       desc: 'Opens the bulk promotion flow. Full role management (including Admin and Moderator) is available on the individual user detail page.',
-      color: 'default' as const,
+      color: 'secondary' as const,
     },
     delete: {
       title: `Delete ${table.selectedIds.size} user${table.selectedIds.size !== 1 ? 's' : ''}?`,
@@ -284,9 +284,7 @@ function AdminUsersPage() {
               break
           }
         }}
-        variant={
-          confirmBulkAction && bulkActionLabels[confirmBulkAction].color === 'destructive' ? 'destructive' : 'default'
-        }
+        variant={confirmBulkAction ? bulkActionLabels[confirmBulkAction].color : 'destructive'}
         isLoading={isBulkPending}
       />
     </div>

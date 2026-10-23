@@ -63,6 +63,8 @@ export function RoomSettingsDialog({ room, open, onOpenChange, onSave }: Props) 
   const [settings, setSettings] = useState<RoomSettings>({ ...room.settings })
 
   function handleOpenChange(nextOpen: boolean) {
+    // Neither Escape nor the scrim closes the dialog while the save is on its way.
+    if (!nextOpen && isLoading) return
     if (nextOpen) {
       setIsPublic(room.isPublic)
       setMaxParticipants(room.maxParticipants)
