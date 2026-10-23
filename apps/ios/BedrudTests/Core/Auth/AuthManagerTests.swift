@@ -86,6 +86,30 @@ final class AuthManagerTests: XCTestCase {
         XCTAssertEqual(manager.currentUser?.id, "u1")
     }
 
+    func testRestoreSessionUpgradesLegacyCachedUserToSuperadmin() async throws {
+        keychain["test-instance_access_token"] = fakeJWT()
+        keychain["test-instance_refresh_token"] = "refresh"
+        // Users cached before accesses existed carry only an isAdmin flag.
+        keychain["test-instance_user_data"] = #"{"id":"u1","email":"a@b.com","name":"Alice","isAdmin":false}"#
+
+        MockURLProtocol.requestHandler = { request in
+            let meJSON = #"{"id":"u1","email":"a@b.com","name":"Alice","accesses":["superadmin","user"]}"#
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, meJSON.data(using: .utf8)!)
+        }
+
+        let manager = makeAuthManager()
+        XCTAssertFalse(manager.currentUser?.isAdmin == true, "The legacy cache carries no accesses")
+
+        // Poll for the background /auth/me task to replace the cached user.
+        for _ in 0..<20 {
+            if manager.currentUser?.isAdmin == true { break }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+
+        XCTAssertTrue(manager.currentUser?.isAdmin == true)
+    }
+
     // MARK: - Login
 
     func testLoginStoresTokensAndSetsUser() async throws {

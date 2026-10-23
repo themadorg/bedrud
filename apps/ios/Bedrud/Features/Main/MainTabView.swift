@@ -10,11 +10,23 @@ enum AppTab: Hashable {
 
 struct MainTabView: View {
     @EnvironmentObject private var instanceManager: InstanceManager
+
+    var body: some View {
+        // BedrudApp shows this view only while authenticated, which requires an auth manager.
+        if let authManager = instanceManager.authManager {
+            MainTabContent(authManager: authManager)
+        }
+    }
+}
+
+/// Observes the auth manager itself, so the Admin tab follows the user the background profile refresh delivers.
+private struct MainTabContent: View {
+    @ObservedObject var authManager: AuthManager
     @State private var selectedTab: AppTab = .rooms
     @State private var showJoinSheet = false
 
     private var isAdmin: Bool {
-        instanceManager.authManager?.currentUser?.isAdmin == true
+        authManager.currentUser?.isAdmin == true
     }
 
     var body: some View {
