@@ -280,6 +280,12 @@ export const sections: SidebarSection[] = [
         order: 29,
       },
       {
+        slug: "guides/reverse-proxy",
+        title: "Reverse Proxy Recipes",
+        description: "Caddy, Traefik, nginx and HAProxy docker-compose stacks",
+        order: 29,
+      },
+      {
         slug: "guides/docker",
         title: "Docker Guide",
         description: "Run Bedrud with Docker",
