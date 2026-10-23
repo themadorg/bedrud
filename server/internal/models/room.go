@@ -22,8 +22,8 @@ var (
 	ErrRoomNameTooLong  = fmt.Errorf("room name must be at most %d characters", RoomNameMaxLength)
 	ErrRoomNameTaken    = errors.New("a room with this name already exists")
 	// Capacity / ban enrollment errors (handlers use errors.Is)
-	ErrRoomFull           = errors.New("room is full")
-	ErrParticipantBanned  = errors.New("user is banned from this room")
+	ErrRoomFull          = errors.New("room is full")
+	ErrParticipantBanned = errors.New("user is banned from this room")
 )
 
 // validRoomNameRegex allows only lowercase alphanumeric and hyphens,
@@ -105,6 +105,14 @@ type RoomSettings struct {
 	IsPersistent    bool `json:"isPersistent" gorm:"not null;default:false"`
 	// TODO oncoming feature
 	RecordingsAllowed bool `json:"recordingsAllowed" gorm:"not null;default:false"`
+	// AllowWelcomeSounds lets the host turn profile welcome sounds off for this room.
+	// Empty means allowed, so clients that do not know the field never switch it off.
+	AllowWelcomeSounds *bool `json:"allowWelcomeSounds,omitempty"`
+}
+
+// WelcomeSoundsAllowed reports whether joiners' welcome sounds may play in this room.
+func (s RoomSettings) WelcomeSoundsAllowed() bool {
+	return s.AllowWelcomeSounds == nil || *s.AllowWelcomeSounds
 }
 
 // RoomParticipant represents a user in a room

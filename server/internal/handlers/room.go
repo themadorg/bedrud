@@ -172,12 +172,13 @@ func (h *RoomHandler) clientLiveKitHost(c *fiber.Ctx) string {
 }
 
 type AdminUpdateRoomSettingsInput struct {
-	AllowChat       *bool `json:"allowChat"`
-	AllowVideo      *bool `json:"allowVideo"`
-	AllowAudio      *bool `json:"allowAudio"`
-	RequireApproval *bool `json:"requireApproval"`
-	E2EE            *bool `json:"e2ee"`
-	IsPersistent    *bool `json:"isPersistent"`
+	AllowChat          *bool `json:"allowChat"`
+	AllowVideo         *bool `json:"allowVideo"`
+	AllowAudio         *bool `json:"allowAudio"`
+	RequireApproval    *bool `json:"requireApproval"`
+	E2EE               *bool `json:"e2ee"`
+	IsPersistent       *bool `json:"isPersistent"`
+	AllowWelcomeSounds *bool `json:"allowWelcomeSounds"`
 }
 
 type CreateRoomRequest struct {
@@ -1587,9 +1588,9 @@ func (h *RoomHandler) GetParticipantProfile(c *fiber.Ctx) error {
 		name = identity
 	}
 
-	// The server decides who hears a clip, so the admin switch holds even against stale clients.
+	// The server decides who hears a clip, so the admin and room switches hold even against stale clients.
 	welcomeSoundURL := ""
-	if h.welcomeSoundsEnabled() {
+	if h.welcomeSoundsEnabled() && room.Settings.WelcomeSoundsAllowed() {
 		welcomeSoundURL = u.WelcomeSoundURL
 	}
 
@@ -2048,6 +2049,10 @@ func (h *RoomHandler) UpdateSettings(c *fiber.Ctx) error {
 	if input.Settings != nil {
 		// Preserve admin-only field — persistence is only changeable via AdminUpdateRoom.
 		input.Settings.IsPersistent = room.Settings.IsPersistent
+		// Clients that predate welcome sounds leave the field out; keep the host's choice.
+		if input.Settings.AllowWelcomeSounds == nil {
+			input.Settings.AllowWelcomeSounds = room.Settings.AllowWelcomeSounds
+		}
 		room.Settings = *input.Settings
 	}
 
@@ -2494,6 +2499,9 @@ func (h *RoomHandler) AdminUpdateRoom(c *fiber.Ctx) error {
 		}
 		if input.Settings.IsPersistent != nil {
 			merged.IsPersistent = *input.Settings.IsPersistent
+		}
+		if input.Settings.AllowWelcomeSounds != nil {
+			merged.AllowWelcomeSounds = input.Settings.AllowWelcomeSounds
 		}
 		room.Settings = merged
 	}

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -228,37 +229,90 @@ func TestAuthHandler_DeleteWelcomeSound(t *testing.T) {
 	})
 }
 
+const welcomeRoomSoundURL = "/uploads/welcome-sounds/creator-user.mp3?v=1"
+
+type welcomeRoomFixture struct {
+	app          *fiber.App
+	settingsRepo *repository.SettingsRepository
+	roomRepo     *repository.RoomRepository
+	roomID       string
+	// claims is read on every request, so a test can switch who is calling.
+	claims *auth.Claims
+}
+
+// setupWelcomeRoom creates a room owned by "creator-user" (who has a welcome sound) with
+// "other-user" in it, and wires the profile and both room settings endpoints.
+func setupWelcomeRoom(t *testing.T, settings models.RoomSettings) *welcomeRoomFixture {
+	t.Helper()
+	db := testutil.SetupTestDB(t)
+	roomRepo := repository.NewRoomRepository(db)
+	settingsRepo := repository.NewSettingsRepository(db)
+	lkCfg := config.LiveKitConfig{Host: "http://localhost:9999", APIKey: "k", APISecret: "s"}
+	handler := NewRoomHandler(testutil.NewMockRoomService(), &lkCfg, &config.ChatConfig{}, roomRepo, repository.NewUserRepository(db), nil, settingsRepo, nil, nil, nil)
+
+	users := []models.User{
+		{ID: "creator-user", Email: "creator@ex.com", Name: "Creator", Provider: "local", IsActive: true, WelcomeSoundURL: welcomeRoomSoundURL},
+		{ID: "other-user", Email: "other@ex.com", Name: "Other", Provider: "local", IsActive: true},
+	}
+	for index := range users {
+		db.Create(&users[index])
+	}
+	room, err := roomRepo.CreateRoom("creator-user", "welcome-room", true, "standard", 0, &settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = roomRepo.AddParticipant(room.ID, "other-user")
+
+	fixture := &welcomeRoomFixture{
+		settingsRepo: settingsRepo,
+		roomRepo:     roomRepo,
+		roomID:       room.ID,
+		claims:       &auth.Claims{UserID: "other-user", Email: "other@ex.com", Accesses: []string{"user"}},
+	}
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user", fixture.claims)
+		return c.Next()
+	})
+	app.Get("/room/:roomId/participant/:identity/profile", handler.GetParticipantProfile)
+	app.Put("/room/:roomId/settings", handler.UpdateSettings)
+	app.Put("/admin/rooms/:roomId", handler.AdminUpdateRoom)
+	fixture.app = app
+	return fixture
+}
+
+func (fixture *welcomeRoomFixture) putJSON(t *testing.T, path string, body map[string]any) {
+	t.Helper()
+	payload, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPut, path, bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := fixture.app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		responseBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("PUT %s: expected 200, got %d: %s", path, resp.StatusCode, responseBody)
+	}
+}
+
+func (fixture *welcomeRoomFixture) storedAllowWelcomeSounds(t *testing.T) *bool {
+	t.Helper()
+	room, err := fixture.roomRepo.GetRoom(fixture.roomID)
+	if err != nil || room == nil {
+		t.Fatalf("reload room: %v", err)
+	}
+	return room.Settings.AllowWelcomeSounds
+}
+
 func TestRoomHandler_GetParticipantProfile_WelcomeSound(t *testing.T) {
-	const soundURL = "/uploads/welcome-sounds/creator-user.mp3?v=1"
+	const soundURL = welcomeRoomSoundURL
 
 	setup := func(t *testing.T) (*fiber.App, *repository.SettingsRepository, string) {
 		t.Helper()
-		db := testutil.SetupTestDB(t)
-		roomRepo := repository.NewRoomRepository(db)
-		settingsRepo := repository.NewSettingsRepository(db)
-		lkCfg := config.LiveKitConfig{Host: "http://localhost:9999", APIKey: "k", APISecret: "s"}
-		handler := NewRoomHandler(testutil.NewMockRoomService(), &lkCfg, &config.ChatConfig{}, roomRepo, repository.NewUserRepository(db), nil, settingsRepo, nil, nil, nil)
-
-		users := []models.User{
-			{ID: "creator-user", Email: "creator@ex.com", Name: "Creator", Provider: "local", IsActive: true, WelcomeSoundURL: soundURL},
-			{ID: "other-user", Email: "other@ex.com", Name: "Other", Provider: "local", IsActive: true},
-		}
-		for index := range users {
-			db.Create(&users[index])
-		}
-		room, err := roomRepo.CreateRoom("creator-user", "welcome-room", true, "standard", 0, &models.RoomSettings{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		_ = roomRepo.AddParticipant(room.ID, "other-user")
-
-		app := fiber.New()
-		app.Use(func(c *fiber.Ctx) error {
-			c.Locals("user", &auth.Claims{UserID: "other-user", Email: "other@ex.com", Accesses: []string{"user"}})
-			return c.Next()
-		})
-		app.Get("/room/:roomId/participant/:identity/profile", handler.GetParticipantProfile)
-		return app, settingsRepo, room.ID
+		fixture := setupWelcomeRoom(t, models.RoomSettings{})
+		return fixture.app, fixture.settingsRepo, fixture.roomID
 	}
 	fetchSoundURL := func(t *testing.T, app *fiber.App, roomID string) any {
 		t.Helper()
@@ -287,6 +341,75 @@ func TestRoomHandler_GetParticipantProfile_WelcomeSound(t *testing.T) {
 
 		if url := fetchSoundURL(t, app, roomID); url != soundURL {
 			t.Fatalf("expected %q, got %v", soundURL, url)
+		}
+	})
+
+	t.Run("should hide the welcome sound in a room whose host turned them off", func(t *testing.T) {
+		off := false
+		fixture := setupWelcomeRoom(t, models.RoomSettings{AllowWelcomeSounds: &off})
+		enableWelcomeSounds(t, fixture.settingsRepo)
+
+		if url := fetchSoundURL(t, fixture.app, fixture.roomID); url != "" {
+			t.Fatalf("expected an empty welcomeSoundUrl, got %v", url)
+		}
+	})
+}
+
+func TestRoomHandler_UpdateSettings_WelcomeSounds(t *testing.T) {
+	ownerClaims := &auth.Claims{UserID: "creator-user", Email: "creator@ex.com", Accesses: []string{"user"}}
+	baseSettings := map[string]any{"allowChat": true, "allowVideo": true, "allowAudio": true}
+
+	t.Run("should let the owner turn welcome sounds off", func(t *testing.T) {
+		fixture := setupWelcomeRoom(t, models.RoomSettings{})
+		fixture.claims = ownerClaims
+		settings := map[string]any{"allowWelcomeSounds": false}
+		for key, value := range baseSettings {
+			settings[key] = value
+		}
+
+		fixture.putJSON(t, "/room/"+fixture.roomID+"/settings", map[string]any{"settings": settings})
+
+		if stored := fixture.storedAllowWelcomeSounds(t); stored == nil || *stored {
+			t.Fatalf("expected welcome sounds stored as off, got %v", stored)
+		}
+	})
+
+	t.Run("should keep the stored choice when a client leaves the field out", func(t *testing.T) {
+		off := false
+		fixture := setupWelcomeRoom(t, models.RoomSettings{AllowWelcomeSounds: &off})
+		fixture.claims = ownerClaims
+
+		fixture.putJSON(t, "/room/"+fixture.roomID+"/settings", map[string]any{"settings": baseSettings})
+
+		if stored := fixture.storedAllowWelcomeSounds(t); stored == nil || *stored {
+			t.Fatalf("expected welcome sounds to stay off, got %v", stored)
+		}
+	})
+}
+
+func TestRoomHandler_AdminUpdateRoom_WelcomeSounds(t *testing.T) {
+	adminClaims := &auth.Claims{UserID: "admin-user", Email: "admin@ex.com", Accesses: []string{"superadmin"}}
+
+	t.Run("should let a superadmin turn welcome sounds off", func(t *testing.T) {
+		fixture := setupWelcomeRoom(t, models.RoomSettings{})
+		fixture.claims = adminClaims
+
+		fixture.putJSON(t, "/admin/rooms/"+fixture.roomID, map[string]any{"settings": map[string]any{"allowWelcomeSounds": false}})
+
+		if stored := fixture.storedAllowWelcomeSounds(t); stored == nil || *stored {
+			t.Fatalf("expected welcome sounds stored as off, got %v", stored)
+		}
+	})
+
+	t.Run("should leave welcome sounds alone when the field is left out", func(t *testing.T) {
+		off := false
+		fixture := setupWelcomeRoom(t, models.RoomSettings{AllowWelcomeSounds: &off})
+		fixture.claims = adminClaims
+
+		fixture.putJSON(t, "/admin/rooms/"+fixture.roomID, map[string]any{"settings": map[string]any{"isPersistent": true}})
+
+		if stored := fixture.storedAllowWelcomeSounds(t); stored == nil || *stored {
+			t.Fatalf("expected welcome sounds to stay off, got %v", stored)
 		}
 	})
 }

@@ -47,6 +47,27 @@ func TestRoomSettings_Defaults(t *testing.T) {
 	}
 }
 
+func TestRoomSettings_WelcomeSoundsAllowed(t *testing.T) {
+	on, off := true, false
+	cases := []struct {
+		name  string
+		value *bool
+		want  bool
+	}{
+		{name: "should allow welcome sounds when the room never set the field", value: nil, want: true},
+		{name: "should allow welcome sounds when the host turned them on", value: &on, want: true},
+		{name: "should block welcome sounds when the host turned them off", value: &off, want: false},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			settings := RoomSettings{AllowWelcomeSounds: testCase.value}
+			if got := settings.WelcomeSoundsAllowed(); got != testCase.want {
+				t.Fatalf("expected %v, got %v", testCase.want, got)
+			}
+		})
+	}
+}
+
 func TestRoomParticipant_DefaultStates(t *testing.T) {
 	rp := RoomParticipant{}
 	if rp.IsActive || rp.IsApproved || rp.IsMuted || rp.IsVideoOff || rp.IsChatBlocked || rp.IsBanned || rp.IsOnStage {
