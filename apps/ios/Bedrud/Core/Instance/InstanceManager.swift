@@ -19,13 +19,12 @@ final class InstanceManager: ObservableObject {
     init(store: InstanceStore) {
         self.store = store
 
-        // Re-build deps whenever the active instance changes
+        // Re-build deps whenever the active instance changes. @Published emits in willSet,
+        // so the store still holds the old id here; rebuild from the emitted one.
         store.$activeInstanceId
             .removeDuplicates()
-            .sink { [weak self] _ in self?.rebuild() }
+            .sink { [weak self] instanceId in self?.rebuild(for: instanceId) }
             .store(in: &cancellables)
-
-        rebuild()
     }
 
     /// Validates that a server URL responds to /api/health.
@@ -59,8 +58,8 @@ final class InstanceManager: ObservableObject {
 
     // MARK: - Private
 
-    private func rebuild() {
-        guard let instance = store.activeInstance else {
+    private func rebuild(for instanceId: String?) {
+        guard let instance = store.instances.first(where: { $0.id == instanceId }) else {
             apiClient = nil
             authAPI = nil
             authManager = nil
