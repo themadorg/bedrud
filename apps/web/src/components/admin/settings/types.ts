@@ -87,6 +87,14 @@ export interface SystemSettings {
   /** Instance allows users to select Krisp (off by default; requires operator licensing). */
   krispEnabled: boolean
 
+  /** Profile welcome sounds play for the room on join (off by default). */
+  welcomeSoundEnabled: boolean
+  /** Welcome sound limits; 0 = config.yaml, then the built-in default. */
+  welcomeSoundMaxBytes: number
+  welcomeSoundMaxDurationSeconds: number
+  welcomeSoundMaxPeakDbfs: number
+  welcomeSoundMaxLoudnessLufs: number
+
   // Email branding
   emailInstanceName: string
   emailSupportEmail: string
