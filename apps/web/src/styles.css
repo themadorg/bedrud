@@ -431,3 +431,26 @@ button:has(> svg):not([aria-label]):not([aria-labelledby]) {
   clip-path: circle(50% at 50% 50%) !important;
   overflow: hidden;
 }
+
+/*
+ * Toasts — one inverse bar for every kind, as the Android client's BedrudSnackbarHost draws it.
+ * Sonner injects its own unlayered stylesheet, so these overrides stay unlayered and lead with
+ * `:root` to outrank its `[data-sonner-toaster][data-sonner-theme=…]` defaults. The icon, not the
+ * bar, says which kind a message is.
+ */
+:root [data-sonner-toaster][data-sonner-theme] {
+  --normal-bg: var(--inverse-surface);
+  --normal-border: var(--inverse-surface);
+  --normal-text: var(--inverse-foreground);
+  --border-radius: var(--radius-xl);
+}
+
+:root [data-sonner-toast][data-styled='true'] [data-close-button] {
+  color: var(--inverse-foreground);
+  border-color: color-mix(in oklab, var(--inverse-foreground) 24%, transparent);
+}
+
+/* Only an error carries a close button; every other kind goes away on its own. */
+:root [data-sonner-toast]:not([data-type='error']) [data-close-button] {
+  display: none;
+}

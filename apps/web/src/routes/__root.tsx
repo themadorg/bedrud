@@ -2,13 +2,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createRootRoute, HeadContent, Scripts } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { IntlProvider } from 'react-intl'
-import { Toaster } from 'sonner'
 import { useAuthStore } from '#/lib/auth.store'
 import { documentLinks, documentMeta } from '#/lib/document-head'
 import { applyTheme, useThemeStore } from '#/lib/theme.store'
 import { installVisualViewportCssVars } from '#/lib/visual-viewport'
 import enMessages from '#/locales/en.json'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { Toaster } from '@/components/ui/sonner'
 import appCss from '../styles.css?url'
 
 // Inline script that runs before first paint to avoid theme flash.
@@ -130,7 +130,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <IntlProvider locale="en" messages={enMessages}>
             <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
           </IntlProvider>
-          <Toaster richColors closeButton />
+          <Toaster />
         </ErrorBoundary>
         <Scripts />
       </body>
