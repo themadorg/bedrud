@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/livekit/protocol/auth"
 	"github.com/livekit/protocol/livekit"
+	"github.com/livekit/protocol/utils/protojson"
 )
 
 const (
@@ -111,6 +111,82 @@ func TestLiveKitWebhook_ParticipantDisconnected(t *testing.T) {
 	}
 	if active[0].UserID != "wh-u1" {
 		t.Fatalf("expected wh-u1 to remain active, got %s", active[0].UserID)
+	}
+}
+
+// LiveKit sends protojson, where enums are strings and fields are camelCase.
+func TestLiveKitWebhook_ParticipantLeftProtojsonPayload(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	roomRepo := repository.NewRoomRepository(db)
+
+	db.Create(&models.User{ID: "wh-pj-u1", Email: "whpj1@ex.com", Name: "WHPJ1", Provider: "local", IsActive: true})
+	db.Create(&models.User{ID: "wh-pj-u2", Email: "whpj2@ex.com", Name: "WHPJ2", Provider: "local", IsActive: true})
+
+	room, _ := roomRepo.CreateRoom("wh-pj-u1", "wh-pj-room", false, "standard", 0, &models.RoomSettings{})
+	_ = roomRepo.AddParticipant(room.ID, "wh-pj-u1")
+	_ = roomRepo.AddParticipant(room.ID, "wh-pj-u2")
+
+	body := []byte(`{
+		"event": "participant_left",
+		"room": {"sid": "RM_abc", "name": "wh-pj-room", "numParticipants": 1, "creationTime": "1761200000"},
+		"participant": {
+			"sid": "PA_xyz",
+			"identity": "wh-pj-u2",
+			"state": "DISCONNECTED",
+			"joinedAt": "1761200010",
+			"kind": "STANDARD",
+			"disconnectReason": "CLIENT_INITIATED",
+			"tracks": [{"sid": "TR_1", "type": "AUDIO", "source": "MICROPHONE"}],
+			"someFutureField": true
+		},
+		"id": "EV_1",
+		"createdAt": "1761200020"
+	}`)
+
+	req := newSignedWebhookRequest(t, whTestAPIKey, whTestAPISecret, body)
+	h := NewLiveKitWebhookHandler(&config.LiveKitConfig{
+		APIKey:    whTestAPIKey,
+		APISecret: whTestAPISecret,
+	}, roomRepo, nil, nil, db)
+
+	app := fiber.New()
+	app.Post("/webhook", h.Handle)
+
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var active []models.RoomParticipant
+	db.Where("room_id = ? AND is_active = ?", room.ID, true).Find(&active)
+	if len(active) != 1 || active[0].UserID != "wh-pj-u1" {
+		t.Fatalf("expected only wh-pj-u1 active, got %+v", active)
+	}
+}
+
+// A correctly signed body that is not a webhook event is a payload error, not
+// a signature error.
+func TestLiveKitWebhook_InvalidPayload(t *testing.T) {
+	req := newSignedWebhookRequest(t, whTestAPIKey, whTestAPISecret, []byte(`{"event": 42`))
+	h := NewLiveKitWebhookHandler(&config.LiveKitConfig{
+		APIKey:    whTestAPIKey,
+		APISecret: whTestAPISecret,
+	}, nil, nil, nil, nil)
+
+	app := fiber.New()
+	app.Post("/webhook", h.Handle)
+
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
 }
 
@@ -457,10 +533,17 @@ func TestLiveKitWebhook_EgressEnded_Duplicate(t *testing.T) {
 func newWebhookRequest(t *testing.T, apiKey, apiSecret string, event *livekit.WebhookEvent) *http.Request {
 	t.Helper()
 
-	body, err := json.Marshal(event)
+	body, err := protojson.Marshal(event)
 	if err != nil {
 		t.Fatalf("failed to marshal event: %v", err)
 	}
+	return newSignedWebhookRequest(t, apiKey, apiSecret, body)
+}
+
+// newSignedWebhookRequest signs a raw body the way LiveKit does, so tests can
+// send payloads exactly as they appear on the wire.
+func newSignedWebhookRequest(t *testing.T, apiKey, apiSecret string, body []byte) *http.Request {
+	t.Helper()
 
 	// Compute SHA256 of body
 	sha := sha256.Sum256(body)
