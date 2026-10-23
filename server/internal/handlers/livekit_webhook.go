@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -19,6 +18,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/auth"
 	"github.com/livekit/protocol/livekit"
+	"github.com/livekit/protocol/utils/protojson"
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
 )
@@ -67,7 +67,8 @@ func NewLiveKitWebhookHandler(
 // @Accept json
 // @Produce json
 // @Success 200 {object} map[string]string "{status: ok}"
-// @Failure 400 {object} map[string]string "Invalid signature"
+// @Failure 400 {object} map[string]string "Invalid payload"
+// @Failure 401 {object} map[string]string "Invalid signature"
 // @Failure 500 {object} map[string]string "Internal error"
 // @Router /livekit/webhook [post]
 func (h *LiveKitWebhookHandler) Handle(c *fiber.Ctx) error {
@@ -77,11 +78,20 @@ func (h *LiveKitWebhookHandler) Handle(c *fiber.Ctx) error {
 		})
 	}
 
-	event, err := h.receiveWebhook(c)
+	body, err := h.verifyWebhook(c)
 	if err != nil {
 		log.Warn().Err(err).Msg("LiveKit webhook: invalid signature")
 		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
 			"error": "invalid webhook signature",
+		})
+	}
+
+	// LiveKit sends protojson (string enums, camelCase fields), which encoding/json cannot decode.
+	event := &livekit.WebhookEvent{}
+	if err := protojson.Unmarshal(body, event); err != nil {
+		log.Warn().Err(err).Msg("LiveKit webhook: invalid payload")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid webhook payload",
 		})
 	}
 
@@ -103,9 +113,9 @@ func (h *LiveKitWebhookHandler) Handle(c *fiber.Ctx) error {
 	return c.Status(http.StatusOK).JSON(fiber.Map{"ok": true})
 }
 
-// receiveWebhook reads body + auth header from fasthttp request,
-// validates the LiveKit webhook JWT signature, and returns the parsed event.
-func (h *LiveKitWebhookHandler) receiveWebhook(c *fiber.Ctx) (*livekit.WebhookEvent, error) {
+// verifyWebhook reads body + auth header from fasthttp request,
+// validates the LiveKit webhook JWT signature, and returns the verified body.
+func (h *LiveKitWebhookHandler) verifyWebhook(c *fiber.Ctx) ([]byte, error) {
 	body := c.Request().Body()
 	if len(body) == 0 {
 		return nil, fiber.NewError(http.StatusBadRequest, "empty body")
@@ -139,12 +149,7 @@ func (h *LiveKitWebhookHandler) receiveWebhook(c *fiber.Ctx) (*livekit.WebhookEv
 	if subtle.ConstantTimeCompare([]byte(claims.Sha256), []byte(hash)) != 1 {
 		return nil, fiber.NewError(http.StatusUnauthorized, "checksum mismatch")
 	}
-
-	var event livekit.WebhookEvent
-	if err := json.Unmarshal(body, &event); err != nil {
-		return nil, fiber.NewError(http.StatusBadRequest, "invalid JSON: "+err.Error())
-	}
-	return &event, nil
+	return body, nil
 }
 
 func (h *LiveKitWebhookHandler) handleParticipantDisconnected(ctx context.Context, event *livekit.WebhookEvent) {
