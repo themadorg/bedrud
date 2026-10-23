@@ -79,6 +79,30 @@ final class InstanceManagerTests: XCTestCase {
         XCTAssertEqual(store.activeInstanceId, "i2")
     }
 
+    func testSwitchToRebuildsDependenciesForNewInstance() {
+        let first = Instance(id: "i1", serverURL: "https://a.com", displayName: "A")
+        let second = Instance(id: "i2", serverURL: "https://b.com", displayName: "B")
+        store.addInstance(first)
+        store.addInstance(second)
+
+        manager.switchTo("i2")
+
+        XCTAssertEqual(manager.apiClient?.baseURL, "https://b.com/api")
+    }
+
+    // MARK: - First Instance on Empty Store
+
+    func testAddingFirstInstanceToEmptyStoreBuildsAuthManager() {
+        let instance = Instance(id: "i1", serverURL: "https://a.com", displayName: "A")
+
+        // Mirrors InstanceManager.addInstance after its health check passes.
+        store.addInstance(instance)
+        manager.switchTo(instance.id)
+
+        XCTAssertNotNil(manager.authManager)
+        XCTAssertEqual(manager.apiClient?.baseURL, "https://a.com/api")
+    }
+
     // MARK: - removeInstance
 
     func testRemoveInstanceRemovesFromStore() async {
