@@ -2196,3 +2196,37 @@ func TestRoomRepository_CountStaleRooms_None(t *testing.T) {
 		t.Fatalf("expected 0 stale rooms, got %d", count)
 	}
 }
+
+func TestStartOfDay_IsMidnightOfTheUTCDayContainingT(t *testing.T) {
+	east := time.FixedZone("+0330", 3*3600+1800)
+	west := time.FixedZone("-0400", -4*3600)
+	sep3 := time.Date(2026, 9, 3, 0, 0, 0, 0, time.UTC)
+	sep4 := time.Date(2026, 9, 4, 0, 0, 0, 0, time.UTC)
+
+	cases := []struct {
+		name string
+		t    time.Time
+		want time.Time
+	}{
+		// East of UTC the local date moves on first. Until 00:00Z the UTC day
+		// is still the 3rd, whatever the local calendar says (#133).
+		{"east, local midnight", time.Date(2026, 9, 4, 0, 0, 0, 0, east), sep3},
+		{"east, one minute before UTC midnight", time.Date(2026, 9, 4, 3, 29, 0, 0, east), sep3},
+		{"east, at UTC midnight", time.Date(2026, 9, 4, 3, 30, 0, 0, east), sep4},
+		{"east, local noon", time.Date(2026, 9, 4, 12, 0, 0, 0, east), sep4},
+		// West of UTC the UTC date moves on first, while the local date lags.
+		{"west, one minute before UTC midnight", time.Date(2026, 9, 3, 19, 59, 0, 0, west), sep3},
+		{"west, at UTC midnight", time.Date(2026, 9, 3, 20, 0, 0, 0, west), sep4},
+		{"already UTC", time.Date(2026, 9, 4, 12, 0, 0, 0, time.UTC), sep4},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := startOfDay(tc.t)
+			if !got.Equal(tc.want) {
+				t.Fatalf("startOfDay(%s) = %s, want %s",
+					tc.t.Format(time.RFC3339), got.UTC().Format(time.RFC3339), tc.want.Format(time.RFC3339))
+			}
+		})
+	}
+}

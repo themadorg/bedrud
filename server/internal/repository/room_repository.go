@@ -547,8 +547,13 @@ func contains(slice []string, s string) bool {
 	return false
 }
 
+// startOfDay returns the UTC midnight that opens the UTC day containing t,
+// the same day the dateFrom/dateTo bounds and the daily-count charts use.
+//
+// The date is read in UTC, not in t's own location: stamping a local calendar
+// date onto UTC midnight lands offset hours away from either day's start (#133).
 func startOfDay(t time.Time) time.Time {
-	year, month, day := t.Date()
+	year, month, day := t.UTC().Date()
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
 
