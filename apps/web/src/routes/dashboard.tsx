@@ -98,7 +98,7 @@ function SidebarContent({
           <div className="mt-3">
             <div className="mb-1 flex items-center gap-2 px-2">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40">Admin</p>
-              <span className="rounded-sm border border-destructive/30 bg-destructive/10 px-1 py-px text-[9px] font-semibold uppercase text-destructive">
+              <span className="rounded-sm border border-warning/30 bg-warning/10 px-1 py-px text-[9px] font-semibold uppercase text-warning">
                 Restricted
               </span>
             </div>
@@ -126,7 +126,7 @@ function SidebarContent({
             size="icon"
             type="button"
             onClick={onLogout}
-            className="h-9 w-9 p-1.5 text-muted-foreground opacity-60 transition-all hover:bg-destructive/10 hover:text-destructive hover:opacity-100"
+            className="h-9 w-9 p-1.5 text-muted-foreground"
             aria-label="Sign out"
           >
             <LogOut className="h-4 w-4" />
