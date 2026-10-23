@@ -78,6 +78,7 @@ interface JoinResponse {
   createdBy?: string
   isPublic?: boolean
   settings?: {
+    allowChat?: boolean
     recordingsAllowed: boolean
   }
   activeRecordingId?: string
@@ -848,6 +849,7 @@ function MeetingPage() {
               adminId={adminId ?? ''}
               createdBy={createdBy ?? ''}
               isPublic={isPublic}
+              allowChat={joinData.settings?.allowChat ?? true}
               // TODO oncoming feature
               recordingsAllowed={false}
               // TODO oncoming feature

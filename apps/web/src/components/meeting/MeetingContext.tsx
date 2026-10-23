@@ -221,6 +221,8 @@ interface MeetingRoomContextValue {
   adminId: string
   isPublic: boolean
   setRoomIsPublic: (isPublic: boolean) => void
+  /** The room owner's chat switch; when off, the composer gives way to a notice. */
+  allowChat: boolean
   currentUserId: string
   isCreator: boolean
   canManageRoomAccess: boolean
@@ -394,6 +396,7 @@ interface MeetingProviderProps {
   adminId: string
   createdBy?: string
   isPublic?: boolean
+  allowChat?: boolean
   recordingsAllowed?: boolean
   activeRecordingId?: string
   onRoomDeletionMessage?: (event: RoomDeletionEvent, message: string, isCurrentUserDeleted: boolean) => void
@@ -406,6 +409,7 @@ export function MeetingProvider({
   adminId,
   createdBy = '',
   isPublic = false,
+  allowChat = true,
   recordingsAllowed = true,
   activeRecordingId,
   onRoomDeletionMessage,
@@ -1296,6 +1300,7 @@ export function MeetingProvider({
       adminId,
       isPublic: roomIsPublic,
       setRoomIsPublic,
+      allowChat,
       currentUserId,
       isCreator,
       canManageRoomAccess,
@@ -1324,6 +1329,7 @@ export function MeetingProvider({
       adminId,
       localIdentity,
       roomIsPublic,
+      allowChat,
       currentUserId,
       isCreator,
       canManageRoomAccess,
