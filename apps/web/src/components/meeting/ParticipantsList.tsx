@@ -46,7 +46,7 @@ export function ParticipantsList({ onClose, adminId }: Props) {
       )}
     >
       {/* Header */}
-      <div className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--meet-border-subtle)] px-3 lg:h-[52px] lg:px-4">
+      <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-[var(--meet-border-subtle)] px-4">
         <div className="flex items-center gap-[7px]">
           <Users size={14} className="text-[var(--meet-btn-muted-fg)]" />
           <span className="text-[13px] font-semibold text-[var(--meet-fg-strong)]">Participants</span>
@@ -57,10 +57,10 @@ export function ParticipantsList({ onClose, adminId }: Props) {
         <button
           type="button"
           onClick={onClose}
-          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent text-[var(--meet-fg-muted)] transition-[background,color] duration-150 hover:bg-[var(--meet-control)] hover:text-[var(--meet-fg-strong)] lg:h-7 lg:w-7"
+          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent text-[var(--meet-fg-muted)] transition-[background,color] duration-150 hover:bg-[var(--meet-control)] hover:text-[var(--meet-fg-strong)]"
           aria-label="Close participants"
         >
-          <X size={18} className="lg:h-[15px] lg:w-[15px]" />
+          <X size={15} />
         </button>
       </div>
 
