@@ -49,6 +49,18 @@ describe('BedrudSheetHandle', () => {
     expect(handleSource).toMatch(/\bh-12\b/)
   })
 
+  it("should win the target's size over vaul's injected handle style", () => {
+    // vaul's `[data-vaul-handle]` rule is unlayered, so it beats Tailwind's layered utilities.
+    expect(handleSource).toContain('!h-12')
+    expect(handleSource).toContain('!w-full')
+  })
+
+  it("should clear vaul's own drawn handle, so only the pill shows", () => {
+    expect(handleSource).toContain('!bg-transparent')
+    expect(handleSource).toContain('!opacity-100')
+    expect(handleSource).toContain('!rounded-none')
+  })
+
   it("should be vaul's own handle, so the tap and the drag stay with vaul", () => {
     expect(handleSource).toContain('Drawer.Handle')
   })
