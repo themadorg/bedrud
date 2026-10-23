@@ -300,7 +300,7 @@ sudo ./bedrud install --lk-port 9000 --lk-tcp-port 9001 --lk-udp-port 9002
 sudo ./bedrud install --behind-proxy --domain meet.example.com
 ```
 
-Sets `behindProxy: true` in the config and configures trusted proxy headers.
+Sets `behindProxy: true` in the config and configures trusted proxy headers. The server binds `0.0.0.0`, so a proxy on the same host reaches it at `127.0.0.1:<port>`. Because the proxy terminates TLS, `livekit.host`, `auth.frontendURL` and `cors.allowedOrigins` use `https://<domain>` without the local `--port`.
 
 ### External LiveKit Server
 

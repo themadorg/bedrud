@@ -207,7 +207,7 @@ Even with nginx, WebRTC UDP media does **not** go through nginx. Clients connect
 
 1. Open UDP ports `50000-60000` (or your configured range) in the firewall
 2. Ensure `livekit.yaml` has the correct `node_ip` set to your server's public IP
-3. Use the `--behind-proxy` flag when installing so the server trusts proxy headers
+3. Use the `--behind-proxy` flag when installing so the server trusts proxy headers, binds `0.0.0.0`, and writes `https://<domain>` public URLs without the local port
 
 ```bash
 bedrud install \

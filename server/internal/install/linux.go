@@ -22,22 +22,23 @@ import (
 const (
 	loopbackIPv4 = "127.0.0.1"
 	loopbackIPv6 = "::1"
+	allIPv4      = "0.0.0.0"
 )
 
 type installConfigYAML struct {
 	Server struct {
-		Port           string   `yaml:"port"`
-		Host           string   `yaml:"host"`
-		EnableTLS      bool     `yaml:"enableTLS"`
-		CertFile       string   `yaml:"certFile"`
-		KeyFile        string   `yaml:"keyFile"`
-		Domain         string   `yaml:"domain"`
-		Email          string   `yaml:"email"`
-		UseACME        bool     `yaml:"useACME"`
+		Port           string           `yaml:"port"`
+		Host           string           `yaml:"host"`
+		EnableTLS      bool             `yaml:"enableTLS"`
+		CertFile       string           `yaml:"certFile"`
+		KeyFile        string           `yaml:"keyFile"`
+		Domain         string           `yaml:"domain"`
+		Email          string           `yaml:"email"`
+		UseACME        bool             `yaml:"useACME"`
 		ACME           *installACMEYAML `yaml:"acme,omitempty"`
-		BehindProxy    bool     `yaml:"behindProxy,omitempty"`
-		TrustedProxies []string `yaml:"trustedProxies,omitempty"`
-		ProxyHeader    string   `yaml:"proxyHeader,omitempty"`
+		BehindProxy    bool             `yaml:"behindProxy,omitempty"`
+		TrustedProxies []string         `yaml:"trustedProxies,omitempty"`
+		ProxyHeader    string           `yaml:"proxyHeader,omitempty"`
 	} `yaml:"server"`
 	Database struct {
 		Type string `yaml:"type"`
@@ -78,6 +79,65 @@ type installACMEYAML struct {
 	Challenge          string `yaml:"challenge"`
 	DNSProvider        string `yaml:"dnsProvider"`
 	CloudflareAPIToken string `yaml:"cloudflareAPIToken"`
+}
+
+// publicEndpoints holds the bind address and public URLs written to config.yaml.
+type publicEndpoints struct {
+	ServerHost  string
+	LiveKitHost string
+	CORSOrigins string
+	FrontendURL string
+}
+
+// behindProxy reports whether config.yaml gets behindProxy: a domain without TLS implies a proxy.
+func (c *InstallConfig) behindProxy() bool {
+	return c.BehindProxy || (!c.EnableTLS && c.Domain != "")
+}
+
+// derivePublicEndpoints computes the URLs clients reach and the address the server binds.
+func derivePublicEndpoints(cfg *InstallConfig) publicEndpoints {
+	protocol := "http"
+	if cfg.EnableTLS {
+		protocol = "https"
+	}
+
+	hostForLK := cfg.OverrideIP
+	if cfg.Domain != "" {
+		hostForLK = cfg.Domain
+	}
+
+	endpoints := publicEndpoints{
+		ServerHost:  cfg.OverrideIP,
+		LiveKitHost: fmt.Sprintf("%s://%s:%s/livekit", protocol, hostForLK, cfg.Port),
+		CORSOrigins: "*",
+	}
+	if cfg.Port == "443" {
+		endpoints.LiveKitHost = fmt.Sprintf("https://%s/livekit", hostForLK)
+	}
+	if cfg.Domain != "" {
+		endpoints.CORSOrigins = fmt.Sprintf("%s://%s", protocol, cfg.Domain)
+		scheme := "https"
+		if cfg.DisableTLS {
+			scheme = "http"
+		}
+		endpoints.FrontendURL = scheme + "://" + cfg.Domain
+	}
+	// The proxy terminates TLS on the public domain and reaches the server over loopback or the LAN.
+	if cfg.behindProxy() {
+		endpoints.ServerHost = allIPv4
+		endpoints.LiveKitHost = fmt.Sprintf("https://%s/livekit", hostForLK)
+		if cfg.Domain != "" {
+			endpoints.CORSOrigins = "https://" + cfg.Domain
+			endpoints.FrontendURL = "https://" + cfg.Domain
+		}
+	}
+
+	if cfg.ExternalLKURL != "" {
+		endpoints.LiveKitHost = cfg.ExternalLKURL
+	} else if cfg.LKDomain != "" {
+		endpoints.LiveKitHost = fmt.Sprintf("https://%s", cfg.LKDomain)
+	}
+	return endpoints
 }
 
 func LinuxInstall(cfg *InstallConfig) error {
@@ -187,26 +247,12 @@ func LinuxInstall(cfg *InstallConfig) error {
 		hostForLK = cfg.Domain
 	}
 
-	livekitPublicHost := fmt.Sprintf("%s://%s:%s/livekit", protocol, hostForLK, cfg.Port)
-	if cfg.Port == "443" {
-		livekitPublicHost = fmt.Sprintf("https://%s/livekit", hostForLK)
-	}
-
-	corsOrigins := "*"
-	corsCredentials := false
-	if cfg.Domain != "" {
-		corsOrigins = fmt.Sprintf("%s://%s", protocol, cfg.Domain)
-		corsCredentials = true
-	}
+	endpoints := derivePublicEndpoints(cfg)
+	livekitPublicHost := endpoints.LiveKitHost
+	corsCredentials := cfg.Domain != ""
 
 	isExternalLK := cfg.ExternalLKURL != ""
 	hasSeparateLKDomain := cfg.LKDomain != "" && !isExternalLK
-
-	if isExternalLK {
-		livekitPublicHost = cfg.ExternalLKURL
-	} else if hasSeparateLKDomain {
-		livekitPublicHost = fmt.Sprintf("https://%s", cfg.LKDomain)
-	}
 
 	lkNodeIP := cfg.OverrideIP
 	if cfg.LKIP != "" {
@@ -216,7 +262,7 @@ func LinuxInstall(cfg *InstallConfig) error {
 	// Build config.yaml
 	var configYAML installConfigYAML
 	configYAML.Server.Port = cfg.Port
-	configYAML.Server.Host = cfg.OverrideIP
+	configYAML.Server.Host = endpoints.ServerHost
 	configYAML.Server.EnableTLS = cfg.EnableTLS
 	configYAML.Server.Domain = cfg.Domain
 	configYAML.Server.Email = cfg.Email
@@ -250,7 +296,7 @@ func LinuxInstall(cfg *InstallConfig) error {
 		}
 	}
 
-	if cfg.BehindProxy || (!cfg.EnableTLS && cfg.Domain != "") {
+	if cfg.behindProxy() {
 		configYAML.Server.BehindProxy = true
 		configYAML.Server.TrustedProxies = []string{loopbackIPv4, loopbackIPv6}
 		configYAML.Server.ProxyHeader = "X-Forwarded-For"
@@ -279,18 +325,12 @@ func LinuxInstall(cfg *InstallConfig) error {
 	configYAML.Auth.SessionSecret = sessionSecret
 	configYAML.Auth.TokenDuration = 24
 	// SPA origin for WebXDC CSP frame-ancestors (and OAuth redirects).
-	if cfg.Domain != "" {
-		scheme := "https"
-		if cfg.DisableTLS {
-			scheme = "http"
-		}
-		configYAML.Auth.FrontendURL = scheme + "://" + cfg.Domain
-	}
+	configYAML.Auth.FrontendURL = endpoints.FrontendURL
 
 	configYAML.Logger.Level = "debug"
 	configYAML.Logger.OutputPath = varLogDir + "/bedrud.log"
 
-	configYAML.CORS.AllowedOrigins = corsOrigins
+	configYAML.CORS.AllowedOrigins = endpoints.CORSOrigins
 	configYAML.CORS.AllowCredentials = corsCredentials
 
 	if cfg.EnableWebxdc && cfg.Domain != "" && cfg.WebxdcBaseDomain != "" && cfg.WebxdcDNSAck {
@@ -478,7 +518,7 @@ func LinuxInstall(cfg *InstallConfig) error {
 	}
 	fmt.Println("  Access URL: ", accessURL)
 	if cfg.Domain != "" {
-		fmt.Println("  Domain URL: ", fmt.Sprintf("%s://%s", protocol, cfg.Domain))
+		fmt.Println("  Domain URL: ", endpoints.FrontendURL)
 	}
 	if cfg.EnableWebxdc && configYAML.Webxdc.Enabled {
 		fmt.Println("  WebXDC:          enabled (experimental)")
