@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"html/template"
 	"strings"
 	"testing"
@@ -20,7 +21,7 @@ const headerBgDefault = "#1a1a2e"
 
 func TestSendEmailHandler_NoSMTP_LogsBody(t *testing.T) {
 	// Handler with nil config — no SMTP configured.
-	h := NewSendEmailHandler(nil)
+	h := NewSendEmailHandler(nil, nil)
 
 	payload := SendEmailPayload{
 		To:           "user@test.com",
@@ -45,7 +46,7 @@ func TestSendEmailHandler_NoSMTP_LogsBody(t *testing.T) {
 
 func TestSendEmailHandler_NoSMTP_EmptyConfig(t *testing.T) {
 	// Handler with empty EmailConfig (Host="").
-	h := NewSendEmailHandler(&config.EmailConfig{})
+	h := NewSendEmailHandler(&config.EmailConfig{}, nil)
 
 	payload := SendEmailPayload{
 		To:           "user@test.com",
@@ -68,7 +69,7 @@ func TestSendEmailHandler_NoSMTP_EmptyConfig(t *testing.T) {
 }
 
 func TestSendEmailHandler_InvalidJSON(t *testing.T) {
-	h := NewSendEmailHandler(nil)
+	h := NewSendEmailHandler(nil, nil)
 
 	job := &models.Job{
 		ID:      uuid.New().String(),
@@ -86,7 +87,7 @@ func TestSendEmailHandler_InvalidJSON(t *testing.T) {
 }
 
 func TestSendEmailHandler_MissingTemplateName(t *testing.T) {
-	h := NewSendEmailHandler(nil)
+	h := NewSendEmailHandler(nil, nil)
 
 	payload := SendEmailPayload{
 		To:           "user@test.com",
@@ -189,7 +190,7 @@ func TestSendEmailHandler_ContextCancelled(t *testing.T) {
 	h := NewSendEmailHandler(&config.EmailConfig{
 		SMTPHost: "127.0.0.1",
 		SMTPPort: 2525,
-	})
+	}, nil)
 
 	payload := SendEmailPayload{
 		To:           "user@test.com",
@@ -215,8 +216,77 @@ func TestSendEmailHandler_ContextCancelled(t *testing.T) {
 	}
 }
 
+// fakeSettingsSource returns fixed effective settings, standing in for the settings repository.
+type fakeSettingsSource struct {
+	settings *models.SystemSettings
+	err      error
+}
+
+func (f fakeSettingsSource) GetEffectiveSettings() (*models.SystemSettings, error) {
+	return f.settings, f.err
+}
+
+func welcomeJob(t *testing.T) *models.Job {
+	t.Helper()
+	payloadBytes, err := json.Marshal(SendEmailPayload{
+		To:           "user@test.com",
+		Subject:      "Welcome!",
+		TemplateName: "welcome",
+		TemplateData: map[string]any{"Name": "Alice"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &models.Job{ID: uuid.New().String(), Type: "send_email", Payload: string(payloadBytes)}
+}
+
+func TestSendEmailHandler_UsesEffectiveSMTPSettings(t *testing.T) {
+	// SMTP saved from the admin dashboard must reach queued mail, not only config.yaml.
+	captured := stubDeliverSMTP(t, nil)
+	h := NewSendEmailHandler(&config.EmailConfig{}, fakeSettingsSource{settings: &models.SystemSettings{
+		EmailSMTPHost:    "smtp.dashboard.example",
+		EmailSMTPPort:    2525,
+		EmailFromAddress: "mail@dashboard.example",
+	}})
+
+	if err := h(context.Background(), &gorm.DB{}, welcomeJob(t)); err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if captured.addr != "smtp.dashboard.example:2525" {
+		t.Errorf("expected dashboard SMTP address, got %q", captured.addr)
+	}
+	if captured.from != "mail@dashboard.example" {
+		t.Errorf("expected dashboard from address, got %q", captured.from)
+	}
+}
+
+func TestSendEmailHandler_FallsBackToConfigWhenSettingsFail(t *testing.T) {
+	captured := stubDeliverSMTP(t, nil)
+	h := NewSendEmailHandler(&config.EmailConfig{SMTPHost: "smtp.config.example", SMTPPort: 587},
+		fakeSettingsSource{err: errors.New("database unavailable")})
+
+	if err := h(context.Background(), &gorm.DB{}, welcomeJob(t)); err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if captured.addr != "smtp.config.example:587" {
+		t.Errorf("expected config.yaml SMTP address, got %q", captured.addr)
+	}
+}
+
+func TestSendEmailHandler_EffectiveSettingsWithoutSMTP_Skips(t *testing.T) {
+	captured := stubDeliverSMTP(t, nil)
+	h := NewSendEmailHandler(nil, fakeSettingsSource{settings: &models.SystemSettings{}})
+
+	if err := h(context.Background(), &gorm.DB{}, welcomeJob(t)); err != nil {
+		t.Fatalf("expected nil error when SMTP not configured, got %v", err)
+	}
+	if captured.addr != "" {
+		t.Errorf("expected no delivery attempt, got one to %q", captured.addr)
+	}
+}
+
 func TestSendEmailHandler_TemplateNotFound_LogsData(t *testing.T) {
-	h := NewSendEmailHandler(nil)
+	h := NewSendEmailHandler(nil, nil)
 
 	payload := SendEmailPayload{
 		To:           "user@test.com",
@@ -245,7 +315,7 @@ func TestSendEmailHandler_TemplateNotFound_LogsData(t *testing.T) {
 }
 
 func TestSendEmailHandler_NilData(t *testing.T) {
-	h := NewSendEmailHandler(nil)
+	h := NewSendEmailHandler(nil, nil)
 
 	payload := SendEmailPayload{
 		To:           "user@test.com",
@@ -452,7 +522,7 @@ func TestRenderPasswordResetTemplate_MissingOptionalKeys(t *testing.T) {
 
 func TestTemplateRenderDirect_SMTPNotConfigured(t *testing.T) {
 	// Run template through the handler with no SMTP config — verifies the full render + log path.
-	h := NewSendEmailHandler(nil)
+	h := NewSendEmailHandler(nil, nil)
 	payload := SendEmailPayload{
 		To:           "alice@test.com",
 		Subject:      "Welcome!",
@@ -479,7 +549,7 @@ func TestTemplateRenderDirect_SMTPNotConfigured(t *testing.T) {
 func TestUnknownTemplate_FallsBackToGeneric(t *testing.T) {
 	// Unknown template name should render the generic template ("Notification from Bedrud" heading).
 	// This test will fail until "generic" is added to the template parse loop.
-	h := NewSendEmailHandler(nil)
+	h := NewSendEmailHandler(nil, nil)
 	payload := SendEmailPayload{
 		To:           "user@test.com",
 		Subject:      "Notification",
@@ -555,7 +625,7 @@ func TestRenderPasswordChangedTemplate(t *testing.T) {
 
 func TestHandler_EnqueuePasswordChanged_NoSMTP(t *testing.T) {
 	// Full handler integration test with password_changed template and no SMTP.
-	h := NewSendEmailHandler(nil)
+	h := NewSendEmailHandler(nil, nil)
 	payload := SendEmailPayload{
 		To:           "user@test.com",
 		Subject:      "Password Changed",
