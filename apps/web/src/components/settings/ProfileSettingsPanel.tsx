@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
-import { isMeetingTone, panelSurfaceClass, type SettingsPanelTone } from './settingsPanelTone'
+import { isMeetingTone, panelSurfaceClass, type SettingsPanelTone, sectionBorderClass } from './settingsPanelTone'
+import { WelcomeSoundSettings } from './WelcomeSoundSettings'
 
 interface MeResponse {
   id: string
@@ -22,6 +23,7 @@ interface MeResponse {
   provider: string
   accesses: string[] | null
   avatarUrl?: string
+  welcomeSoundUrl?: string
 }
 
 function mapMeToUser(u: MeResponse): User {
@@ -34,6 +36,7 @@ function mapMeToUser(u: MeResponse): User {
     isAdmin: (u.accesses?.includes('admin') || u.accesses?.includes('superadmin')) ?? false,
     accesses: u.accesses ?? [],
     avatarUrl: u.avatarUrl,
+    welcomeSoundUrl: u.welcomeSoundUrl,
   }
 }
 
@@ -66,10 +69,6 @@ function roleBadgeClass(role: string, meeting: boolean): string {
   return meeting
     ? 'border-[var(--meet-border)] bg-[var(--meet-control)] text-[var(--meet-fg-muted)]'
     : 'border-border bg-muted/40 text-muted-foreground'
-}
-
-function sectionBorderClass(meeting: boolean) {
-  return meeting ? 'border-[var(--meet-border)]' : 'border-border'
 }
 
 export function ProfileSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelTone }) {
@@ -347,6 +346,8 @@ export function ProfileSettingsPanel({ tone = 'default' }: { tone?: SettingsPane
           </Button>
         </form>
       </div>
+
+      <WelcomeSoundSettings tone={tone} />
 
       <div className="px-5 py-4">
         <p className="mb-3 text-sm font-medium">Account details</p>
