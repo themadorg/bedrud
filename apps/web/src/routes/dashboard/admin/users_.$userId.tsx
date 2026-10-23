@@ -7,6 +7,7 @@ import {
   Clock,
   Globe,
   Hash,
+  Loader2,
   Lock,
   LogOut,
   Mail,
@@ -22,6 +23,7 @@ import type { CSSProperties } from 'react'
 import { useEffect, useState } from 'react'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { toast } from 'sonner'
+import { AlertConfirmDialog } from '#/components/admin/AlertConfirmDialog'
 import { ProviderBadge } from '#/components/admin/ProviderBadge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
@@ -196,9 +198,14 @@ function UserDetailPage() {
       ),
   })
 
+  const [banDialogOpen, setBanDialogOpen] = useState(false)
+
   const toggleStatus = useMutation({
     mutationFn: (active: boolean) => api.put(`/api/admin/users/${userId}/status`, { active }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'user', userId] }),
+    onSuccess: () => {
+      setBanDialogOpen(false)
+      return queryClient.invalidateQueries({ queryKey: ['admin', 'user', userId] })
+    },
     onError: (err) => toast.error(getErrorMessage(err, 'Failed to update user status')),
   })
 
@@ -313,12 +320,12 @@ function UserDetailPage() {
                 <div className="flex items-center gap-2 pb-1">
                   {!isReadOnly ? (
                     <>
+                      {/* The dropdown keeps showing the saved role; picking another one asks in a popup. */}
                       <Select
-                        value={pendingRole ?? currentRole}
-                        onValueChange={(role) => setPendingRole(role)}
-                        disabled={changeRole.isPending}
+                        value={currentRole}
+                        onValueChange={(role) => role !== currentRole && setPendingRole(role)}
                       >
-                        <SelectTrigger className="h-8 w-[130px] text-xs">
+                        <SelectTrigger className="h-9 w-[130px] text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -329,31 +336,6 @@ function UserDetailPage() {
                           ))}
                         </SelectContent>
                       </Select>
-                      {pendingRole && (
-                        <div className="flex items-center gap-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() =>
-                              changeRole.mutate(ROLE_ACCESS_MAP[pendingRole as keyof typeof ROLE_ACCESS_MAP])
-                            }
-                            disabled={changeRole.isPending}
-                            className="h-7 px-2 text-[11px]"
-                          >
-                            {changeRole.isPending ? 'Saving…' : 'Confirm'}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setPendingRole(null)}
-                            disabled={changeRole.isPending}
-                            className="h-7 px-2 text-[11px]"
-                          >
-                            ×
-                          </Button>
-                        </div>
-                      )}
                     </>
                   ) : (
                     <span
@@ -368,25 +350,20 @@ function UserDetailPage() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => toggleStatus.mutate(!user.isActive)}
+                      onClick={() => (user.isActive ? setBanDialogOpen(true) : toggleStatus.mutate(true))}
                       disabled={toggleStatus.isPending}
-                      style={
-                        user.isActive
-                          ? { background: '#10b98115', color: '#10b981', borderColor: '#10b98130' }
-                          : { background: '#ef444415', color: '#f87171', borderColor: '#ef444430' }
-                      }
+                      // Ban and Unban share one width so swapping the label never moves the row.
+                      className="w-24 disabled:opacity-100"
                     >
-                      {user.isActive ? (
-                        <>
-                          <UserCheck className="h-3.5 w-3.5" />
-                          Active
-                        </>
+                      {/* The banned badge below shows the state, so the button names its action. */}
+                      {toggleStatus.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : user.isActive ? (
+                        <UserX className="h-3.5 w-3.5" />
                       ) : (
-                        <>
-                          <UserX className="h-3.5 w-3.5" />
-                          Banned
-                        </>
+                        <UserCheck className="h-3.5 w-3.5" />
                       )}
+                      {user.isActive ? 'Ban' : 'Unban'}
                     </Button>
                   )}
                   {!isReadOnly && currentUser?.id !== user.id && (
@@ -396,11 +373,6 @@ function UserDetailPage() {
                         size="sm"
                         type="button"
                         onClick={() => setForceLogoutDialogOpen(true)}
-                        style={{
-                          background: '#f59e0b15',
-                          color: '#fbbf24',
-                          borderColor: '#f59e0b30',
-                        }}
                         aria-label="Force logout"
                       >
                         <LogOut className="h-3.5 w-3.5" />
@@ -414,11 +386,7 @@ function UserDetailPage() {
                           setConfirmEmail('')
                           setDeleteDialogOpen(true)
                         }}
-                        style={{
-                          background: '#ef444415',
-                          color: '#f87171',
-                          borderColor: '#ef444430',
-                        }}
+                        className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
                         aria-label="Delete user"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -817,6 +785,29 @@ function UserDetailPage() {
           ← Back to all users
         </Link>
       </p>
+
+      {/* Role change confirmation dialog */}
+      <AlertConfirmDialog
+        open={pendingRole !== null}
+        onOpenChange={(open) => !open && !changeRole.isPending && setPendingRole(null)}
+        title={`Change role to ${ROLE_OPTIONS.find(({ value }) => value === pendingRole)?.label ?? pendingRole}?`}
+        description={`${user?.name || user?.email} gets the permissions of the new role right away.`}
+        confirmLabel="Change role"
+        onConfirm={() => changeRole.mutate(ROLE_ACCESS_MAP[pendingRole as keyof typeof ROLE_ACCESS_MAP])}
+        variant="default"
+        isLoading={changeRole.isPending}
+      />
+
+      {/* Ban confirmation dialog; unbanning restores access, so it needs no confirmation. */}
+      <AlertConfirmDialog
+        open={banDialogOpen}
+        onOpenChange={(open) => !open && !toggleStatus.isPending && setBanDialogOpen(false)}
+        title={`Ban ${user?.name || user?.email}?`}
+        description="This will log them out immediately and prevent future sign-ins."
+        confirmLabel="Ban"
+        onConfirm={() => toggleStatus.mutate(false)}
+        isLoading={toggleStatus.isPending}
+      />
 
       {/* Force logout confirmation dialog */}
       <Dialog open={forceLogoutDialogOpen} onOpenChange={(open) => !open && setForceLogoutDialogOpen(false)}>
