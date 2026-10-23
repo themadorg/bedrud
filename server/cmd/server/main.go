@@ -559,6 +559,7 @@ func run() error {
 		adminGroup.Delete("/webxdc/catalog/:id", webxdcHandler.AdminDeleteInstanceCatalog)
 	}
 	adminGroup.Put("/settings", adminHandler.UpdateSettings)
+	adminGroup.Post("/settings/send-test-email", adminHandler.SendTestEmail)
 	adminGroup.Post("/settings/validate", adminHandler.ValidateSettingsConnectivity)
 	adminGroup.Get("/invite-tokens", adminHandler.ListInviteTokens)
 	adminGroup.Post("/invite-tokens", adminHandler.CreateInviteToken)
