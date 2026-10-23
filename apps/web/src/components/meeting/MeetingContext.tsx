@@ -2,6 +2,7 @@
 import { useRoomContext } from '@livekit/components-react'
 import { ConnectionState, type Participant, type Room, RoomEvent } from 'livekit-client'
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { api } from '#/lib/api'
 import { useAuthStore } from '#/lib/auth.store'
 import { decodeBedrudJwt } from '#/lib/jwt-user'
@@ -33,7 +34,7 @@ import {
   ingestChatChunk,
   pruneChunkBuffers,
 } from './chat/chatDataChannel'
-import { applyReactionToggle } from './chat/chatReactions'
+import { applyReactionToggle, restoreVoterChoice } from './chat/chatReactions'
 import { isMeetingChatDataTopic } from './chat/chatTopic'
 import { useChatPersistence } from './chat/useChatPersistence'
 import { fetchMeetingParticipantProfile } from './meetingParticipantProfile'
@@ -221,6 +222,8 @@ interface MeetingRoomContextValue {
   adminId: string
   isPublic: boolean
   setRoomIsPublic: (isPublic: boolean) => void
+  /** The room owner's chat switch; when off, the composer gives way to a notice. */
+  allowChat: boolean
   currentUserId: string
   isCreator: boolean
   canManageRoomAccess: boolean
@@ -394,6 +397,7 @@ interface MeetingProviderProps {
   adminId: string
   createdBy?: string
   isPublic?: boolean
+  allowChat?: boolean
   recordingsAllowed?: boolean
   activeRecordingId?: string
   onRoomDeletionMessage?: (event: RoomDeletionEvent, message: string, isCurrentUserDeleted: boolean) => void
@@ -406,6 +410,7 @@ export function MeetingProvider({
   adminId,
   createdBy = '',
   isPublic = false,
+  allowChat = true,
   recordingsAllowed = true,
   activeRecordingId,
   onRoomDeletionMessage,
@@ -1246,6 +1251,7 @@ export function MeetingProvider({
       const lp = room.localParticipant
       const voterIdentity = lp.identity || ''
       if (!voterIdentity) return
+      const previous = chatMessagesRef.current.find((m) => m.id === messageId)?.reactions[voterIdentity]
 
       setChatMessages((prev) =>
         prev.map((m) => {
@@ -1257,6 +1263,13 @@ export function MeetingProvider({
       const payload = { type: 'reaction', messageId, emoji, voterIdentity }
       const data = new TextEncoder().encode(JSON.stringify(payload))
       void lp.publishData(data, { reliable: true, topic: MEETING_CHAT_TOPIC }).catch((err) => {
+        // Nobody else saw the reaction, so it comes off this screen too.
+        setChatMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId ? { ...m, reactions: restoreVoterChoice(m.reactions, voterIdentity, previous) } : m,
+          ),
+        )
+        toast.error('Reaction not sent')
         if (import.meta.env.DEV) console.error('[MeetingContext] failed to publish reaction:', err)
       })
     },
@@ -1268,6 +1281,7 @@ export function MeetingProvider({
       const lp = room.localParticipant
       const voterIdentity = lp.identity || ''
       if (!voterIdentity) return
+      const previous = chatMessagesRef.current.find((m) => m.id === messageId)?.poll?.votes[voterIdentity]
 
       setChatMessages((prev) =>
         prev.map((m) => {
@@ -1283,6 +1297,15 @@ export function MeetingProvider({
       const payload = { type: 'poll_vote', messageId, optionId, voterIdentity }
       const data = new TextEncoder().encode(JSON.stringify(payload))
       void lp.publishData(data, { reliable: true, topic: MEETING_CHAT_TOPIC }).catch((err) => {
+        // Nobody else saw the vote, so it comes off this screen too.
+        setChatMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId && m.poll
+              ? { ...m, poll: { ...m.poll, votes: restoreVoterChoice(m.poll.votes, voterIdentity, previous) } }
+              : m,
+          ),
+        )
+        toast.error('Vote not sent')
         if (import.meta.env.DEV) console.error('[MeetingContext] failed to publish poll vote:', err)
       })
     },
@@ -1296,6 +1319,7 @@ export function MeetingProvider({
       adminId,
       isPublic: roomIsPublic,
       setRoomIsPublic,
+      allowChat,
       currentUserId,
       isCreator,
       canManageRoomAccess,
@@ -1324,6 +1348,7 @@ export function MeetingProvider({
       adminId,
       localIdentity,
       roomIsPublic,
+      allowChat,
       currentUserId,
       isCreator,
       canManageRoomAccess,

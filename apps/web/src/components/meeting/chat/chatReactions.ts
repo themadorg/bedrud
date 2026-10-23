@@ -33,6 +33,18 @@ export function applyReactionToggle(reactions: ChatReactions, voterIdentity: str
   return next
 }
 
+/** Puts back one voter's earlier choice (a reaction or a poll vote) after a send that failed. */
+export function restoreVoterChoice(
+  choices: Record<string, string>,
+  voterIdentity: string,
+  previous: string | undefined,
+): Record<string, string> {
+  const next = { ...choices }
+  if (previous === undefined) delete next[voterIdentity]
+  else next[voterIdentity] = previous
+  return next
+}
+
 export interface GroupedReaction {
   emoji: string
   count: number

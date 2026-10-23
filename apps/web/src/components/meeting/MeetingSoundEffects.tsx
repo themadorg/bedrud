@@ -3,6 +3,7 @@ import { RoomEvent } from 'livekit-client'
 import { useEffect, useRef } from 'react'
 import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
 import { closeCtx, playChat, playJoin, playLeave, playMutedBeep } from '#/lib/meeting-sounds'
+import { captureLevel, SAMPLE_INTERVAL_MS, SpeechLevelTracker } from '#/lib/speech-level-tracker'
 import { useMeetingChatContext, useMeetingRoomContext } from './MeetingContext'
 
 /**
@@ -77,8 +78,6 @@ export function MeetingSoundEffects() {
 
 // ── Hook: monitor mic input while muted ────────────────────────
 
-const SPEECH_THRESHOLD = 0.035 // RMS amplitude — tuned to ignore background noise
-
 function useMutedMicMonitor() {
   const { isSelfDeafened } = useMeetingRoomContext()
   // useLocalParticipant is a reactive hook — re-renders when mic state changes.
@@ -105,7 +104,7 @@ function useMutedMicMonitor() {
 
     let cancelled = false
     let stream: MediaStream | null = null
-    let animFrame = 0
+    let sampleTimer: ReturnType<typeof setInterval> | undefined
     let lastBeepAt = 0
     let ac: AudioContext | null = null
 
@@ -128,27 +127,27 @@ function useMutedMicMonitor() {
       analyser.fftSize = 512
       source.connect(analyser)
       const data = new Float32Array(analyser.fftSize)
+      // Speech is judged against this microphone's own noise floor; a fixed bar missed quiet mics and fired on hot ones.
+      const tracker = new SpeechLevelTracker()
 
-      function tick() {
-        if (cancelled) return
+      function sample() {
         analyser.getFloatTimeDomainData(data)
         let sum = 0
         for (let i = 0; i < data.length; i++) sum += data[i] * data[i]
-        const rms = Math.sqrt(sum / data.length)
+        const isSpeech = tracker.isSpeech(captureLevel(Math.sqrt(sum / data.length)))
 
-        if (beepEnabledRef.current && rms > SPEECH_THRESHOLD && Date.now() - lastBeepAt > beepIntervalRef.current) {
+        if (beepEnabledRef.current && isSpeech && Date.now() - lastBeepAt > beepIntervalRef.current) {
           lastBeepAt = Date.now()
           playMutedBeep()
         }
-        animFrame = requestAnimationFrame(tick)
       }
-      tick()
+      sampleTimer = setInterval(sample, SAMPLE_INTERVAL_MS)
     }
 
     start()
     return () => {
       cancelled = true
-      cancelAnimationFrame(animFrame)
+      clearInterval(sampleTimer)
       stream?.getTracks().forEach((t) => {
         t.stop()
       })

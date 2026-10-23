@@ -7,6 +7,7 @@ import {
   type ChatPoll,
   normalizeChatAttachment,
   type SystemMessage,
+  useMeetingRoomContext,
 } from '@/components/meeting/MeetingContext'
 import { MeetingElevatedLeftDock } from '@/components/meeting/MeetingElevatedLeftDock'
 import { MeetingElevatedPanelBody, MeetingElevatedPanelHeader } from '@/components/meeting/MeetingElevatedPanelChrome'
@@ -95,6 +96,7 @@ export function ChatPanel({
   elevated = false,
 }: Props) {
   const inputRef = useRef<ChatInputHandle>(null)
+  const { allowChat } = useMeetingRoomContext()
   const noop = useCallback(() => {}, [])
   const isMobile = useIsMobile()
   const { closeChat: closeElevatedChat } = useMeetingExpandChromeHandlers()
@@ -145,7 +147,13 @@ export function ChatPanel({
           inputRef.current?.attachFile(file)
         }}
       />
-      <ChatInput ref={inputRef} onSend={sendChat} onUpload={uploadAndSend} elevated={elevated} />
+      {allowChat ? (
+        <ChatInput ref={inputRef} onSend={sendChat} onUpload={uploadAndSend} elevated={elevated} />
+      ) : (
+        <p className="m-0 shrink-0 border-t border-[var(--meet-border-subtle)] px-4 py-3 text-center text-[13px] text-[var(--meet-fg-muted)]">
+          Chat is turned off for this room
+        </p>
+      )}
     </>
   )
 

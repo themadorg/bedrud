@@ -708,6 +708,7 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 	out := fiber.Map{
 		"id": room.ID, "name": room.Name, "token": token, "adminId": adminId,
 		"isPublic":          room.IsPublic,
+		"settings":          room.Settings,
 		settingLiveKitHost:  h.clientLiveKitHost(c),
 		"activeRecordingId": activeRecordingID,
 	}

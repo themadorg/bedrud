@@ -30,6 +30,7 @@ import {
 } from '#/lib/meeting-debug-log'
 import { readMeetingDeviceId } from '#/lib/meeting-device-storage'
 import { useRecentRoomsStore } from '#/lib/recent-rooms.store'
+import { type EndedOwnRoom, type OwnRoomListing, restartRoomRequest } from '#/lib/room-restart'
 import { usePinnedParticipants } from '#/lib/usePinnedParticipants'
 import { isGuestUser, useUserStore } from '#/lib/user.store'
 import { useVideoPreferencesStore } from '#/lib/video-preferences.store'
@@ -78,6 +79,7 @@ interface JoinResponse {
   createdBy?: string
   isPublic?: boolean
   settings?: {
+    allowChat?: boolean
     recordingsAllowed: boolean
   }
   activeRecordingId?: string
@@ -87,19 +89,8 @@ interface JoinResponse {
   tokens?: { accessToken: string; refreshToken?: string | null }
 }
 
-interface ArchivedOwnedResponse {
+interface ArchivedOwnedResponse extends EndedOwnRoom {
   status: 'archived_owned'
-  name: string
-  mode: string
-  settings: {
-    allowChat: boolean
-    allowVideo: boolean
-    allowAudio: boolean
-    requireApproval: boolean
-    e2ee: boolean
-    isPersistent: boolean
-    recordingsAllowed: boolean
-  }
 }
 
 /** Always-on transport diagnostics (console + copyable ring buffer for bug reports). */
@@ -200,6 +191,8 @@ function LiveKitTransportDiagnostics({
 
 export const Route = createFileRoute('/m/$meetId')({
   ssr: false,
+  // A chat link to another room navigates here in place; a fresh page drops the old room's join and call state.
+  remountDeps: ({ params }) => params.meetId,
   head: () => ({ meta: [{ title: 'Meeting — Bedrud' }] }),
   component: MeetingPage,
 })
@@ -243,11 +236,7 @@ function MeetingPage() {
   const [guestInput, setGuestInput] = useState('')
   const [wasKicked, setWasKicked] = useState(false)
   const [wasRoomDeleted, setWasRoomDeleted] = useState(false)
-  const [archivedRoom, setArchivedRoom] = useState<{
-    name: string
-    mode: string
-    settings: ArchivedOwnedResponse['settings']
-  } | null>(null)
+  const [archivedRoom, setArchivedRoom] = useState<EndedOwnRoom | null>(null)
   const redirectTargetRef = useRef({ to: '/auth/login', search: { redirect: undefined } as { redirect?: string } })
   const deletionTypeRef = useRef<'user_deleted' | 'room_closed'>('room_closed')
 
@@ -650,12 +639,12 @@ function MeetingPage() {
             <Button
               type="button"
               onClick={() => {
+                // The ended-room answer has no public setting or limit; without the room list the room would come back private.
                 api
-                  .post<{ name: string }>('/api/room/create', {
-                    name: archivedRoom.name,
-                    mode: archivedRoom.mode,
-                    settings: archivedRoom.settings,
-                  })
+                  .get<OwnRoomListing[]>('/api/room/list')
+                  .then((ownRooms) =>
+                    api.post<{ name: string }>('/api/room/create', restartRoomRequest(archivedRoom, ownRooms)),
+                  )
                   .then((room) => {
                     if (cancelledRef.current) return
                     setArchivedRoom(null)
@@ -680,7 +669,10 @@ function MeetingPage() {
                       })
                   })
                   .catch((err: Error) => {
-                    if (!cancelledRef.current) setJoinError(err.message)
+                    if (cancelledRef.current) return
+                    // The ended-room screen would otherwise hide the error; Retry brings it back.
+                    setArchivedRoom(null)
+                    setJoinError(err.message)
                   })
               }}
               className="flex-1 rounded-lg py-2.5"
@@ -848,6 +840,7 @@ function MeetingPage() {
               adminId={adminId ?? ''}
               createdBy={createdBy ?? ''}
               isPublic={isPublic}
+              allowChat={joinData.settings?.allowChat ?? true}
               // TODO oncoming feature
               recordingsAllowed={false}
               // TODO oncoming feature

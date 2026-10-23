@@ -7,6 +7,7 @@ import remarkGfm from 'remark-gfm'
 import { textDirectionFor } from '#/lib/text-direction'
 import { cn } from '@/lib/utils'
 import type { ChatAttachment } from '../MeetingContext'
+import { ChatLink } from './ChatLink'
 import { ChatMessageContextMenu } from './ChatMessageContextMenu'
 import { ChatPollBubble } from './ChatPollBubble'
 import { ChatReactionList } from './ChatReactionList'
@@ -82,14 +83,9 @@ function ChatMarkdown({ content, isLocal }: { content: string; isLocal: boolean 
         return <span>{children}</span>
       }
       return (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: linkColor, textDecoration: 'underline', wordBreak: 'break-all' }}
-        >
+        <ChatLink href={href} style={{ color: linkColor, textDecoration: 'underline', wordBreak: 'break-all' }}>
           {children}
-        </a>
+        </ChatLink>
       )
     },
     p: ({ children }: C) => <p style={{ margin: 0, lineHeight: 1.45 }}>{children}</p>,
