@@ -237,9 +237,10 @@ export function ChatTab({
                 chatUploadBackend: 's3',
                 chatUploadS3Endpoint: settings.chatUploadS3Endpoint,
                 chatUploadS3Bucket: settings.chatUploadS3Bucket,
-                chatUploadS3AccessKey: settings.chatUploadS3AccessKey,
+                chatUploadS3AccessKey:
+                  settings.chatUploadS3AccessKey === MASKED_SECRET ? '' : settings.chatUploadS3AccessKey,
                 chatUploadS3SecretKey:
-                  settings.chatUploadS3SecretKey === '••••••••' ? '' : settings.chatUploadS3SecretKey,
+                  settings.chatUploadS3SecretKey === MASKED_SECRET ? '' : settings.chatUploadS3SecretKey,
               }}
             />
           </div>
