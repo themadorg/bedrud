@@ -79,10 +79,15 @@ Every PR runs these checks automatically:
 
 | Check   | What it validates                    |
 |---------|--------------------------------------|
-| Server  | `go vet`, build, tests               |
+| Server  | `go vet`, build, tests, golangci-lint on changed lines |
 | Web     | TypeScript type check, build (Biome) |
 | Android | Lint, unit tests                     |
 | iOS     | Build, test (simulator)              |
+
+The server lint job runs every linter in `server/.golangci.yml`, but only fails
+on findings in lines the pull request changed. Existing findings on master are
+tracked in [#151](https://github.com/themadorg/bedrud/issues/151) and do not
+block a pull request.
 
 ### Before Submitting
 
@@ -91,6 +96,10 @@ Run checks locally to catch issues before CI:
 ```bash
 # Server
 cd server && go vet ./... && go build ./... && go test -v -count=1 ./...
+
+# Server lint, same version and flags as CI (findings on your changes only)
+curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b "$(go env GOPATH)/bin" v2.14.0
+cd server && golangci-lint run --new-from-merge-base=origin/master ./...
 
 # Web
 cd apps/web && bun run check && bun run build
