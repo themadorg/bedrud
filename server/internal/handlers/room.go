@@ -2385,6 +2385,7 @@ func (h *RoomHandler) AdminSuspendRoom(c *fiber.Ctx) error {
 // @Failure 401 {object} ErrorResponse "Unauthorized"
 // @Failure 403 {object} ErrorResponse "Forbidden"
 // @Failure 404 {object} ErrorResponse "Room not found"
+// @Failure 409 {object} ErrorResponse "Another active room holds the name"
 // @Failure 500 {object} ErrorResponse "Failed to reactivate"
 // @Router /admin/rooms/{roomId}/reactivate [post]
 func (h *RoomHandler) AdminReactivateRoom(c *fiber.Ctx) error {
@@ -2402,6 +2403,9 @@ func (h *RoomHandler) AdminReactivateRoom(c *fiber.Ctx) error {
 	room.IsActive = true
 	room.ExpiresAt = time.Now().Add(24 * time.Hour)
 	if err := h.roomRepo.UpdateRoom(room); err != nil {
+		if errors.Is(err, models.ErrRoomNameTaken) {
+			return c.Status(409).JSON(fiber.Map{"error": err.Error()})
+		}
 		log.Error().Err(err).Str("roomId", roomID).Msg("Failed to reactivate room")
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to reactivate room"})
 	}

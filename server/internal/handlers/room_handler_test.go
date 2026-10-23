@@ -667,6 +667,33 @@ func TestAdminReactivateRoom_Success(t *testing.T) {
 	}
 }
 
+func TestAdminReactivateRoom_NameTakenByActiveRoom(t *testing.T) {
+	app, roomRepo := setupAdminRoomTestApp(t)
+
+	room, err := roomRepo.CreateRoom("admin-user", "reactivate-me", true, "standard", 0, &models.RoomSettings{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	room.IsActive = false
+	if err := roomRepo.UpdateRoom(room); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := roomRepo.CreateRoom("admin-user", "reactivate-me", true, "standard", 0, &models.RoomSettings{}); err != nil {
+		t.Fatalf("a suspended room's name should be reusable: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/rooms/"+room.ID+"/reactivate", http.NoBody)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusConflict {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 409 when another active room holds the name, got %d: %s", resp.StatusCode, string(respBody))
+	}
+}
+
 func TestAdminReactivateRoom_AlreadyActive(t *testing.T) {
 	app, roomRepo := setupAdminRoomTestApp(t)
 
