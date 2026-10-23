@@ -11,6 +11,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/sessions v1.4.0
+	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/libdns/cloudflare v0.2.2
 	github.com/livekit/protocol v1.52.0
 	github.com/magefile/mage v1.17.2

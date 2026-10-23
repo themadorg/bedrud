@@ -8,6 +8,7 @@ import (
 	"bedrud/internal/models"
 	"bedrud/internal/repository"
 	"bedrud/internal/services"
+	"bedrud/internal/storage"
 
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
@@ -48,6 +49,10 @@ func NewUserDeleteHandler(
 		}
 		if err := prefsRepo.DeleteByUserID(payload.UserID); err != nil {
 			return fmt.Errorf("delete preferences for user %s: %w", payload.UserID, err)
+		}
+		// A leftover sound file is harmless, so it never blocks the account deletion.
+		if err := storage.DeleteUserWelcomeSoundFile(payload.UserID); err != nil {
+			log.Warn().Err(err).Str("userID", payload.UserID).Msg("failed to delete welcome sound file")
 		}
 
 		// Hard delete the user

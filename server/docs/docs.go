@@ -558,6 +558,36 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "Filter by owner name or email",
+                        "name": "owner",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Created on or after this date (YYYY-MM-DD)",
+                        "name": "dateFrom",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Created on or before this date, inclusive (YYYY-MM-DD)",
+                        "name": "dateTo",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Last activity on or after this date (YYYY-MM-DD)",
+                        "name": "lastActivityFrom",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Last activity on or before this date, inclusive (YYYY-MM-DD)",
+                        "name": "lastActivityTo",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "default": "createdAt",
                         "description": "Sort field: name, createdAt, maxParticipants, participantsCount, lastActivityAt, createdBy",
                         "name": "sort",
@@ -2382,6 +2412,59 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/users/{id}/welcome-sound": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Remove a user's welcome sound file and URL (requires superadmin access).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Clear a user's welcome sound",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Welcome sound cleared",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/webhooks": {
             "get": {
                 "description": "Get paginated list of webhook endpoints. Superadmin access required.",
@@ -3060,6 +3143,136 @@ const docTemplate = `{
                         "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/auth.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/auth.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/me/avatar": {
+            "post": {
+                "description": "Upload a profile photo stored on the server",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Upload profile avatar",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/auth.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/auth.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Remove a custom uploaded profile photo",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Remove profile avatar",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/auth.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/me/welcome-sound": {
+            "post": {
+                "description": "Upload a short MP3 that plays for the room when you join. Requires the feature to be enabled; limited to two changes per UTC day.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Upload welcome sound",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/auth.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/auth.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/auth.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/auth.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Remove your welcome sound. Always allowed and does not count against the daily limit.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Remove welcome sound",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object"
                         }
                     },
                     "401": {
@@ -3903,6 +4116,60 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed to list archived rooms",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/room/check/{roomName}": {
+            "get": {
+                "description": "Read-only lookup for whether a room exists and is joinable.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rooms"
+                ],
+                "summary": "Check room availability",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Room name",
+                        "name": "roomName",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{exists, name}",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid room name",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Private or full",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Room not found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "410": {
+                        "description": "Room inactive",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -4878,6 +5145,55 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/room/{roomId}/participant/{identity}/profile": {
+            "get": {
+                "description": "Fetch a participant's display name, avatar and welcome sound. Caller and target must both be in the room. welcomeSoundUrl is empty while welcome sounds are off.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rooms"
+                ],
+                "summary": "Get meeting participant profile",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Room ID",
+                        "name": "roomId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Participant identity",
+                        "name": "identity",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{id, name, avatarUrl, welcomeSoundUrl}",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Not in meeting",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Participant not found",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -6270,7 +6586,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
-                    "description": "tls_expiry, stale_room, empty_room, auth_spike",
+                    "description": "tls_expiry, stale_room, empty_room, auth_spike, unreadable_timestamps",
                     "type": "string"
                 }
             }
@@ -6692,6 +7008,9 @@ const docTemplate = `{
                 "chatUploadMaxBytes": {
                     "type": "integer"
                 },
+                "chatUploadMaxDimension": {
+                    "type": "integer"
+                },
                 "chatUploadS3AccessKey": {
                     "type": "string"
                 },
@@ -6832,6 +7151,10 @@ const docTemplate = `{
                 "jwtSecret": {
                     "type": "string"
                 },
+                "krispEnabled": {
+                    "description": "Krisp noise cancellation (optional proprietary filter via @livekit/krisp-noise-filter).\nOff by default. Admins must enable after confirming their own Krisp/LiveKit licensing.\nBedrud does not ship a Krisp license.",
+                    "type": "boolean"
+                },
                 "livekitApiKey": {
                     "type": "string"
                 },
@@ -6877,6 +7200,10 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "registrationEnabled": {
+                    "type": "boolean"
+                },
+                "rnnoiseEnabled": {
+                    "description": "RNNoise WASM noise suppression (optional; ~1.9 MB download when used).\nOff by default. When disabled, clients must not load the RNNoise package.",
                     "type": "boolean"
                 },
                 "serverCertFile": {
@@ -6928,6 +7255,54 @@ const docTemplate = `{
                 },
                 "updatedAt": {
                     "type": "string"
+                },
+                "webxdcGalleryAllowRemoteDownload": {
+                    "type": "boolean"
+                },
+                "webxdcGalleryEnabled": {
+                    "description": "Experimental WebXDC gallery (admin-configurable; runtime host still needs webxdc.enabled + domain in config.yaml)",
+                    "type": "boolean"
+                },
+                "webxdcGalleryInstanceCatalogEnabled": {
+                    "description": "Instance catalog: admin-uploaded .xdc packages shared across all rooms (in addition to remote/semi-remote).",
+                    "type": "boolean"
+                },
+                "webxdcGalleryRemoteCatalogUrl": {
+                    "type": "string"
+                },
+                "webxdcGallerySource": {
+                    "description": "local | remote | both | semi-remote",
+                    "type": "string"
+                },
+                "webxdcMaxArchiveMB": {
+                    "description": "Package size limits (MiB / counts). 0 = use config.yaml defaults (10 / 30 / 5 MiB, 500 entries).\nMax single file is the usual \"entry too large\" limit for large files inside a .xdc zip.",
+                    "type": "integer"
+                },
+                "webxdcMaxEntries": {
+                    "type": "integer"
+                },
+                "webxdcMaxSingleFileMB": {
+                    "type": "integer"
+                },
+                "webxdcMaxUncompressedMB": {
+                    "type": "integer"
+                },
+                "welcomeSoundEnabled": {
+                    "description": "Profile welcome sounds that play for the room when a user joins.\nOff by default. When disabled, uploads are rejected and clients play no clips.",
+                    "type": "boolean"
+                },
+                "welcomeSoundMaxBytes": {
+                    "description": "Welcome sound upload limits. 0 = use config.yaml, then the built-in defaults.",
+                    "type": "integer"
+                },
+                "welcomeSoundMaxDurationSeconds": {
+                    "type": "integer"
+                },
+                "welcomeSoundMaxLoudnessLufs": {
+                    "type": "number"
+                },
+                "welcomeSoundMaxPeakDbfs": {
+                    "type": "number"
                 }
             }
         },
@@ -6986,6 +7361,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updatedAt": {
+                    "type": "string"
+                },
+                "welcomeSoundUrl": {
                     "type": "string"
                 }
             }

@@ -119,6 +119,18 @@ Admin can update; Fiber CORS middleware reads from **startup config** — some C
 
 These are returned to frontend via public settings — not enforced server-side on data channel messages.
 
+### Welcome sounds (in progress)
+
+| Field | Default | Purpose |
+|-------|---------|---------|
+| `welcomeSoundEnabled` | `false` | Admin switch for profile welcome sounds |
+| `welcomeSoundMaxBytes` | 32768 | Largest accepted upload (0 = config, then default) |
+| `welcomeSoundMaxDurationSeconds` | 7 | Longest accepted clip |
+| `welcomeSoundMaxPeakDbfs` | -1 | Reject clips whose sample peak reaches this level |
+| `welcomeSoundMaxLoudnessLufs` | -20 | Reject clips louder than this integrated loudness |
+
+Public settings return `welcomeSound: {enabled, maxBytes, maxDurationSeconds}`. The upload API enforces these limits; the web profile UI and meeting playback are not wired yet. See [the design](../plan/welcome-sound/01-design.md).
+
 ### Recordings (planned)
 
 `recordingsEnabled`, `recordingMaxDurationMins`, `recordingMaxFileSizeMB` — model exists; feature not wired.

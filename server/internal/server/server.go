@@ -380,14 +380,14 @@ func Run(configPath, version string) error {
 		queueConcurrency = 1
 	}
 	queueWorker := queue.NewWorker(database.GetDB(), map[string]queue.Handler{
-		"user_delete":        queue.NewUserDeleteHandler(cleanupSvc, userRepo, passkeyRepo, prefsRepo, roomRepo),
-		"room_delete":        queue.NewRoomDeleteHandler(cleanupSvc, roomRepo),
-		"room_suspend":       queue.NewRoomSuspendHandler(cleanupSvc, roomRepo),
-		"chat_upload_s3":     queue.NewChatUploadS3Handler(uploadStore, uploadTracker),
-		"send_email":         queue.NewSendEmailHandler(&cfg.Email),
-		"dispatch_webhook":   queue.NewDispatchWebhookHandler(),
-		"process_recording":  queue.NewProcessRecordingHandler(recordingRepo, webhookRepo, cfg.LiveKit.Host, cfg.LiveKit.InternalHost, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, recordingStore),
-		"recording_delete":   queue.NewRecordingDeleteHandler(recordingRepo),
+		"user_delete":       queue.NewUserDeleteHandler(cleanupSvc, userRepo, passkeyRepo, prefsRepo, roomRepo),
+		"room_delete":       queue.NewRoomDeleteHandler(cleanupSvc, roomRepo),
+		"room_suspend":      queue.NewRoomSuspendHandler(cleanupSvc, roomRepo),
+		"chat_upload_s3":    queue.NewChatUploadS3Handler(uploadStore, uploadTracker),
+		"send_email":        queue.NewSendEmailHandler(&cfg.Email),
+		"dispatch_webhook":  queue.NewDispatchWebhookHandler(),
+		"process_recording": queue.NewProcessRecordingHandler(recordingRepo, webhookRepo, cfg.LiveKit.Host, cfg.LiveKit.InternalHost, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, recordingStore),
+		"recording_delete":  queue.NewRecordingDeleteHandler(recordingRepo),
 	}, queue.WorkerOptions{
 		Interval:    time.Duration(cfg.Queue.PollInterval.Int64()) * time.Millisecond,
 		Concurrency: queueConcurrency,
@@ -421,6 +421,8 @@ func Run(configPath, version string) error {
 	api.Put("/auth/me", middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.UpdateProfile)
 	api.Post("/auth/me/avatar", middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.UploadAvatar)
 	api.Delete("/auth/me/avatar", middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.DeleteAvatar)
+	api.Post("/auth/me/welcome-sound", middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo), middleware.APIRateLimiter(cfg.RateLimit), authHandler.UploadWelcomeSound)
+	api.Delete("/auth/me/welcome-sound", middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.DeleteWelcomeSound)
 	api.Put("/auth/password", middleware.Protected(), middleware.RequireBearerForMutations(), middleware.RequireEmailVerified(cfg, userRepo), authHandler.ChangePassword)
 	api.Post("/auth/verify", authHandler.VerifyEmail)
 	api.Get("/auth/verify/status", middleware.Protected(), authHandler.CheckVerificationStatus)
@@ -473,7 +475,6 @@ func Run(configPath, version string) error {
 	api.Put("/room/:roomId/settings", append(requireAuthMut, middleware.RejectGuest(), roomHandler.UpdateSettings)...)
 	api.Delete("/room/:roomId", append(requireAuthMut, middleware.RejectGuest(), roomHandler.DeleteRoom)...)
 	api.Post("/room/:roomId/chat/upload", append(requireAuthMut, middleware.APIRateLimiter(cfg.RateLimit), roomHandler.UploadChatImage)...)
-
 
 	// TODO oncoming feature: recording routes
 	// api.Post("/rooms/:id/recording/start", ...)
@@ -545,6 +546,22 @@ func Run(configPath, version string) error {
 		return c.SendFile(resolved)
 	})
 
+	welcomeSoundDir := storage.WelcomeSoundDir()
+	if err := os.MkdirAll(welcomeSoundDir, 0o755); err != nil {
+		log.Warn().Err(err).Str("dir", welcomeSoundDir).Msg("Could not create welcome sound upload dir")
+	}
+	app.Get("/uploads/welcome-sounds/*", func(c *fiber.Ctx) error {
+		path := c.Params("*")
+		if path == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "Missing file path"})
+		}
+		resolved, err := storage.ResolveWelcomeSoundFile(path)
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid path"})
+		}
+		return c.SendFile(resolved)
+	})
+
 	// TODO oncoming feature: recording static file serving
 
 	// Admin routes
@@ -580,6 +597,7 @@ func Run(configPath, version string) error {
 	adminGroup.Post("/users/:id/verify/resend", usersHandler.AdminResendVerification)
 	adminGroup.Get("/users/:id/sessions", usersHandler.ListUserSessions)
 	adminGroup.Delete("/users/:id", usersHandler.DeleteUser)
+	adminGroup.Delete("/users/:id/welcome-sound", usersHandler.ClearUserWelcomeSound)
 	adminGroup.Get("/rooms/:roomId/participants", roomHandler.AdminGetRoomParticipants)
 	adminGroup.Post("/rooms/:roomId/participants/:identity/kick", roomHandler.AdminKickParticipant)
 	adminGroup.Post("/rooms/:roomId/participants/:identity/mute", roomHandler.AdminMuteParticipant)

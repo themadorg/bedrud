@@ -63,6 +63,7 @@ func setupUsersTestApp(t *testing.T) (*fiber.App, *repository.UserRepository) {
 	app.Put("/admin/users/:id/status", usersHandler.UpdateUserStatus)
 	app.Put("/admin/users/:id/accesses", usersHandler.UpdateUserAccesses)
 	app.Delete("/admin/users/:id", usersHandler.DeleteUser)
+	app.Delete("/admin/users/:id/welcome-sound", usersHandler.ClearUserWelcomeSound)
 	app.Put("/admin/users/:id/password", usersHandler.SetUserPassword)
 	app.Post("/admin/users/:id/verify", usersHandler.AdminVerifyEmail)
 	app.Post("/admin/users/:id/verify/resend", usersHandler.AdminResendVerification)
