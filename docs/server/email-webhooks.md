@@ -15,7 +15,7 @@ Transactional email (SMTP) and outbound webhooks in the Bedrud backend.
 
 ### Architecture
 
-Emails are **never sent synchronously** from HTTP handlers. All sends go through the `send_email` queue job:
+Transactional emails are **never sent synchronously** from HTTP handlers. They go through the `send_email` queue job (the admin test email below is the one direct send):
 
 ```
 HTTP handler → queue.Enqueue("send_email", payload) → Worker → SMTP
@@ -25,7 +25,7 @@ This keeps API responses fast and isolates SMTP failures from user-facing operat
 
 ### SMTP configuration
 
-Primary source: `config.yaml` `email` section.
+Effective settings: SMTP fields saved in the admin dashboard (Email tab) override the `config.yaml` `email` section field by field; empty dashboard fields fall back to `config.yaml`. The queue resolves them on every send (`queue.SMTPSettingsFrom`), so dashboard changes apply without a restart.
 
 | Field | Env var | Purpose |
 |-------|---------|---------|
@@ -86,7 +86,7 @@ queue.Enqueue(ctx, db, "send_email", queue.SendEmailPayload{
 
 ### Admin test email
 
-`POST /api/admin/settings/test-email` — sends a test message using current SMTP and branding settings. Requires superadmin.
+`POST /api/admin/settings/send-test-email` with `{ "to": "<email>" }` — sends a test message immediately (not queued) through the same effective SMTP settings as queued mail, using `queue.SendSMTPMail` with a 30s timeout. Requires superadmin. Responses: `200` sent; `400` invalid recipient, mail not configured, or a delivery error (the SMTP server's reply, never credentials); `408` the mail server did not respond within 30s. The admin dashboard exposes it as **Send Test** on the Email tab; it uses saved settings, so unsaved edits are not tested.
 
 ### Verification cooldown
 

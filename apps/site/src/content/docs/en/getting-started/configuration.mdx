@@ -304,6 +304,8 @@ Requires SMTP. Token TTL: `resetTokenTTLHours` (default 1 hour). Endpoints: `POS
 
 Transactional mail via SMTP + job queue. Templates: `welcome`, `password_changed`, `password_reset`, `room_invite`, `verify_email` (HTML + text). Branding via `email.templates.*`.
 
+SMTP fields saved in the admin dashboard (**Settings → Email**) override `email.*` here, field by field, and apply without a restart. To check delivery, enter a recipient under **Send Test Email** and press **Send Test**: it sends right away through the saved settings, the same path verification and reset emails use, and shows the mail server's error if delivery fails.
+
 ---
 
 ## LiveKit Configuration
