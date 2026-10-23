@@ -19,7 +19,8 @@ import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { type DashboardEntry, timeAgo } from '@/lib/dashboard-room-list'
+import type { DashboardEntry } from '@/lib/dashboard-room-list'
+import { timeAgo } from '@/lib/time-ago'
 
 interface Room {
   id: string
@@ -103,8 +104,8 @@ export function RoomCard({ entry, onJoin, onDelete, onSettings, onRemove }: Prop
             )}
           </div>
           <h3 className="mt-1.5 truncate font-mono text-[13px] font-semibold leading-tight">{entry.name}</h3>
-          {entry.lastJoinedAt !== null && (
-            <p className="mt-0.5 text-[11px] text-muted-foreground/70">{timeAgo(entry.lastJoinedAt)}</p>
+          {entry.lastActivityAt !== null && (
+            <p className="mt-0.5 text-[11px] text-muted-foreground/70">{timeAgo(entry.lastActivityAt)}</p>
           )}
         </div>
 

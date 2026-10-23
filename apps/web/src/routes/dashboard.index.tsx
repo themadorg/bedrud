@@ -25,6 +25,7 @@ interface Room {
   maxParticipants: number
   isActive: boolean
   mode: string
+  lastActivityAt?: string | null
   settings: {
     allowChat: boolean
     allowVideo: boolean

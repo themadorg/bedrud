@@ -4,6 +4,8 @@ import type { RecentRoom } from '#/lib/recent-rooms.store'
 export interface NamedRoom {
   id: string
   name: string
+  /** When anyone last joined the room, as the RFC 3339 instant the server stamps on every join. */
+  lastActivityAt?: string | null
 }
 
 /**
@@ -12,37 +14,61 @@ export interface NamedRoom {
  * and a timestamp and nothing else.
  */
 export type DashboardEntry<TRoom extends NamedRoom> =
-  | { kind: 'server'; key: string; name: string; room: TRoom; lastJoinedAt: number | null }
-  | { kind: 'recent'; key: string; name: string; lastJoinedAt: number }
-
-const MILLISECONDS_PER_MINUTE = 60_000
-const MINUTES_PER_HOUR = 60
-const HOURS_PER_DAY = 24
+  | { kind: 'server'; key: string; name: string; room: TRoom; lastActivityAt: number | null }
+  | { kind: 'recent'; key: string; name: string; lastActivityAt: number }
 
 /** Indexes local history by room name, so a server room can find its own last visit. */
 function lastJoinedByName(recents: readonly RecentRoom[]): Map<string, number> {
   return new Map(recents.map((recent) => [recent.name, recent.joinedAt]))
 }
 
-/** Wraps a server room as an entry, carrying its last visit when this device has one. */
-function toServerEntry<TRoom extends NamedRoom>(room: TRoom, lastJoinedAt: number | null): DashboardEntry<TRoom> {
-  return { kind: 'server', key: `server:${room.id}`, name: room.name, room, lastJoinedAt }
+/**
+ * Returns when a server room was last active. The server's record wins, since it counts every
+ * participant's join where local history only knows this device's visits; the visit answers when
+ * the server reports nothing, or something that does not parse.
+ */
+function resolveActivityAt(room: NamedRoom, lastVisit: number | null): number | null {
+  const serverActivity = room.lastActivityAt ? Date.parse(room.lastActivityAt) : Number.NaN
+  return Number.isNaN(serverActivity) ? lastVisit : serverActivity
+}
+
+/** Wraps a server room as an entry, dated by its own activity. */
+function toServerEntry<TRoom extends NamedRoom>(room: TRoom, lastVisit: number | null): DashboardEntry<TRoom> {
+  return {
+    kind: 'server',
+    key: `server:${room.id}`,
+    name: room.name,
+    room,
+    lastActivityAt: resolveActivityAt(room, lastVisit),
+  }
 }
 
 /** Wraps a room known only from local history as an entry. */
 function toRecentEntry<TRoom extends NamedRoom>(recent: RecentRoom): DashboardEntry<TRoom> {
-  return { kind: 'recent', key: `recent:${recent.name}`, name: recent.name, lastJoinedAt: recent.joinedAt }
+  return { kind: 'recent', key: `recent:${recent.name}`, name: recent.name, lastActivityAt: recent.joinedAt }
+}
+
+/**
+ * Orders entries most recently active first. Entries nothing can date follow, in the order they came
+ * in: the sort is stable, so they keep the server's order.
+ */
+function sortByActivity<TRoom extends NamedRoom>(entries: DashboardEntry<TRoom>[]): DashboardEntry<TRoom>[] {
+  return entries.sort((left, right) => {
+    if (left.lastActivityAt === null || right.lastActivityAt === null) {
+      return (left.lastActivityAt === null ? 1 : 0) - (right.lastActivityAt === null ? 1 : 0)
+    }
+    return right.lastActivityAt - left.lastActivityAt
+  })
 }
 
 /**
  * Builds the list behind the "All" chip: every room this device knows about, from either source,
  * in one order.
  *
- * Rooms with a last visit come first, most recent first, whether the record is a server room or
- * local history alone — the question the ordering answers is "what were you in most recently", and
- * ownership does not change that. Owned rooms never joined from this device follow, in the order
- * the server returned them, because there is nothing to date them by. A room that is both owned and
- * recently joined appears once, as a server entry, in its recency position.
+ * Rooms that can be dated come first, most recently active first, whether the record is a server
+ * room or local history alone. A server room is dated by the server's last activity, falling back
+ * to this device's visit. Owned rooms nothing can date follow, in the order the server returned
+ * them. A room that is both owned and recently joined appears once, as a server entry.
  *
  * This mirrors the Android client's rule in `DashboardScreen.kt`, minus its per-server filtering.
  */
@@ -53,49 +79,20 @@ export function mergeDashboardRooms<TRoom extends NamedRoom>(
   const lastJoined = lastJoinedByName(recents)
   const serverRoomNames = new Set(rooms.map((room) => room.name))
 
-  const datedEntries: { entry: DashboardEntry<TRoom>; lastJoinedAt: number }[] = [
-    ...recents
-      .filter((recent) => !serverRoomNames.has(recent.name))
-      .map((recent) => ({ entry: toRecentEntry<TRoom>(recent), lastJoinedAt: recent.joinedAt })),
-    ...rooms
-      .filter((room) => lastJoined.has(room.name))
-      .map((room) => {
-        const lastJoinedAt = lastJoined.get(room.name) as number
-        return { entry: toServerEntry(room, lastJoinedAt), lastJoinedAt }
-      }),
-  ]
-
-  const neverJoined = rooms.filter((room) => !lastJoined.has(room.name)).map((room) => toServerEntry(room, null))
-
-  return [
-    ...datedEntries.sort((left, right) => right.lastJoinedAt - left.lastJoinedAt).map(({ entry }) => entry),
-    ...neverJoined,
-  ]
+  return sortByActivity([
+    ...recents.filter((recent) => !serverRoomNames.has(recent.name)).map((recent) => toRecentEntry<TRoom>(recent)),
+    ...rooms.map((room) => toServerEntry(room, lastJoined.get(room.name) ?? null)),
+  ])
 }
 
 /**
- * Builds the list behind the "My Rooms" chip: owned rooms only, in the order the server returned
- * them, each carrying its last visit so the card can show the same label it shows under "All".
+ * Builds the list behind the "My Rooms" chip: owned rooms only, in the same activity order as
+ * "All", so the order agrees with the time each card prints.
  */
 export function serverRoomsOnly<TRoom extends NamedRoom>(
   rooms: readonly TRoom[],
   recents: readonly RecentRoom[],
 ): DashboardEntry<TRoom>[] {
   const lastJoined = lastJoinedByName(recents)
-  return rooms.map((room) => toServerEntry(room, lastJoined.get(room.name) ?? null))
-}
-
-/**
- * Formats a last-visit timestamp as the card's presence label, the web's reading of the Android
- * card's presence line. `now` is a parameter so the label can be tested without faking the clock.
- */
-export function timeAgo(timestamp: number, now: number = Date.now()): string {
-  const minutes = Math.floor((now - timestamp) / MILLISECONDS_PER_MINUTE)
-  if (minutes < 1) return 'just now'
-  if (minutes < MINUTES_PER_HOUR) return `${minutes}m ago`
-
-  const hours = Math.floor(minutes / MINUTES_PER_HOUR)
-  if (hours < HOURS_PER_DAY) return `${hours}h ago`
-
-  return `${Math.floor(hours / HOURS_PER_DAY)}d ago`
+  return sortByActivity(rooms.map((room) => toServerEntry(room, lastJoined.get(room.name) ?? null)))
 }

@@ -1,3 +1,4 @@
+import { timeAgo } from '#/lib/time-ago'
 import type { ChatMessage, SystemMessage } from '../MeetingContext'
 
 // ─── Display item types ───────────────────────────────────────────────────────
@@ -71,11 +72,7 @@ export function avatarInitials(name: string): string {
 }
 
 export function relativeTime(ts: number): string {
-  const diff = Date.now() - ts
-  if (diff < 60_000) return 'just now'
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
-  return `${Math.floor(diff / 86_400_000)}d ago`
+  return timeAgo(ts)
 }
 
 export function absoluteTime(ts: number): string {
