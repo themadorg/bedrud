@@ -43,7 +43,7 @@ Phone layout applies below 1024px, the `lg` Tailwind breakpoint the dashboard sh
 | `BedrudCompactTopBar` | dashboard mobile header | exists |
 | `BedrudBottomSheet` | `BedrudSheet`, `components/ui/BedrudSheet.tsx` — vaul, drag handle, `rounded-t-3xl` | built in unit 2; units 3 and 4 reuse it rather than adding a second sheet |
 | `MeetingChatSheet` (half / full / dismiss over the live call) | bottom sheet over the meeting | unit 2 |
-| `MeetingControlsPanel` (floating pill, handle unfolds options upward) | `MeetingControlsPill`, `components/meeting/MeetingControlsPill.tsx` | built in unit 3 |
+| `MeetingControlsPanel` (floating pill, controls only; its handle opens a titled "More options" sheet) | `MeetingControlsPill` and `MeetingOptionsSheet` on `BedrudSheet`, `components/meeting/` | built in unit 3; options moved from an unfold to a sheet after bedrud-android#262 |
 | `MeetingInviteSheet` (avatar grid + share targets) | `MeetingInviteSheet`, on `BedrudSheet` | built in unit 4 |
 | `SettingsContent` (one scrolling page of card sections) | mobile settings page | unit 5 |
 | `QuickJoinBar` + `FilterRow` (dashboard) | quick-join bar + filter chips | unit 6 |
@@ -61,7 +61,7 @@ sheet rather than beside it.
 |---|---|---|---|
 | 1 | Foundation | shape scale, one breakpoint hook, PWA head metas and manifest, docs, contract tests | in progress, [02](./02-foundation.md), [03](./03-foundation-plan.md) |
 | 2 | Meeting chat sheet | chat as a bottom sheet over the live call: half on open, full on drag or keyboard, dismissed on a second drag down | done, [08](./08-meeting-chat-sheet.md), [09](./09-meeting-chat-sheet-plan.md) |
-| 3 | Meeting controls pill | floating bottom pill (camera, screen share, mic, chat, hang up), drag handle unfolds room options upward in the same surface, no "more" menu | done, [10](./10-meeting-controls-pill.md), [11](./11-meeting-controls-pill-plan.md) |
+| 3 | Meeting controls pill | floating bottom pill (camera, screen share, mic, chat, hang up), drag handle unfolds room options upward in the same surface, no "more" menu (since revised: the options are a titled sheet, see [10](./10-meeting-controls-pill.md#revision-options-as-a-sheet)) | done, [10](./10-meeting-controls-pill.md), [11](./11-meeting-controls-pill-plan.md) |
 | 4 | Invite sheet | participants and invite as one sheet: avatar grid, count, share targets, room link | done, [12](./12-invite-sheet.md), [13](./13-invite-sheet-plan.md) |
 | 5 | Mobile settings page | one scrolling page of card sections on phones, the settings dialog moved to the shared breakpoint, and the desktop settings route redirected on phones | done, [04](./04-mobile-settings.md), [05](./05-mobile-settings-plan.md) |
 | 6 | Dashboard parity | quick-join bar on phones with pasted-link support, filter chips over one merged room list, and the dashboard tree moved to the shared breakpoint | done, [06](./06-dashboard-parity.md), [07](./07-dashboard-parity-plan.md) |

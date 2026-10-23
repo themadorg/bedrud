@@ -309,27 +309,28 @@ top-right cluster stays visible behind the sheet instead; only the controls bar 
 ## Phone meeting controls
 
 Below the breakpoint, `ControlsBar` renders `MeetingControlsPill` instead of the desktop bar. One
-surface anchored to the bottom: handle, options panel, controls row. The options unfold *above* the
-controls, so the controls never move.
+surface anchored to the bottom: a handle labelled "More options", then the controls row. The handle
+opens `MeetingOptionsSheet`, an ordinary `BedrudSheet` titled "More options".
 
 Five controls, in Android's order: camera, screen share, mic pill, chat, leave. Chat has no
 top-right toggle on a phone — the pill is its only entry point.
 
 Four things are easy to get wrong:
 
-- **The panel is not a sheet.** Do not rebuild it on a bottom-sheet primitive. A sheet puts the
-  options on a second surface carrying its own copy of the controls, which is the bug Android's
-  `MeetingControlsPanel` documents at length.
+- **The options are a sheet, and the pill is controls only.** They used to unfold out of the pill.
+  Android reversed that in bedrud-android#262 because the grown pill read as a custom surface beside
+  every other sheet, and the web followed. Do not grow the pill again, and do not copy the call
+  controls into the sheet: two copies of the same buttons at two elevations was the original bug.
 - **Only the bar element branches on `useIsMobile()`, never the whole component.** The settings and
   app-gallery dialogs render after it and are reached from both surfaces; an early return for the
   phone silently makes those rows do nothing.
-- **The drag threshold lives in `controlsPanelDrag.ts`,** not in the component. `controlsPill.test.ts`
-  fails if a bare `24` appears in `MeetingControlsPill.tsx`.
+- **Scrim, drag-down and Escape are the sheet's.** The pill carries no gesture or overlay of its own;
+  `controlsPill.test.ts` fails if one comes back.
 - **Audio devices are rows, not a second surface.** Microphones, speakers and noise modes are
-  panel rows with a check on the active one. They used to be a full-screen dialog over the call.
+  sheet rows with a check on the active one. They used to be a full-screen dialog over the call.
 
 The row list is pure and lives in `meetingOptionRows.ts`; icons come from `meetingOptionIcon` in
-`MeetingOptionsPanel.tsx`, which the desktop `⋯` menu shares. Fixed row ids are a union, so adding
+`MeetingOptionsSheet.tsx`, which the desktop `⋯` menu shares. Fixed row ids are a union, so adding
 one fails the type check at the icon map until it is given an icon. Device rows carry their device
 id after a `microphone:` / `speaker:` / `noise:` prefix.
 

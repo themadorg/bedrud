@@ -13,6 +13,37 @@ until both have merged. Nothing here depends on unit 2's code, for the reason in
 
 Desktop is untouched apart from two corner values.
 
+## Revision: options as a sheet
+
+Android reversed the unfold in bedrud-android#262, after this unit shipped, and the web follows.
+The pill now carries the controls only. Its handle, labelled "More options", opens the options in
+`MeetingOptionsSheet`, an ordinary `BedrudSheet` titled "More options".
+
+Android's reason: the grown pill read as a custom surface beside every other sheet in the app —
+floating, outlined, rounded on all sides and untitled. The original objection to a sheet still
+holds and is still met: the sheet carries only the options, never a copy of the five controls.
+
+What that changes below:
+
+- **The handle** draws its pill from `HANDLE_PILL_CLASS`, exported by `BedrudSheetHandle`, so the
+  two handles share one shape at Android's 0.55 alpha
+  ([#162](https://github.com/themadorg/bedrud/issues/162)). It stays a plain button with a 48px
+  target, because the pill is not a drawer.
+- **The gesture** is a tap on the handle. Scrim, drag-down and Escape are the sheet's. Android also
+  opens the sheet on a swipe up the bar; the web does not.
+- **The panel's scroll cap, the expand and collapse durations, `--meet-scrim` and
+  `--meet-controls-panel-max-height`** are gone. The sheet takes its ceiling from
+  `--meet-sheet-max-height`, which leaves one height token
+  ([#163](https://github.com/themadorg/bedrud/issues/163)).
+- **Chat and leave** no longer collapse anything first: the sheet is modal, so the controls are not
+  reachable while it is open.
+- **Files**: `MeetingOptionsPanel.tsx` is renamed `MeetingOptionsSheet.tsx`, and
+  `controlsPanelDrag.ts` is deleted with its test. `controlsPill.test.ts` now pins the sheet and its
+  title, and that the pill carries no scrim, drag or Escape handling.
+
+The row order and the close rule — toggles stay open, actions close — are unchanged. The sections
+below are the original spec, kept for the reasoning behind the controls row.
+
 ## The controls surface
 
 ### Today
