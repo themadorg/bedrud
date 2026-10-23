@@ -143,7 +143,7 @@ final class AuthAPITests: XCTestCase {
 
         await MainActor.run {
             let tokens = AuthTokens(accessToken: token, refreshToken: "refresh")
-            let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: nil)
+            let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: nil)
             authManager.loginWithTokens(tokens: tokens, user: user)
         }
 
@@ -152,7 +152,7 @@ final class AuthAPITests: XCTestCase {
             XCTAssertEqual(request.httpMethod, "GET")
             XCTAssertNotNil(request.value(forHTTPHeaderField: "Authorization"))
 
-            let meJSON = #"{"id":"u1","email":"a@b.com","name":"Alice","avatar_url":"https://img.com/a.png","is_admin":true,"provider":"github"}"#
+            let meJSON = #"{"id":"u1","email":"a@b.com","name":"Alice","avatar_url":"https://img.com/a.png","accesses":["superadmin","user"],"provider":"github"}"#
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, meJSON.data(using: .utf8)!)
         }
@@ -161,7 +161,7 @@ final class AuthAPITests: XCTestCase {
         XCTAssertEqual(me.id, "u1")
         XCTAssertEqual(me.name, "Alice")
         XCTAssertEqual(me.avatarUrl, "https://img.com/a.png")
-        XCTAssertEqual(me.isAdmin, true)
+        XCTAssertEqual(me.accesses, ["superadmin", "user"])
         XCTAssertEqual(me.provider, "github")
     }
 
@@ -194,7 +194,7 @@ final class AuthAPITests: XCTestCase {
     }
 
     func testMeResponseDecoding() throws {
-        let json = #"{"id":"u1","email":"a@b.com","name":"Alice","avatar_url":"https://img.com/a.png","is_admin":true,"provider":"github"}"#
+        let json = #"{"id":"u1","email":"a@b.com","name":"Alice","avatar_url":"https://img.com/a.png","accesses":["superadmin","user"],"provider":"github"}"#
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         let response = try decoder.decode(MeResponse.self, from: json.data(using: .utf8)!)
@@ -202,7 +202,7 @@ final class AuthAPITests: XCTestCase {
         XCTAssertEqual(response.email, "a@b.com")
         XCTAssertEqual(response.name, "Alice")
         XCTAssertEqual(response.avatarUrl, "https://img.com/a.png")
-        XCTAssertEqual(response.isAdmin, true)
+        XCTAssertEqual(response.accesses, ["superadmin", "user"])
         XCTAssertEqual(response.provider, "github")
     }
 
@@ -212,7 +212,7 @@ final class AuthAPITests: XCTestCase {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         let response = try decoder.decode(MeResponse.self, from: json.data(using: .utf8)!)
         XCTAssertNil(response.avatarUrl)
-        XCTAssertNil(response.isAdmin)
+        XCTAssertNil(response.accesses)
         XCTAssertNil(response.provider)
     }
 

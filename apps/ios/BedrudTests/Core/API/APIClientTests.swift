@@ -299,7 +299,7 @@ final class APIClientTests: XCTestCase {
 
         await MainActor.run {
             let tokens = AuthTokens(accessToken: token, refreshToken: "refresh")
-            let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: nil)
+            let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: nil)
             authManager.loginWithTokens(tokens: tokens, user: user)
         }
 
@@ -466,7 +466,7 @@ final class APIClientTests: XCTestCase {
 
         // Manually login to set up auth state
         await MainActor.run {
-            let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: nil)
+            let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: nil)
             let tokens = AuthTokens(accessToken: initialToken, refreshToken: "refresh")
             authManager.loginWithTokens(tokens: tokens, user: user)
         }
@@ -504,7 +504,7 @@ final class APIClientTests: XCTestCase {
 
         // Manually login to set up auth state
         await MainActor.run {
-            let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: nil)
+            let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: nil)
             let tokens = AuthTokens(accessToken: token, refreshToken: "refresh")
             authManager.loginWithTokens(tokens: tokens, user: user)
         }

@@ -144,7 +144,7 @@ final class AuthFlowIntegrationTests: XCTestCase {
         // Pre-populate keychain as if user was previously logged in
         keychain["integration-test_access_token"] = token
         keychain["integration-test_refresh_token"] = "refresh"
-        let userData = try! JSONEncoder().encode(User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: nil))
+        let userData = try! JSONEncoder().encode(User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: nil))
         keychain["integration-test_user_data"] = String(data: userData, encoding: .utf8)
 
         MockURLProtocol.requestHandler = { request in
@@ -187,7 +187,7 @@ final class AuthFlowIntegrationTests: XCTestCase {
         // Pre-populate with expired token
         keychain["integration-test_access_token"] = expiredToken
         keychain["integration-test_refresh_token"] = "old-refresh"
-        let userData = try! JSONEncoder().encode(User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: nil))
+        let userData = try! JSONEncoder().encode(User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: nil))
         keychain["integration-test_user_data"] = String(data: userData, encoding: .utf8)
 
         var refreshCalled = false

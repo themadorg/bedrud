@@ -70,7 +70,7 @@ enum TestHelpers {
 
         // Login with test tokens
         let tokens = AuthTokens(accessToken: fakeJWT(), refreshToken: "refresh")
-        let user = User(id: "u1", email: "a@b.com", name: "Test User", avatarUrl: nil, isAdmin: false, provider: nil)
+        let user = User(id: "u1", email: "a@b.com", name: "Test User", avatarUrl: nil, accesses: nil, provider: nil)
         manager.loginWithTokens(tokens: tokens, user: user)
 
         return manager
@@ -173,7 +173,7 @@ enum TestHelpers {
         name: String = "Test User",
         isAdmin: Bool = false
     ) -> User {
-        User(id: id, email: email, name: name, avatarUrl: nil, isAdmin: isAdmin, provider: nil)
+        User(id: id, email: email, name: name, avatarUrl: nil, accesses: isAdmin ? [User.adminAccess] : nil, provider: nil)
     }
 
     /// Creates an admin user instance

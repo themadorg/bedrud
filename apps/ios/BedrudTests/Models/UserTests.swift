@@ -6,7 +6,7 @@ final class UserTests: XCTestCase {
     // MARK: - Init
 
     func testInit() {
-        let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: "https://img.com/a.png", isAdmin: true, provider: "github")
+        let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: "https://img.com/a.png", accesses: ["superadmin", "user"], provider: "github")
         XCTAssertEqual(user.id, "u1")
         XCTAssertEqual(user.email, "a@b.com")
         XCTAssertEqual(user.name, "Alice")
@@ -18,21 +18,21 @@ final class UserTests: XCTestCase {
     // MARK: - Custom Equality (id-based)
 
     func testEqualitySameIdDifferentFields() {
-        let a = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: nil)
-        let b = User(id: "u1", email: "different@b.com", name: "Bob", avatarUrl: "url", isAdmin: true, provider: "google")
+        let a = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: nil)
+        let b = User(id: "u1", email: "different@b.com", name: "Bob", avatarUrl: "url", accesses: ["superadmin"], provider: "google")
         XCTAssertEqual(a, b, "User equality is id-based")
     }
 
     func testEqualityDifferentId() {
-        let a = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: nil)
-        let b = User(id: "u2", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: nil)
+        let a = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: nil)
+        let b = User(id: "u2", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: nil)
         XCTAssertNotEqual(a, b)
     }
 
     // MARK: - Codable Round-Trip
 
     func testCodableRoundTrip() throws {
-        let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: "github")
+        let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: "github")
         let data = try JSONEncoder().encode(user)
         let decoded = try JSONDecoder().decode(User.self, from: data)
         XCTAssertEqual(decoded.id, "u1")
@@ -41,6 +41,14 @@ final class UserTests: XCTestCase {
         XCTAssertNil(decoded.avatarUrl)
         XCTAssertFalse(decoded.isAdmin)
         XCTAssertEqual(decoded.provider, "github")
+    }
+
+    func testDecodesLegacyCachedUserWithoutAccesses() throws {
+        // Users cached before accesses existed carry only an isAdmin flag.
+        let json = #"{"id":"u1","email":"a@b.com","name":"Alice","isAdmin":true}"#
+        let decoded = try JSONDecoder().decode(User.self, from: json.data(using: .utf8)!)
+        XCTAssertEqual(decoded.id, "u1")
+        XCTAssertFalse(decoded.isAdmin)
     }
 
     // MARK: - AdminUser

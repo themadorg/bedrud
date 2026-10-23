@@ -81,7 +81,7 @@ final class PasskeyManager: NSObject, ObservableObject {
             email: loginResponse.user.email,
             name: loginResponse.user.name,
             avatarUrl: loginResponse.user.avatarUrl,
-            isAdmin: loginResponse.user.isAdmin ?? false,
+            accesses: loginResponse.user.accesses,
             provider: nil
         )
         authManager.loginWithTokens(tokens: loginResponse.tokens, user: user)
@@ -216,7 +216,7 @@ final class PasskeyManager: NSObject, ObservableObject {
             email: loginResponse.user.email,
             name: loginResponse.user.name,
             avatarUrl: loginResponse.user.avatarUrl,
-            isAdmin: loginResponse.user.isAdmin ?? false,
+            accesses: loginResponse.user.accesses,
             provider: nil
         )
         authManager.loginWithTokens(tokens: loginResponse.tokens, user: user)

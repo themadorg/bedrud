@@ -42,7 +42,7 @@ struct UserResponse: Decodable {
     let email: String
     let name: String
     let avatarUrl: String?
-    let isAdmin: Bool?
+    let accesses: [String]?
 }
 
 struct RegisterResponse: Decodable {
@@ -60,7 +60,7 @@ struct MeResponse: Decodable {
     let email: String
     let name: String
     let avatarUrl: String?
-    let isAdmin: Bool?
+    let accesses: [String]?
     let provider: String?
 }
 

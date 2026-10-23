@@ -51,7 +51,7 @@ final class RoomAPITests: XCTestCase {
     private func authenticateManager() {
         let token = fakeJWT()
         let tokens = AuthTokens(accessToken: token, refreshToken: "refresh")
-        let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: nil)
+        let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: nil)
         authManager.loginWithTokens(tokens: tokens, user: user)
     }
 
