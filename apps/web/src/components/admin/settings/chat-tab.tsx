@@ -1,5 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Field, Section, TextInput, ValidateButton } from './shared'
+import { Field, MASKED_SECRET, Section, TextInput, ValidateButton } from './shared'
 import type { SystemSettings } from './types'
 
 function numOrPrev(v: string, prev: number): number {
@@ -186,9 +186,14 @@ export function ChatTab({
               </Field>
               <Field
                 label="Access Key"
-                hint="S3 access key ID. Saved to database. Leave empty to use config.yaml value."
+                hint={
+                  settings.chatUploadS3AccessKey === MASKED_SECRET
+                    ? 'Hidden — enter new value to change. S3 access key ID.'
+                    : 'S3 access key ID. Saved to database. Leave empty to use config.yaml value.'
+                }
               >
                 <TextInput
+                  type="password"
                   value={settings.chatUploadS3AccessKey}
                   onChange={(v) => setSettings({ ...settings, chatUploadS3AccessKey: v })}
                   mono
@@ -197,12 +202,13 @@ export function ChatTab({
               <Field
                 label="Secret Key"
                 hint={
-                  settings.chatUploadS3SecretKey === '••••••••'
+                  settings.chatUploadS3SecretKey === MASKED_SECRET
                     ? 'Hidden — enter new value to change. S3 secret key.'
                     : 'S3 secret access key. Saved to database. Leave empty to use config.yaml value.'
                 }
               >
                 <TextInput
+                  type="password"
                   value={settings.chatUploadS3SecretKey}
                   onChange={(v) => setSettings({ ...settings, chatUploadS3SecretKey: v })}
                   mono

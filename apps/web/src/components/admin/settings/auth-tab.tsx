@@ -1,4 +1,4 @@
-import { Field, Section, TextInput, Toggle } from './shared'
+import { Field, MASKED_SECRET, Section, TextInput, Toggle } from './shared'
 import type { SystemSettings } from './types'
 
 function OAuthProviderCard({
@@ -20,7 +20,7 @@ function OAuthProviderCard({
   errors?: Record<string, string>
   clearFieldError?: (field: string) => void
 }) {
-  const configured = clientId !== '' && clientSecret !== '' && clientSecret !== '••••••••'
+  const configured = clientId !== '' && clientSecret !== '' && clientSecret !== MASKED_SECRET
 
   const redirectField = `${idPrefix}RedirectUrl` as keyof SystemSettings
 
@@ -41,15 +41,16 @@ function OAuthProviderCard({
         <Field
           label="Client Secret"
           hint={
-            clientSecret === '••••••••'
+            clientSecret === MASKED_SECRET
               ? 'Hidden — enter new value to change'
               : "OAuth app secret from the provider's developer console. Leave empty to use config.yaml value."
           }
         >
           <TextInput
+            type="password"
             value={clientSecret}
             onChange={(v) => onChange({ [`${idPrefix}ClientSecret`]: v })}
-            placeholder={configured ? '••••••••' : `Enter ${name} Client Secret`}
+            placeholder={configured ? MASKED_SECRET : `Enter ${name} Client Secret`}
             mono
           />
         </Field>
