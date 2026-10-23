@@ -8,11 +8,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"net/mail"
-	"net/smtp"
 	"net/url"
 	"strconv"
 	"strings"
@@ -22,6 +22,7 @@ import (
 	"bedrud/internal/auth"
 	"bedrud/internal/lkutil"
 	"bedrud/internal/models"
+	"bedrud/internal/queue"
 	"bedrud/internal/repository"
 	"bedrud/internal/utils"
 
@@ -246,6 +247,8 @@ type AdminHandler struct {
 	webhookRepo     *repository.WebhookRepository
 	// TODO oncoming feature
 	recordingRepo *repository.RecordingRepository
+	// sendMail delivers the admin test email; tests replace it to avoid a real SMTP server.
+	sendMail func(ctx context.Context, settings queue.SMTPSettings, to, subject, bodyHTML, bodyPlain string) error
 }
 
 func NewAdminHandler(
@@ -254,7 +257,7 @@ func NewAdminHandler(
 	wr *repository.WebhookRepository,
 	rr *repository.RecordingRepository,
 ) *AdminHandler {
-	return &AdminHandler{settingsRepo: sr, inviteTokenRepo: itr, webhookRepo: wr, recordingRepo: rr}
+	return &AdminHandler{settingsRepo: sr, inviteTokenRepo: itr, webhookRepo: wr, recordingRepo: rr, sendMail: queue.SendSMTPMail}
 }
 
 // GetSettings returns effective system settings with secrets masked.
@@ -326,9 +329,9 @@ func (h *AdminHandler) GetPublicSettings(c *fiber.Ctx) error {
 		"chatMessageTTLHours":      s.ChatMessageTTLHours,
 		"chatUploadMaxBytes":       maxBytes,
 		"chatUploadMaxDimension":   maxDim,
-		"recordingsEnabled": s.RecordingsEnabled,
-		"rnnoiseEnabled":    s.RNNoiseEnabled,
-		"krispEnabled":      s.KrispEnabled,
+		"recordingsEnabled":        s.RecordingsEnabled,
+		"rnnoiseEnabled":           s.RNNoiseEnabled,
+		"krispEnabled":             s.KrispEnabled,
 		"webxdc": fiber.Map{
 			"enabled":      webxdcEnabled,
 			"experimental": true,
@@ -838,20 +841,20 @@ func (h *AdminHandler) CreateInviteToken(c *fiber.Ctx) error {
 	return c.Status(201).JSON(token)
 }
 
-// SendTestEmail sends a synchronous test email to verify SMTP configuration end-to-end.
+// SendTestEmail sends a synchronous test email through the active mail configuration.
 // POST /api/admin/settings/send-test-email
 //
 // @Summary Send test email
-// @Description Send a synchronous test email to verify SMTP configuration. Superadmin access required.
+// @Description Send a test email immediately (not queued) through the saved mail configuration — database overrides on config.yaml, the same transport transactional mail uses. Times out after 30s. Superadmin access required.
 // @Tags admin
 // @Accept json
 // @Produce json
 // @Param request body object true "{to: string} - recipient email"
 // @Success 200 {object} map[string]interface{} "Test email sent"
-// @Failure 400 {object} ErrorResponse "Invalid request or SMTP error"
+// @Failure 400 {object} ErrorResponse "Invalid request, mail not configured, or delivery error"
 // @Failure 401 {object} ErrorResponse "Unauthorized"
 // @Failure 403 {object} ErrorResponse "Forbidden"
-// @Failure 408 {object} ErrorResponse "SMTP connection timed out"
+// @Failure 408 {object} ErrorResponse "Mail server did not respond within 30s"
 // @Failure 500 {object} ErrorResponse "Failed to load settings"
 // @Router /admin/settings/send-test-email [post]
 func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
@@ -873,60 +876,6 @@ func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to load settings"})
 	}
 
-	// Build SMTP config from effective settings with fallback to config.yaml
-	smtpHost := effective.EmailSMTPHost
-	smtpPort := effective.EmailSMTPPort
-	username := effective.EmailUsername
-	password := effective.EmailPassword
-	fromAddr := effective.EmailFromAddress
-	fromName := effective.EmailFromName
-	tlsSkip := effective.EmailTLSSkipVerify
-	smtpsMode := effective.EmailSMTPSMode
-
-	// Double-check: if still empty, try config.yaml directly
-	if smtpHost == "" || smtpPort == 0 {
-		if cfg := config.GetSafe(); cfg != nil {
-			if smtpHost == "" {
-				smtpHost = cfg.Email.SMTPHost
-			}
-			if smtpPort == 0 {
-				smtpPort = cfg.Email.SMTPPort
-			}
-			if username == "" {
-				username = cfg.Email.Username
-			}
-			if password == "" {
-				password = cfg.Email.Password
-			}
-			if fromAddr == "" {
-				fromAddr = cfg.Email.FromAddress
-			}
-			if fromName == "" {
-				fromName = cfg.Email.FromName
-			}
-			if !tlsSkip && cfg.Email.TLSSkipVerify {
-				tlsSkip = cfg.Email.TLSSkipVerify
-			}
-			if !smtpsMode && cfg.Email.SMTPSMode {
-				smtpsMode = cfg.Email.SMTPSMode
-			}
-		}
-	}
-
-	if smtpHost == "" || smtpPort == 0 {
-		return c.Status(400).JSON(fiber.Map{"error": "SMTP not configured — set host and port in settings"})
-	}
-
-	if fromAddr == "" {
-		fromAddr = "noreply@bedrud"
-	}
-	if fromName == "" {
-		fromName = effective.EmailInstanceName
-		if fromName == "" {
-			fromName = "Bedrud"
-		}
-	}
-
 	instanceName := effective.EmailInstanceName
 	if instanceName == "" {
 		instanceName = "Bedrud"
@@ -940,37 +889,19 @@ func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
 		instanceName, now,
 	)
 
-	addr := net.JoinHostPort(smtpHost, fmt.Sprint(smtpPort))
-	var auth smtp.Auth
-	if username != "" {
-		auth = smtp.PlainAuth("", username, password, smtpHost)
-	}
-
-	msg := utils.BuildMessage(fromName, fromAddr, input.To, subject, bodyHTML, bodyPlain)
-
-	ctx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
-	defer cancel()
-
-	errCh := make(chan error, 1)
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				errCh <- fmt.Errorf("panic in SendSMTP: %v", r)
-			}
-		}()
-		errCh <- utils.SendSMTP(addr, auth, fromAddr, []string{input.To}, []byte(msg), smtpHost, tlsSkip, smtpsMode)
-	}()
-
-	select {
-	case err := <-errCh:
-		if err != nil {
-			log.Error().Err(err).Str("to", input.To).Msg("Test email send failed")
-			return c.Status(400).JSON(fiber.Map{"error": err.Error()})
-		}
+	// The same transport resolution as queued mail, so a passing test means real mail can be delivered.
+	err = h.sendMail(c.Context(), queue.SMTPSettingsFrom(effective), input.To, subject, bodyHTML, bodyPlain)
+	switch {
+	case err == nil:
 		log.Info().Str("to", input.To).Msg("Test email sent successfully")
 		return c.JSON(fiber.Map{"status": "ok", "message": fmt.Sprintf("Test email sent to %s", input.To)})
-	case <-ctx.Done():
-		return c.Status(408).JSON(fiber.Map{"error": "SMTP connection timed out after 30s"})
+	case errors.Is(err, queue.ErrSMTPTimeout):
+		log.Warn().Err(err).Str("to", input.To).Msg("Test email timed out")
+		return c.Status(408).JSON(fiber.Map{"error": err.Error()})
+	default:
+		// SMTP errors carry the server's reply and the address dialled, never the credentials.
+		log.Error().Err(err).Str("to", input.To).Msg("Test email send failed")
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
 }
 
