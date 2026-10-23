@@ -9,9 +9,11 @@ import (
 	"bedrud/config"
 	"bedrud/internal/models"
 	"bedrud/internal/repository"
+	"bedrud/internal/storage"
 	"bedrud/internal/testutil"
 
 	"github.com/livekit/protocol/livekit"
+	"gorm.io/gorm"
 )
 
 // lkConfig is the config every test that means to reach the room loop needs.
@@ -58,7 +60,7 @@ func assertActive(t *testing.T, roomRepo *repository.RoomRepository, id string, 
 
 func TestInitialize_DoesNotPanic(t *testing.T) {
 	// Initialize should not panic with nil deps
-	Initialize(nil, nil, nil, nil, &config.LiveKitConfig{}, &config.ServerConfig{}, nil, nil)
+	Initialize(nil, nil, nil, nil, &config.LiveKitConfig{}, &config.ServerConfig{}, nil, nil, nil, nil)
 	// Stop should not panic either
 	Stop()
 }
@@ -244,4 +246,112 @@ func TestScheduler_CleanupExpiredRooms_Integration(t *testing.T) {
 	_ = roomRepo.CleanupExpiredRooms()
 
 	assertActive(t, roomRepo, "expired-room", false, "expired room")
+}
+
+// seedChatUpload inserts an upload row created age ago and returns its ID.
+func seedChatUpload(t *testing.T, db *gorm.DB, id string, age time.Duration) string {
+	t.Helper()
+	upload := &models.ChatUpload{
+		ID: id, RoomID: "room-1", UploadedBy: "user-1", FileHash: id, Extension: ".png",
+		FileSize: 100, StorageBackend: "inline", CreatedAt: time.Now().Add(-age),
+	}
+	if err := db.Create(upload).Error; err != nil {
+		t.Fatalf("seed upload %s: %v", id, err)
+	}
+	return id
+}
+
+func setChatMessageTTL(t *testing.T, settingsRepo *repository.SettingsRepository, hours int) {
+	t.Helper()
+	settings, err := settingsRepo.GetSettings()
+	if err != nil {
+		t.Fatalf("load settings: %v", err)
+	}
+	settings.ChatMessageTTLHours = hours
+	if err := settingsRepo.SaveSettings(settings); err != nil {
+		t.Fatalf("save settings: %v", err)
+	}
+}
+
+func uploadExists(t *testing.T, db *gorm.DB, id string) bool {
+	t.Helper()
+	var count int64
+	if err := db.Model(&models.ChatUpload{}).Where("id = ?", id).Count(&count).Error; err != nil {
+		t.Fatalf("count upload %s: %v", id, err)
+	}
+	return count > 0
+}
+
+func TestCleanupExpiredChatUploads_DeletesOnlyPastTTL(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	settingsRepo := repository.NewSettingsRepository(db)
+	tracker := storage.NewChatUploadTracker(db, t.TempDir(), nil)
+	setChatMessageTTL(t, settingsRepo, 24)
+
+	expired := seedChatUpload(t, db, "expired", 48*time.Hour)
+	fresh := seedChatUpload(t, db, "fresh", 1*time.Hour)
+
+	cleanupExpiredChatUploads(settingsRepo, tracker)
+
+	if uploadExists(t, db, expired) {
+		t.Fatal("upload older than the TTL should be deleted")
+	}
+	if !uploadExists(t, db, fresh) {
+		t.Fatal("upload younger than the TTL should remain")
+	}
+}
+
+// The TTL is read on every run, so an admin change applies without a restart.
+func TestCleanupExpiredChatUploads_HonorsTTLChangeBetweenRuns(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	settingsRepo := repository.NewSettingsRepository(db)
+	tracker := storage.NewChatUploadTracker(db, t.TempDir(), nil)
+	upload := seedChatUpload(t, db, "two-days-old", 48*time.Hour)
+
+	setChatMessageTTL(t, settingsRepo, 72)
+	cleanupExpiredChatUploads(settingsRepo, tracker)
+	if !uploadExists(t, db, upload) {
+		t.Fatal("upload within a 72h TTL should remain")
+	}
+
+	setChatMessageTTL(t, settingsRepo, 24)
+	cleanupExpiredChatUploads(settingsRepo, tracker)
+	if uploadExists(t, db, upload) {
+		t.Fatal("upload should be deleted once the TTL drops to 24h")
+	}
+}
+
+func TestCleanupExpiredChatUploads_ZeroTTLKeepsEverything(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	settingsRepo := repository.NewSettingsRepository(db)
+	tracker := storage.NewChatUploadTracker(db, t.TempDir(), nil)
+	setChatMessageTTL(t, settingsRepo, 0)
+	upload := seedChatUpload(t, db, "ancient", 365*24*time.Hour)
+
+	cleanupExpiredChatUploads(settingsRepo, tracker)
+
+	if !uploadExists(t, db, upload) {
+		t.Fatal("a TTL of 0 means keep forever")
+	}
+}
+
+// With no value saved in the database, the config.yaml TTL applies, the same
+// effective value the meeting client receives from the public settings.
+func TestCleanupExpiredChatUploads_FallsBackToConfigTTL(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	settingsRepo := repository.NewSettingsRepository(db)
+	settingsRepo.SetConfig(&config.Config{Chat: config.ChatConfig{MessageTTLHours: 24}})
+	tracker := storage.NewChatUploadTracker(db, t.TempDir(), nil)
+	setChatMessageTTL(t, settingsRepo, 0)
+	upload := seedChatUpload(t, db, "expired", 48*time.Hour)
+
+	cleanupExpiredChatUploads(settingsRepo, tracker)
+
+	if uploadExists(t, db, upload) {
+		t.Fatal("upload older than the config TTL should be deleted")
+	}
+}
+
+func TestCleanupExpiredChatUploads_NilDepsDoNotPanic(t *testing.T) {
+	cleanupExpiredChatUploads(nil, nil)
 }

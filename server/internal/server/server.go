@@ -202,8 +202,6 @@ func Run(configPath, version string) error {
 	auth.SetAccessTokenBlockStore(userRepo)
 	// TODO oncoming feature: recordingStore, scheduler recording cleanup
 	// recordingStore := storage.NewRecordingStore(&cfg.Recording, &cfg.Chat.Uploads.S3)
-	scheduler.Initialize(database.GetDB(), roomRepo, userRepo, recordingRepo, &cfg.LiveKit, &cfg.Server, nil, nil)
-	defer scheduler.Stop()
 	auth.Init(cfg)
 
 	// Load deactivated users into in-memory ban set for fast middleware checks
@@ -354,6 +352,8 @@ func Run(configPath, version string) error {
 	uploadStore := storage.NewChatUploadStore(&cfg.Chat.Uploads)
 	recordingStore := storage.NewRecordingStore(&cfg.Recording, &cfg.Chat.Uploads.S3)
 	uploadTracker := storage.NewChatUploadTracker(database.GetDB(), uploadDir, s3Deleter)
+	scheduler.Initialize(database.GetDB(), roomRepo, userRepo, recordingRepo, &cfg.LiveKit, &cfg.Server, nil, nil, settingsRepo, uploadTracker)
+	defer scheduler.Stop()
 	lkClient := lkutil.NewClient(&cfg.LiveKit)
 	// TODO oncoming feature: egress client, recording service, recording HTTP routes
 	// egressClient, err := lkutil.NewEgressClient(&cfg.LiveKit)
