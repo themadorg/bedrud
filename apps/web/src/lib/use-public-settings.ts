@@ -1,5 +1,6 @@
 // TODO oncoming feature
 import { api } from '#/lib/api'
+import type { WelcomeSoundLimits } from '#/lib/welcome-sound'
 
 export interface PublicSettings {
   serverName: string
@@ -21,6 +22,8 @@ export interface PublicSettings {
   rnnoiseEnabled?: boolean
   /** Admin enabled Krisp for this instance (users may then select it). Default false. */
   krispEnabled?: boolean
+  /** Profile welcome sounds: the admin switch and the upload limits. Off by default. */
+  welcomeSound?: { enabled: boolean } & WelcomeSoundLimits
 }
 
 let cached: PublicSettings | null = null
