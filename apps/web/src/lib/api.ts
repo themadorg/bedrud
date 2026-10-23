@@ -1,4 +1,4 @@
-import { currentRememberMode, useAuthStore } from './auth.store'
+import { currentRememberMode, refusesSession, useAuthStore } from './auth.store'
 
 // In dev, leave BASE_URL empty so requests go to /api/... and Vite's proxy
 // forwards them to localhost:7071 — no CORS. In production, set VITE_API_URL
@@ -34,6 +34,25 @@ export class ApiError extends Error {
   }
 }
 
+/** Marks a request that never reached the server, in place of the browser's own wording, which differs per engine. */
+export class NetworkError extends Error {
+  constructor() {
+    super("Couldn't reach the server")
+    this.name = 'NetworkError'
+  }
+}
+
+/** Sends a request, reporting a failure to reach the server as a NetworkError. */
+async function send(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init)
+  } catch (error) {
+    // An aborted request stays an abort, so a caller that cancelled it can still tell.
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    throw new NetworkError()
+  }
+}
+
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') return null
   // Try meta tag first (server-rendered pages)
@@ -51,15 +70,25 @@ type RequestOptions = Omit<RequestInit, 'body'> & { body?: unknown }
 // instead of hammering the /refresh endpoint in parallel.
 let refreshPromise: Promise<string | null> | null = null
 
+/**
+ * Returns the new access token, or null when the server refuses the session.
+ *
+ * A refresh that never reaches the server, or meets a server error, a timeout or rate limiting,
+ * throws instead: those say nothing about the session, so the caller fails without signing out.
+ */
 async function doRefresh(): Promise<string | null> {
+  const res = await send(`${BASE_URL}/api/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', // HTTP-only refresh_token cookie is sent automatically
+  })
+  if (!res.ok) {
+    if (refusesSession(res.status)) return null
+    throw new ApiError(res.status, await res.text(), null, `Request failed with status ${res.status}`)
+  }
   try {
-    const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include', // HTTP-only refresh_token cookie is sent automatically
-    })
-    if (!res.ok) return null
-    const data = (await res.json()) as { access_token: string; refresh_token: string }
+    const data = (await res.json()) as { access_token?: string; refresh_token?: string }
+    if (!data.access_token || !data.refresh_token) return null
     // Preserve the storage the session already uses. Omitting this promotes a
     // session-only login into localStorage on the first refresh.
     useAuthStore.getState().setTokens(
@@ -71,6 +100,7 @@ async function doRefresh(): Promise<string | null> {
     )
     return data.access_token
   } catch {
+    // A success without a readable token pair cannot continue the session.
     return null
   }
 }
@@ -103,7 +133,7 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
     }
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await send(`${BASE_URL}${path}`, {
     ...options,
     headers,
     credentials: 'include', // always send HTTP-only cookies

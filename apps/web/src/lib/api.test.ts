@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, api } from './api'
+import { ApiError, api, NetworkError } from './api'
 import { useAuthStore } from './auth.store'
 
 /**
@@ -196,12 +196,16 @@ describe('401 handling', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('clears the session and redirects when the refresh fails', async () => {
+  // 400 no token, 401 expired or revoked, 403 an account that can no longer sign in, 409 a token
+  // a racing refresh already rotated: each is the server refusing the session.
+  it.each([
+    400, 401, 403, 409,
+  ])('clears the session and redirects when the server refuses the refresh with %i', async (status) => {
     useAuthStore.setState({ tokens: { accessToken: 'stale', refreshToken: 'rt-1' } })
     localStorage.setItem('auth_at', 'stale')
 
     const fetchMock = vi.fn(async (url: string) =>
-      url.endsWith('/api/auth/refresh') ? reply(401, '') : reply(401, '{"error":"expired"}'),
+      url.endsWith('/api/auth/refresh') ? reply(status, '') : reply(401, '{"error":"expired"}'),
     )
     vi.stubGlobal('fetch', fetchMock)
 
@@ -210,6 +214,53 @@ describe('401 handling', () => {
     expect(useAuthStore.getState().tokens).toBeNull()
     expect(localStorage.getItem('auth_at')).toBeNull()
     expect(replace).toHaveBeenCalledWith('/auth')
+  })
+
+  it('clears the session when a successful refresh carries no token', async () => {
+    useAuthStore.setState({ tokens: { accessToken: 'stale', refreshToken: 'rt-1' } })
+
+    const fetchMock = vi.fn(async (url: string) =>
+      url.endsWith('/api/auth/refresh') ? ok({}) : reply(401, '{"error":"expired"}'),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(api.get('/api/rooms')).rejects.toThrow('Session expired')
+
+    expect(useAuthStore.getState().tokens).toBeNull()
+    expect(replace).toHaveBeenCalledWith('/auth')
+  })
+
+  it('keeps the session when the refresh never reaches the server', async () => {
+    useAuthStore.setState({ tokens: { accessToken: 'stale', refreshToken: 'rt-1' } })
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith('/api/auth/refresh')) throw new TypeError('Failed to fetch')
+      return reply(401, '{"error":"expired"}')
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    // The call fails as the network failure it is, not as an expired session.
+    await expect(api.get('/api/rooms')).rejects.toThrow(NetworkError)
+
+    expect(useAuthStore.getState().tokens?.accessToken).toBe('stale')
+    expect(replace).not.toHaveBeenCalled()
+  })
+
+  // A server error, a timeout and rate limiting say nothing about the refresh token itself.
+  it.each([408, 429, 500, 503])('keeps the session when the refresh meets %i', async (status) => {
+    useAuthStore.setState({ tokens: { accessToken: 'stale', refreshToken: 'rt-1' } })
+
+    const fetchMock = vi.fn(async (url: string) =>
+      url.endsWith('/api/auth/refresh') ? reply(status, 'try later') : reply(401, '{"error":"expired"}'),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const error = await api.get('/api/rooms').catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).status).toBe(status)
+    expect(useAuthStore.getState().tokens?.accessToken).toBe('stale')
+    expect(replace).not.toHaveBeenCalled()
   })
 
   it('shares a single refresh across concurrent 401s', async () => {
@@ -285,6 +336,18 @@ describe('error responses', () => {
     expect(apiError.body).toBe('{"error":"forbidden","code":7}')
     expect(apiError.parsedBody).toEqual({ error: 'forbidden', code: 7 })
     expect(apiError.name).toBe('ApiError')
+  })
+
+  it('reports a request that never reaches the server as a NetworkError', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+
+    // The browser's own text differs per engine and is not for the reader.
+    await expect(api.get('/api/rooms')).rejects.toThrow(NetworkError)
   })
 
   it('leaves parsedBody null when the body is not JSON', async () => {

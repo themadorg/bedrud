@@ -39,6 +39,14 @@ export function currentRememberMode(): boolean | 'ephemeral' {
   return true
 }
 
+// A timeout and rate limiting are 4xx statuses that say nothing about the session.
+const TRANSIENT_CLIENT_STATUSES = new Set([408, 429])
+
+/** Reports whether a failed auth status is the server refusing the session rather than a passing failure. */
+export function refusesSession(status: number): boolean {
+  return status >= 400 && status < 500 && !TRANSIENT_CLIENT_STATUSES.has(status)
+}
+
 const _init = { promise: null as Promise<void> | null }
 
 export const useAuthStore = create<AuthStore>()((set, get) => ({
@@ -87,6 +95,9 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
 
     _init.promise = (async () => {
       const wasRemembered = Boolean(localStorage.getItem(REMEMBER_KEY)) || Boolean(sessionStorage.getItem(REMEMBER_KEY))
+      // Set when a check never reached the server or met a failure that says nothing about the
+      // session, so an installed app opened offline or during an outage keeps its sign-in.
+      let unreachable = false
 
       // Try cookie-based refresh first (primary path).
       // Always attempt this — email verification sets cookies but not REMEMBER_KEY.
@@ -103,8 +114,10 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
           set({ initialized: true })
           return
         }
+        if (!refusesSession(res.status)) unreachable = true
       } catch {
         // Network error — fall through to persisted token
+        unreachable = true
       }
 
       // Fallback: use the persisted access token (only if user was previously logged in).
@@ -122,13 +135,21 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
               set({ initialized: true })
               return
             }
+            if (!refusesSession(meRes.status)) unreachable = true
           } catch {
-            // Token expired — fall through to clear
+            unreachable = true
+          }
+
+          // Nothing refused the session, so it stands until a request the server answers says otherwise.
+          if (unreachable) {
+            get().setTokens({ accessToken: persistedAT, refreshToken: null }, currentRememberMode())
+            set({ initialized: true })
+            return
           }
         }
       }
 
-      // Both paths failed — clear session
+      // The server refused every path, or there was no session to restore — clear session
       get().clear()
       set({ initialized: true })
     })().finally(() => {

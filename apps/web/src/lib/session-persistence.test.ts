@@ -155,6 +155,37 @@ describe('initialize', () => {
     expect(useAuthStore.getState().initialized).toBe(true)
   })
 
+  it('keeps the persisted session when the server cannot be reached', async () => {
+    useAuthStore.getState().setTokens({ accessToken: 'persisted', refreshToken: null })
+    useAuthStore.setState({ tokens: null }) // simulate an installed app opened offline
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+
+    await useAuthStore.getState().initialize()
+
+    expect(useAuthStore.getState().tokens?.accessToken).toBe('persisted')
+    expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBe('persisted')
+    expect(useAuthStore.getState().initialized).toBe(true)
+  })
+
+  it('keeps the persisted session when the server answers with errors that say nothing about it', async () => {
+    useAuthStore.getState().setTokens({ accessToken: 'persisted', refreshToken: null })
+    useAuthStore.setState({ tokens: null }) // simulate a fresh page load during an outage
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => reply(503, 'unavailable')),
+    )
+
+    await useAuthStore.getState().initialize()
+
+    expect(useAuthStore.getState().tokens?.accessToken).toBe('persisted')
+    expect(useAuthStore.getState().initialized).toBe(true)
+  })
+
   it('does not try the persisted-token path for someone who was never signed in', async () => {
     // Typed so mock.calls carries the url, which the assertion below reads.
     const fetchMock = vi.fn<(url: string) => Promise<Response>>(async () => reply(401, ''))
