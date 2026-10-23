@@ -30,6 +30,7 @@ import {
 } from '#/lib/meeting-debug-log'
 import { readMeetingDeviceId } from '#/lib/meeting-device-storage'
 import { useRecentRoomsStore } from '#/lib/recent-rooms.store'
+import { getPublicSettings } from '#/lib/use-public-settings'
 import { usePinnedParticipants } from '#/lib/usePinnedParticipants'
 import { isGuestUser, useUserStore } from '#/lib/user.store'
 import { useVideoPreferencesStore } from '#/lib/video-preferences.store'
@@ -241,6 +242,10 @@ function MeetingPage() {
   // null = waiting to decide, '' = authenticated (skip dialog), string = confirmed guest name
   const [guestName, setGuestName] = useState<string | null>(null)
   const [guestInput, setGuestInput] = useState('')
+  // null while the public settings load, so the guest form never flashes on a closed instance.
+  const [guestJoinPolicy, setGuestJoinPolicy] = useState<{ blocked: boolean; registrationEnabled: boolean } | null>(
+    null,
+  )
   const [wasKicked, setWasKicked] = useState(false)
   const [wasRoomDeleted, setWasRoomDeleted] = useState(false)
   const [archivedRoom, setArchivedRoom] = useState<{
@@ -304,6 +309,27 @@ function MeetingPage() {
     setGuestName(tokens ? '' : null)
     setMounted(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokens])
+
+  // Mirrors the server's guest-join policy; invite-only instances still accept guests.
+  useEffect(() => {
+    if (tokens) return
+    let cancelled = false
+    getPublicSettings()
+      .then((settings) => {
+        if (cancelled) return
+        setGuestJoinPolicy({
+          blocked: !settings.registrationEnabled || !settings.guestLoginEnabled,
+          registrationEnabled: settings.registrationEnabled,
+        })
+      })
+      .catch(() => {
+        // The server still enforces the policy, so an unreadable settings response keeps the form.
+        if (!cancelled) setGuestJoinPolicy({ blocked: false, registrationEnabled: true })
+      })
+    return () => {
+      cancelled = true
+    }
   }, [tokens])
 
   // Audio preferences — derive MediaTrackConstraints from stored settings
@@ -562,8 +588,8 @@ function MeetingPage() {
         .catch((err: Error) => {
           if (!cancelledRef.current) setJoinError(err.message)
         })
-    } else if (guestName !== null && guestName !== '') {
-      // Guest with confirmed name
+    } else if (guestJoinPolicy?.blocked === false && guestName !== null && guestName !== '') {
+      // Guest with confirmed name, on an instance that accepts guests
       api
         .post<JoinResponse>('/api/room/guest-join', { roomName: meetId, guestName })
         .then((data) => {
@@ -582,7 +608,7 @@ function MeetingPage() {
           if (!cancelledRef.current) setJoinError(err.message)
         })
     }
-  }, [meetId, tokens, guestName, joinData, addRecent])
+  }, [meetId, tokens, guestName, guestJoinPolicy, joinData, addRecent])
 
   // Still on server or waiting for client mount — show neutral spinner to avoid SSR flash
   if (!mounted) {
@@ -593,6 +619,42 @@ function MeetingPage() {
   // Guard with mounted to avoid SSR flash — localStorage unavailable on server,
   // so guestName is always null and tokens always null during SSR.
   if (mounted && !tokens && guestName === null) {
+    if (guestJoinPolicy === null) {
+      return <MeetLoadingScreen />
+    }
+    if (guestJoinPolicy.blocked) {
+      return (
+        <div className="meet-room app-fixed-viewport flex items-center justify-center bg-[var(--meet-bg)]">
+          <div className="meet-prejoin-panel flex flex-col gap-5">
+            <div>
+              <p className="m-0 text-[17px] font-semibold text-[var(--meet-fg)]">Guest access is disabled</p>
+              <p className="m-0 mt-1.5 text-[13px] text-[var(--meet-fg-muted)]">
+                Sign in to join <span className="text-[var(--meet-btn-muted-fg)]">{meetId}</span>
+              </p>
+            </div>
+            <div className="flex gap-2.5">
+              <Button
+                type="button"
+                onClick={() => navigate({ to: '/auth/login', search: { redirect: `/m/${meetId}` } })}
+                className="flex-1 rounded-lg py-2.5"
+              >
+                Sign in
+              </Button>
+              {guestJoinPolicy.registrationEnabled ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate({ to: '/auth/register' })}
+                  className="rounded-lg border-[var(--meet-border)] px-3.5 py-2.5 text-[13px] text-[var(--meet-fg-muted)]"
+                >
+                  Sign up
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="meet-room app-fixed-viewport flex items-center justify-center bg-[var(--meet-bg)]">
         <div className="meet-prejoin-panel flex flex-col gap-5">
