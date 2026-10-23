@@ -453,6 +453,7 @@ func (h *RoomHandler) JoinRoom(c *fiber.Ctx) error {
 				"status":   "archived_owned",
 				"name":     room.Name,
 				"mode":     room.Mode,
+				"isPublic": room.IsPublic,
 				"settings": room.Settings,
 			})
 		}
