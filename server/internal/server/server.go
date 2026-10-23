@@ -380,14 +380,14 @@ func Run(configPath, version string) error {
 		queueConcurrency = 1
 	}
 	queueWorker := queue.NewWorker(database.GetDB(), map[string]queue.Handler{
-		"user_delete":        queue.NewUserDeleteHandler(cleanupSvc, userRepo, passkeyRepo, prefsRepo, roomRepo),
-		"room_delete":        queue.NewRoomDeleteHandler(cleanupSvc, roomRepo),
-		"room_suspend":       queue.NewRoomSuspendHandler(cleanupSvc, roomRepo),
-		"chat_upload_s3":     queue.NewChatUploadS3Handler(uploadStore, uploadTracker),
-		"send_email":         queue.NewSendEmailHandler(&cfg.Email),
-		"dispatch_webhook":   queue.NewDispatchWebhookHandler(),
-		"process_recording":  queue.NewProcessRecordingHandler(recordingRepo, webhookRepo, cfg.LiveKit.Host, cfg.LiveKit.InternalHost, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, recordingStore),
-		"recording_delete":   queue.NewRecordingDeleteHandler(recordingRepo),
+		"user_delete":       queue.NewUserDeleteHandler(cleanupSvc, userRepo, passkeyRepo, prefsRepo, roomRepo),
+		"room_delete":       queue.NewRoomDeleteHandler(cleanupSvc, roomRepo),
+		"room_suspend":      queue.NewRoomSuspendHandler(cleanupSvc, roomRepo),
+		"chat_upload_s3":    queue.NewChatUploadS3Handler(uploadStore, uploadTracker),
+		"send_email":        queue.NewSendEmailHandler(&cfg.Email),
+		"dispatch_webhook":  queue.NewDispatchWebhookHandler(),
+		"process_recording": queue.NewProcessRecordingHandler(recordingRepo, webhookRepo, cfg.LiveKit.Host, cfg.LiveKit.InternalHost, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, recordingStore),
+		"recording_delete":  queue.NewRecordingDeleteHandler(recordingRepo),
 	}, queue.WorkerOptions{
 		Interval:    time.Duration(cfg.Queue.PollInterval.Int64()) * time.Millisecond,
 		Concurrency: queueConcurrency,
@@ -473,7 +473,6 @@ func Run(configPath, version string) error {
 	api.Put("/room/:roomId/settings", append(requireAuthMut, middleware.RejectGuest(), roomHandler.UpdateSettings)...)
 	api.Delete("/room/:roomId", append(requireAuthMut, middleware.RejectGuest(), roomHandler.DeleteRoom)...)
 	api.Post("/room/:roomId/chat/upload", append(requireAuthMut, middleware.APIRateLimiter(cfg.RateLimit), roomHandler.UploadChatImage)...)
-
 
 	// TODO oncoming feature: recording routes
 	// api.Post("/rooms/:id/recording/start", ...)
@@ -776,8 +775,14 @@ func serveListeners(app *fiber.App, cfg *config.Config) error {
 		port = "8080"
 	}
 	addr := cfg.Server.ListenAddr(port)
+	// Listens on "tcp" rather than app.Listen, whose default network is tcp4, so
+	// ":port" accepts both IPv4 and IPv6 like the TLS paths above.
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("HTTP listener failed on %s: %w", addr, utils.BindError(addr, err))
+	}
 	log.Info().Msgf("➜ Bedrud is running on HTTP %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, port), addr)
-	if err := app.Listen(addr); err != nil {
+	if err := app.Listener(ln); err != nil {
 		return fmt.Errorf("HTTP listener failed on %s: %w", addr, utils.BindError(addr, err))
 	}
 	return nil
