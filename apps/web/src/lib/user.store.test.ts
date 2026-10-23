@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyProfileUpdate, canOpenAdmin, type ServerUser, toUser } from '#/lib/user.store'
+import { applyProfileUpdate, canOpenAdmin, hasPassword, type ServerUser, toUser, type User } from '#/lib/user.store'
 
 const serverUser: ServerUser = {
   id: 'user-1',
@@ -9,6 +9,10 @@ const serverUser: ServerUser = {
   accesses: ['user'],
   avatarUrl: '/avatar.png',
   passwordChangedAt: null,
+}
+
+function userWith(overrides: Partial<User>): User {
+  return { ...toUser(serverUser), ...overrides }
 }
 
 describe('toUser', () => {
@@ -58,6 +62,20 @@ describe('applyProfileUpdate', () => {
 
   it('should map the update alone when no user is stored', () => {
     expect(applyProfileUpdate(null, serverUser)).toEqual(toUser(serverUser))
+  })
+})
+
+describe('hasPassword', () => {
+  it('should return false for a passkey account that never set a password', () => {
+    expect(hasPassword(userWith({ provider: 'passkey', passwordChangedAt: null }))).toBe(false)
+  })
+
+  it('should return true for a passkey account once a password is stamped', () => {
+    expect(hasPassword(userWith({ provider: 'passkey', passwordChangedAt: '2026-10-20T10:00:00Z' }))).toBe(true)
+  })
+
+  it('should return true for an email account that never changed its password', () => {
+    expect(hasPassword(userWith({ provider: 'local', passwordChangedAt: null }))).toBe(true)
   })
 })
 

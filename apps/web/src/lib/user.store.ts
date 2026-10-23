@@ -47,6 +47,14 @@ export function applyProfileUpdate(current: User | null, updated: ServerUser): U
   return user
 }
 
+/**
+ * A passkey account starts without a password; setting one stamps `passwordChangedAt`.
+ * Every other account that can hold a password was created with one.
+ */
+export function hasPassword(user: User): boolean {
+  return user.provider !== 'passkey' || Boolean(user.passwordChangedAt)
+}
+
 /** The server's `/admin` group answers superadmins only. */
 export function canOpenAdmin(user: User | null | undefined): boolean {
   return user?.isSuperAdmin ?? false

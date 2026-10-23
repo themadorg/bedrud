@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import { api } from '#/lib/api'
 import { useAuthStore } from '#/lib/auth.store'
 import { changePasswordAndSignBackIn } from '#/lib/change-password'
-import { toUser, useUserStore } from '#/lib/user.store'
+import { hasPassword, toUser, useUserStore } from '#/lib/user.store'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -126,11 +126,12 @@ export function SecuritySettingsPanel() {
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const isOAuthOnly = user?.provider && !['local', 'passkey'].includes(user.provider)
+  const passwordIsSet = user ? hasPassword(user) : true
 
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
-    const currentPassword = fd.get('currentPassword') as string
+    const currentPassword = (fd.get('currentPassword') as string | null) ?? ''
     const newPassword = fd.get('newPassword') as string
     const confirmPassword = fd.get('confirmPassword') as string
 
@@ -173,7 +174,9 @@ export function SecuritySettingsPanel() {
       <Card>
         <CardHeader className="border-b px-5 py-3">
           <CardTitle className="text-sm font-semibold">Password</CardTitle>
-          <CardDescription className="text-xs text-muted-foreground">Change your account password</CardDescription>
+          <CardDescription className="text-xs text-muted-foreground">
+            {passwordIsSet ? 'Change your account password' : 'Set a password to also sign in with your email'}
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-5">
           {isOAuthOnly ? (
@@ -186,20 +189,22 @@ export function SecuritySettingsPanel() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="currentPassword" className="text-xs font-medium text-muted-foreground">
-                  Current password
-                </Label>
-                <Input
-                  id="currentPassword"
-                  name="currentPassword"
-                  type="password"
-                  placeholder="••••••••"
-                  required
-                  onChange={() => setStatus(null)}
-                  className="h-9 text-sm"
-                />
-              </div>
+              {passwordIsSet && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="currentPassword" className="text-xs font-medium text-muted-foreground">
+                    Current password
+                  </Label>
+                  <Input
+                    id="currentPassword"
+                    name="currentPassword"
+                    type="password"
+                    placeholder="••••••••"
+                    required
+                    onChange={() => setStatus(null)}
+                    className="h-9 text-sm"
+                  />
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label htmlFor="newPassword" className="text-xs font-medium text-muted-foreground">
                   New password
@@ -231,7 +236,7 @@ export function SecuritySettingsPanel() {
               {status && <Alert {...status} />}
               <Button type="submit" variant="default" size="sm" disabled={isLoading} className="gap-1.5">
                 {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Lock className="h-3 w-3" />}
-                Update password
+                {passwordIsSet ? 'Update password' : 'Set password'}
               </Button>
             </form>
           )}
@@ -250,7 +255,9 @@ export function SecuritySettingsPanel() {
           </div>
           <div className="flex items-center justify-between py-3">
             <span className="text-xs text-muted-foreground">Password</span>
-            <span className="text-xs font-medium">{isOAuthOnly ? 'Managed by provider' : 'Set'}</span>
+            <span className="text-xs font-medium">
+              {isOAuthOnly ? 'Managed by provider' : passwordIsSet ? 'Set' : 'Not set'}
+            </span>
           </div>
           <div className="flex items-center justify-between py-3 last:pb-0">
             <span className="text-xs text-muted-foreground">Two-factor auth</span>
