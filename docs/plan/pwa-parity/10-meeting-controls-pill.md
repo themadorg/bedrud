@@ -30,7 +30,8 @@ What that changes below:
   ([#162](https://github.com/themadorg/bedrud/issues/162)). It stays a plain button with a 48px
   target, because the pill is not a drawer.
 - **The gesture** is a tap on the handle. Scrim, drag-down and Escape are the sheet's. Android also
-  opens the sheet on a swipe up the bar; the web does not.
+  opens the sheet on a swipe up the bar; the web does not yet, tracked in
+  [#213](https://github.com/themadorg/bedrud/issues/213).
 - **The panel's scroll cap, the expand and collapse durations, `--meet-scrim` and
   `--meet-controls-panel-max-height`** are gone. The sheet takes its ceiling from
   `--meet-sheet-max-height`, which leaves one height token
