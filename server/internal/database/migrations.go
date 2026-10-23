@@ -3,11 +3,53 @@ package database
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"bedrud/internal/models"
 
 	"github.com/rs/zerolog/log"
+	"gorm.io/gorm"
 )
+
+// activeRoomNameIndexError explains why idx_rooms_active_name could not be
+// created. The usual cause is data, not schema: two active rooms already share
+// a name. Those rooms are listed, newest first, so an operator can pick the one
+// to keep and deactivate the rest. The query is raw so soft-deleted rows, which
+// the index still covers, are not hidden by GORM's default scope.
+func activeRoomNameIndexError(db *gorm.DB, createErr error) error {
+	var rows []struct {
+		ID   string
+		Name string
+	}
+	if err := db.Raw(`
+		SELECT id, name FROM rooms
+		WHERE is_active = ? AND name IN (
+			SELECT name FROM rooms WHERE is_active = ? GROUP BY name HAVING COUNT(*) > 1
+		)
+		ORDER BY name, created_at DESC`, true, true).Scan(&rows).Error; err != nil || len(rows) == 0 {
+		return fmt.Errorf("create unique index idx_rooms_active_name: %w", createErr)
+	}
+
+	idsByName := map[string][]string{}
+	var names []string
+	for _, row := range rows {
+		if _, seen := idsByName[row.Name]; !seen {
+			names = append(names, row.Name)
+		}
+		idsByName[row.Name] = append(idsByName[row.Name], row.ID)
+	}
+	var duplicates []string
+	for _, name := range names {
+		duplicates = append(duplicates, fmt.Sprintf("%q (room ids, newest first: %s)", name, strings.Join(idsByName[name], ", ")))
+	}
+
+	return fmt.Errorf(
+		"create unique index idx_rooms_active_name: more than one active room shares a name: %s; "+
+			"keep one active room per name and deactivate the others "+
+			"(UPDATE rooms SET is_active = false WHERE id IN (...)), then start again: %w",
+		strings.Join(duplicates, "; "), createErr,
+	)
+}
 
 // RunMigrations performs all database migrations
 func RunMigrations() error {
@@ -77,17 +119,20 @@ func RunMigrations() error {
 	// Partial unique index: only active rooms must have unique names.
 	// Inactive (idle) and archived (soft-deleted) rooms allow name reuse.
 	// DB-level enforcement alongside app-level check in repository.
+	//
+	// Migration fails rather than continuing without it: the index is the only
+	// thing that makes two active rooms with one name impossible.
 	idxName := "idx_rooms_active_name"
 	if db.Dialector.Name() == DBTypeSQLite {
 		if !db.Migrator().HasIndex(&models.Room{}, idxName) {
 			if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_rooms_active_name ON rooms(name) WHERE is_active = 1").Error; err != nil {
-				log.Warn().Err(err).Msg("Failed to create partial unique index for active room names")
+				return activeRoomNameIndexError(db, err)
 			}
 		}
 	} else if db.Dialector.Name() == DBTypePostgres {
 		if !db.Migrator().HasIndex(&models.Room{}, idxName) {
 			if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_rooms_active_name ON rooms(name) WHERE is_active = true").Error; err != nil {
-				log.Warn().Err(err).Msg("Failed to create partial unique index for active room names")
+				return activeRoomNameIndexError(db, err)
 			}
 		}
 	}

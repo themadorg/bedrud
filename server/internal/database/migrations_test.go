@@ -333,6 +333,69 @@ func TestRunMigrations_PartialIndexRejectsDuplicateActiveRoomNames(t *testing.T)
 	}
 }
 
+// An existing database can already hold two active rooms with one name, from
+// before the partial index existed or from a run where creating it failed.
+// The index cannot be built over that data, and carrying on without it leaves
+// active-name uniqueness unenforced, so migration has to stop.
+func TestRunMigrations_FailsWhenActiveRoomNamesAreAlreadyDuplicated(t *testing.T) {
+	for _, d := range dialects() {
+		t.Run(d.name, func(t *testing.T) {
+			db := d.open(t)
+
+			// The schema as it stands without the partial index.
+			if err := db.AutoMigrate(&models.User{}, &models.Room{}); err != nil {
+				t.Fatalf("build schema without the partial index: %v", err)
+			}
+			seedOwner(t, db)
+			if err := db.Create(newRoom("standup")).Error; err != nil {
+				t.Fatalf("first active room: %v", err)
+			}
+			duplicate := newRoom("standup")
+			duplicate.ID = "standup-duplicate"
+			if err := db.Create(duplicate).Error; err != nil {
+				t.Fatalf("second active room (no index yet): %v", err)
+			}
+
+			err := RunMigrations()
+			if err == nil {
+				t.Fatal("RunMigrations succeeded over duplicate active room names; the database is running without idx_rooms_active_name")
+			}
+			if !strings.Contains(err.Error(), "standup") {
+				t.Errorf("error should name the duplicated room so an operator can fix the data, got: %v", err)
+			}
+			if db.Migrator().HasIndex(&models.Room{}, "idx_rooms_active_name") {
+				t.Error("idx_rooms_active_name exists over duplicate active names")
+			}
+		})
+	}
+}
+
+// Only active rooms compete for a name: an archived room sharing an active
+// room's name is the normal state after a name is reused, not a conflict.
+func TestRunMigrations_AllowsInactiveRoomSharingAnActiveName(t *testing.T) {
+	for _, d := range dialects() {
+		t.Run(d.name, func(t *testing.T) {
+			db := d.open(t)
+
+			if err := db.AutoMigrate(&models.User{}, &models.Room{}); err != nil {
+				t.Fatalf("build schema without the partial index: %v", err)
+			}
+			seedOwner(t, db)
+			seedArchivedRoom(t, db, "standup-archived", "standup")
+			if err := db.Create(newRoom("standup")).Error; err != nil {
+				t.Fatalf("active room: %v", err)
+			}
+
+			if err := RunMigrations(); err != nil {
+				t.Fatalf("RunMigrations with one active and one archived room sharing a name: %v", err)
+			}
+			if !db.Migrator().HasIndex(&models.Room{}, "idx_rooms_active_name") {
+				t.Error("idx_rooms_active_name missing after migration")
+			}
+		})
+	}
+}
+
 // The isolation the Postgres helper depends on: every connection in the pool
 // must land in the test's own schema, not just the first one. Opens a second
 // connection explicitly, because a connection that never ran SET search_path
