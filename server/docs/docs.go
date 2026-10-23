@@ -6454,6 +6454,11 @@ const docTemplate = `{
                 "provider": {
                     "type": "string",
                     "example": "local"
+                },
+                "welcomeSoundUrl": {
+                    "description": "WelcomeSoundURL is only filled on the detail view, where an admin can clear it.",
+                    "type": "string",
+                    "example": "/uploads/welcome-sounds/123e4567-e89b-12d3-a456-426614174000.mp3?v=1"
                 }
             }
         },
@@ -6965,6 +6970,10 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "allowVideo": {
+                    "type": "boolean"
+                },
+                "allowWelcomeSounds": {
+                    "description": "AllowWelcomeSounds lets the host turn profile welcome sounds off for this room.\nEmpty means allowed, so clients that do not know the field never switch it off.",
                     "type": "boolean"
                 },
                 "e2ee": {
