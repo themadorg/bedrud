@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { api } from '#/lib/api'
 import { getErrorMessage } from '#/lib/errors'
 import { cn } from '#/lib/utils'
@@ -100,12 +100,13 @@ export function Toggle({
   label: string
   hint?: string
 }) {
+  const switchId = useId()
   return (
     <div>
-      <span className="flex cursor-pointer items-center gap-2">
-        <Switch checked={checked} onCheckedChange={onChange} />
+      <label htmlFor={switchId} className="flex cursor-pointer items-center gap-2">
+        <Switch id={switchId} checked={checked} onCheckedChange={onChange} />
         <span className="text-xs">{label}</span>
-      </span>
+      </label>
       {hint && <p className="mt-0.5 text-[10px] text-muted-foreground/60">{hint}</p>}
     </div>
   )
