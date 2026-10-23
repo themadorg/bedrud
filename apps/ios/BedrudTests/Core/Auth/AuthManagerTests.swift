@@ -70,7 +70,7 @@ final class AuthManagerTests: XCTestCase {
         keychain["test-instance_access_token"] = token
         keychain["test-instance_refresh_token"] = "refresh-token"
 
-        let userData = try! JSONEncoder().encode(User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: nil))
+        let userData = try! JSONEncoder().encode(User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: nil))
         keychain["test-instance_user_data"] = String(data: userData, encoding: .utf8)
 
         // Mock the /auth/me call
@@ -84,6 +84,30 @@ final class AuthManagerTests: XCTestCase {
         XCTAssertTrue(manager.isAuthenticated)
         XCTAssertNotNil(manager.currentUser)
         XCTAssertEqual(manager.currentUser?.id, "u1")
+    }
+
+    func testRestoreSessionUpgradesLegacyCachedUserToSuperadmin() async throws {
+        keychain["test-instance_access_token"] = fakeJWT()
+        keychain["test-instance_refresh_token"] = "refresh"
+        // Users cached before accesses existed carry only an isAdmin flag.
+        keychain["test-instance_user_data"] = #"{"id":"u1","email":"a@b.com","name":"Alice","isAdmin":false}"#
+
+        MockURLProtocol.requestHandler = { request in
+            let meJSON = #"{"id":"u1","email":"a@b.com","name":"Alice","accesses":["superadmin","user"]}"#
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, meJSON.data(using: .utf8)!)
+        }
+
+        let manager = makeAuthManager()
+        XCTAssertFalse(manager.currentUser?.isAdmin == true, "The legacy cache carries no accesses")
+
+        // Poll for the background /auth/me task to replace the cached user.
+        for _ in 0..<20 {
+            if manager.currentUser?.isAdmin == true { break }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+
+        XCTAssertTrue(manager.currentUser?.isAdmin == true)
     }
 
     // MARK: - Login
@@ -110,10 +134,62 @@ final class AuthManagerTests: XCTestCase {
         XCTAssertEqual(keychain["test-instance_refresh_token"], "new-refresh")
     }
 
+    func testLoginReadsSuperadminFromAccesses() async throws {
+        MockURLProtocol.requestHandler = { request in
+            let responseJSON = """
+            {
+                "tokens": {"accessToken": "at", "refreshToken": "rt"},
+                "user": {"id": "u1", "email": "a@b.com", "name": "Alice", "avatarUrl": "", "accesses": ["superadmin", "user"]}
+            }
+            """
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, responseJSON.data(using: .utf8)!)
+        }
+
+        let manager = makeAuthManager()
+        let user = try await manager.login(email: "a@b.com", password: "pass")
+
+        XCTAssertTrue(user.isAdmin)
+    }
+
+    func testLoginWithAdminAccessIsNotAdmin() async throws {
+        MockURLProtocol.requestHandler = { request in
+            let responseJSON = """
+            {
+                "tokens": {"accessToken": "at", "refreshToken": "rt"},
+                "user": {"id": "u1", "email": "a@b.com", "name": "Alice", "avatarUrl": "", "accesses": ["admin", "moderator", "user"]}
+            }
+            """
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, responseJSON.data(using: .utf8)!)
+        }
+
+        let manager = makeAuthManager()
+        let user = try await manager.login(email: "a@b.com", password: "pass")
+
+        XCTAssertFalse(user.isAdmin, "The /admin routes admit only superadmin")
+    }
+
+    // MARK: - OAuth Login
+
+    func testOAuthLoginReadsSuperadminFromAccesses() async throws {
+        MockURLProtocol.requestHandler = { request in
+            let meJSON = #"{"id":"u1","email":"a@b.com","name":"Alice","avatarUrl":"","provider":"github","accesses":["superadmin"]}"#
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, meJSON.data(using: .utf8)!)
+        }
+
+        let manager = makeAuthManager()
+        let user = try await manager.loginWithOAuth(accessToken: fakeJWT())
+
+        XCTAssertTrue(user.isAdmin)
+        XCTAssertTrue(manager.currentUser?.isAdmin == true)
+    }
+
     // MARK: - Register
 
     func testRegisterStoresTokensAndDecodesJWT() async throws {
-        let token = fakeJWT(userId: "u2", email: "b@c.com", accesses: ["admin"])
+        let token = fakeJWT(userId: "u2", email: "b@c.com", accesses: ["superadmin"])
 
         MockURLProtocol.requestHandler = { request in
             let responseJSON = """
@@ -183,7 +259,7 @@ final class AuthManagerTests: XCTestCase {
     func testLoginWithTokensSetsStateDirect() {
         let manager = makeAuthManager()
         let tokens = AuthTokens(accessToken: "a", refreshToken: "r")
-        let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: nil)
+        let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: nil)
 
         manager.loginWithTokens(tokens: tokens, user: user)
 
@@ -377,7 +453,7 @@ final class AuthManagerTests: XCTestCase {
     func testLoginWithTokensCachesUserData() {
         let manager = makeAuthManager()
         let tokens = AuthTokens(accessToken: "a", refreshToken: "r")
-        let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: nil)
+        let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: nil)
 
         manager.loginWithTokens(tokens: tokens, user: user)
 
@@ -437,7 +513,7 @@ final class AuthManagerTests: XCTestCase {
     // MARK: - Register Returns User with Admin from JWT
 
     func testRegisterReturnsAdminUser() async throws {
-        let token = fakeJWT(userId: "u1", email: "admin@test.com", accesses: ["admin", "moderator"])
+        let token = fakeJWT(userId: "u1", email: "admin@test.com", accesses: ["superadmin", "user"])
 
         MockURLProtocol.requestHandler = { request in
             let responseJSON = #"{"access_token": "\#(token)", "refresh_token": "rt"}"#
@@ -449,6 +525,21 @@ final class AuthManagerTests: XCTestCase {
         let user = try await manager.register(email: "admin@test.com", password: "pass", name: "Admin")
 
         XCTAssertTrue(user.isAdmin)
+    }
+
+    func testRegisterWithAdminAccessIsNotAdmin() async throws {
+        let token = fakeJWT(userId: "u1", email: "admin@test.com", accesses: ["admin", "moderator"])
+
+        MockURLProtocol.requestHandler = { request in
+            let responseJSON = #"{"access_token": "\#(token)", "refresh_token": "rt"}"#
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, responseJSON.data(using: .utf8)!)
+        }
+
+        let manager = makeAuthManager()
+        let user = try await manager.register(email: "admin@test.com", password: "pass", name: "Admin")
+
+        XCTAssertFalse(user.isAdmin, "The /admin routes admit only superadmin")
     }
 
     func testRegisterReturnsNonAdminUser() async throws {

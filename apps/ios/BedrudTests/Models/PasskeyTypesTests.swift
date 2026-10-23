@@ -80,7 +80,7 @@ final class PasskeyTypesTests: XCTestCase {
         let json = """
         {
             "tokens": {"access_token": "at-123", "refresh_token": "rt-456"},
-            "user": {"id": "u1", "email": "a@b.com", "name": "Alice", "avatar_url": "https://img.com/a.png", "is_admin": true}
+            "user": {"id": "u1", "email": "a@b.com", "name": "Alice", "avatar_url": "https://img.com/a.png", "accesses": ["superadmin", "user"]}
         }
         """
         let decoder = JSONDecoder()
@@ -93,14 +93,14 @@ final class PasskeyTypesTests: XCTestCase {
         XCTAssertEqual(response.user.email, "a@b.com")
         XCTAssertEqual(response.user.name, "Alice")
         XCTAssertEqual(response.user.avatarUrl, "https://img.com/a.png")
-        XCTAssertEqual(response.user.isAdmin, true)
+        XCTAssertEqual(response.user.accesses, ["superadmin", "user"])
     }
 
     func testLoginResponseWithNullOptionals() throws {
         let json = """
         {
             "tokens": {"access_token": "at", "refresh_token": "rt"},
-            "user": {"id": "u1", "email": "a@b.com", "name": "Alice", "avatar_url": null, "is_admin": null}
+            "user": {"id": "u1", "email": "a@b.com", "name": "Alice", "avatar_url": null, "accesses": null}
         }
         """
         let decoder = JSONDecoder()
@@ -108,19 +108,19 @@ final class PasskeyTypesTests: XCTestCase {
         let response = try decoder.decode(LoginResponse.self, from: json.data(using: .utf8)!)
 
         XCTAssertNil(response.user.avatarUrl)
-        XCTAssertNil(response.user.isAdmin)
+        XCTAssertNil(response.user.accesses)
     }
 
     // MARK: - UserResponse
 
     func testUserResponseDecoding() throws {
-        let json = #"{"id":"u1","email":"a@b.com","name":"Alice","avatar_url":"url","is_admin":false}"#
+        let json = #"{"id":"u1","email":"a@b.com","name":"Alice","avatar_url":"url","accesses":["user"]}"#
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         let user = try decoder.decode(UserResponse.self, from: json.data(using: .utf8)!)
         XCTAssertEqual(user.id, "u1")
         XCTAssertEqual(user.avatarUrl, "url")
-        XCTAssertEqual(user.isAdmin, false)
+        XCTAssertEqual(user.accesses, ["user"])
     }
 
     // MARK: - RefreshTokenRequest Encoding

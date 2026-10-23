@@ -172,7 +172,7 @@ final class InstanceManagerTests: XCTestCase {
 
         // Login via the auth manager
         let tokens = AuthTokens(accessToken: "at", refreshToken: "rt")
-        let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: nil)
+        let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: nil)
         manager.authManager?.loginWithTokens(tokens: tokens, user: user)
 
         // Allow Combine pipeline to propagate
@@ -349,7 +349,7 @@ final class InstanceManagerTests: XCTestCase {
 
         // Login
         let tokens = AuthTokens(accessToken: "at", refreshToken: "rt")
-        let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, isAdmin: false, provider: nil)
+        let user = User(id: "u1", email: "a@b.com", name: "Alice", avatarUrl: nil, accesses: nil, provider: nil)
         manager.authManager?.loginWithTokens(tokens: tokens, user: user)
 
         // Verify user is authenticated

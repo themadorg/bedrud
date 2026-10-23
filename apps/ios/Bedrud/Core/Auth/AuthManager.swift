@@ -66,7 +66,7 @@ final class AuthManager: ObservableObject {
                     email: me.email,
                     name: me.name,
                     avatarUrl: me.avatarUrl,
-                    isAdmin: me.isAdmin ?? false,
+                    accesses: me.accesses,
                     provider: me.provider
                 )
                 currentUser = user
@@ -96,7 +96,7 @@ final class AuthManager: ObservableObject {
             email: response.user.email,
             name: response.user.name,
             avatarUrl: response.user.avatarUrl,
-            isAdmin: response.user.isAdmin ?? false,
+            accesses: response.user.accesses,
             provider: nil
         )
 
@@ -133,7 +133,7 @@ final class AuthManager: ObservableObject {
             email: decoded.email,
             name: name,
             avatarUrl: nil,
-            isAdmin: decoded.accesses?.contains("admin") ?? false,
+            accesses: decoded.accesses,
             provider: nil
         )
 
@@ -163,7 +163,7 @@ final class AuthManager: ObservableObject {
             email: me.email,
             name: me.name,
             avatarUrl: me.avatarUrl,
-            isAdmin: me.isAdmin ?? false,
+            accesses: me.accesses,
             provider: me.provider
         )
 
@@ -190,7 +190,7 @@ final class AuthManager: ObservableObject {
             email: response.user.email,
             name: response.user.name,
             avatarUrl: response.user.avatarUrl,
-            isAdmin: response.user.isAdmin ?? false,
+            accesses: response.user.accesses,
             provider: nil
         )
 
