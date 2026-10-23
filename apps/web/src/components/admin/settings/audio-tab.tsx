@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Field, Section, Toggle } from './shared'
 import type { SystemSettings } from './types'
+import { WelcomeSoundSection } from './welcome-sound-section'
 
 const KRISP_LICENSE_URL = 'https://krisp.ai/developers/'
 const LIVEKIT_KRISP_DOCS_URL = 'https://docs.livekit.io/transport/media/noise-cancellation/'
@@ -18,9 +19,13 @@ const LIVEKIT_KRISP_DOCS_URL = 'https://docs.livekit.io/transport/media/noise-ca
 export function AudioTab({
   settings,
   setSettings,
+  errors,
+  clearFieldError,
 }: {
   settings: SystemSettings
   setSettings: (s: SystemSettings) => void
+  errors?: Record<string, string>
+  clearFieldError?: (field: string) => void
 }) {
   const [licenseOpen, setLicenseOpen] = useState(false)
 
@@ -110,6 +115,13 @@ export function AudioTab({
           load RNNoise or Krisp packages.
         </p>
       </Section>
+
+      <WelcomeSoundSection
+        settings={settings}
+        setSettings={setSettings}
+        errors={errors}
+        clearFieldError={clearFieldError}
+      />
 
       <Dialog open={licenseOpen} onOpenChange={(open) => !open && setLicenseOpen(false)}>
         <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>

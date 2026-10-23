@@ -93,6 +93,13 @@ chat:
   maxMessageCount: 10000            # Max chat messages kept per room (0 = unlimited). Env: CHAT_MAX_MESSAGE_COUNT
   messageTTLHours: 2160             # Purge messages older than this (0 = forever). 2160 = 90 days. Env: CHAT_MESSAGE_TTL_HOURS
 
+# Profile welcome sound limits. Turn the feature on in the admin panel (off by default). 0 = built-in default.
+welcomeSound:
+  maxBytes: 32768          # Largest accepted MP3. Env: WELCOME_SOUND_MAX_BYTES
+  maxDurationSeconds: 7    # Longest accepted clip. Env: WELCOME_SOUND_MAX_DURATION_SECONDS
+  maxPeakDbfs: -1          # Reject clips whose sample peak reaches this level. Env: WELCOME_SOUND_MAX_PEAK_DBFS
+  maxLoudnessLufs: -20     # Reject clips louder than this integrated loudness. Env: WELCOME_SOUND_MAX_LOUDNESS_LUFS
+
 queue:
   pollInterval: 500    # ms between polls. Env: QUEUE_POLL_INTERVAL
   maxAttempts: 3       # retries before failed. Env: QUEUE_MAX_ATTEMPTS

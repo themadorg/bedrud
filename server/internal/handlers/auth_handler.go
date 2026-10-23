@@ -523,6 +523,8 @@ func profileResponse(user *models.User) fiber.Map {
 		"provider":  user.Provider,
 		"accesses":  user.Accesses,
 		"avatarUrl": user.AvatarURL,
+		// The owner always sees their own sound, so they can remove it even while the feature is off.
+		"welcomeSoundUrl": user.WelcomeSoundURL,
 	}
 }
 

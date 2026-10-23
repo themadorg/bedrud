@@ -246,6 +246,15 @@ func NewRoomHandlerWithSecrets(
 	}
 }
 
+// welcomeSoundsEnabled reports the admin switch; without settings the feature stays off.
+func (h *RoomHandler) welcomeSoundsEnabled() bool {
+	if h.settingsRepo == nil {
+		return false
+	}
+	s, err := h.settingsRepo.GetEffectiveSettings()
+	return err == nil && s.WelcomeSoundEnabled
+}
+
 func (h *RoomHandler) maxParticipantsLimit() int {
 	if h.settingsRepo == nil {
 		return 1000
@@ -1517,12 +1526,12 @@ func (h *RoomHandler) livekitParticipant(ctx context.Context, roomName, identity
 // GET /api/room/:roomId/participant/:identity/profile
 //
 // @Summary Get meeting participant profile
-// @Description Fetch a participant's display name and avatar. Caller and target must both be in the room.
+// @Description Fetch a participant's display name, avatar and welcome sound. Caller and target must both be in the room. welcomeSoundUrl is empty while welcome sounds are off.
 // @Tags rooms
 // @Produce json
 // @Param roomId path string true "Room ID"
 // @Param identity path string true "Participant identity"
-// @Success 200 {object} map[string]interface{} "{id, name, avatarUrl}"
+// @Success 200 {object} map[string]interface{} "{id, name, avatarUrl, welcomeSoundUrl}"
 // @Failure 403 {object} ErrorResponse "Not in meeting"
 // @Failure 404 {object} ErrorResponse "Participant not found"
 // @Router /room/{roomId}/participant/{identity}/profile [get]
@@ -1549,9 +1558,10 @@ func (h *RoomHandler) GetParticipantProfile(c *fiber.Ctx) error {
 			name = identity
 		}
 		return c.JSON(fiber.Map{
-			"id":        identity,
-			"name":      name,
-			"avatarUrl": "",
+			"id":              identity,
+			"name":            name,
+			"avatarUrl":       "",
+			"welcomeSoundUrl": "",
 		})
 	}
 
@@ -1562,9 +1572,10 @@ func (h *RoomHandler) GetParticipantProfile(c *fiber.Ctx) error {
 			name = identity
 		}
 		return c.JSON(fiber.Map{
-			"id":        identity,
-			"name":      name,
-			"avatarUrl": "",
+			"id":              identity,
+			"name":            name,
+			"avatarUrl":       "",
+			"welcomeSoundUrl": "",
 		})
 	}
 
@@ -1576,10 +1587,17 @@ func (h *RoomHandler) GetParticipantProfile(c *fiber.Ctx) error {
 		name = identity
 	}
 
+	// The server decides who hears a clip, so the admin switch holds even against stale clients.
+	welcomeSoundURL := ""
+	if h.welcomeSoundsEnabled() {
+		welcomeSoundURL = u.WelcomeSoundURL
+	}
+
 	return c.JSON(fiber.Map{
-		"id":        identity,
-		"name":      name,
-		"avatarUrl": u.AvatarURL,
+		"id":              identity,
+		"name":            name,
+		"avatarUrl":       u.AvatarURL,
+		"welcomeSoundUrl": welcomeSoundURL,
 	})
 }
 

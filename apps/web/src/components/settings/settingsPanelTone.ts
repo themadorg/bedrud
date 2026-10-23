@@ -19,6 +19,11 @@ export function panelSurfaceClass(tone: SettingsPanelTone) {
   return `${panelSurfaceBaseClass} ${toneClass}`
 }
 
+/** Returns the divider colour between sections of a settings panel. */
+export function sectionBorderClass(meeting: boolean) {
+  return meeting ? 'border-[var(--meet-border)]' : 'border-border'
+}
+
 export const meetingSliderClass =
   '[&>span.relative]:bg-[var(--meet-slider-track)] [&>span.relative>span]:bg-[var(--meet-accent)] [&_[role=slider]]:border-[color-mix(in_oklab,var(--meet-accent)_50%,transparent)] [&_[role=slider]]:bg-[var(--meet-slider-thumb)]'
 

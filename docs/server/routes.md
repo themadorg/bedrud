@@ -28,6 +28,8 @@ Authoritative list of HTTP routes registered in `internal/server/server.go`. All
 | POST | `/api/auth/logout` | Protected | — |
 | GET | `/api/auth/me` | Protected + EmailVerified | — |
 | PUT | `/api/auth/me` | Protected + EmailVerified | — |
+| POST | `/api/auth/me/welcome-sound` | Protected + EmailVerified; 403 for guests or while welcome sounds are off; 429 after two changes per UTC day | API |
+| DELETE | `/api/auth/me/welcome-sound` | Protected + EmailVerified | — |
 | PUT | `/api/auth/password` | Protected + EmailVerified | — |
 | POST | `/api/auth/verify` | none | — |
 | GET | `/api/auth/verify/status` | Protected | — |
@@ -118,6 +120,14 @@ All: Protected + EmailVerified.
 
 Serves disk-backed chat images. Path traversal prevented. Inline (base64) and S3 images are not served here.
 
+## Welcome sound static files
+
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/uploads/welcome-sounds/*` | none (like `/uploads/avatars/*`) |
+
+Serves `<userID>.mp3` from `./data/uploads/welcome-sounds`. Path traversal prevented. Peers learn the URL from the participant profile endpoint, which leaves it empty while welcome sounds are off.
+
 ---
 
 ## Admin
@@ -140,6 +150,7 @@ Prefix: `/api/admin`.
 | POST | `/users/:id/verify/resend` | `AdminResendVerification` |
 | GET | `/users/:id/sessions` | `ListUserSessions` |
 | DELETE | `/users/:id` | `DeleteUser` (202 async) |
+| DELETE | `/users/:id/welcome-sound` | `ClearUserWelcomeSound` |
 
 ### Rooms
 

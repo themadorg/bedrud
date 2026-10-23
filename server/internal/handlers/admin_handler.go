@@ -32,6 +32,14 @@ import (
 	"github.com/twitchtv/twirp"
 )
 
+// Bounds an admin may set for welcome sound limits.
+const (
+	welcomeSoundMaxBytesCeiling           = 1 << 20
+	welcomeSoundMaxDurationCeilingSeconds = 30
+	welcomeSoundPeakFloorDbfs             = -30.0
+	welcomeSoundLoudnessFloorLufs         = -50.0
+)
+
 // validateSettings checks that settings values are within acceptable ranges.
 func validateSettings(s *models.SystemSettings) error {
 	// Token duration
@@ -326,9 +334,14 @@ func (h *AdminHandler) GetPublicSettings(c *fiber.Ctx) error {
 		"chatMessageTTLHours":      s.ChatMessageTTLHours,
 		"chatUploadMaxBytes":       maxBytes,
 		"chatUploadMaxDimension":   maxDim,
-		"recordingsEnabled": s.RecordingsEnabled,
-		"rnnoiseEnabled":    s.RNNoiseEnabled,
-		"krispEnabled":      s.KrispEnabled,
+		"recordingsEnabled":        s.RecordingsEnabled,
+		"rnnoiseEnabled":           s.RNNoiseEnabled,
+		"krispEnabled":             s.KrispEnabled,
+		"welcomeSound": fiber.Map{
+			"enabled":            s.WelcomeSoundEnabled,
+			"maxBytes":           s.WelcomeSoundMaxBytes,
+			"maxDurationSeconds": s.WelcomeSoundMaxDurationSeconds,
+		},
 		"webxdc": fiber.Map{
 			"enabled":      webxdcEnabled,
 			"experimental": true,
@@ -568,7 +581,7 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 			"livekitExternal", "corsAllowCredentials", "guestLoginEnabled",
 			"recordingsEnabled",
 			"webxdcGalleryEnabled", "webxdcGalleryAllowRemoteDownload", "webxdcGalleryInstanceCatalogEnabled",
-			"rnnoiseEnabled", "krispEnabled",
+			"rnnoiseEnabled", "krispEnabled", "welcomeSoundEnabled",
 			"emailTlsSkipVerify", "emailSmtpsMode":
 			var b bool
 			if err := json.Unmarshal(val, &b); err != nil {
@@ -605,6 +618,8 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 				existing.RNNoiseEnabled = b
 			case "krispEnabled":
 				existing.KrispEnabled = b
+			case "welcomeSoundEnabled":
+				existing.WelcomeSoundEnabled = b
 			case "emailTlsSkipVerify":
 				existing.EmailTLSSkipVerify = b
 			case "emailSmtpsMode":
@@ -618,7 +633,8 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 			"chatUploadMaxDimension",
 			"recordingMaxDurationMins", "recordingMaxFileSizeMB",
 			"emailSmtpPort",
-			"webxdcMaxArchiveMB", "webxdcMaxUncompressedMB", "webxdcMaxSingleFileMB", "webxdcMaxEntries":
+			"webxdcMaxArchiveMB", "webxdcMaxUncompressedMB", "webxdcMaxSingleFileMB", "webxdcMaxEntries",
+			"welcomeSoundMaxBytes", "welcomeSoundMaxDurationSeconds":
 			var i int
 			if err := json.Unmarshal(val, &i); err != nil {
 				return fmt.Errorf("%s: expected an integer, got %s", key, describeJSONType(val))
@@ -664,6 +680,35 @@ func applySettingsFields(existing *models.SystemSettings, raw map[string]json.Ra
 					return fmt.Errorf("webxdcMaxEntries: must be 0–10000 (0 = config default)")
 				}
 				existing.WebxdcMaxEntries = i
+			case "welcomeSoundMaxBytes":
+				if i < 0 || i > welcomeSoundMaxBytesCeiling {
+					return fmt.Errorf("welcomeSoundMaxBytes: must be 0–%d (0 = config default)", welcomeSoundMaxBytesCeiling)
+				}
+				existing.WelcomeSoundMaxBytes = i
+			case "welcomeSoundMaxDurationSeconds":
+				if i < 0 || i > welcomeSoundMaxDurationCeilingSeconds {
+					return fmt.Errorf("welcomeSoundMaxDurationSeconds: must be 0–%d (0 = config default)", welcomeSoundMaxDurationCeilingSeconds)
+				}
+				existing.WelcomeSoundMaxDurationSeconds = i
+			}
+
+		// Float fields
+		case "welcomeSoundMaxPeakDbfs", "welcomeSoundMaxLoudnessLufs":
+			var f float64
+			if err := json.Unmarshal(val, &f); err != nil {
+				return fmt.Errorf("%s: expected a number, got %s", key, describeJSONType(val))
+			}
+			switch key {
+			case "welcomeSoundMaxPeakDbfs":
+				if f < welcomeSoundPeakFloorDbfs || f > 0 {
+					return fmt.Errorf("welcomeSoundMaxPeakDbfs: must be %g–0 (0 = config default)", welcomeSoundPeakFloorDbfs)
+				}
+				existing.WelcomeSoundMaxPeakDbfs = f
+			case "welcomeSoundMaxLoudnessLufs":
+				if f < welcomeSoundLoudnessFloorLufs || f > 0 {
+					return fmt.Errorf("welcomeSoundMaxLoudnessLufs: must be %g–0 (0 = config default)", welcomeSoundLoudnessFloorLufs)
+				}
+				existing.WelcomeSoundMaxLoudnessLufs = f
 			}
 
 		// Int64 fields

@@ -169,6 +169,12 @@ chat:
     #   secretKey: ""
     #   publicBaseUrl: ""
 
+welcomeSound:                            # Profile welcome sounds; switch on in admin System settings → Audio
+  maxBytes: 32768                        # Largest MP3 (32 KB). 0 = default. Env: WELCOME_SOUND_MAX_BYTES
+  maxDurationSeconds: 7                  # Env: WELCOME_SOUND_MAX_DURATION_SECONDS
+  maxPeakDbfs: -1                        # Reject clips peaking at or above this. Env: WELCOME_SOUND_MAX_PEAK_DBFS
+  maxLoudnessLufs: -20                   # Reject clips louder than this. Env: WELCOME_SOUND_MAX_LOUDNESS_LUFS
+
 # Reserved for planned recording feature (routes not registered in production yet)
 recording:
   maxFileSizeMB: 2048                    # 0 = unlimited
@@ -262,6 +268,19 @@ Advisory client-side retention (LiveKit does not persist data-channel messages s
 | `s3.*` | S3 兼容凭证与公开基础 URL |
 
 会议 UI 与 `GET /api/auth/settings` 会暴露有效的 `chatUploadMaxBytes` 与 `chatUploadMaxDimension`，供客户端上传前预检。上传 API 仍强制相同限制（超大 `413`，超尺寸 `400`）。
+
+#### Welcome Sounds
+
+`welcomeSound` sets the default limits for profile welcome sounds: a short MP3 on each account that plays for everyone in the room when that person joins. The feature itself is **off** until a superadmin switches it on in **System settings → Audio**, where the limits can also be overridden.
+
+| Field | Meaning |
+|-------|---------|
+| `maxBytes` | Largest upload (default 32 KB) |
+| `maxDurationSeconds` | Longest clip (default 7) |
+| `maxPeakDbfs` | Clips whose sample peak reaches this level are rejected (default −1 dBFS) |
+| `maxLoudnessLufs` | Clips with integrated loudness (ITU-R BS.1770) above this are rejected (default −20 LUFS) |
+
+Uploads are decoded and measured on the server; only MP3 at 16, 24, 32, 44.1 or 48 kHz is accepted. Each user can change their sound twice per UTC day, and a superadmin can clear any user's sound from the user's admin page.
 
 #### Recordings
 
@@ -407,6 +426,10 @@ export LIVEKIT_API_SECRET=prodsecret
 | `CHAT_GLOBAL_DISK_THRESHOLD_BYTES` | `chat.globalDiskThresholdBytes` | Global upload ceiling |
 | `CHAT_MAX_MESSAGE_COUNT` | `chat.maxMessageCount` | Client chat message cap |
 | `CHAT_MESSAGE_TTL_HOURS` | `chat.messageTTLHours` | Client chat TTL hours |
+| `WELCOME_SOUND_MAX_BYTES` | `welcomeSound.maxBytes` | Largest welcome sound upload |
+| `WELCOME_SOUND_MAX_DURATION_SECONDS` | `welcomeSound.maxDurationSeconds` | Longest welcome sound |
+| `WELCOME_SOUND_MAX_PEAK_DBFS` | `welcomeSound.maxPeakDbfs` | Welcome sound peak ceiling |
+| `WELCOME_SOUND_MAX_LOUDNESS_LUFS` | `welcomeSound.maxLoudnessLufs` | Welcome sound loudness ceiling |
 | `QUEUE_POLL_INTERVAL` | `queue.pollInterval` | Job poll interval (ms) |
 | `QUEUE_MAX_ATTEMPTS` | `queue.maxAttempts` | Max job retries |
 | `QUEUE_CONCURRENCY` | `queue.concurrency` | Worker count |

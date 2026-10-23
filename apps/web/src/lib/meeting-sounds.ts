@@ -1,7 +1,9 @@
 /**
- * Synthesised notification sounds for meetings using Web Audio API.
- * No external audio files needed — tones are generated on the fly.
+ * Notification sounds for meetings using the Web Audio API.
+ * The chimes are generated on the fly; the only files played are peers' welcome sounds.
  */
+
+import { WELCOME_SOUND_PLAYBACK_GAIN } from '#/lib/welcome-sound'
 
 let ctx: AudioContext | null = null
 
@@ -59,6 +61,41 @@ export function playChat() {
 export function playMutedBeep() {
   tone(340, 0.09, 'square', 0.06)
   setTimeout(() => tone(340, 0.09, 'square', 0.06), 130)
+}
+
+// Decoded clips by URL; the `?v=` suffix changes on every upload, so a replaced clip is fetched again.
+const welcomeBuffers = new Map<string, Promise<AudioBuffer>>()
+
+function loadWelcomeBuffer(ac: AudioContext, url: string): Promise<AudioBuffer> {
+  const cached = welcomeBuffers.get(url)
+  if (cached) return cached
+  const loading = fetch(url)
+    .then((response) => {
+      if (!response.ok) throw new Error(`welcome sound fetch failed: ${response.status}`)
+      return response.arrayBuffer()
+    })
+    .then((data) => ac.decodeAudioData(data))
+  welcomeBuffers.set(url, loading)
+  loading.catch(() => welcomeBuffers.delete(url))
+  return loading
+}
+
+/**
+ * Plays a peer's welcome sound at the fixed welcome gain. Resolves when the clip ends and
+ * rejects if it cannot be fetched or decoded, so the caller can fall back to the chime.
+ */
+export async function playWelcome(url: string): Promise<void> {
+  const ac = getCtx()
+  const buffer = await loadWelcomeBuffer(ac, url)
+  await new Promise<void>((resolve) => {
+    const source = ac.createBufferSource()
+    const vol = ac.createGain()
+    source.buffer = buffer
+    vol.gain.value = WELCOME_SOUND_PLAYBACK_GAIN
+    source.connect(vol).connect(ac.destination)
+    source.onended = () => resolve()
+    source.start()
+  })
 }
 
 /** Close the shared AudioContext. Call on meeting unmount to release resources (esp. mobile). */
