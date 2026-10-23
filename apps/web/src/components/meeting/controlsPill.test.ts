@@ -10,6 +10,7 @@ function source(fileName: string): string {
 }
 
 const pill = source('MeetingControlsPill.tsx')
+const optionsSheet = source('MeetingOptionsSheet.tsx')
 const micPill = source('MeetingMicPill.tsx')
 const controlsRow = source('MeetingCallControlsRow.tsx')
 const controlsBar = source('ControlsBar.tsx')
@@ -30,17 +31,57 @@ describe('the controls pill surface', () => {
     expect(pill).toContain('env(safe-area-inset-bottom, 0px)')
   })
 
-  it('should dim the call with the meeting scrim', () => {
-    expect(pill).toContain('var(--meet-scrim)')
+  it('should carry controls only, never the options themselves', () => {
+    // Android #262: options that grew out of the pill read as a custom surface beside every sheet.
+    expect(pill).not.toContain('aria-expanded')
+    expect(pill).not.toContain('max-h-0')
   })
 
-  it('should resolve a drag through the shared rule rather than its own threshold', () => {
-    expect(pill).toContain('expandedAfterDrag')
-    expect(pill).not.toMatch(/\b24\b/)
+  it('should leave scrim, drag and Escape to the sheet', () => {
+    expect(pill).not.toContain('var(--meet-scrim)')
+    expect(pill).not.toContain('expandedAfterDrag')
+    expect(pill).not.toContain('onPointerUp')
+    expect(pill).not.toContain("'Escape'")
   })
 
-  it('should close on Escape', () => {
-    expect(pill).toContain('Escape')
+  it('should draw the handle pill from the shared sheet handle', () => {
+    expect(pill).toContain('HANDLE_PILL_CLASS')
+    expect(pill).not.toMatch(/const HANDLE_PILL_CLASS/)
+  })
+
+  it('should keep the handle a full 48px touch target named More options', () => {
+    expect(pill).toContain('aria-label="More options"')
+    expect(pill).toMatch(/className="flex h-12 w-full/)
+  })
+})
+
+describe('the more options sheet', () => {
+  it('should be the app sheet rather than a second one', () => {
+    expect(optionsSheet).toContain('<BedrudSheet')
+  })
+
+  it('should carry the More options title on screen, not only for assistive technology', () => {
+    expect(optionsSheet).toContain('label="More options"')
+    expect(optionsSheet).toMatch(/>\s*More options\s*</)
+  })
+
+  it('should leave the sheet chrome to the sheet', () => {
+    expect(optionsSheet).not.toContain('snapPoints=')
+    expect(optionsSheet).not.toMatch(/\brounded-t-/)
+    expect(optionsSheet).not.toContain('BedrudSheetHandle')
+  })
+
+  it('should let its rows scroll, since the web can offer more of them than half a sheet holds', () => {
+    expect(optionsSheet).toContain('overflow-y-auto')
+  })
+
+  it('should close before a row that leads elsewhere, and stay open for a toggle', () => {
+    expect(optionsSheet).toContain("row.kind === 'action'")
+  })
+
+  it('should not unfold or fade, because it no longer grows out of the pill', () => {
+    expect(optionsSheet).not.toContain('expanded')
+    expect(optionsSheet).not.toContain('--meet-controls-panel-max-height')
   })
 })
 

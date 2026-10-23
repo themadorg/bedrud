@@ -33,7 +33,7 @@ import { cn } from '#/lib/utils'
 import { DeviceSelector } from '@/components/meeting/DeviceSelector'
 import { useMeetingChatContext, useMeetingRoomContext } from '@/components/meeting/MeetingContext'
 import { MeetingControlsPill } from '@/components/meeting/MeetingControlsPill'
-import { meetingOptionIcon } from '@/components/meeting/MeetingOptionsPanel'
+import { meetingOptionIcon } from '@/components/meeting/MeetingOptionsSheet'
 import { meetControlsDockClass, useMeetingUILayout } from '@/components/meeting/MeetingUILayoutContext'
 import {
   isExpandChromeSource,

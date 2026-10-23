@@ -1,12 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { expandedAfterDrag } from '@/components/meeting/controlsPanelDrag'
+import { useState } from 'react'
 import { MeetingCallControlsRow } from '@/components/meeting/MeetingCallControlsRow'
-import { MeetingOptionsPanel } from '@/components/meeting/MeetingOptionsPanel'
+import { MeetingOptionsSheet } from '@/components/meeting/MeetingOptionsSheet'
 import type { MeetingOptionRow, MeetingOptionRowId } from '@/components/meeting/meetingOptionRows'
+import { HANDLE_PILL_CLASS } from '@/components/ui/BedrudSheetHandle'
 import { cn } from '@/lib/utils'
-
-/** The grab bar: Android's 32 × 4dp, inside a 48px tap target spanning the surface. */
-const HANDLE_PILL_CLASS = 'h-1 w-8 rounded-full bg-[var(--meet-fg-muted)] opacity-55'
 
 interface MeetingControlsPillProps {
   rows: MeetingOptionRow[]
@@ -29,72 +26,22 @@ interface MeetingControlsPillProps {
 }
 
 /**
- * The phone in-call controls, and the room options that grow out of them.
+ * The phone in-call controls, and the handle that opens the room options in their own sheet.
  *
- * One surface, anchored to the bottom, so the options unfold *above* the controls and the row your
- * thumb is resting on never moves — the pill simply becomes taller. This mirrors Android's
- * `MeetingControlsPanel`, which is deliberately not built on the app's sheet primitive for the
- * same reason: as a sheet, the options arrived as a second surface carrying a duplicate copy of
- * the same controls at a different height.
+ * The pill carries controls only. Scrim, drag-down and Escape for the options all come from
+ * `BedrudSheet`, as they do for every other sheet in the app.
  */
-export function MeetingControlsPill({
-  rows,
-  onSelectOption,
-  chatOpen,
-  onToggleChat,
-  onLeave,
-  ...controls
-}: MeetingControlsPillProps) {
-  const [expanded, setExpanded] = useState(false)
-  const dragStartRef = useRef<number | null>(null)
-
-  const collapse = useCallback(() => setExpanded(false), [])
-
-  // Escape is the web's answer to Android's BackHandler.
-  useEffect(() => {
-    if (!expanded) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') collapse()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [expanded, collapse])
-
-  const handlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
-    dragStartRef.current = event.clientY
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-
-  const handlePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
-    const start = dragStartRef.current
-    dragStartRef.current = null
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
-    }
-    if (start === null) return
-    const next = expandedAfterDrag(expanded, event.clientY - start)
-    // A drag the rule declined to act on was a tap on the handle, which toggles.
-    setExpanded(next === expanded ? !expanded : next)
-  }
-
-  // Rows that lead somewhere else close the panel on the way; toggles leave it open so the flip is
-  // visible. The row list says which is which.
-  const selectRow = (id: MeetingOptionRowId) => {
-    const row = rows.find((candidate) => candidate.id === id)
-    if (row && row.kind === 'action') collapse()
-    onSelectOption(id)
-  }
+export function MeetingControlsPill({ rows, onSelectOption, ...controls }: MeetingControlsPillProps) {
+  const [optionsOpen, setOptionsOpen] = useState(false)
 
   return (
     <>
-      {expanded && (
-        <button
-          type="button"
-          aria-label="Close room options"
-          onClick={collapse}
-          className="fixed inset-0 z-20 border-none bg-[var(--meet-scrim)] transition-opacity duration-[320ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
-        />
-      )}
+      <MeetingOptionsSheet
+        open={optionsOpen}
+        onClose={() => setOptionsOpen(false)}
+        rows={rows}
+        onSelect={onSelectOption}
+      />
 
       <div
         id="meet-controls"
@@ -109,29 +56,15 @@ export function MeetingControlsPill({
       >
         <button
           type="button"
-          aria-label="Room options"
-          aria-expanded={expanded}
-          onPointerDown={handlePointerDown}
-          onPointerUp={handlePointerUp}
-          className="flex h-12 w-full shrink-0 cursor-grab items-center justify-center border-none bg-transparent active:cursor-grabbing"
+          aria-label="More options"
+          aria-haspopup="dialog"
+          onClick={() => setOptionsOpen(true)}
+          className="flex h-12 w-full shrink-0 cursor-pointer items-center justify-center border-none bg-transparent"
         >
           <span className={HANDLE_PILL_CLASS} />
         </button>
 
-        <MeetingOptionsPanel rows={rows} expanded={expanded} onSelect={selectRow} />
-
-        <MeetingCallControlsRow
-          {...controls}
-          chatOpen={chatOpen}
-          onToggleChat={() => {
-            collapse()
-            onToggleChat()
-          }}
-          onLeave={() => {
-            collapse()
-            onLeave()
-          }}
-        />
+        <MeetingCallControlsRow {...controls} />
       </div>
     </>
   )
