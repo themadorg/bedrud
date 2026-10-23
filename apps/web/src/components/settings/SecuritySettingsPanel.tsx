@@ -1,7 +1,9 @@
 import { AlertCircle, Check, Loader2, Lock, LogIn } from 'lucide-react'
 import React, { useState } from 'react'
 import { api } from '#/lib/api'
-import { useUserStore } from '#/lib/user.store'
+import { useAuthStore } from '#/lib/auth.store'
+import { changePasswordAndSignBackIn } from '#/lib/change-password'
+import { toUser, useUserStore } from '#/lib/user.store'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -118,6 +120,8 @@ function AccountForm({
 
 export function SecuritySettingsPanel() {
   const user = useUserStore((s) => s.user)
+  const setUser = useUserStore((s) => s.setUser)
+  const setTokens = useAuthStore((s) => s.setTokens)
   const [isLoading, setIsLoading] = useState(false)
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
@@ -142,7 +146,9 @@ export function SecuritySettingsPanel() {
     setIsLoading(true)
     setStatus(null)
     try {
-      await api.put('/api/auth/password', { currentPassword, newPassword })
+      const res = await changePasswordAndSignBackIn(user?.email ?? '', currentPassword, newPassword)
+      setTokens(res.tokens)
+      setUser(toUser(res.user))
       setStatus({ type: 'success', message: 'Password updated.' })
       ;(e.target as HTMLFormElement).reset()
     } catch (err) {
