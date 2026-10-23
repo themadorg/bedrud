@@ -72,7 +72,7 @@ Rejected: playing through a published LiveKit audio track (fights echo cancellat
 - **Admin kill switch:** `SystemSettings.WelcomeSoundEnabled` (default `false`, opt-in as the issue asks), exposed in `GET /api/auth/settings` as `welcomeSound: {enabled, maxBytes, maxDurationSeconds}`. When it is off, uploads return 403, the profile hides the URL, and the profile panel hides the section. The toggle lives in a "Welcome sounds" section of the admin Audio tab, next to RNNoise and Krisp.
 - **Limits from config:** `welcomeSound.maxBytes`, `welcomeSound.maxDurationSeconds`, `welcomeSound.maxPeakDbfs` and `welcomeSound.maxLoudnessLufs` in `config.yaml` (with env overrides), merged through `mergeFromConfig`'s existing "0 means use the config value" rule and overridable in the admin panel.
 - **Enable flag:** it lives only in `SystemSettings`, like RNNoise and Krisp. A config default for a bool would need a `*bool` to tell "unset" from "false". If operators want one anyway, it is a small add-on.
-- **Host toggle:** a new `RoomSettings.AllowWelcomeSounds` (default `true`), set by the room owner in the room settings. When it is off, `GetParticipantProfile` returns an empty `welcomeSoundUrl` for that room, so it is enforced server-side like the kill switch. It touches room create and update, `@bedrud/api-types`, and the web room settings UI. Native clients only need to tolerate the new field until their parity issues land.
+- **Host toggle:** a new nullable `RoomSettings.AllowWelcomeSounds`, set by the room owner in the room settings. Empty means allowed, and the owner's settings update keeps the stored value when a client leaves the field out, because older clients send whole settings objects and would otherwise switch it off. When it is off, `GetParticipantProfile` returns an empty `welcomeSoundUrl` for that room, so it is enforced server-side like the kill switch. It touches room create and update, `@bedrud/api-types`, and the web room settings UI. Native clients only need to tolerate the new field until their parity issues land.
 
 Rejected: a per-listener volume slider (a three-way mode plus a fixed, quiet playback gain covers the need with less UI) · a per-speaker mute in the participant context menu (nice later, not needed for safety).
 
@@ -123,5 +123,5 @@ Docs ship with units 3 to 5: the admin and user guides under `docs/guide` and th
 
 - **Default size:** 32 KiB.
 - **Format:** MP3 only.
-- **Room toggle:** in v1 (unit 6).
+- **Room toggle:** in v1 (unit 6), stored as a nullable field where empty means allowed. A plain `true` default was rejected because Android, iOS and desktop send whole settings objects and would turn it off; a reversed "mute" field was rejected because an old client's save would undo a host's mute.
 - **Playback gain:** 0.5, the starting value on the listening demo, accepted as is. It can be tuned in unit 5.

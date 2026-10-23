@@ -85,7 +85,7 @@ Tracks revoked refresh tokens (logout, force-logout, password change).
 | `last_activity_at` | timestamp | Scheduler stale detection |
 | `deleted_at` | timestamp | Soft archive; NULL = active |
 | `mode` | varchar(20) | e.g. `standard` |
-| `settings_*` | embedded | `allow_chat`, `allow_video`, `allow_audio`, `require_approval`, `e2ee`, `is_persistent`, `recordings_allowed` |
+| `settings_*` | embedded | `allow_chat`, `allow_video`, `allow_audio`, `require_approval`, `e2ee`, `is_persistent`, `recordings_allowed`, `allow_welcome_sounds` (nullable; NULL = allowed) |
 
 **Indexes:**
 
