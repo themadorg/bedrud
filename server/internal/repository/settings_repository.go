@@ -7,6 +7,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// defaultServerName is the display name used when neither an admin nor server.domain provides one.
+const defaultServerName = "Bedrud"
+
 type SettingsRepository struct {
 	db  *gorm.DB
 	cfg *config.Config
@@ -102,6 +105,13 @@ func mergeFromConfig(s *models.SystemSettings, cfg *config.Config) {
 	}
 	if s.ServerDomain == "" {
 		s.ServerDomain = cfg.Server.Domain
+	}
+	// The display name has no config key: an admin-set name wins, then the domain, then the product name.
+	if s.ServerName == "" {
+		s.ServerName = cfg.Server.Domain
+	}
+	if s.ServerName == "" {
+		s.ServerName = defaultServerName
 	}
 	if !s.ServerEnableTLS && cfg.Server.EnableTLS {
 		s.ServerEnableTLS = cfg.Server.EnableTLS
