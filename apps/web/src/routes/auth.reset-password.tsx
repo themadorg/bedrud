@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '#/lib/api'
+import { getErrorMessage } from '#/lib/errors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -49,8 +50,8 @@ function ResetPasswordPage() {
     try {
       await api.post('/api/auth/reset-password', { token, newPassword })
       setSuccess(true)
-    } catch (err: any) {
-      setError(err?.parsedBody?.error || err instanceof Error ? err.message : 'Failed to reset password')
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to reset password'))
     } finally {
       setIsLoading(false)
     }

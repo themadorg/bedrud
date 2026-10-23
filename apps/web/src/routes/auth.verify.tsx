@@ -3,6 +3,7 @@ import { Info, Loader2, Mail, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ApiError, api } from '#/lib/api'
 import { useAuthStore } from '#/lib/auth.store'
+import { getErrorMessage } from '#/lib/errors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -159,7 +160,7 @@ function VerifyPage() {
           navigate({ to: '/auth/login', search: { redirect: undefined } })
           return
         }
-        setError(err.message || 'Verification failed')
+        setError(getErrorMessage(err, 'Verification failed'))
       })
   }, [token, navigate, setTokens])
 

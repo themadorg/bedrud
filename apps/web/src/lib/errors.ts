@@ -1,4 +1,15 @@
-import { ApiError } from '#/lib/api'
+import { ApiError, NetworkError } from '#/lib/api'
+
+const NO_CONNECTION = 'No internet connection'
+const SERVER_UNREACHABLE = "Couldn't reach the server"
+
+/**
+ * Reports whether an error carries wording this app or its server wrote. A built-in error's own
+ * text (a TypeError, a DOMException) is English and technical, so it never reaches the reader.
+ */
+function hasOwnWording(error: Error): boolean {
+  return error.constructor === Error || error instanceof ApiError
+}
 
 function parseErrorPayload(payload: string): string | null {
   const trimmed = payload.trim()
@@ -27,6 +38,9 @@ function parseErrorPayload(payload: string): string | null {
 }
 
 export function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof NetworkError) return navigator.onLine === false ? NO_CONNECTION : SERVER_UNREACHABLE
+  if (error instanceof Error && !hasOwnWording(error)) return fallback
+
   const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
 
   const normalized = raw.replace(/^\d{3}:\s*/s, '').trim()

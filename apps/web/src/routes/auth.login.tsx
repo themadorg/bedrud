@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 import { FormattedMessage } from 'react-intl'
 import { ApiError, api } from '#/lib/api'
 import { useAuthStore } from '#/lib/auth.store'
+import { getErrorMessage } from '#/lib/errors'
 import { getPublicSettings, type PublicSettings } from '#/lib/use-public-settings'
 import { useUserStore } from '#/lib/user.store'
+import { isPasskeyCancelled, passkeyErrorMessage } from '#/lib/webauthn'
 import { OAuthButtons } from '@/components/auth/OAuthButtons'
 import { loginWithPasskey } from '@/components/auth/PasskeyButton'
 import { Alert } from '@/components/ui/alert'
@@ -115,7 +117,7 @@ function LoginPage() {
         startCooldown(120)
         return
       }
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(getErrorMessage(err, 'Login failed'))
     } finally {
       setIsLoading(false)
     }
@@ -152,7 +154,8 @@ function LoginPage() {
       const res = await loginWithPasskey(trimmed)
       handleSuccess(res)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Passkey login failed')
+      if (isPasskeyCancelled(err)) return
+      setError(passkeyErrorMessage(err, 'Passkey login failed'))
     } finally {
       setPasskeyLoading(false)
     }
