@@ -877,6 +877,41 @@ func TestRoomRepository_CreateRoom_MaxParticipantsNotSet(t *testing.T) {
 
 // ====== Room Settings Preservation ======
 
+func TestRoomRepository_CreateRoom_WelcomeSounds(t *testing.T) {
+	t.Run("should leave the field empty when the creator did not send it", func(t *testing.T) {
+		db := testutil.SetupTestDB(t)
+		repo := NewRoomRepository(db)
+		db.Create(&models.User{ID: testUserIDRoom, Email: "u1@ex.com", Name: "U1", Provider: "local", IsActive: true})
+
+		room, err := repo.CreateRoom(testUserIDRoom, "welcome-default", false, "standard", 0, &models.RoomSettings{})
+		if err != nil {
+			t.Fatalf("failed to create room: %v", err)
+		}
+
+		found, _ := repo.GetRoom(room.ID)
+		if found.Settings.AllowWelcomeSounds != nil || !found.Settings.WelcomeSoundsAllowed() {
+			t.Fatalf("expected an empty field that counts as allowed, got %v", found.Settings.AllowWelcomeSounds)
+		}
+	})
+
+	t.Run("should store a room created with welcome sounds off", func(t *testing.T) {
+		db := testutil.SetupTestDB(t)
+		repo := NewRoomRepository(db)
+		db.Create(&models.User{ID: testUserIDRoom, Email: "u1@ex.com", Name: "U1", Provider: "local", IsActive: true})
+		off := false
+
+		room, err := repo.CreateRoom(testUserIDRoom, "welcome-off", false, "standard", 0, &models.RoomSettings{AllowWelcomeSounds: &off})
+		if err != nil {
+			t.Fatalf("failed to create room: %v", err)
+		}
+
+		found, _ := repo.GetRoom(room.ID)
+		if found.Settings.WelcomeSoundsAllowed() {
+			t.Fatal("expected welcome sounds to be stored as off")
+		}
+	})
+}
+
 func TestRoomRepository_CreateRoom_SettingsPreserved(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := NewRoomRepository(db)

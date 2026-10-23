@@ -57,12 +57,12 @@ type SystemSettings struct {
 	ChatUploadMaxDimension int    `json:"chatUploadMaxDimension"`
 	ChatUploadInlineMax    int64  `json:"chatUploadInlineMax"`
 	ChatUploadDiskDir      string `gorm:"size:512" json:"chatUploadDiskDir"`
-	ChatUploadS3Endpoint  string `gorm:"size:255" json:"chatUploadS3Endpoint"`
-	ChatUploadS3Bucket    string `gorm:"size:255" json:"chatUploadS3Bucket"`
-	ChatUploadS3Region    string `gorm:"size:50" json:"chatUploadS3Region"`
-	ChatUploadS3AccessKey string `gorm:"size:255" json:"chatUploadS3AccessKey"`
-	ChatUploadS3SecretKey string `gorm:"size:255" json:"chatUploadS3SecretKey"`
-	ChatUploadS3PublicURL string `gorm:"size:512" json:"chatUploadS3PublicUrl"`
+	ChatUploadS3Endpoint   string `gorm:"size:255" json:"chatUploadS3Endpoint"`
+	ChatUploadS3Bucket     string `gorm:"size:255" json:"chatUploadS3Bucket"`
+	ChatUploadS3Region     string `gorm:"size:50" json:"chatUploadS3Region"`
+	ChatUploadS3AccessKey  string `gorm:"size:255" json:"chatUploadS3AccessKey"`
+	ChatUploadS3SecretKey  string `gorm:"size:255" json:"chatUploadS3SecretKey"`
+	ChatUploadS3PublicURL  string `gorm:"size:512" json:"chatUploadS3PublicUrl"`
 
 	// Room limits
 	MaxParticipantsLimit int `gorm:"default:1000" json:"maxParticipantsLimit"`
@@ -104,6 +104,15 @@ type SystemSettings struct {
 	// Off by default. Admins must enable after confirming their own Krisp/LiveKit licensing.
 	// Bedrud does not ship a Krisp license.
 	KrispEnabled bool `gorm:"not null;default:false" json:"krispEnabled"`
+
+	// Profile welcome sounds that play for the room when a user joins.
+	// Off by default. When disabled, uploads are rejected and clients play no clips.
+	WelcomeSoundEnabled bool `gorm:"not null;default:false" json:"welcomeSoundEnabled"`
+	// Welcome sound upload limits. 0 = use config.yaml, then the built-in defaults.
+	WelcomeSoundMaxBytes           int     `gorm:"default:0" json:"welcomeSoundMaxBytes"`
+	WelcomeSoundMaxDurationSeconds int     `gorm:"default:0" json:"welcomeSoundMaxDurationSeconds"`
+	WelcomeSoundMaxPeakDbfs        float64 `gorm:"default:0" json:"welcomeSoundMaxPeakDbfs"`
+	WelcomeSoundMaxLoudnessLufs    float64 `gorm:"default:0" json:"welcomeSoundMaxLoudnessLufs"`
 
 	// Email branding
 	EmailInstanceName string `gorm:"size:255" json:"emailInstanceName"`

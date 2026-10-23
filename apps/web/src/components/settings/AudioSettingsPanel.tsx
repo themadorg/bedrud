@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { PushToTalkKeyCapture } from '#/components/settings/PushToTalkKeyCapture'
 import {
   type AudioPreferences,
+  type JoinSoundMode,
   type NoiseSuppressionMode,
   useAudioPreferencesStore,
 } from '#/lib/audio-preferences.store'
@@ -28,6 +29,12 @@ const MODES: { value: NoiseSuppressionMode; label: string; icon: React.ElementTy
 ]
 
 const SEGMENTS = 32
+
+const JOIN_SOUND_OPTIONS: { value: JoinSoundMode; label: string }[] = [
+  { value: 'welcome', label: 'Welcome sounds' },
+  { value: 'chime', label: 'Chime only' },
+  { value: 'off', label: 'Off' },
+]
 
 const BEEP_INTERVALS: { value: number; label: string }[] = [
   { value: 3000, label: '3s' },
@@ -295,6 +302,8 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
   }, [mode, rnnoiseAllowed, krispAllowed, setMode])
 
   const krispLicenseAcknowledged = useAudioPreferencesStore((s) => s.krispLicenseAcknowledged)
+  const joinSoundMode = useAudioPreferencesStore((s) => s.joinSoundMode)
+  const setJoinSoundMode = useAudioPreferencesStore((s) => s.setJoinSoundMode)
 
   const audioPrefsRef = useRef<AudioPreferences>({
     noiseSuppressionMode: mode,
@@ -307,6 +316,7 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
     pushToTalkEnabled,
     pushToTalkKey,
     krispLicenseAcknowledged,
+    joinSoundMode,
   })
   audioPrefsRef.current = {
     noiseSuppressionMode: mode,
@@ -319,6 +329,7 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
     pushToTalkEnabled,
     pushToTalkKey,
     krispLicenseAcknowledged,
+    joinSoundMode,
   }
 
   const syncMutation = useMutation({
@@ -342,6 +353,7 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
     pushToTalkEnabled,
     pushToTalkKey,
     krispLicenseAcknowledged,
+    joinSoundMode,
   ])
 
   useEffect(() => {
@@ -627,6 +639,35 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="border-b px-5 py-3">
+          <CardTitle className="text-sm font-semibold">Join sounds</CardTitle>
+          <CardDescription className="text-xs text-muted-foreground">
+            What you hear when someone joins a meeting
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-5">
+          <div className={segmentTrackClass} role="radiogroup" aria-label="Join sounds">
+            {JOIN_SOUND_OPTIONS.map(({ value, label }) => {
+              const active = joinSoundMode === value
+              return (
+                <label key={value} className={cn(modeSegmentClass(active, meeting, false), 'cursor-pointer')}>
+                  <input
+                    type="radio"
+                    name="join-sound-mode"
+                    value={value}
+                    checked={active}
+                    onChange={() => setJoinSoundMode(value)}
+                    className="sr-only"
+                  />
+                  {label}
+                </label>
+              )
+            })}
+          </div>
         </CardContent>
       </Card>
 

@@ -12,6 +12,7 @@ import {
   UserCheck,
   Users,
   Video,
+  Volume2,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -27,6 +28,12 @@ interface RoomSettings {
   allowAudio: boolean
   requireApproval: boolean
   e2ee: boolean
+  /** Missing on rooms that never set it, which the server treats as allowed. */
+  allowWelcomeSounds?: boolean
+}
+
+function withDefaults(settings: RoomSettings): Required<RoomSettings> {
+  return { ...settings, allowWelcomeSounds: settings.allowWelcomeSounds ?? true }
 }
 
 interface Room {
@@ -53,6 +60,7 @@ const FEATURES = [
   { key: 'allowChat' as const, icon: MessageSquare, label: 'Chat' },
   { key: 'e2ee' as const, icon: ShieldCheck, label: 'E2E' },
   { key: 'requireApproval' as const, icon: UserCheck, label: 'Gate' },
+  { key: 'allowWelcomeSounds' as const, icon: Volume2, label: 'Welcome' },
 ]
 
 export function RoomSettingsDialog({ room, open, onOpenChange, onSave }: Props) {
@@ -60,13 +68,13 @@ export function RoomSettingsDialog({ room, open, onOpenChange, onSave }: Props) 
   const [error, setError] = useState<string | null>(null)
   const [isPublic, setIsPublic] = useState(room.isPublic)
   const [maxParticipants, setMaxParticipants] = useState(room.maxParticipants)
-  const [settings, setSettings] = useState<RoomSettings>({ ...room.settings })
+  const [settings, setSettings] = useState<Required<RoomSettings>>(withDefaults(room.settings))
 
   function handleOpenChange(nextOpen: boolean) {
     if (nextOpen) {
       setIsPublic(room.isPublic)
       setMaxParticipants(room.maxParticipants)
-      setSettings({ ...room.settings })
+      setSettings(withDefaults(room.settings))
       setError(null)
     }
     onOpenChange(nextOpen)

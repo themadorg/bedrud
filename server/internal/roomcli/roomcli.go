@@ -112,6 +112,7 @@ func ShowRoom(configPath, roomID string) error {
 		clioutput.Printf("    RequireApproval:%t\n", room.Settings.RequireApproval)
 		clioutput.Printf("    E2EE:           %t\n", room.Settings.E2EE)
 		clioutput.Printf("    Persistent:     %t\n", room.Settings.IsPersistent)
+		clioutput.Printf("    WelcomeSounds:  %t\n", room.Settings.WelcomeSoundsAllowed())
 		clioutput.Printf("  ActiveParticipants: %d\n", len(participants))
 		return nil
 	})
@@ -235,12 +236,13 @@ func roomDetail(r *models.Room) map[string]any {
 		"createdAt":       r.CreatedAt.Format(time.RFC3339),
 		"expiresAt":       r.ExpiresAt.Format(time.RFC3339),
 		"settings": map[string]any{
-			"allowChat":       r.Settings.AllowChat,
-			"allowVideo":      r.Settings.AllowVideo,
-			"allowAudio":      r.Settings.AllowAudio,
-			"requireApproval": r.Settings.RequireApproval,
-			"e2ee":            r.Settings.E2EE,
-			"isPersistent":    r.Settings.IsPersistent,
+			"allowChat":          r.Settings.AllowChat,
+			"allowVideo":         r.Settings.AllowVideo,
+			"allowAudio":         r.Settings.AllowAudio,
+			"requireApproval":    r.Settings.RequireApproval,
+			"e2ee":               r.Settings.E2EE,
+			"isPersistent":       r.Settings.IsPersistent,
+			"allowWelcomeSounds": r.Settings.WelcomeSoundsAllowed(),
 		},
 	}
 }

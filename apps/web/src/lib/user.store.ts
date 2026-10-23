@@ -9,6 +9,8 @@ export interface User {
   isAdmin: boolean
   accesses: string[] | null
   avatarUrl?: string
+  /** The user's own welcome sound, from /api/auth/me. */
+  welcomeSoundUrl?: string
 }
 
 export function isGuestUser(user: User | null | undefined): boolean {

@@ -14,6 +14,7 @@ import (
 	"bedrud/internal/queue"
 	"bedrud/internal/repository"
 	"bedrud/internal/services"
+	"bedrud/internal/storage"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
@@ -43,6 +44,8 @@ type UserDetails struct {
 	Accesses        []string `json:"accesses" example:"user,admin"`
 	EmailVerifiedAt *string  `json:"emailVerifiedAt,omitempty" example:"2025-01-01 12:00:00"`
 	CreatedAt       string   `json:"createdAt" example:"2025-01-01 12:00:00"`
+	// WelcomeSoundURL is only filled on the detail view, where an admin can clear it.
+	WelcomeSoundURL string `json:"welcomeSoundUrl,omitempty" example:"/uploads/welcome-sounds/123e4567-e89b-12d3-a456-426614174000.mp3?v=1"`
 }
 
 type UserStatusUpdateRequest struct {
@@ -359,6 +362,41 @@ func (h *UsersHandler) UpdateUserStatus(c *fiber.Ctx) error {
 	return c.JSON(UserStatusUpdateResponse{
 		Message: "User status updated successfully",
 	})
+}
+
+// ClearUserWelcomeSound removes another user's welcome sound, for moderation.
+// @Summary Clear a user's welcome sound
+// @Description Remove a user's welcome sound file and URL (requires superadmin access).
+// @Tags admin
+// @Produce json
+// @Param id path string true "User ID"
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{} "Welcome sound cleared"
+// @Failure 403 {object} ErrorResponse "Forbidden"
+// @Failure 404 {object} ErrorResponse "User not found"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /admin/users/{id}/welcome-sound [delete]
+func (h *UsersHandler) ClearUserWelcomeSound(c *fiber.Ctx) error {
+	claims, ok := c.Locals("user").(*auth.Claims)
+	if !ok || claims == nil || !containsAccess(claims.Accesses, "superadmin") {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Insufficient permissions"})
+	}
+
+	user, err := h.userRepo.GetUserByID(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to lookup user"})
+	}
+	if user == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+	}
+	if err := storage.DeleteUserWelcomeSoundFile(user.ID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to remove welcome sound"})
+	}
+	user.WelcomeSoundURL = ""
+	if err := h.userRepo.UpdateUser(user); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update user"})
+	}
+	return c.JSON(fiber.Map{"message": "Welcome sound cleared"})
 }
 
 // DeleteUser permanently deletes a user and all associated data asynchronously.
@@ -940,6 +978,7 @@ func (h *UsersHandler) GetUserDetail(c *fiber.Ctx) error {
 			Accesses:        user.Accesses,
 			EmailVerifiedAt: eva,
 			CreatedAt:       user.CreatedAt.Format("2006-01-02 15:04:05"),
+			WelcomeSoundURL: user.WelcomeSoundURL,
 		},
 		"rooms": rooms,
 	})

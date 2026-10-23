@@ -169,7 +169,15 @@ const TAB_FIELDS: Record<AdminSettingsTabId, (keyof SystemSettings)[]> = {
     'webxdcMaxSingleFileMB',
     'webxdcMaxEntries',
   ],
-  audio: ['rnnoiseEnabled', 'krispEnabled'],
+  audio: [
+    'rnnoiseEnabled',
+    'krispEnabled',
+    'welcomeSoundEnabled',
+    'welcomeSoundMaxBytes',
+    'welcomeSoundMaxDurationSeconds',
+    'welcomeSoundMaxPeakDbfs',
+    'welcomeSoundMaxLoudnessLufs',
+  ],
   logging: ['logLevel'],
   webhooks: [],
 }
@@ -434,7 +442,12 @@ export function AdminSettingsPage({ initialTab }: { initialTab: AdminSettingsTab
               />
             </TabsContent>
             <TabsContent value="audio">
-              <AudioTab settings={current} setSettings={handleTabChange} />
+              <AudioTab
+                settings={current}
+                setSettings={handleTabChange}
+                errors={localErrors}
+                clearFieldError={clearFieldError}
+              />
             </TabsContent>
             <TabsContent value="logging">
               <LoggingTab settings={current} setSettings={handleTabChange} />

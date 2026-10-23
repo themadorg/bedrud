@@ -13,6 +13,20 @@ import type { SystemSettings } from './types'
 /** Placeholder the API returns instead of a stored secret; sending it back means "unchanged". */
 export const MASKED_SECRET = '••••••••'
 
+/** Same bounds the server enforces in applySettingsFields (admin_handler.go). */
+export const WELCOME_SOUND_LIMIT_BOUNDS = {
+  maxBytes: 1024 * 1024,
+  maxDurationSeconds: 30,
+  minPeakDbfs: -30,
+  minLoudnessLufs: -50,
+} as const
+
+/** Parses a number field, keeping the previous value while the text is not a number yet. */
+export function numOrPrev(v: string, prev: number): number {
+  const parsed = Number(v)
+  return Number.isNaN(parsed) ? prev : parsed
+}
+
 export function Section({
   title,
   description,
@@ -169,6 +183,19 @@ export function validateLocalSettings(s: SystemSettings): Record<string, string>
   }
   if (s.webxdcMaxEntries != null && (s.webxdcMaxEntries < 0 || s.webxdcMaxEntries > 10000)) {
     errors.webxdcMaxEntries = 'Must be 0–10000'
+  }
+  const bounds = WELCOME_SOUND_LIMIT_BOUNDS
+  if (s.welcomeSoundMaxBytes < 0 || s.welcomeSoundMaxBytes > bounds.maxBytes) {
+    errors.welcomeSoundMaxBytes = `Must be 0–${bounds.maxBytes} bytes`
+  }
+  if (s.welcomeSoundMaxDurationSeconds < 0 || s.welcomeSoundMaxDurationSeconds > bounds.maxDurationSeconds) {
+    errors.welcomeSoundMaxDurationSeconds = `Must be 0–${bounds.maxDurationSeconds} seconds`
+  }
+  if (s.welcomeSoundMaxPeakDbfs < bounds.minPeakDbfs || s.welcomeSoundMaxPeakDbfs > 0) {
+    errors.welcomeSoundMaxPeakDbfs = `Must be ${bounds.minPeakDbfs} to 0 dBFS`
+  }
+  if (s.welcomeSoundMaxLoudnessLufs < bounds.minLoudnessLufs || s.welcomeSoundMaxLoudnessLufs > 0) {
+    errors.welcomeSoundMaxLoudnessLufs = `Must be ${bounds.minLoudnessLufs} to 0 LUFS`
   }
   for (const [name, val] of strictUrlFields) {
     if (!val) continue

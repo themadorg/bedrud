@@ -149,6 +149,7 @@ More shots: [bedrud.org/en/screenshots](https://bedrud.org/en/screenshots)
 - **Native Client Apps** — Android (Jetpack Compose), iOS (SwiftUI), and desktop (Rust + Slint for Windows, Linux, and macOS) with picture-in-picture, deep linking, and call management
 - **Multiple Auth Methods** — Email/password, OAuth (Google, GitHub, Twitter), guest access, and FIDO2 passkeys
 - **Room Controls** — Public/private rooms, admin kick/mute/video-off, participant management
+- **Welcome Sounds** — An opt-in short MP3 on each profile that plays for the room when that person joins (web app); uploads are checked on the server for length, peak and loudness, and every listener can switch them off
 - **Multi-Instance** — Mobile and desktop apps can connect to multiple Bedrud servers simultaneously
 - **Bot Agents** — Python agents for streaming music, radio, and video into rooms
 - **Built-in Installer** — `bedrud install` sets up systemd services, TLS certificates, and configuration on Debian/Ubuntu
