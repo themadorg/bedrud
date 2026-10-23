@@ -6,6 +6,8 @@ order: 29
 
 How to deploy Bedrud when your server sits behind a reverse proxy or CDN. This is a common production setup, but WebRTC (LiveKit) requires special handling because **CDNs cannot proxy UDP media traffic**.
 
+Running Bedrud in Docker behind Caddy, Traefik, nginx or HAProxy? See [Reverse Proxy Recipes](/en/docs/guides/reverse-proxy) for complete docker-compose stacks.
+
 **Config requirement:** when `behindProxy: true`, you **must** set a non-empty `trustedProxies` list (proxy IPs or CIDRs). The server refuses to start without it (no `0.0.0.0/0` default). Env: `SERVER_TRUSTED_PROXIES`.
 
 ---
