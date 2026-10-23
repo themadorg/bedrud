@@ -775,8 +775,14 @@ func serveListeners(app *fiber.App, cfg *config.Config) error {
 		port = "8080"
 	}
 	addr := cfg.Server.ListenAddr(port)
+	// Listens on "tcp" rather than app.Listen, whose default network is tcp4, so
+	// ":port" accepts both IPv4 and IPv6 like the TLS paths above.
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("HTTP listener failed on %s: %w", addr, utils.BindError(addr, err))
+	}
 	log.Info().Msgf("➜ Bedrud is running on HTTP %s (bound %s)", utils.DisplayAddr(cfg.Server.Host, port), addr)
-	if err := app.Listen(addr); err != nil {
+	if err := app.Listener(ln); err != nil {
 		return fmt.Errorf("HTTP listener failed on %s: %w", addr, utils.BindError(addr, err))
 	}
 	return nil
