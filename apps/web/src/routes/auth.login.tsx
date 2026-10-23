@@ -5,7 +5,7 @@ import { FormattedMessage } from 'react-intl'
 import { ApiError, api } from '#/lib/api'
 import { useAuthStore } from '#/lib/auth.store'
 import { getPublicSettings, type PublicSettings } from '#/lib/use-public-settings'
-import { useUserStore } from '#/lib/user.store'
+import { type ServerUser, toUser, useUserStore } from '#/lib/user.store'
 import { OAuthButtons } from '@/components/auth/OAuthButtons'
 import { loginWithPasskey } from '@/components/auth/PasskeyButton'
 import { Alert } from '@/components/ui/alert'
@@ -23,7 +23,7 @@ export const Route = createFileRoute('/auth/login')({
 })
 
 interface AuthResponse {
-  user: { id: string; email: string; name: string; provider: string; accesses: string[] | null; avatarUrl?: string }
+  user: ServerUser
   tokens: { accessToken: string; refreshToken: string }
 }
 
@@ -78,16 +78,7 @@ function LoginPage() {
 
   function handleSuccess(res: AuthResponse) {
     setTokens(res.tokens)
-    setUser({
-      id: res.user.id,
-      email: res.user.email,
-      name: res.user.name,
-      provider: res.user.provider,
-      isSuperAdmin: res.user.accesses?.includes('superadmin') ?? false,
-      isAdmin: (res.user.accesses?.includes('admin') || res.user.accesses?.includes('superadmin')) ?? false,
-      accesses: res.user.accesses ?? [],
-      avatarUrl: res.user.avatarUrl,
-    })
+    setUser(toUser(res.user))
     navigate({ to: redirect ?? '/dashboard' })
   }
 

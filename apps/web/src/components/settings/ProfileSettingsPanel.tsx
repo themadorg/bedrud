@@ -5,8 +5,7 @@ import { useAuthStore } from '#/lib/auth.store'
 import { resolveAvatarUrl } from '#/lib/avatar-url'
 import { getPalette } from '#/lib/participant-palette'
 import { useProfileSyncStore } from '#/lib/profile-sync.store'
-import type { User } from '#/lib/user.store'
-import { useUserStore } from '#/lib/user.store'
+import { applyProfileUpdate, type ServerUser, toUser, useUserStore } from '#/lib/user.store'
 import { Alert } from '@/components/ui/alert'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -14,28 +13,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { isMeetingTone, panelSurfaceClass, type SettingsPanelTone } from './settingsPanelTone'
-
-interface MeResponse {
-  id: string
-  name: string
-  email: string
-  provider: string
-  accesses: string[] | null
-  avatarUrl?: string
-}
-
-function mapMeToUser(u: MeResponse): User {
-  return {
-    id: u.id,
-    email: u.email,
-    name: u.name,
-    provider: u.provider,
-    isSuperAdmin: u.accesses?.includes('superadmin') ?? false,
-    isAdmin: (u.accesses?.includes('admin') || u.accesses?.includes('superadmin')) ?? false,
-    accesses: u.accesses ?? [],
-    avatarUrl: u.avatarUrl,
-  }
-}
 
 function profileInitials(name: string, email?: string): string {
   const source = name.trim() || email?.trim() || '?'
@@ -91,10 +68,10 @@ export function ProfileSettingsPanel({ tone = 'default' }: { tone?: SettingsPane
     let cancelled = false
     setIsHydrating(true)
     api
-      .get<MeResponse>('/api/auth/me')
+      .get<ServerUser>('/api/auth/me')
       .then((me) => {
         if (cancelled) return
-        setUser(mapMeToUser(me))
+        setUser(toUser(me))
         setName(me.name)
       })
       .catch(() => {})
@@ -140,8 +117,8 @@ export function ProfileSettingsPanel({ tone = 'default' }: { tone?: SettingsPane
     try {
       const form = new FormData()
       form.append('avatar', file)
-      const updated = await api.post<MeResponse>('/api/auth/me/avatar', form)
-      setUser(mapMeToUser(updated))
+      const updated = await api.post<ServerUser>('/api/auth/me/avatar', form)
+      setUser(applyProfileUpdate(useUserStore.getState().user, updated))
       useProfileSyncStore.getState().bump()
       URL.revokeObjectURL(previewUrl)
       setAvatarPreview(null)
@@ -159,8 +136,8 @@ export function ProfileSettingsPanel({ tone = 'default' }: { tone?: SettingsPane
     setStatus(null)
     setAvatarRemoving(true)
     try {
-      const updated = await api.delete<MeResponse>('/api/auth/me/avatar')
-      setUser(mapMeToUser(updated))
+      const updated = await api.delete<ServerUser>('/api/auth/me/avatar')
+      setUser(applyProfileUpdate(useUserStore.getState().user, updated))
       useProfileSyncStore.getState().bump()
       setAvatarPreview(null)
       setStatus({ type: 'success', message: 'Profile photo removed.' })
@@ -181,8 +158,8 @@ export function ProfileSettingsPanel({ tone = 'default' }: { tone?: SettingsPane
     setIsLoading(true)
     setStatus(null)
     try {
-      const updated = await api.put<MeResponse>('/api/auth/me', { name: trimmed })
-      setUser(mapMeToUser(updated))
+      const updated = await api.put<ServerUser>('/api/auth/me', { name: trimmed })
+      setUser(applyProfileUpdate(useUserStore.getState().user, updated))
       useProfileSyncStore.getState().bump()
       setStatus({ type: 'success', message: 'Name updated.' })
     } catch (err) {

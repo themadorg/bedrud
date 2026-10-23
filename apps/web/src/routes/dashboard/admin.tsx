@@ -1,8 +1,8 @@
 import { createFileRoute, Outlet, redirect, useNavigate } from '@tanstack/react-router'
 import { createContext, useContext, useEffect, useMemo } from 'react'
 import { api } from '#/lib/api'
-import type { User } from '#/lib/user.store'
-import { useUserStore } from '#/lib/user.store'
+import { loadRegisteredUser } from '#/lib/require-registered-user'
+import { canOpenAdmin, type ServerUser, toUser, useUserStore } from '#/lib/user.store'
 
 export const Route = createFileRoute('/dashboard/admin')({
   // Loader confirms admin status (after ensuring user is loaded).
@@ -15,26 +15,14 @@ export const Route = createFileRoute('/dashboard/admin')({
     let user = useUserStore.getState().user
     if (!user) {
       try {
-        const u = await api.get<User & { accesses?: string[] }>('/api/auth/me')
-        useUserStore.getState().setUser({
-          id: u.id,
-          email: u.email,
-          name: u.name,
-          provider: u.provider,
-          isSuperAdmin: u.accesses?.includes('superadmin') ?? false,
-          isAdmin: (u.accesses?.includes('admin') || u.accesses?.includes('superadmin')) ?? false,
-          accesses: u.accesses ?? [],
-          avatarUrl: u.avatarUrl,
-        })
+        useUserStore.getState().setUser(toUser(await api.get<ServerUser>('/api/auth/me')))
         user = useUserStore.getState().user
       } catch {
         throw redirect({ to: '/auth' })
       }
     }
 
-    const accesses = user?.accesses ?? []
-    const canAccess = user?.isSuperAdmin || accesses.includes('admin') || accesses.includes('moderator')
-    if (!canAccess) {
+    if (!canOpenAdmin(user)) {
       throw redirect({ to: '/dashboard' })
     }
   },
@@ -59,10 +47,16 @@ function AdminGuard() {
   const navigate = useNavigate()
   const accesses = user?.accesses ?? []
   const isModerator = accesses.includes('moderator')
-  const canAccess = user?.isSuperAdmin || accesses.includes('admin') || isModerator
+  const canAccess = canOpenAdmin(user)
 
   useEffect(() => {
-    if (user !== null && !canAccess) {
+    // A hard load runs the loader during SSR, where it returns early, so a deep link can
+    // reach the guard before any user is loaded.
+    if (user === null) {
+      loadRegisteredUser().catch(() => navigate({ to: '/auth' }))
+      return
+    }
+    if (!canAccess) {
       navigate({ to: '/dashboard' })
     }
   }, [user, canAccess, navigate])
@@ -71,6 +65,8 @@ function AdminGuard() {
     () => ({ isReadOnly: isModerator, isModerator, currentUserId: user?.id ?? null }),
     [isModerator, user?.id],
   )
+
+  if (!canAccess) return null
 
   return (
     <AdminContext.Provider value={ctx}>
