@@ -187,7 +187,7 @@ Three image variants are available:
 All images contain the same static binary — the base image only affects runtime utilities (ca-certs, timezone data).
 
 > [!TIP]
-> Ports `8090` (web UI + API) and `7880` (WebRTC media) must both be exposed. For production, use a reverse proxy (Traefik, Caddy, nginx) with TLS on port 8090.
+> For production, put a reverse proxy in front so only HTTPS (443) is public and `8090`/`7880` stay private; WebRTC media ports (`7881/tcp`, `50000-60000/udp`) still need to be open. Ready-made docker-compose stacks for Caddy, Traefik, nginx and HAProxy: [Reverse Proxy Recipes](https://bedrud.org/en/docs/guides/reverse-proxy/).
 
 #### Ports
 
@@ -443,6 +443,7 @@ Key pages:
 - [Quick Start](https://bedrud.org/en/docs/getting-started/quickstart/)
 - [Architecture Overview](https://bedrud.org/en/docs/architecture/overview/)
 - [Deployment Guide](https://bedrud.org/en/docs/guides/deployment/)
+- [Reverse Proxy Recipes](https://bedrud.org/en/docs/guides/reverse-proxy/)
 - [API Reference](https://bedrud.org/en/docs/api/authentication/)
 
 ---
