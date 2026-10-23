@@ -1,4 +1,4 @@
-import { Field, Section, TextInput, Toggle, ValidateButton } from './shared'
+import { Field, MASKED_SECRET, Section, TextInput, Toggle, ValidateButton } from './shared'
 import type { SystemSettings } from './types'
 
 export function LiveKitTab({
@@ -60,12 +60,13 @@ export function LiveKitTab({
       <Field
         label="API Secret"
         hint={
-          settings.livekitApiSecret === '••••••••'
+          settings.livekitApiSecret === MASKED_SECRET
             ? 'Hidden — enter new value to change'
             : 'Saved to database. Leave empty to use config.yaml value.'
         }
       >
         <TextInput
+          type="password"
           value={settings.livekitApiSecret}
           onChange={(v) => {
             ce('livekitApiSecret')
@@ -83,7 +84,7 @@ export function LiveKitTab({
           payload={{
             livekitHost: settings.livekitHost,
             livekitApiKey: settings.livekitApiKey,
-            livekitApiSecret: settings.livekitApiSecret === '••••••••' ? '' : settings.livekitApiSecret,
+            livekitApiSecret: settings.livekitApiSecret === MASKED_SECRET ? '' : settings.livekitApiSecret,
           }}
         />
       )}

@@ -205,6 +205,7 @@ export function EmailTab({
             }
           >
             <TextInput
+              type="password"
               value={settings.emailPassword}
               onChange={(v) => setSettings({ ...settings, emailPassword: v })}
               mono
