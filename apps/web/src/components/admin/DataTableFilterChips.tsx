@@ -24,6 +24,7 @@ export function DataTableFilterChips({ filters, onRemove, onClearAll }: DataTabl
         <Badge
           key={`${f.key}-${f.value}-${i}`}
           variant="secondary"
+          shape="chip"
           className="gap-1 px-2 py-0.5 text-[10px] font-normal"
         >
           {f.label}: {f.value}

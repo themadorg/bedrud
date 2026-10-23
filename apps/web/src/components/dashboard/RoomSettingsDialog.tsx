@@ -159,6 +159,7 @@ export function RoomSettingsDialog({ room, open, onOpenChange, onSave }: Props) 
                 <Badge
                   key={key}
                   variant={active ? 'default' : 'outline'}
+                  shape="chip"
                   className={cn(
                     'cursor-pointer gap-1.5 px-3 py-1.5 text-xs font-medium',
                     active
