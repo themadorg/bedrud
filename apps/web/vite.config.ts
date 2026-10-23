@@ -1,13 +1,55 @@
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import { devtools } from '@tanstack/devtools-vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
+import license from 'rollup-plugin-license'
+import type { Plugin } from 'vite'
 import { defineConfig } from 'vitest/config'
+import { formatLicenseReport, LICENSE_REPORT_FILE } from './src/lib/third-party-licenses'
 import { excalidrawAliases } from './src/vendor/excalidraw/aliases'
 
 const appRoot = path.dirname(fileURLToPath(import.meta.url))
+
+// TanStack Start writes the browser build here, and `make build` serves this folder from the root.
+const CLIENT_OUT_DIR = path.join(appRoot, 'dist/client')
+
+/**
+ * Writes the open-source licence report into the browser build, where Settings links to it.
+ * The bundler lists every package it put in the build. Two things it cannot credit are added by
+ * hand from `licenses/`, exactly as each project publishes its licence: the fonts in
+ * `public/fonts`, which are files rather than dependencies, and the vendored Excalidraw tree, whose
+ * package manifests name MIT but carry no licence text.
+ */
+function thirdPartyLicenses(): Plugin {
+  const bundledAssets = [
+    {
+      name: 'Shabnam (font)',
+      license: 'OFL-1.1',
+      licenseText: readFileSync(path.join(appRoot, 'licenses/shabnam-OFL.txt'), 'utf8'),
+    },
+    {
+      name: 'Excalidraw (vendored in src/vendor/excalidraw)',
+      license: 'MIT',
+      licenseText: readFileSync(path.join(appRoot, 'licenses/excalidraw-MIT.txt'), 'utf8'),
+    },
+  ]
+  return {
+    ...(license({
+      thirdParty: {
+        output: {
+          file: path.join(CLIENT_OUT_DIR, LICENSE_REPORT_FILE),
+          template: (dependencies) => formatLicenseReport(dependencies, bundledAssets),
+        },
+      },
+    }) as Plugin),
+    apply: 'build',
+    // The server build bundles the same packages for SSR; only the browser build ships the report.
+    applyToEnvironment: (environment) => environment.name === 'client',
+  }
+}
 
 // Keeps the route generator away from test files that sit beside the routes they cover.
 const ROUTE_FILE_IGNORE_PATTERN = '\\.test\\.tsx?$'
@@ -185,6 +227,7 @@ const config = defineConfig({
       },
     }),
     viteReact(),
+    thirdPartyLicenses(),
   ],
   test: {
     environment: 'jsdom',
