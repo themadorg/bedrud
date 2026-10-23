@@ -8,14 +8,15 @@ struct AdminUser: Codable, Identifiable, Equatable {
     let name: String
     let provider: String?
     let isActive: Bool
-    let isAdmin: Bool
     let accesses: [String]?
     let createdAt: String?
+
+    var isAdmin: Bool { accesses?.contains(User.adminAccess) == true }
 
     static func == (lhs: AdminUser, rhs: AdminUser) -> Bool { lhs.id == rhs.id }
 
     enum CodingKeys: String, CodingKey {
-        case id, email, name, provider, isActive, isAdmin, accesses, createdAt
+        case id, email, name, provider, isActive, accesses, createdAt
     }
 
     init(from decoder: Decoder) throws {
@@ -25,15 +26,14 @@ struct AdminUser: Codable, Identifiable, Equatable {
         name = try c.decode(String.self, forKey: .name)
         provider = try c.decodeIfPresent(String.self, forKey: .provider)
         isActive = try c.decodeIfPresent(Bool.self, forKey: .isActive) ?? false
-        isAdmin = try c.decodeIfPresent(Bool.self, forKey: .isAdmin) ?? false
         accesses = try c.decodeIfPresent([String].self, forKey: .accesses)
         createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
     }
 
     init(id: String, email: String, name: String, provider: String? = nil,
-         isActive: Bool, isAdmin: Bool = false, accesses: [String]? = nil, createdAt: String? = nil) {
+         isActive: Bool, accesses: [String]? = nil, createdAt: String? = nil) {
         self.id = id; self.email = email; self.name = name; self.provider = provider
-        self.isActive = isActive; self.isAdmin = isAdmin; self.accesses = accesses; self.createdAt = createdAt
+        self.isActive = isActive; self.accesses = accesses; self.createdAt = createdAt
     }
 }
 

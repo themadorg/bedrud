@@ -96,7 +96,7 @@ struct AdminUsersView: View {
                     users[idx] = AdminUser(
                         id: u.id, email: u.email, name: u.name,
                         provider: u.provider, isActive: !u.isActive,
-                        isAdmin: u.isAdmin, accesses: u.accesses, createdAt: u.createdAt
+                        accesses: u.accesses, createdAt: u.createdAt
                     )
                 }
             } catch {
@@ -232,7 +232,7 @@ struct AdminUserDetailView: View {
                 let updated = AdminUser(
                     id: user.id, email: user.email, name: user.name,
                     provider: user.provider, isActive: !user.isActive,
-                    isAdmin: user.isAdmin, accesses: user.accesses, createdAt: user.createdAt
+                    accesses: user.accesses, createdAt: user.createdAt
                 )
                 onUpdate(updated)
                 dismiss()

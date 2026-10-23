@@ -53,6 +53,16 @@ final class UserTests: XCTestCase {
 
     // MARK: - AdminUser
 
+    func testAdminUserIsAdminOnlyForSuperadmin() throws {
+        let json = """
+        [{"id":"a1","email":"s@b.com","name":"S","accesses":["superadmin","user"]},
+         {"id":"a2","email":"a@b.com","name":"A","accesses":["admin","moderator"]}]
+        """
+        let users = try JSONDecoder().decode([AdminUser].self, from: json.data(using: .utf8)!)
+        XCTAssertTrue(users[0].isAdmin)
+        XCTAssertFalse(users[1].isAdmin)
+    }
+
     func testAdminUserInit() {
         let admin = AdminUser(id: "a1", email: "admin@b.com", name: "Admin", provider: "local", isActive: true, accesses: ["admin"], createdAt: "2024-01-01")
         XCTAssertEqual(admin.id, "a1")
