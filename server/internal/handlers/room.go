@@ -593,6 +593,7 @@ type RefreshLiveKitTokenRequest struct {
 // @Param request body GuestJoinRoomRequest true "Guest name and room name"
 // @Success 200 {object} map[string]interface{} "{id, name, token, adminId, livekitHost}"
 // @Failure 400 {object} ErrorResponse "Invalid request or guest name required"
+// @Failure 403 {object} ErrorResponse "Registration or guest login disabled, room private, full, or guest banned"
 // @Failure 404 {object} ErrorResponse "Room not found"
 // @Failure 500 {object} ErrorResponse "Failed to join room"
 // @Router /room/guest-join [post]
@@ -620,13 +621,20 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Guest name too long (max 50 characters)"})
 	}
 
-	// Check guest login settings
+	// Check registration settings (mirrors AuthHandler.GuestLogin)
 	if h.settingsRepo != nil {
 		settings, _ := h.settingsRepo.GetSettings()
-		if settings != nil && !settings.GuestLoginEnabled {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": "Guest login is currently disabled",
-			})
+		if settings != nil {
+			if !settings.RegistrationEnabled {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"error": "Registration is currently disabled",
+				})
+			}
+			if !settings.GuestLoginEnabled {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"error": "Guest login is currently disabled",
+				})
+			}
 		}
 	}
 
