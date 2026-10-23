@@ -4,6 +4,15 @@ import { DEFAULT_PUSH_TO_TALK_KEY, normalizePushToTalkKey } from '#/lib/push-to-
 
 export type NoiseSuppressionMode = 'none' | 'browser' | 'rnnoise' | 'krisp'
 
+/** What the listener hears when someone joins: their welcome sound, the plain chime, or nothing. */
+export type JoinSoundMode = 'welcome' | 'chime' | 'off'
+
+const JOIN_SOUND_MODES: readonly JoinSoundMode[] = ['welcome', 'chime', 'off']
+
+function isJoinSoundMode(value: unknown): value is JoinSoundMode {
+  return JOIN_SOUND_MODES.includes(value as JoinSoundMode)
+}
+
 export interface AudioPreferences {
   noiseSuppressionMode: NoiseSuppressionMode
   echoCancellation: boolean
@@ -19,9 +28,11 @@ export interface AudioPreferences {
    * Krisp stays off until this is set via enableKrispAfterLicenseAck().
    */
   krispLicenseAcknowledged: boolean
+  joinSoundMode: JoinSoundMode
 }
 
 interface AudioPreferencesStore extends AudioPreferences {
+  setJoinSoundMode: (mode: JoinSoundMode) => void
   setMode: (mode: NoiseSuppressionMode) => void
   /** After the license dialog — only path that may set mode to krisp. */
   enableKrispAfterLicenseAck: () => void
@@ -59,6 +70,8 @@ export const useAudioPreferencesStore = create<AudioPreferencesStore>()(
       pushToTalkEnabled: false,
       pushToTalkKey: DEFAULT_PUSH_TO_TALK_KEY,
       krispLicenseAcknowledged: false,
+      joinSoundMode: 'welcome',
+      setJoinSoundMode: (joinSoundMode) => set({ joinSoundMode }),
       setMode: (noiseSuppressionMode) =>
         set((s) => {
           // Block silent krisp enable — use enableKrispAfterLicenseAck after the dialog.
@@ -101,6 +114,7 @@ export const useAudioPreferencesStore = create<AudioPreferencesStore>()(
             ...(partial.krispLicenseAcknowledged !== undefined && {
               krispLicenseAcknowledged: partial.krispLicenseAcknowledged,
             }),
+            ...(isJoinSoundMode(partial.joinSoundMode) && { joinSoundMode: partial.joinSoundMode }),
           }
         }),
     }),
