@@ -26,18 +26,18 @@ const (
 
 type installConfigYAML struct {
 	Server struct {
-		Port           string   `yaml:"port"`
-		Host           string   `yaml:"host"`
-		EnableTLS      bool     `yaml:"enableTLS"`
-		CertFile       string   `yaml:"certFile"`
-		KeyFile        string   `yaml:"keyFile"`
-		Domain         string   `yaml:"domain"`
-		Email          string   `yaml:"email"`
-		UseACME        bool     `yaml:"useACME"`
+		Port           string           `yaml:"port"`
+		Host           string           `yaml:"host"`
+		EnableTLS      bool             `yaml:"enableTLS"`
+		CertFile       string           `yaml:"certFile"`
+		KeyFile        string           `yaml:"keyFile"`
+		Domain         string           `yaml:"domain"`
+		Email          string           `yaml:"email"`
+		UseACME        bool             `yaml:"useACME"`
 		ACME           *installACMEYAML `yaml:"acme,omitempty"`
-		BehindProxy    bool     `yaml:"behindProxy,omitempty"`
-		TrustedProxies []string `yaml:"trustedProxies,omitempty"`
-		ProxyHeader    string   `yaml:"proxyHeader,omitempty"`
+		BehindProxy    bool             `yaml:"behindProxy,omitempty"`
+		TrustedProxies []string         `yaml:"trustedProxies,omitempty"`
+		ProxyHeader    string           `yaml:"proxyHeader,omitempty"`
 	} `yaml:"server"`
 	Database struct {
 		Type string `yaml:"type"`
