@@ -380,14 +380,14 @@ func Run(configPath, version string) error {
 		queueConcurrency = 1
 	}
 	queueWorker := queue.NewWorker(database.GetDB(), map[string]queue.Handler{
-		"user_delete":        queue.NewUserDeleteHandler(cleanupSvc, userRepo, passkeyRepo, prefsRepo, roomRepo),
-		"room_delete":        queue.NewRoomDeleteHandler(cleanupSvc, roomRepo),
-		"room_suspend":       queue.NewRoomSuspendHandler(cleanupSvc, roomRepo),
-		"chat_upload_s3":     queue.NewChatUploadS3Handler(uploadStore, uploadTracker),
-		"send_email":         queue.NewSendEmailHandler(&cfg.Email),
-		"dispatch_webhook":   queue.NewDispatchWebhookHandler(),
-		"process_recording":  queue.NewProcessRecordingHandler(recordingRepo, webhookRepo, cfg.LiveKit.Host, cfg.LiveKit.InternalHost, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, recordingStore),
-		"recording_delete":   queue.NewRecordingDeleteHandler(recordingRepo),
+		"user_delete":       queue.NewUserDeleteHandler(cleanupSvc, userRepo, passkeyRepo, prefsRepo, roomRepo),
+		"room_delete":       queue.NewRoomDeleteHandler(cleanupSvc, roomRepo),
+		"room_suspend":      queue.NewRoomSuspendHandler(cleanupSvc, roomRepo),
+		"chat_upload_s3":    queue.NewChatUploadS3Handler(uploadStore, uploadTracker),
+		"send_email":        queue.NewSendEmailHandler(&cfg.Email),
+		"dispatch_webhook":  queue.NewDispatchWebhookHandler(),
+		"process_recording": queue.NewProcessRecordingHandler(recordingRepo, webhookRepo, cfg.LiveKit.Host, cfg.LiveKit.InternalHost, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, recordingStore),
+		"recording_delete":  queue.NewRecordingDeleteHandler(recordingRepo),
 	}, queue.WorkerOptions{
 		Interval:    time.Duration(cfg.Queue.PollInterval.Int64()) * time.Millisecond,
 		Concurrency: queueConcurrency,
@@ -473,7 +473,6 @@ func Run(configPath, version string) error {
 	api.Put("/room/:roomId/settings", append(requireAuthMut, middleware.RejectGuest(), roomHandler.UpdateSettings)...)
 	api.Delete("/room/:roomId", append(requireAuthMut, middleware.RejectGuest(), roomHandler.DeleteRoom)...)
 	api.Post("/room/:roomId/chat/upload", append(requireAuthMut, middleware.APIRateLimiter(cfg.RateLimit), roomHandler.UploadChatImage)...)
-
 
 	// TODO oncoming feature: recording routes
 	// api.Post("/rooms/:id/recording/start", ...)
