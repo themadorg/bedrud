@@ -272,7 +272,7 @@ definitions:
         description: error, warning, info
         type: string
       type:
-        description: tls_expiry, stale_room, empty_room, auth_spike
+        description: tls_expiry, stale_room, empty_room, auth_spike, unreadable_timestamps
         type: string
     type: object
   models.DayActivity:
@@ -552,6 +552,8 @@ definitions:
         type: integer
       chatUploadMaxBytes:
         type: integer
+      chatUploadMaxDimension:
+        type: integer
       chatUploadS3AccessKey:
         type: string
       chatUploadS3Bucket:
@@ -648,6 +650,12 @@ definitions:
         type: integer
       jwtSecret:
         type: string
+      krispEnabled:
+        description: |-
+          Krisp noise cancellation (optional proprietary filter via @livekit/krisp-noise-filter).
+          Off by default. Admins must enable after confirming their own Krisp/LiveKit licensing.
+          Bedrud does not ship a Krisp license.
+        type: boolean
       livekitApiKey:
         type: string
       livekitApiSecret:
@@ -684,6 +692,11 @@ definitions:
         type: boolean
       registrationEnabled:
         type: boolean
+      rnnoiseEnabled:
+        description: |-
+          RNNoise WASM noise suppression (optional; ~1.9 MB download when used).
+          Off by default. When disabled, clients must not load the RNNoise package.
+        type: boolean
       serverCertFile:
         type: string
       serverDomain:
@@ -718,6 +731,32 @@ definitions:
         type: string
       updatedAt:
         type: string
+      webxdcGalleryAllowRemoteDownload:
+        type: boolean
+      webxdcGalleryEnabled:
+        description: Experimental WebXDC gallery (admin-configurable; runtime host
+          still needs webxdc.enabled + domain in config.yaml)
+        type: boolean
+      webxdcGalleryInstanceCatalogEnabled:
+        description: 'Instance catalog: admin-uploaded .xdc packages shared across
+          all rooms (in addition to remote/semi-remote).'
+        type: boolean
+      webxdcGalleryRemoteCatalogUrl:
+        type: string
+      webxdcGallerySource:
+        description: local | remote | both | semi-remote
+        type: string
+      webxdcMaxArchiveMB:
+        description: |-
+          Package size limits (MiB / counts). 0 = use config.yaml defaults (10 / 30 / 5 MiB, 500 entries).
+          Max single file is the usual "entry too large" limit for large files inside a .xdc zip.
+        type: integer
+      webxdcMaxEntries:
+        type: integer
+      webxdcMaxSingleFileMB:
+        type: integer
+      webxdcMaxUncompressedMB:
+        type: integer
     type: object
   models.TLSStatus:
     properties:
@@ -1147,6 +1186,26 @@ paths:
       - description: Filter by creator user ID
         in: query
         name: createdBy
+        type: string
+      - description: Filter by owner name or email
+        in: query
+        name: owner
+        type: string
+      - description: Created on or after this date (YYYY-MM-DD)
+        in: query
+        name: dateFrom
+        type: string
+      - description: Created on or before this date, inclusive (YYYY-MM-DD)
+        in: query
+        name: dateTo
+        type: string
+      - description: Last activity on or after this date (YYYY-MM-DD)
+        in: query
+        name: lastActivityFrom
+        type: string
+      - description: Last activity on or before this date, inclusive (YYYY-MM-DD)
+        in: query
+        name: lastActivityTo
         type: string
       - default: createdAt
         description: 'Sort field: name, createdAt, maxParticipants, participantsCount,
@@ -2647,12 +2706,14 @@ paths:
       - system
   /api/health:
     get:
-      description: Get the health status of the service
+      description: |-
+        Get the health status of the service, plus the instance's display name and version. Needs no session.
+        serverName resolves to the admin-set name, then server.domain, then "Bedrud"; it is omitted if settings cannot be read.
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: status, time, version, serverName
           schema:
             additionalProperties: true
             type: object
@@ -2882,6 +2943,45 @@ paths:
           schema:
             $ref: '#/definitions/auth.ErrorResponse'
       summary: Update profile
+      tags:
+      - auth
+  /auth/me/avatar:
+    delete:
+      description: Remove a custom uploaded profile photo
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Remove profile avatar
+      tags:
+      - auth
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a profile photo stored on the server
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Upload profile avatar
       tags:
       - auth
   /auth/passkey/login/begin:
@@ -3299,12 +3399,14 @@ paths:
       - auth
   /health:
     get:
-      description: Get the health status of the service
+      description: |-
+        Get the health status of the service, plus the instance's display name and version. Needs no session.
+        serverName resolves to the admin-set name, then server.domain, then "Bedrud"; it is omitted if settings cannot be read.
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: status, time, version, serverName
           schema:
             additionalProperties: true
             type: object
@@ -3827,6 +3929,40 @@ paths:
       summary: Get participant info
       tags:
       - rooms
+  /room/{roomId}/participant/{identity}/profile:
+    get:
+      description: Fetch a participant's display name and avatar. Caller and target
+        must both be in the room.
+      parameters:
+      - description: Room ID
+        in: path
+        name: roomId
+        required: true
+        type: string
+      - description: Participant identity
+        in: path
+        name: identity
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{id, name, avatarUrl}'
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Not in meeting
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Participant not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Get meeting participant profile
+      tags:
+      - rooms
   /room/{roomId}/promote/{identity}:
     post:
       consumes:
@@ -4195,6 +4331,42 @@ paths:
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
       summary: List archived rooms
+      tags:
+      - rooms
+  /room/check/{roomName}:
+    get:
+      description: Read-only lookup for whether a room exists and is joinable.
+      parameters:
+      - description: Room name
+        in: path
+        name: roomName
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{exists, name}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid room name
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Private or full
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Room not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "410":
+          description: Room inactive
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Check room availability
       tags:
       - rooms
   /room/create:
