@@ -154,6 +154,17 @@ HTTP listener, TLS, proxy, and capacity limits.
 | `maxMessageCount` | `CHAT_MAX_MESSAGE_COUNT` | Messages kept per room (default 10000) |
 | `messageTTLHours` | `CHAT_MESSAGE_TTL_HOURS` | Message max age (default 2160 = 90 days) |
 
+### `welcomeSound`
+
+Default limits for profile welcome sounds (in progress; the upload API and the web profile enforce them, meeting playback is not wired yet). The on/off switch lives in the admin panel only. `0` uses the built-in default.
+
+| Field | Env | Description |
+|-------|-----|-------------|
+| `maxBytes` | `WELCOME_SOUND_MAX_BYTES` | Largest accepted upload (default 32768) |
+| `maxDurationSeconds` | `WELCOME_SOUND_MAX_DURATION_SECONDS` | Longest accepted clip (default 7) |
+| `maxPeakDbfs` | `WELCOME_SOUND_MAX_PEAK_DBFS` | Reject clips whose sample peak reaches this level (default -1) |
+| `maxLoudnessLufs` | `WELCOME_SOUND_MAX_LOUDNESS_LUFS` | Reject clips louder than this integrated loudness (default -20) |
+
 ### `recording`
 
 | Field | Env | Description |

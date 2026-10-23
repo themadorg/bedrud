@@ -39,11 +39,27 @@ func (r *SettingsRepository) GetEffectiveSettings() (*models.SystemSettings, err
 	if err != nil {
 		return nil, err
 	}
-	if r.cfg == nil {
-		return s, nil
+	if r.cfg != nil {
+		mergeFromConfig(s, r.cfg)
 	}
-	mergeFromConfig(s, r.cfg)
+	applyWelcomeSoundDefaults(s)
 	return s, nil
+}
+
+// applyWelcomeSoundDefaults fills welcome sound limits that neither the admin panel nor config.yaml set.
+func applyWelcomeSoundDefaults(s *models.SystemSettings) {
+	if s.WelcomeSoundMaxBytes == 0 {
+		s.WelcomeSoundMaxBytes = config.DefaultWelcomeSoundMaxBytes
+	}
+	if s.WelcomeSoundMaxDurationSeconds == 0 {
+		s.WelcomeSoundMaxDurationSeconds = config.DefaultWelcomeSoundMaxDurationSeconds
+	}
+	if s.WelcomeSoundMaxPeakDbfs == 0 {
+		s.WelcomeSoundMaxPeakDbfs = config.DefaultWelcomeSoundMaxPeakDbfs
+	}
+	if s.WelcomeSoundMaxLoudnessLufs == 0 {
+		s.WelcomeSoundMaxLoudnessLufs = config.DefaultWelcomeSoundMaxLoudnessLufs
+	}
 }
 
 // mergeFromConfig fills in zero/empty fields from the config file.
@@ -256,6 +272,20 @@ func mergeFromConfig(s *models.SystemSettings, cfg *config.Config) {
 	}
 	if s.ChatMessageTTLHours == 0 && cfg.Chat.MessageTTLHours != 0 {
 		s.ChatMessageTTLHours = cfg.Chat.MessageTTLHours
+	}
+
+	// Welcome sound limits
+	if s.WelcomeSoundMaxBytes == 0 && cfg.WelcomeSound.MaxBytes != 0 {
+		s.WelcomeSoundMaxBytes = cfg.WelcomeSound.MaxBytes
+	}
+	if s.WelcomeSoundMaxDurationSeconds == 0 && cfg.WelcomeSound.MaxDurationSeconds != 0 {
+		s.WelcomeSoundMaxDurationSeconds = cfg.WelcomeSound.MaxDurationSeconds
+	}
+	if s.WelcomeSoundMaxPeakDbfs == 0 && cfg.WelcomeSound.MaxPeakDbfs != 0 {
+		s.WelcomeSoundMaxPeakDbfs = cfg.WelcomeSound.MaxPeakDbfs
+	}
+	if s.WelcomeSoundMaxLoudnessLufs == 0 && cfg.WelcomeSound.MaxLoudnessLufs != 0 {
+		s.WelcomeSoundMaxLoudnessLufs = cfg.WelcomeSound.MaxLoudnessLufs
 	}
 
 	// Logger

@@ -1,11 +1,6 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Field, Section, TextInput, ValidateButton } from './shared'
+import { Field, numOrPrev, Section, TextInput, ValidateButton } from './shared'
 import type { SystemSettings } from './types'
-
-function numOrPrev(v: string, prev: number): number {
-  const parsed = Number(v)
-  return Number.isNaN(parsed) ? prev : parsed
-}
 
 function numOrPrev64(v: string, prev: number): number {
   const parsed = Number(v)

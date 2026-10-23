@@ -55,6 +55,9 @@ recordings ──► rooms (planned, wired in code)      │
 | `name` | varchar(255) | Display name |
 | `provider` | varchar(20) | `local`, `passkey`, `guest`, or OAuth provider |
 | `avatar_url` | varchar(255) | |
+| `welcome_sound_url` | varchar(255) | Versioned `/uploads/welcome-sounds/<id>.mp3?v=…`; empty = none |
+| `welcome_sound_change_day` | varchar(10) | UTC day (`YYYY-MM-DD`) of the last welcome sound upload |
+| `welcome_sound_change_count` | int | Uploads on that day; capped at 2 |
 | `password` | varchar(255) | Bcrypt hash; empty for OAuth/passkey/guest |
 | `refresh_token` | text | Current refresh token hash |
 | `accesses` | text[] / text | PostgreSQL array or comma-joined; levels: `superadmin`, `admin`, `moderator`, `user`, `guest` |
