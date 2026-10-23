@@ -545,6 +545,11 @@ func TestGuestJoinRoom_Success(t *testing.T) {
 	if tokens, _ := payload["tokens"].(map[string]interface{}); tokens == nil || tokens["accessToken"] == "" {
 		t.Fatalf("expected tokens.accessToken, got %#v", payload["tokens"])
 	}
+	// Guests need the room's settings too, or a call with chat switched off still offers it to them.
+	settings, _ := payload["settings"].(map[string]interface{})
+	if allowChat, ok := settings["allowChat"].(bool); !ok || allowChat {
+		t.Fatalf("expected settings.allowChat false, got %#v", payload["settings"])
+	}
 }
 
 func TestGuestJoinRoom_CreatesGuestUserBeforeParticipant(t *testing.T) {
