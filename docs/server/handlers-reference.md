@@ -158,7 +158,7 @@ All under `/api/admin/users` — requires superadmin.
 | `GetPublicSettings` | `GET /settings/public` (no admin) |
 | `UpdateSettings` | `PUT /admin/settings` |
 | `ValidateSettingsConnectivity` | `POST /admin/settings/validate` |
-| `SendTestEmail` | `POST /admin/settings/test-email` |
+| `SendTestEmail` | `POST /admin/settings/send-test-email` |
 | `ListInviteTokens` | `GET /admin/invite-tokens` |
 | `CreateInviteToken` | `POST /admin/invite-tokens` |
 | `DeleteInviteToken` | `DELETE /admin/invite-tokens/:id` |

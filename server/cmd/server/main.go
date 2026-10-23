@@ -382,7 +382,7 @@ func run() error {
 		"room_delete":       queue.NewRoomDeleteHandler(cleanupSvc, roomRepo),
 		"room_suspend":      queue.NewRoomSuspendHandler(cleanupSvc, roomRepo),
 		"chat_upload_s3":    queue.NewChatUploadS3Handler(storage.NewChatUploadStore(&cfg.Chat.Uploads), uploadTracker),
-		"send_email":        queue.NewSendEmailHandler(&cfg.Email),
+		"send_email":        queue.NewSendEmailHandler(&cfg.Email, settingsRepo),
 		"dispatch_webhook":  queue.NewDispatchWebhookHandler(),
 		"process_recording": queue.NewProcessRecordingHandler(recordingRepo, webhookRepo, cfg.LiveKit.Host, cfg.LiveKit.InternalHost, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, recordingStore),
 		"recording_delete":  queue.NewRecordingDeleteHandler(recordingRepo),
@@ -559,6 +559,7 @@ func run() error {
 		adminGroup.Delete("/webxdc/catalog/:id", webxdcHandler.AdminDeleteInstanceCatalog)
 	}
 	adminGroup.Put("/settings", adminHandler.UpdateSettings)
+	adminGroup.Post("/settings/send-test-email", adminHandler.SendTestEmail)
 	adminGroup.Post("/settings/validate", adminHandler.ValidateSettingsConnectivity)
 	adminGroup.Get("/invite-tokens", adminHandler.ListInviteTokens)
 	adminGroup.Post("/invite-tokens", adminHandler.CreateInviteToken)

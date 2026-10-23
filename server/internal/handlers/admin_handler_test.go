@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +16,7 @@ import (
 	"bedrud/config"
 	"bedrud/internal/auth"
 	"bedrud/internal/models"
+	"bedrud/internal/queue"
 	"bedrud/internal/repository"
 	"bedrud/internal/testutil"
 
@@ -1252,6 +1255,103 @@ func TestAdminHandler_SendTestEmail_SMTPNotConfigured(t *testing.T) {
 	if resp.StatusCode != http.StatusBadRequest {
 		respBody, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 400, got %d: %s", resp.StatusCode, string(respBody))
+	}
+}
+
+// capturedTestEmail records what the fake mail sender received.
+type capturedTestEmail struct {
+	settings queue.SMTPSettings
+	to       string
+	subject  string
+}
+
+// setupSendTestEmailApp serves SendTestEmail with SMTP saved in the database and a fake sender.
+func setupSendTestEmailApp(t *testing.T, result error) (*fiber.App, *capturedTestEmail) {
+	t.Helper()
+	config.SetForTest(&config.Config{})
+	db := testutil.SetupTestDB(t)
+	settingsRepo := repository.NewSettingsRepository(db)
+	if err := settingsRepo.SaveSettings(&models.SystemSettings{
+		EmailSMTPHost:     "smtp.dashboard.example",
+		EmailSMTPPort:     2525,
+		EmailInstanceName: "Acme Meet",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	adminHandler := NewAdminHandler(settingsRepo, repository.NewInviteTokenRepository(db),
+		repository.NewWebhookRepository(db), repository.NewRecordingRepository(db))
+	captured := &capturedTestEmail{}
+	adminHandler.sendMail = func(ctx context.Context, settings queue.SMTPSettings, to, subject, bodyHTML, bodyPlain string) error {
+		captured.settings = settings
+		captured.to = to
+		captured.subject = subject
+		return result
+	}
+
+	app := fiber.New()
+	app.Post("/admin/settings/send-test-email", adminHandler.SendTestEmail)
+	return app, captured
+}
+
+func postSendTestEmail(t *testing.T, app *fiber.App, to string) (int, map[string]string) {
+	t.Helper()
+	body, _ := json.Marshal(map[string]string{"to": to})
+	req := httptest.NewRequest(http.MethodPost, "/admin/settings/send-test-email", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var decoded map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+		t.Fatal(err)
+	}
+	return resp.StatusCode, decoded
+}
+
+func TestAdminHandler_SendTestEmail_Success(t *testing.T) {
+	app, captured := setupSendTestEmailApp(t, nil)
+
+	status, body := postSendTestEmail(t, app, "ops@example.com")
+
+	if status != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %v", status, body)
+	}
+	if body["message"] != "Test email sent to ops@example.com" {
+		t.Errorf("unexpected message %q", body["message"])
+	}
+	if captured.to != "ops@example.com" {
+		t.Errorf("expected recipient ops@example.com, got %q", captured.to)
+	}
+	if captured.settings.Host != "smtp.dashboard.example" || captured.settings.Port != 2525 {
+		t.Errorf("expected saved SMTP settings, got %+v", captured.settings)
+	}
+	if captured.subject != "Test Email from Acme Meet" {
+		t.Errorf("unexpected subject %q", captured.subject)
+	}
+}
+
+func TestAdminHandler_SendTestEmail_TransportError(t *testing.T) {
+	app, _ := setupSendTestEmailApp(t, errors.New("smtp send: smtp auth after STARTTLS: 535 authentication failed"))
+
+	status, body := postSendTestEmail(t, app, "ops@example.com")
+
+	if status != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %v", status, body)
+	}
+	if !strings.Contains(body["error"], "535 authentication failed") {
+		t.Errorf("expected transport error in message, got %q", body["error"])
+	}
+}
+
+func TestAdminHandler_SendTestEmail_Timeout(t *testing.T) {
+	app, _ := setupSendTestEmailApp(t, queue.ErrSMTPTimeout)
+
+	status, body := postSendTestEmail(t, app, "ops@example.com")
+
+	if status != http.StatusRequestTimeout {
+		t.Fatalf("expected 408, got %d: %v", status, body)
 	}
 }
 

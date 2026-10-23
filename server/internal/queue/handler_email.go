@@ -7,13 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"net"
-	"net/smtp"
-	"time"
 
 	"bedrud/config"
 	"bedrud/internal/models"
-	"bedrud/internal/utils"
 
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
@@ -27,14 +23,48 @@ var emailTemplatesFS embed.FS
 // emailHandler holds SMTP config, parsed templates, and email branding config.
 type emailHandler struct {
 	cfg        *config.EmailConfig
+	settings   EffectiveSettingsSource
 	tmpls      map[string]*template.Template
 	plainTmpls map[string]*template.Template
 }
 
+// emailSettingsFromConfig maps config.yaml email values onto the settings shape SMTPSettingsFrom reads.
+func emailSettingsFromConfig(cfg *config.EmailConfig) *models.SystemSettings {
+	if cfg == nil {
+		return nil
+	}
+	return &models.SystemSettings{
+		EmailSMTPHost:      cfg.SMTPHost,
+		EmailSMTPPort:      cfg.SMTPPort,
+		EmailUsername:      cfg.Username,
+		EmailPassword:      cfg.Password,
+		EmailFromAddress:   cfg.FromAddress,
+		EmailFromName:      cfg.FromName,
+		EmailInstanceName:  cfg.Templates.InstanceName,
+		EmailTLSSkipVerify: cfg.TLSSkipVerify,
+		EmailSMTPSMode:     cfg.SMTPSMode,
+	}
+}
+
+// resolveSMTP returns the effective SMTP transport, the same one the admin test email uses.
+// It falls back to config.yaml when the settings source is absent or cannot be read.
+func (h *emailHandler) resolveSMTP() SMTPSettings {
+	if h.settings != nil {
+		effective, err := h.settings.GetEffectiveSettings()
+		if err == nil {
+			return SMTPSettingsFrom(effective)
+		}
+		log.Warn().Err(err).Msg("email: failed to load effective settings, using config.yaml SMTP")
+	}
+	return SMTPSettingsFrom(emailSettingsFromConfig(h.cfg))
+}
+
 // NewSendEmailHandler creates a handler that sends transactional emails via SMTP.
-// When SMTP is not configured, the handler logs and skips (no-op, no error).
-func NewSendEmailHandler(cfg *config.EmailConfig) Handler {
-	h := &emailHandler{cfg: cfg}
+// SMTP comes from settings (database overrides on config.yaml) at send time, so
+// dashboard changes apply without a restart. When SMTP is not configured, the
+// handler logs and skips (no-op, no error).
+func NewSendEmailHandler(cfg *config.EmailConfig, settings EffectiveSettingsSource) Handler {
+	h := &emailHandler{cfg: cfg, settings: settings}
 
 	h.tmpls = make(map[string]*template.Template)
 	h.plainTmpls = make(map[string]*template.Template)
@@ -81,7 +111,8 @@ func NewSendEmailHandler(cfg *config.EmailConfig) Handler {
 			return err
 		}
 
-		if h.cfg == nil || h.cfg.SMTPHost == "" || h.cfg.SMTPPort == 0 {
+		transport := h.resolveSMTP()
+		if !transport.Configured() {
 			log.Warn().Str("to", payload.To).Str("subject", subject).
 				Str("template", templateName).
 				Str("body", bodyHTML).
@@ -90,51 +121,13 @@ func NewSendEmailHandler(cfg *config.EmailConfig) Handler {
 			return nil
 		}
 
-		from := h.cfg.FromAddress
-		if from == "" {
-			from = "noreply@bedrud"
-		}
-		fromName := h.cfg.FromName
-		if fromName == "" {
-			fromName = defaultEmailFromName
-		}
-
 		bodyPlain := renderPlaintextBody(h.plainTmpls, SendEmailPayload{
 			TemplateName: templateName,
 			TemplateData: data,
 		})
 
-		msg := utils.BuildMessage(from, fromName, payload.To, subject, bodyHTML, bodyPlain)
-
-		addr := net.JoinHostPort(h.cfg.SMTPHost, fmt.Sprint(h.cfg.SMTPPort))
-
-		var auth smtp.Auth
-		if h.cfg.Username != "" {
-			auth = smtp.PlainAuth("", h.cfg.Username, h.cfg.Password, h.cfg.SMTPHost)
-		}
-
-		done := make(chan error, 1)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					done <- fmt.Errorf("panic in sendSMTP: %v", r)
-				}
-			}()
-			done <- utils.SendSMTP(addr, auth, from, []string{payload.To}, []byte(msg),
-				h.cfg.SMTPHost, h.cfg.TLSSkipVerify, h.cfg.SMTPSMode)
-		}()
-
-		timer := time.NewTimer(30 * time.Second)
-		defer timer.Stop()
-		select {
-		case err := <-done:
-			if err != nil {
-				return fmt.Errorf("smtp send: %w", err)
-			}
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-timer.C:
-			return fmt.Errorf("smtp send timed out after 30s")
+		if err := SendSMTPMail(ctx, transport, payload.To, subject, bodyHTML, bodyPlain); err != nil {
+			return err
 		}
 
 		log.Info().Str("to", payload.To).Str("subject", subject).
