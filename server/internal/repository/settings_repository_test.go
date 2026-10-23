@@ -83,6 +83,37 @@ func TestSettingsRepository_SaveSettings_MultipleUpdates(t *testing.T) {
 	}
 }
 
+func TestMergeFromConfig_ServerName_FallsBackToDomain(t *testing.T) {
+	s := &models.SystemSettings{}
+	cfg := &config.Config{}
+	cfg.Server.Domain = "meet.example.com"
+	mergeFromConfig(s, cfg)
+
+	if s.ServerName != "meet.example.com" {
+		t.Errorf("expected 'meet.example.com', got %q", s.ServerName)
+	}
+}
+
+func TestMergeFromConfig_ServerName_FallsBackToDefaultWithoutDomain(t *testing.T) {
+	s := &models.SystemSettings{}
+	mergeFromConfig(s, &config.Config{})
+
+	if s.ServerName != "Bedrud" {
+		t.Errorf("expected 'Bedrud', got %q", s.ServerName)
+	}
+}
+
+func TestMergeFromConfig_ServerName_DBWins(t *testing.T) {
+	s := &models.SystemSettings{ServerName: "Team Calls"}
+	cfg := &config.Config{}
+	cfg.Server.Domain = "meet.example.com"
+	mergeFromConfig(s, cfg)
+
+	if s.ServerName != "Team Calls" {
+		t.Errorf("expected 'Team Calls' (DB wins), got %q", s.ServerName)
+	}
+}
+
 func TestMergeFromConfig_EmailBranding_ConfigFillsEmpty(t *testing.T) {
 	s := &models.SystemSettings{}
 	cfg := testConfigWithEmailBranding()

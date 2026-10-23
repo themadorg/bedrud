@@ -173,8 +173,10 @@ The server exposes two endpoints for load balancer and orchestration probes:
 
 | Endpoint | Returns | Use |
 |----------|---------|-----|
-| `GET /api/health` | `{"status":"healthy","time":<unix>}` | Liveness check |
+| `GET /api/health` | `{"status":"healthy","time":<unix>,"version":"…","serverName":"…"}` | Liveness check |
 | `GET /api/ready` | `{"status":"ready","time":<unix>}` | Readiness check |
+
+`serverName` is the instance's display name, which clients show when a user adds the server. It is the name set in the admin settings; if none is set, it falls back to `server.domain`, then to `Bedrud`. It is left out only if the settings cannot be read, so the probe stays green.
 
 Root-level redirects (`/health` → `/api/health`, `/ready` → `/api/ready`) exist for backward compatibility.
 

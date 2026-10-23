@@ -75,7 +75,7 @@ Merged from config when DB fields empty. Goth re-initialized when admin updates 
 | `serverPort`, `serverHost`, `serverDomain` | Public URL construction |
 | `serverEnableTls`, `serverCertFile`, `serverKeyFile`, `serverUseAcme` | TLS (mostly config-driven at startup) |
 | `behindProxy` | Trusted proxy / rate limit IP |
-| `serverName` | Instance display name |
+| `serverName` | Instance display name, public via `GET /api/auth/settings` and `GET /api/health`. Resolves to the admin-set value, then `server.domain`, then `Bedrud`; there is no `config.yaml` key |
 
 ### LiveKit
 

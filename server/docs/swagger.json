@@ -552,6 +552,36 @@
                     },
                     {
                         "type": "string",
+                        "description": "Filter by owner name or email",
+                        "name": "owner",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Created on or after this date (YYYY-MM-DD)",
+                        "name": "dateFrom",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Created on or before this date, inclusive (YYYY-MM-DD)",
+                        "name": "dateTo",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Last activity on or after this date (YYYY-MM-DD)",
+                        "name": "lastActivityFrom",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Last activity on or before this date, inclusive (YYYY-MM-DD)",
+                        "name": "lastActivityTo",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "default": "createdAt",
                         "description": "Sort field: name, createdAt, maxParticipants, participantsCount, lastActivityAt, createdBy",
                         "name": "sort",
@@ -2784,7 +2814,7 @@
         },
         "/api/health": {
             "get": {
-                "description": "Get the health status of the service",
+                "description": "Get the health status of the service, plus the instance's display name and version. Needs no session.\nserverName resolves to the admin-set name, then server.domain, then \"Bedrud\"; it is omitted if settings cannot be read.",
                 "produces": [
                     "application/json"
                 ],
@@ -2794,7 +2824,7 @@
                 "summary": "Health check endpoint",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "status, time, version, serverName",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -3054,6 +3084,65 @@
                         "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/auth.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/auth.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/me/avatar": {
+            "post": {
+                "description": "Upload a profile photo stored on the server",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Upload profile avatar",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/auth.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/auth.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Remove a custom uploaded profile photo",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Remove profile avatar",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object"
                         }
                     },
                     "401": {
@@ -3768,7 +3857,7 @@
         },
         "/health": {
             "get": {
-                "description": "Get the health status of the service",
+                "description": "Get the health status of the service, plus the instance's display name and version. Needs no session.\nserverName resolves to the admin-set name, then server.domain, then \"Bedrud\"; it is omitted if settings cannot be read.",
                 "produces": [
                     "application/json"
                 ],
@@ -3778,7 +3867,7 @@
                 "summary": "Health check endpoint",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "status, time, version, serverName",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -3897,6 +3986,60 @@
                     },
                     "500": {
                         "description": "Failed to list archived rooms",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/room/check/{roomName}": {
+            "get": {
+                "description": "Read-only lookup for whether a room exists and is joinable.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rooms"
+                ],
+                "summary": "Check room availability",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Room name",
+                        "name": "roomName",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{exists, name}",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid room name",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Private or full",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Room not found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "410": {
+                        "description": "Room inactive",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -4872,6 +5015,55 @@
                     },
                     "500": {
                         "description": "Failed",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/room/{roomId}/participant/{identity}/profile": {
+            "get": {
+                "description": "Fetch a participant's display name and avatar. Caller and target must both be in the room.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rooms"
+                ],
+                "summary": "Get meeting participant profile",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Room ID",
+                        "name": "roomId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Participant identity",
+                        "name": "identity",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{id, name, avatarUrl}",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Not in meeting",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Participant not found",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -6264,7 +6456,7 @@
                     "type": "string"
                 },
                 "type": {
-                    "description": "tls_expiry, stale_room, empty_room, auth_spike",
+                    "description": "tls_expiry, stale_room, empty_room, auth_spike, unreadable_timestamps",
                     "type": "string"
                 }
             }
@@ -6686,6 +6878,9 @@
                 "chatUploadMaxBytes": {
                     "type": "integer"
                 },
+                "chatUploadMaxDimension": {
+                    "type": "integer"
+                },
                 "chatUploadS3AccessKey": {
                     "type": "string"
                 },
@@ -6826,6 +7021,10 @@
                 "jwtSecret": {
                     "type": "string"
                 },
+                "krispEnabled": {
+                    "description": "Krisp noise cancellation (optional proprietary filter via @livekit/krisp-noise-filter).\nOff by default. Admins must enable after confirming their own Krisp/LiveKit licensing.\nBedrud does not ship a Krisp license.",
+                    "type": "boolean"
+                },
                 "livekitApiKey": {
                     "type": "string"
                 },
@@ -6871,6 +7070,10 @@
                     "type": "boolean"
                 },
                 "registrationEnabled": {
+                    "type": "boolean"
+                },
+                "rnnoiseEnabled": {
+                    "description": "RNNoise WASM noise suppression (optional; ~1.9 MB download when used).\nOff by default. When disabled, clients must not load the RNNoise package.",
                     "type": "boolean"
                 },
                 "serverCertFile": {
@@ -6922,6 +7125,37 @@
                 },
                 "updatedAt": {
                     "type": "string"
+                },
+                "webxdcGalleryAllowRemoteDownload": {
+                    "type": "boolean"
+                },
+                "webxdcGalleryEnabled": {
+                    "description": "Experimental WebXDC gallery (admin-configurable; runtime host still needs webxdc.enabled + domain in config.yaml)",
+                    "type": "boolean"
+                },
+                "webxdcGalleryInstanceCatalogEnabled": {
+                    "description": "Instance catalog: admin-uploaded .xdc packages shared across all rooms (in addition to remote/semi-remote).",
+                    "type": "boolean"
+                },
+                "webxdcGalleryRemoteCatalogUrl": {
+                    "type": "string"
+                },
+                "webxdcGallerySource": {
+                    "description": "local | remote | both | semi-remote",
+                    "type": "string"
+                },
+                "webxdcMaxArchiveMB": {
+                    "description": "Package size limits (MiB / counts). 0 = use config.yaml defaults (10 / 30 / 5 MiB, 500 entries).\nMax single file is the usual \"entry too large\" limit for large files inside a .xdc zip.",
+                    "type": "integer"
+                },
+                "webxdcMaxEntries": {
+                    "type": "integer"
+                },
+                "webxdcMaxSingleFileMB": {
+                    "type": "integer"
+                },
+                "webxdcMaxUncompressedMB": {
+                    "type": "integer"
                 }
             }
         },
