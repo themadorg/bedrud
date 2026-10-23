@@ -7,6 +7,8 @@ export interface RoomSettings {
   requireApproval: boolean;
   e2ee: boolean;
   isPersistent: boolean;
+  /** Host switch for profile welcome sounds; missing means allowed. */
+  allowWelcomeSounds?: boolean;
 }
 
 export interface RoomParticipant {

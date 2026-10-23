@@ -31,6 +31,7 @@ interface Room {
     allowAudio: boolean
     requireApproval: boolean
     e2ee: boolean
+    allowWelcomeSounds?: boolean
   }
 }
 
