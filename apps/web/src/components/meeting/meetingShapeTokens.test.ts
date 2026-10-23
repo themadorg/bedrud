@@ -44,18 +44,9 @@ describe('meeting shape tokens', () => {
 })
 
 describe('meeting panel tokens', () => {
-  it('should define a scrim for the options panel', () => {
-    expect(tokenValue(meetingCss, '--meet-scrim')).toBe('rgba(23, 23, 23, 0.32)')
-  })
-
-  it('should cap the options panel below the status bar', () => {
-    expect(tokenValue(meetingCss, '--meet-controls-panel-max-height')).toBe(
-      'calc(var(--app-height, 100svh) - 12px - env(safe-area-inset-top, 0px))',
-    )
-  })
-
-  it('should darken the scrim in the dark theme', () => {
-    // The light value is read first by `tokenValue`, so the dark override is checked by hand.
-    expect(meetingCss).toContain('--meet-scrim: rgba(0, 0, 0, 0.32);')
+  it('should drop the options panel scrim and ceiling now the options are a sheet', () => {
+    // The sheet brings its own overlay and takes its ceiling from --meet-sheet-max-height.
+    expect(meetingCss).not.toContain('--meet-scrim')
+    expect(meetingCss).not.toContain('--meet-controls-panel-max-height')
   })
 })
