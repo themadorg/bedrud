@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { CheckCircle2, Loader2, XCircle } from 'lucide-react'
+import { CheckCircle2, Eye, EyeOff, Loader2, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '#/lib/api'
 import { getErrorMessage } from '#/lib/errors'
@@ -63,27 +63,52 @@ export function TextInput({
   placeholder?: string
   mono?: boolean
   disabled?: boolean
-  type?: 'text' | 'number' | 'url' | 'email'
+  type?: 'text' | 'number' | 'url' | 'email' | 'password'
   min?: number
   max?: number
   pattern?: string
   required?: boolean
   error?: string
 }) {
+  const [showSecret, setShowSecret] = useState(false)
+  const secret = type === 'password'
+
   return (
     <div>
-      <Input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        type={type ?? 'text'}
-        min={min}
-        max={max}
-        pattern={pattern}
-        required={required}
-        className={cn('h-8 px-1 text-xs', error ? 'border-destructive' : 'border-transparent', mono && 'font-mono')}
-      />
+      <div className="relative">
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          disabled={disabled}
+          type={secret && showSecret ? 'text' : (type ?? 'text')}
+          // Stops the browser from offering the admin's own saved site password for a service credential.
+          autoComplete={secret ? 'new-password' : undefined}
+          min={min}
+          max={max}
+          pattern={pattern}
+          required={required}
+          className={cn(
+            'h-8 px-1 text-xs',
+            error ? 'border-destructive' : 'border-transparent',
+            mono && 'font-mono',
+            secret && 'pe-8',
+          )}
+        />
+        {secret && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowSecret((shown) => !shown)}
+            className="absolute end-1 top-1/2 h-6 w-6 -translate-y-1/2"
+            tabIndex={-1}
+            aria-label={showSecret ? 'Hide secret' : 'Show secret'}
+          >
+            {showSecret ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          </Button>
+        )}
+      </div>
       {error && <p className="mt-0.5 text-[10px] text-destructive">{error}</p>}
     </div>
   )
