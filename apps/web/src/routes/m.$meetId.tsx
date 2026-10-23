@@ -9,6 +9,7 @@ import { WifiOff } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '#/lib/api'
+import { type ArchivedOwnedResponse, recreateRoomRequest } from '#/lib/archived-room'
 import { useAudioPreferencesStore } from '#/lib/audio-preferences.store'
 import { useAuthStore } from '#/lib/auth.store'
 import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
@@ -85,21 +86,6 @@ interface JoinResponse {
   accessToken?: string
   refreshToken?: string
   tokens?: { accessToken: string; refreshToken?: string | null }
-}
-
-interface ArchivedOwnedResponse {
-  status: 'archived_owned'
-  name: string
-  mode: string
-  settings: {
-    allowChat: boolean
-    allowVideo: boolean
-    allowAudio: boolean
-    requireApproval: boolean
-    e2ee: boolean
-    isPersistent: boolean
-    recordingsAllowed: boolean
-  }
 }
 
 /** Always-on transport diagnostics (console + copyable ring buffer for bug reports). */
@@ -243,11 +229,7 @@ function MeetingPage() {
   const [guestInput, setGuestInput] = useState('')
   const [wasKicked, setWasKicked] = useState(false)
   const [wasRoomDeleted, setWasRoomDeleted] = useState(false)
-  const [archivedRoom, setArchivedRoom] = useState<{
-    name: string
-    mode: string
-    settings: ArchivedOwnedResponse['settings']
-  } | null>(null)
+  const [archivedRoom, setArchivedRoom] = useState<ArchivedOwnedResponse | null>(null)
   const redirectTargetRef = useRef({ to: '/auth/login', search: { redirect: undefined } as { redirect?: string } })
   const deletionTypeRef = useRef<'user_deleted' | 'room_closed'>('room_closed')
 
@@ -548,8 +530,7 @@ function MeetingPage() {
           if (cancelledRef.current) return
           // Archived room owned by current user — show recreate dialog
           if ((data as unknown as ArchivedOwnedResponse).status === 'archived_owned') {
-            const ar = data as unknown as ArchivedOwnedResponse
-            setArchivedRoom({ name: ar.name, mode: ar.mode, settings: ar.settings })
+            setArchivedRoom(data as unknown as ArchivedOwnedResponse)
             return
           }
           if (!data.id) {
@@ -651,11 +632,7 @@ function MeetingPage() {
               type="button"
               onClick={() => {
                 api
-                  .post<{ name: string }>('/api/room/create', {
-                    name: archivedRoom.name,
-                    mode: archivedRoom.mode,
-                    settings: archivedRoom.settings,
-                  })
+                  .post<{ name: string }>('/api/room/create', recreateRoomRequest(archivedRoom))
                   .then((room) => {
                     if (cancelledRef.current) return
                     setArchivedRoom(null)
@@ -665,8 +642,7 @@ function MeetingPage() {
                       .then((data) => {
                         if (cancelledRef.current) return
                         if ((data as unknown as ArchivedOwnedResponse).status === 'archived_owned') {
-                          const ar = data as unknown as ArchivedOwnedResponse
-                          setArchivedRoom({ name: ar.name, mode: ar.mode, settings: ar.settings })
+                          setArchivedRoom(data as unknown as ArchivedOwnedResponse)
                           return
                         }
                         if (!data.id) {

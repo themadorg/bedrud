@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -361,6 +362,46 @@ func TestJoinRoom_RoomInactive_OwnedByJoiner(t *testing.T) {
 	}
 	if result["name"] != "my-inactive-room" {
 		t.Fatalf("expected name 'my-inactive-room', got %v", result["name"])
+	}
+}
+
+// The web client recreates the room from this response, so a missing isPublic
+// would restart a public room as private.
+func TestJoinRoom_RoomInactive_OwnedByJoiner_ReturnsVisibility(t *testing.T) {
+	for _, isPublic := range []bool{true, false} {
+		t.Run(fmt.Sprintf("isPublic=%v", isPublic), func(t *testing.T) {
+			claims := &auth.Claims{UserID: "joiner", Email: "joiner@ex.com", Name: "Joiner", Accesses: []string{"user"}}
+			app, roomRepo := setupJoinTestApp(t, claims)
+
+			room, err := roomRepo.CreateRoom("joiner", "ended-room", isPublic, "standard", 0, &models.RoomSettings{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			room.IsActive = false
+			if err := roomRepo.UpdateRoom(room); err != nil {
+				t.Fatal(err)
+			}
+
+			body, _ := json.Marshal(map[string]interface{}{"roomName": "ended-room"})
+			req := httptest.NewRequest(http.MethodPost, "/rooms/join", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := app.Test(req, -1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+
+			var result map[string]interface{}
+			if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+				t.Fatalf("failed to decode response: %v", err)
+			}
+			if result["status"] != "archived_owned" {
+				t.Fatalf("expected status 'archived_owned', got %v", result["status"])
+			}
+			if result["isPublic"] != isPublic {
+				t.Fatalf("expected isPublic %v, got %v", isPublic, result["isPublic"])
+			}
+		})
 	}
 }
 
