@@ -27,6 +27,7 @@ Go version: **1.26** (`server/go.mod`)
 | `github.com/go-co-op/gocron` | v1.37.0 | Background scheduler |
 | `github.com/magefile/mage` | v1.17.2 | Build tasks |
 | `github.com/google/uuid` | v1.6.0 | UUID generation |
+| `github.com/hajimehoshi/go-mp3` | v0.3.4 | Pure-Go MP3 decoding for welcome sound validation (16, 24, 32, 44.1 and 48 kHz only; 22.05 kHz at low bitrates decodes inaccurately) |
 | `golang.org/x/crypto` | v0.52.0 | bcrypt, TLS, ACME |
 | `golang.org/x/net` | v0.54.0 | Network utilities |
 | `golang.org/x/text` | v0.37.0 | Text processing |
