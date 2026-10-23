@@ -44,7 +44,7 @@ sudo bedrud --json install --no-tls
 | `--lk-udp-port` | LiveKit RTC UDP port |
 | `--lk-udp-range` | WebRTC UDP range, e.g. `50000-60000` |
 | `--fresh` | Wipe the existing install (config, database, certs) then reinstall. Without this flag, existing `/etc/bedrud/config.yaml` and `livekit.yaml` are **not** overwritten. |
-| `--behind-proxy` | CDN/reverse-proxy mode |
+| `--behind-proxy` | CDN/reverse-proxy mode: binds `0.0.0.0` and writes `https://<domain>` public URLs without the listen port |
 | `--external-livekit` | External LiveKit URL |
 | `--livekit-domain` | Separate domain for local LiveKit |
 | `--lk-ip` | LiveKit node IP behind CDN |
