@@ -36,6 +36,11 @@ describe('BedrudSheet', () => {
   it('should not introduce a breakpoint other than the shared one', () => {
     expect(sheetSource).not.toMatch(/(^|[\s"'`])(max-)?(sm|md):/)
   })
+
+  it('should dim the call from the first snap point, as the Android scrim does', () => {
+    // vaul fades the overlay in only from `fadeFromIndex`, which defaults to the last snap point.
+    expect(sheetSource).toContain('fadeFromIndex={0}')
+  })
 })
 
 describe('BedrudSheetHandle', () => {
