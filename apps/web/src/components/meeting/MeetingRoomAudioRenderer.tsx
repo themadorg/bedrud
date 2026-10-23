@@ -1,7 +1,33 @@
-import { RoomAudioRenderer, useRoomContext } from '@livekit/components-react'
+import { RoomAudioRenderer, useAudioPlayback, useRoomContext } from '@livekit/components-react'
 import { type RemoteParticipant, RoomEvent } from 'livekit-client'
+import { VolumeX } from 'lucide-react'
 import { useEffect } from 'react'
 import { useMeetingRoomContext } from '@/components/meeting/MeetingContext'
+import { Button } from '@/components/ui/button'
+
+/**
+ * Asks for a tap when the browser blocks remote audio. LiveKit only retries playback on its
+ * own once a local mic stream starts, so a listener without a mic would otherwise stay silent.
+ */
+function StartAudioPrompt() {
+  const room = useRoomContext()
+  const { canPlayAudio, startAudio } = useAudioPlayback(room)
+
+  if (canPlayAudio) return null
+
+  return (
+    <div
+      role="alert"
+      className="fixed bottom-[calc(100px+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-60 flex items-center gap-3 bg-[var(--meet-bg-panel)] border border-[var(--meet-border)] rounded-xl px-4 py-3 shadow-[var(--meet-shadow)] backdrop-blur-lg max-w-[min(340px,calc(100vw-32px))]"
+    >
+      <VolumeX size={15} className="shrink-0 text-[var(--meet-fg-muted)]" aria-hidden="true" />
+      <span className="flex-1 text-[13px] text-[var(--meet-fg)]">Your browser blocked meeting sound.</span>
+      <Button type="button" size="sm" onClick={() => startAudio()}>
+        Turn on sound
+      </Button>
+    </div>
+  )
+}
 
 /** Renders remote room audio and keeps it silent while the local user is deafened. */
 export function MeetingRoomAudioRenderer() {
@@ -40,5 +66,10 @@ export function MeetingRoomAudioRenderer() {
     }
   }, [deafened, room])
 
-  return <RoomAudioRenderer volume={deafened ? 0 : 1} />
+  return (
+    <>
+      <RoomAudioRenderer volume={deafened ? 0 : 1} />
+      <StartAudioPrompt />
+    </>
+  )
 }
