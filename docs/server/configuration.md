@@ -156,7 +156,7 @@ HTTP listener, TLS, proxy, and capacity limits.
 
 ### `welcomeSound`
 
-Default limits for profile welcome sounds (in progress; the upload API and the web profile enforce them, meeting playback is not wired yet). The on/off switch lives in the admin panel only. `0` uses the built-in default.
+Default limits for profile welcome sounds (web app; native clients do not play them yet). The on/off switch lives in the admin panel only. `0` uses the built-in default.
 
 | Field | Env | Description |
 |-------|-----|-------------|
