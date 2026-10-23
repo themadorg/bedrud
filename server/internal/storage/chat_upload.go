@@ -807,6 +807,27 @@ func (t *ChatUploadTracker) GetTotalUploadBytes() (int64, error) {
 	return total, nil
 }
 
+// deleteObject removes the stored object behind an already-deleted upload row.
+func (t *ChatUploadTracker) deleteObject(u *models.ChatUpload) {
+	key := ChatObjectKey(u.RoomID, u.UploadedBy, u.FileHash, u.Extension)
+	switch u.StorageBackend {
+	case uploadBackendS3:
+		if t.deleter != nil {
+			if err := t.deleter.DeleteObject(key); err != nil {
+				log.Warn().Err(err).Str("key", key).Str("roomID", u.RoomID).Msg("failed to delete S3 chat upload object")
+			}
+		} else {
+			log.Warn().Str("key", key).Str("roomID", u.RoomID).Msg("no S3 deleter configured, orphaned S3 object")
+		}
+	case uploadBackendInline:
+	default: // disk or unknown
+		path := filepath.Join(t.chatDir, filepath.FromSlash(key))
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			log.Warn().Err(err).Str("path", path).Msg("orphan chat upload file on disk")
+		}
+	}
+}
+
 func (t *ChatUploadTracker) DeleteByRoom(roomID string) error {
 	var deleted []models.ChatUpload
 	result := t.db.Clauses(clause.Returning{}).Where("room_id = ?", roomID).Delete(&deleted)
@@ -817,25 +838,33 @@ func (t *ChatUploadTracker) DeleteByRoom(roomID string) error {
 		return nil
 	}
 	for i := range deleted {
-		u := &deleted[i]
-		// Objects are keyed room/user/hash — unique per upload path, always delete.
-		key := ChatObjectKey(u.RoomID, u.UploadedBy, u.FileHash, u.Extension)
-		switch u.StorageBackend {
-		case uploadBackendS3:
-			if t.deleter != nil {
-				if err := t.deleter.DeleteObject(key); err != nil {
-					log.Warn().Err(err).Str("key", key).Str("roomID", roomID).Msg("failed to delete S3 chat upload object")
-				}
-			} else {
-				log.Warn().Str("key", key).Str("roomID", roomID).Msg("no S3 deleter configured, orphaned S3 object")
-			}
-		case uploadBackendInline:
-		default: // disk or unknown
-			path := filepath.Join(t.chatDir, filepath.FromSlash(key))
-			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-				log.Warn().Err(err).Str("path", path).Msg("orphan chat upload file on disk")
-			}
-		}
+		// Objects are keyed room/user/hash and every row of the room is gone, so always delete.
+		t.deleteObject(&deleted[i])
 	}
 	return nil
+}
+
+// DeleteOlderThan removes uploads created before cutoff, with their stored objects,
+// and returns how many rows were deleted.
+func (t *ChatUploadTracker) DeleteOlderThan(cutoff time.Time) (int64, error) {
+	var deleted []models.ChatUpload
+	result := t.db.Clauses(clause.Returning{}).Where("created_at < ?", cutoff).Delete(&deleted)
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	for i := range deleted {
+		u := &deleted[i]
+		// Re-uploading the same image in a room reuses its key, so a newer row may still need the object.
+		var remaining int64
+		if err := t.db.Model(&models.ChatUpload{}).
+			Where("room_id = ? AND uploaded_by = ? AND file_hash = ? AND extension = ?", u.RoomID, u.UploadedBy, u.FileHash, u.Extension).
+			Count(&remaining).Error; err != nil {
+			log.Warn().Err(err).Str("roomID", u.RoomID).Str("hash", u.FileHash).Msg("failed to check chat upload references, keeping object")
+			continue
+		}
+		if remaining == 0 {
+			t.deleteObject(u)
+		}
+	}
+	return result.RowsAffected, nil
 }
