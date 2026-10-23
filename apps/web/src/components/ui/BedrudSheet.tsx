@@ -72,7 +72,6 @@ export function BedrudSheet({
           <Drawer.Title className="sr-only">{label}</Drawer.Title>
           <BedrudSheetHandle
             label={`Resize ${label}`}
-            preventCycle
             onClick={() => onSnapPointChange(snapPointOnHandleTap(activeSnapPoint, SHEET_SNAP_POINTS))}
           />
           {/*

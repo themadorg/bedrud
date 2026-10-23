@@ -1,4 +1,6 @@
+import { useRef } from 'react'
 import { Drawer } from 'vaul'
+import { isHandleTap } from '@/components/ui/sheetSnapPoints'
 
 /** The drawn pill: Android's `Dimens.meetingHandleWidth` × `meetingHandleHeight`. */
 const HANDLE_PILL_CLASS = 'h-1 w-8 rounded-full bg-[var(--meet-fg-muted)]'
@@ -22,23 +24,23 @@ const HANDLE_PILL_CLASS = 'h-1 w-8 rounded-full bg-[var(--meet-fg-muted)]'
  * makes the handle a bare `div` rather than a button, so the accessible name has to be given rather
  * than read from the element.
  *
- * `preventCycle` turns off vaul's own tap handling, which closes the sheet at the last snap point
- * instead of stepping back down. A sheet that wants the tap to move between its own heights passes
- * it along with an `onClick`.
+ * `onClick` replaces vaul's own tap handling, which closes the sheet at the last snap point instead
+ * of stepping back down. That also drops the guard vaul keeps against the click a drag ends with,
+ * so the handle keeps its own: the press is recorded in the capture phase, which leaves vaul's
+ * pointerdown handler in place, and a click that travelled past the touch slop is not passed on.
  */
-export function BedrudSheetHandle({
-  label,
-  preventCycle,
-  onClick,
-}: {
-  label: string
-  preventCycle?: boolean
-  onClick?: () => void
-}) {
+export function BedrudSheetHandle({ label, onClick }: { label: string; onClick: () => void }) {
+  const pressRef = useRef<{ clientX: number; clientY: number } | null>(null)
   return (
     <Drawer.Handle
-      preventCycle={preventCycle}
-      onClick={onClick}
+      onPointerDownCapture={(event) => {
+        pressRef.current = { clientX: event.clientX, clientY: event.clientY }
+      }}
+      onClick={(event) => {
+        const press = pressRef.current
+        pressRef.current = null
+        if (isHandleTap(press, event)) onClick()
+      }}
       aria-label={label}
       className="!m-0 !h-12 !w-full shrink-0 cursor-grab !rounded-none !bg-transparent !opacity-100 active:cursor-grabbing *:flex *:items-center *:justify-center"
     >

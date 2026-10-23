@@ -74,8 +74,18 @@ describe('BedrudSheetHandle', () => {
     expect(handleSource).toContain('aria-label={label}')
   })
 
-  it('should let a sheet with one height opt out of cycling', () => {
-    expect(handleSource).toContain('preventCycle')
+  it('should ignore the click that ends a drag, so a drag released on the handle does not also step', () => {
+    expect(handleSource).toContain('isHandleTap(')
+  })
+
+  it("should record the press without replacing vaul's own pointerdown handler", () => {
+    expect(handleSource).toContain('onPointerDownCapture')
+    expect(handleSource).not.toMatch(/\bonPointerDown=/)
+  })
+
+  it("should drop vaul's preventCycle, which the handle's own tap already replaces", () => {
+    expect(handleSource).not.toContain('preventCycle')
+    expect(sheetSource).not.toContain('preventCycle')
   })
 })
 
