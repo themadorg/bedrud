@@ -223,9 +223,6 @@ func run() error {
 	// TODO oncoming feature: recordingStore, scheduler recording cleanup
 	// recordingStore := storage.NewRecordingStore(&cfg.Recording, &cfg.Chat.Uploads.S3)
 
-	scheduler.Initialize(database.GetDB(), roomRepo, userRepo, recordingRepo, &cfg.LiveKit, &cfg.Server, nil, nil)
-	defer scheduler.Stop()
-
 	// ===============================
 	// Services
 	// ===============================
@@ -348,6 +345,8 @@ func run() error {
 		}
 	}
 	uploadTracker := storage.NewChatUploadTracker(database.GetDB(), uploadDir, s3Deleter)
+	scheduler.Initialize(database.GetDB(), roomRepo, userRepo, recordingRepo, &cfg.LiveKit, &cfg.Server, nil, nil, settingsRepo, uploadTracker)
+	defer scheduler.Stop()
 	lkClient := lkutil.NewClient(&cfg.LiveKit)
 	// TODO oncoming feature: egress client, recording service, recording handler
 	// egressClient, err := lkutil.NewEgressClient(&cfg.LiveKit)

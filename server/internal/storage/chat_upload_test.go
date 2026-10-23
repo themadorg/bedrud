@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -16,6 +17,9 @@ import (
 	"bedrud/config"
 	"bedrud/internal/models"
 	"bedrud/internal/testutil"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type mockObjectDeleter struct {
@@ -291,6 +295,142 @@ func TestDeleteByRoom_EmptyRoom(t *testing.T) {
 	if err := tracker.DeleteByRoom("nonexistent"); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// ─── Category C2: DeleteOlderThan ────────────────────────────────────────
+
+// seedUploadAt inserts an upload row with an explicit created_at, which Record
+// cannot do, and returns its ID. GORM only fills autoCreateTime when it is zero.
+func seedUploadAt(t *testing.T, db *gorm.DB, roomID, userID, hash, backend string, createdAt time.Time) string {
+	t.Helper()
+	upload := &models.ChatUpload{
+		ID:             uuid.New().String(),
+		RoomID:         roomID,
+		UploadedBy:     userID,
+		FileHash:       hash,
+		Extension:      ".png",
+		FileSize:       100,
+		StorageBackend: backend,
+		CreatedAt:      createdAt,
+	}
+	if err := db.Create(upload).Error; err != nil {
+		t.Fatal(err)
+	}
+	return upload.ID
+}
+
+// writeUploadFile creates the on-disk object for room/user/hash.png and returns its path.
+func writeUploadFile(t *testing.T, dir, roomID, userID, hash string) string {
+	t.Helper()
+	path := filepath.Join(dir, roomID, userID, hash+".png")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func assertUploadIDs(t *testing.T, db *gorm.DB, want ...string) {
+	t.Helper()
+	var ids []string
+	if err := db.Model(&models.ChatUpload{}).Order("id").Pluck("id", &ids).Error; err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(want)
+	if strings.Join(ids, ",") != strings.Join(want, ",") {
+		t.Fatalf("remaining uploads = %v, want %v", ids, want)
+	}
+}
+
+func TestDeleteOlderThan_Disk_RemovesExpiredKeepsFresh(t *testing.T) {
+	dir := t.TempDir()
+	db := testutil.SetupTestDB(t)
+	tracker := NewChatUploadTracker(db, dir, nil)
+	now := time.Now()
+
+	seedUploadAt(t, db, "room1", "u1", "old", "disk", now.Add(-72*time.Hour))
+	freshID := seedUploadAt(t, db, "room1", "u1", "fresh", "disk", now.Add(-1*time.Hour))
+	oldPath := writeUploadFile(t, dir, "room1", "u1", "old")
+	freshPath := writeUploadFile(t, dir, "room1", "u1", "fresh")
+
+	deleted, err := tracker.DeleteOlderThan(now.Add(-48 * time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 1 {
+		t.Fatalf("deleted = %d, want 1", deleted)
+	}
+	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
+		t.Fatal("expired file should have been removed")
+	}
+	if _, err := os.Stat(freshPath); err != nil {
+		t.Fatalf("fresh file should remain: %v", err)
+	}
+	assertUploadIDs(t, db, freshID)
+}
+
+// The same image uploaded twice by one user in one room maps to one object key.
+// Expiring the older row must not take the object out from under the newer one.
+func TestDeleteOlderThan_KeepsObjectStillReferencedByFreshRow(t *testing.T) {
+	dir := t.TempDir()
+	db := testutil.SetupTestDB(t)
+	mockDel := &mockObjectDeleter{}
+	tracker := NewChatUploadTracker(db, dir, mockDel)
+	now := time.Now()
+
+	seedUploadAt(t, db, "room1", "u1", "dup", "disk", now.Add(-72*time.Hour))
+	freshID := seedUploadAt(t, db, "room1", "u1", "dup", "disk", now.Add(-1*time.Hour))
+	seedUploadAt(t, db, "room1", "u1", "dups3", "s3", now.Add(-72*time.Hour))
+	freshS3ID := seedUploadAt(t, db, "room1", "u1", "dups3", "s3", now.Add(-1*time.Hour))
+	path := writeUploadFile(t, dir, "room1", "u1", "dup")
+
+	deleted, err := tracker.DeleteOlderThan(now.Add(-48 * time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 2 {
+		t.Fatalf("deleted = %d, want 2", deleted)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("shared file should remain: %v", err)
+	}
+	if keys := mockDel.Keys(); len(keys) != 0 {
+		t.Fatalf("shared S3 object should remain, deleted %v", keys)
+	}
+	assertUploadIDs(t, db, freshID, freshS3ID)
+}
+
+func TestDeleteOlderThan_S3_CallsDeleter(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	mockDel := &mockObjectDeleter{}
+	tracker := NewChatUploadTracker(db, t.TempDir(), mockDel)
+
+	seedUploadAt(t, db, "room1", "u1", "abc", "s3", time.Now().Add(-72*time.Hour))
+
+	if _, err := tracker.DeleteOlderThan(time.Now().Add(-48 * time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	keys := mockDel.Keys()
+	if len(keys) != 1 || keys[0] != "room1/u1/abc.png" {
+		t.Fatalf("deleted keys = %v, want [room1/u1/abc.png]", keys)
+	}
+}
+
+func TestDeleteOlderThan_NothingExpired(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	tracker := NewChatUploadTracker(db, t.TempDir(), nil)
+	freshID := seedUploadAt(t, db, "room1", "u1", "fresh", "inline", time.Now())
+
+	deleted, err := tracker.DeleteOlderThan(time.Now().Add(-48 * time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 0 {
+		t.Fatalf("deleted = %d, want 0", deleted)
+	}
+	assertUploadIDs(t, db, freshID)
 }
 
 // ─── Category D: s3Store.deleteObject ─────────────────────────────────────

@@ -37,7 +37,7 @@ var (
 	certMu    sync.Mutex
 )
 
-func Initialize(db *gorm.DB, roomRepo *repository.RoomRepository, userRepo *repository.UserRepository, recordingRepo *repository.RecordingRepository, lkCfg *config.LiveKitConfig, serverCfg *config.ServerConfig, recStore storage.RecordingStore, recCfg *config.RecordingConfig) {
+func Initialize(db *gorm.DB, roomRepo *repository.RoomRepository, userRepo *repository.UserRepository, recordingRepo *repository.RecordingRepository, lkCfg *config.LiveKitConfig, serverCfg *config.ServerConfig, recStore storage.RecordingStore, recCfg *config.RecordingConfig, settingsRepo *repository.SettingsRepository, uploadTracker *storage.ChatUploadTracker) {
 	scheduler = gocron.NewScheduler(time.Local)
 
 	certFile = ""
@@ -146,6 +146,13 @@ func Initialize(db *gorm.DB, roomRepo *repository.RoomRepository, userRepo *repo
 		queue.CleanupJobs(db, 7*24*time.Hour)
 		queue.CleanupFailedJobs(db, 30*24*time.Hour)
 	})
+
+	// Daily cleanup of chat uploads older than the effective chatMessageTTLHours
+	if settingsRepo != nil && uploadTracker != nil {
+		_, _ = scheduler.Every(1).Day().At("03:15").Do(func() {
+			cleanupExpiredChatUploads(settingsRepo, uploadTracker)
+		})
+	}
 
 	// TODO oncoming feature: stale recording cleanup
 	// Daily cleanup of stale (failed + pending + started) recordings older than 7 days
@@ -303,6 +310,33 @@ func checkIdleRooms(roomRepo *repository.RoomRepository, cfg *config.LiveKitConf
 				}
 			}
 		}
+	}
+}
+
+// cleanupExpiredChatUploads deletes chat uploads older than the effective
+// chatMessageTTLHours, read on every run so admin changes apply without a restart.
+// The server keeps no chat messages (they travel over the LiveKit data channel),
+// so uploads are the only server-side chat data the TTL can apply to.
+// A TTL of 0 means keep forever, as the admin settings describe it.
+func cleanupExpiredChatUploads(settingsRepo *repository.SettingsRepository, uploadTracker *storage.ChatUploadTracker) {
+	if settingsRepo == nil || uploadTracker == nil {
+		return
+	}
+	settings, err := settingsRepo.GetEffectiveSettings()
+	if err != nil {
+		log.Error().Err(err).Msg("Scheduler: failed to load settings for chat upload cleanup")
+		return
+	}
+	ttl := settings.ChatMessageTTLHours
+	if ttl <= 0 {
+		return
+	}
+	cutoff := time.Now().Add(-time.Duration(ttl) * time.Hour)
+	deleted, err := uploadTracker.DeleteOlderThan(cutoff)
+	if err != nil {
+		log.Error().Err(err).Msg("Scheduler: failed to clean up expired chat uploads")
+	} else if deleted > 0 {
+		log.Info().Int64("deleted", deleted).Int("ttlHours", ttl).Msg("Scheduler: cleaned up expired chat uploads")
 	}
 }
 

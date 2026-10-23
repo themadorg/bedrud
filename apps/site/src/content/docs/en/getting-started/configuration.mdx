@@ -154,7 +154,7 @@ chat:
   maxUploadBytesPerUser: 524288000       # 500 MB. 0 = unlimited. Env: CHAT_MAX_UPLOAD_BYTES_PER_USER
   globalDiskThresholdBytes: 0            # 0 = unlimited. Env: CHAT_GLOBAL_DISK_THRESHOLD_BYTES
   maxMessageCount: 10000                 # Client-side retention. Env: CHAT_MAX_MESSAGE_COUNT
-  messageTTLHours: 2160                  # 90 days. Env: CHAT_MESSAGE_TTL_HOURS
+  messageTTLHours: 2160                  # 90 days; also deletes older chat uploads. Env: CHAT_MESSAGE_TTL_HOURS
   uploads:
     backend: "disk"                      # disk | s3 | inline
     maxBytes: 10485760                   # Hard per-file limit (default 10 MB). Server HTTP body limit is aligned to this value.
@@ -253,10 +253,10 @@ Four buckets (omit `rateLimit` for defaults; set any `*MaxRequests: 0` to disabl
 
 #### Chat History
 
-Advisory client-side retention (LiveKit does not persist data-channel messages server-side):
+Messages travel over the LiveKit data channel and are never stored on the server, so these limits trim history in the client:
 
 - **`maxMessageCount`** — default `10000` (`0` = unlimited)
-- **`messageTTLHours`** — default `2160` / 90 days (`0` = forever)
+- **`messageTTLHours`** — default `2160` / 90 days (`0` = forever). The server applies it too: a daily job deletes chat uploads (images and files) older than this, along with their stored files.
 
 #### Chat Uploads
 
@@ -416,7 +416,7 @@ export LIVEKIT_API_SECRET=prodsecret
 | `CHAT_MAX_UPLOAD_BYTES_PER_USER` | `chat.maxUploadBytesPerUser` | Per-user upload quota |
 | `CHAT_GLOBAL_DISK_THRESHOLD_BYTES` | `chat.globalDiskThresholdBytes` | Global upload ceiling |
 | `CHAT_MAX_MESSAGE_COUNT` | `chat.maxMessageCount` | Client chat message cap |
-| `CHAT_MESSAGE_TTL_HOURS` | `chat.messageTTLHours` | Client chat TTL hours |
+| `CHAT_MESSAGE_TTL_HOURS` | `chat.messageTTLHours` | Chat history and upload TTL hours |
 | `QUEUE_POLL_INTERVAL` | `queue.pollInterval` | Job poll interval (ms) |
 | `QUEUE_MAX_ATTEMPTS` | `queue.maxAttempts` | Max job retries |
 | `QUEUE_CONCURRENCY` | `queue.concurrency` | Worker count |

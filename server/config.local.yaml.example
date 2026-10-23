@@ -91,7 +91,7 @@ chat:
   maxUploadBytesPerUser: 524288000  # Per-user upload quota (500 MB). 0 = unlimited. Env: CHAT_MAX_UPLOAD_BYTES_PER_USER
   globalDiskThresholdBytes: 0       # Global storage ceiling across all users. 0 = unlimited. Env: CHAT_GLOBAL_DISK_THRESHOLD_BYTES
   maxMessageCount: 10000            # Max chat messages kept per room (0 = unlimited). Env: CHAT_MAX_MESSAGE_COUNT
-  messageTTLHours: 2160             # Purge messages older than this (0 = forever). 2160 = 90 days. Env: CHAT_MESSAGE_TTL_HOURS
+  messageTTLHours: 2160             # Purge messages and chat uploads older than this (0 = forever). 2160 = 90 days. Env: CHAT_MESSAGE_TTL_HOURS
 
 queue:
   pollInterval: 500    # ms between polls. Env: QUEUE_POLL_INTERVAL
