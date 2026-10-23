@@ -32,6 +32,10 @@ interface BedrudSheetProps {
  * skipping half on the way down, so the spec's "a second drag down dismisses" holds rather than one
  * hard flick closing from full.
  *
+ * `fadeFromIndex={0}` dims the call from half as well as full. vaul otherwise fades the overlay in
+ * only at the last snap point, but the sheet is modal at every height, so a call it blocks should
+ * look blocked — and Android's M3 scrim shows at the partial height too.
+ *
  * The height is set rather than capped. vaul reads its fractional snap points against the content's
  * own height, so a sheet that is only as tall as its content makes "half" half of that content and
  * leaves the rest translated off the bottom of the screen. Setting the height makes the fractions
@@ -54,6 +58,7 @@ export function BedrudSheet({
       activeSnapPoint={activeSnapPoint}
       setActiveSnapPoint={onSnapPointChange}
       snapToSequentialPoint
+      fadeFromIndex={0}
       dismissible
       modal
     >
@@ -67,7 +72,6 @@ export function BedrudSheet({
           <Drawer.Title className="sr-only">{label}</Drawer.Title>
           <BedrudSheetHandle
             label={`Resize ${label}`}
-            preventCycle
             onClick={() => onSnapPointChange(snapPointOnHandleTap(activeSnapPoint, SHEET_SNAP_POINTS))}
           />
           {/*

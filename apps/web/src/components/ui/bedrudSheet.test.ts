@@ -36,6 +36,11 @@ describe('BedrudSheet', () => {
   it('should not introduce a breakpoint other than the shared one', () => {
     expect(sheetSource).not.toMatch(/(^|[\s"'`])(max-)?(sm|md):/)
   })
+
+  it('should dim the call from the first snap point, as the Android scrim does', () => {
+    // vaul fades the overlay in only from `fadeFromIndex`, which defaults to the last snap point.
+    expect(sheetSource).toContain('fadeFromIndex={0}')
+  })
 })
 
 describe('BedrudSheetHandle', () => {
@@ -49,6 +54,18 @@ describe('BedrudSheetHandle', () => {
     expect(handleSource).toMatch(/\bh-12\b/)
   })
 
+  it("should win the target's size over vaul's injected handle style", () => {
+    // vaul's `[data-vaul-handle]` rule is unlayered, so it beats Tailwind's layered utilities.
+    expect(handleSource).toContain('!h-12')
+    expect(handleSource).toContain('!w-full')
+  })
+
+  it("should clear vaul's own drawn handle, so only the pill shows", () => {
+    expect(handleSource).toContain('!bg-transparent')
+    expect(handleSource).toContain('!opacity-100')
+    expect(handleSource).toContain('!rounded-none')
+  })
+
   it("should be vaul's own handle, so the tap and the drag stay with vaul", () => {
     expect(handleSource).toContain('Drawer.Handle')
   })
@@ -57,8 +74,18 @@ describe('BedrudSheetHandle', () => {
     expect(handleSource).toContain('aria-label={label}')
   })
 
-  it('should let a sheet with one height opt out of cycling', () => {
-    expect(handleSource).toContain('preventCycle')
+  it('should ignore the click that ends a drag, so a drag released on the handle does not also step', () => {
+    expect(handleSource).toContain('isHandleTap(')
+  })
+
+  it("should record the press without replacing vaul's own pointerdown handler", () => {
+    expect(handleSource).toContain('onPointerDownCapture')
+    expect(handleSource).not.toMatch(/\bonPointerDown=/)
+  })
+
+  it("should drop vaul's preventCycle, which the handle's own tap already replaces", () => {
+    expect(handleSource).not.toContain('preventCycle')
+    expect(sheetSource).not.toContain('preventCycle')
   })
 })
 
