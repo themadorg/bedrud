@@ -22,6 +22,7 @@ import type { CSSProperties } from 'react'
 import { useEffect, useState } from 'react'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { toast } from 'sonner'
+import { AdminUserWelcomeSound } from '#/components/admin/AdminUserWelcomeSound'
 import { ProviderBadge } from '#/components/admin/ProviderBadge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
@@ -78,6 +79,7 @@ interface UserDetail {
   isActive: boolean
   accesses: string[] | null
   createdAt: string
+  welcomeSoundUrl?: string
 }
 
 interface Room {
@@ -488,6 +490,8 @@ function UserDetailPage() {
               </div>
             </div>
           </div>
+
+          <AdminUserWelcomeSound userId={user.id} welcomeSoundUrl={user.welcomeSoundUrl} readOnly={isReadOnly} />
 
           {/* ── Stats row ──────────────────────────────────── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
