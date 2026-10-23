@@ -20,7 +20,7 @@ import {
 import { meetingDebugLog } from '#/lib/meeting-debug-log'
 import { useProfileSyncStore } from '#/lib/profile-sync.store'
 import { getPublicSettings } from '#/lib/use-public-settings'
-import { type User, useUserStore } from '#/lib/user.store'
+import { type ServerUser, toUser, useUserStore } from '#/lib/user.store'
 import {
   applyChatChunkPart,
   assembledChatFromChunks,
@@ -349,28 +349,6 @@ function metadataHasAvatarKey(metadata?: string): boolean {
   }
 }
 
-interface MeResponse {
-  id: string
-  name: string
-  email: string
-  provider: string
-  accesses: string[] | null
-  avatarUrl?: string
-}
-
-function mapMeToUser(me: MeResponse): User {
-  return {
-    id: me.id,
-    email: me.email,
-    name: me.name,
-    provider: me.provider,
-    isSuperAdmin: me.accesses?.includes('superadmin') ?? false,
-    isAdmin: (me.accesses?.includes('admin') || me.accesses?.includes('superadmin')) ?? false,
-    accesses: me.accesses ?? [],
-    avatarUrl: me.avatarUrl,
-  }
-}
-
 function patchLocalParticipantMetadata(
   room: Room,
   participant: { metadata?: string; setMetadata: (data: string) => Promise<void> },
@@ -577,8 +555,8 @@ export function MeetingProvider({
 
     if (accessToken && !localIdentity.startsWith('guest-')) {
       try {
-        const me = await api.get<MeResponse>('/api/auth/me')
-        setUser(mapMeToUser(me))
+        const me = await api.get<ServerUser>('/api/auth/me')
+        setUser(toUser(me))
         const serverName = me.name?.trim()
         const serverAvatar = me.avatarUrl?.trim() || undefined
         if (serverName) {

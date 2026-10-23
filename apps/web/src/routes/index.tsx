@@ -6,8 +6,7 @@ import { useAuthStore } from '#/lib/auth.store'
 import { formatJoinRoomError } from '#/lib/errors'
 import { isGuestToken } from '#/lib/jwt-user'
 import { type RecentRoom, useRecentRoomsStore } from '#/lib/recent-rooms.store'
-import type { User } from '#/lib/user.store'
-import { isGuestUser, useUserStore } from '#/lib/user.store'
+import { isGuestUser, type ServerUser, toUser, useUserStore } from '#/lib/user.store'
 import { cn } from '#/lib/utils'
 import { BedrudLogo } from '@/components/BedrudLogo'
 import { HomeSettingsDialog } from '@/components/settings/HomeSettingsDialog'
@@ -25,17 +24,7 @@ async function loadUserIfNeeded() {
   if (typeof window === 'undefined') return
   if (!useAuthStore.getState().tokens) return
   if (useUserStore.getState().user) return
-  const u = await api.get<User & { accesses?: string[] }>('/api/auth/me')
-  useUserStore.getState().setUser({
-    id: u.id,
-    email: u.email,
-    name: u.name,
-    provider: u.provider,
-    isSuperAdmin: u.accesses?.includes('superadmin') ?? false,
-    isAdmin: (u.accesses?.includes('admin') || u.accesses?.includes('superadmin')) ?? false,
-    accesses: u.accesses ?? [],
-    avatarUrl: u.avatarUrl,
-  })
+  useUserStore.getState().setUser(toUser(await api.get<ServerUser>('/api/auth/me')))
 }
 
 export const Route = createFileRoute('/')({

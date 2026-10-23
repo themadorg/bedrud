@@ -9,6 +9,42 @@ export interface User {
   isAdmin: boolean
   accesses: string[] | null
   avatarUrl?: string
+  passwordChangedAt?: string | null
+}
+
+/** The user as `/api/auth/me` and the sign-in responses send it. */
+export interface ServerUser {
+  id: string
+  email: string
+  name: string
+  provider: string
+  accesses: string[] | null
+  avatarUrl?: string
+  passwordChangedAt?: string | null
+}
+
+export function toUser(serverUser: ServerUser): User {
+  return {
+    id: serverUser.id,
+    email: serverUser.email,
+    name: serverUser.name,
+    provider: serverUser.provider,
+    isSuperAdmin: serverUser.accesses?.includes('superadmin') ?? false,
+    isAdmin: (serverUser.accesses?.includes('admin') || serverUser.accesses?.includes('superadmin')) ?? false,
+    accesses: serverUser.accesses ?? [],
+    avatarUrl: serverUser.avatarUrl,
+    passwordChangedAt: serverUser.passwordChangedAt,
+  }
+}
+
+/**
+ * Maps a profile update onto the stored user. The profile endpoints answer without
+ * `passwordChangedAt`, so the stored stamp is kept unless the update carries one.
+ */
+export function applyProfileUpdate(current: User | null, updated: ServerUser): User {
+  const user = toUser(updated)
+  if (updated.passwordChangedAt === undefined && current) user.passwordChangedAt = current.passwordChangedAt
+  return user
 }
 
 export function isGuestUser(user: User | null | undefined): boolean {
