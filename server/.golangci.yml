@@ -52,6 +52,11 @@ linters:
       - linters:
           - all
         path: magefile.go
+      # Repeated literals in tests are fixtures, not constants waiting to be
+      # named; left on, goconst is most of what the job reports.
+      - linters:
+          - goconst
+        path: _test\.go
     paths:
       - third_party$
       - builtin$

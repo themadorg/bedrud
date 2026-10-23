@@ -98,6 +98,7 @@ make build-dist    # Compressed linux/amd64 tarball
 make test-back     # cd server && go test -v -count=1 ./...
 cd server && go vet ./...
 cd server && go build ./...
+cd server && golangci-lint run --new-from-merge-base=origin/master ./...  # v2.14.0, changed lines only
 ```
 
 **Web:**
@@ -125,7 +126,7 @@ cd apps/site && bun run typecheck:astro  # Astro type checking
 cd apps/site && bun run build            # Prod build
 ```
 
-**CI order:** Server: `go vet` → `go build` → `go test -race`. Web: `bun run check` → `bun run test` → `bun run build`. devcli: `go vet` → `go test -race`. Site: `bun run check` → `bun run typecheck:astro` → `bun run build`.
+**CI order:** Server: `go vet` → `go build` → `go test -race`; PRs also run golangci-lint on changed lines (backlog in #151). Web: `bun run check` → `bun run test` → `bun run build`. devcli: `go vet` → `go test -race`. Site: `bun run check` → `bun run typecheck:astro` → `bun run build`.
 
 ---
 
