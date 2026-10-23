@@ -412,6 +412,15 @@ func (h *RoomHandler) CreateRoom(c *fiber.Ctx) error {
 	})
 }
 
+// ensureLiveKitRoom creates the room on LiveKit before a join token is issued.
+// A LiveKit with room.auto_create: false, or one that restarted and forgot its
+// rooms, otherwise rejects the join. CreateRoom is idempotent on LiveKit.
+func (h *RoomHandler) ensureLiveKitRoom(ctx context.Context, room *models.Room) error {
+	ctx = h.withAuth(ctx, &lkauth.VideoGrant{RoomCreate: true})
+	_, err := h.client.CreateRoom(ctx, &livekit.CreateRoomRequest{Name: room.Name, MaxParticipants: uint32(room.MaxParticipants)})
+	return err
+}
+
 // JoinRoom allows an authenticated user to join an existing room.
 // POST /api/room/join
 //
@@ -472,6 +481,12 @@ func (h *RoomHandler) JoinRoom(c *fiber.Ctx) error {
 			}
 			return c.Status(403).JSON(fiber.Map{"error": "This room is private"})
 		}
+	}
+
+	// Before enrollment, so a LiveKit failure leaves no participant row behind.
+	if err := h.ensureLiveKitRoom(c.Context(), room); err != nil {
+		log.Error().Err(err).Str("room", room.Name).Msg("LiveKit CreateRoom on join failed")
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "Media server unavailable"})
 	}
 
 	// Enforce participant limit (atomic capacity check inside transaction)
@@ -662,6 +677,12 @@ func (h *RoomHandler) GuestJoinRoom(c *fiber.Ctx) error {
 	// Enforce ban for returning guests before capacity enrollment.
 	if banned, bErr := h.roomRepo.IsParticipantBanned(room.ID, guestID); bErr == nil && banned {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "you are banned from this room"})
+	}
+
+	// Before enrollment, so a LiveKit failure leaves no participant row behind.
+	if err := h.ensureLiveKitRoom(c.Context(), room); err != nil {
+		log.Error().Err(err).Str("room", room.Name).Msg("LiveKit CreateRoom on guest join failed")
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "Media server unavailable"})
 	}
 
 	// Atomic capacity check + participant tracking — fail closed (no LiveKit token on error).

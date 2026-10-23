@@ -28,7 +28,7 @@ import (
 // used for the control plane), not the application's auth middleware.
 // Events handled:
 //   - participant_left:         marks participant inactive in DB
-//   - room_finished:            marks all room participants + room inactive
+//   - room_finished:            marks all room participants + room inactive (persistent rooms stay active)
 //   - egress_started:           updates recording status to started
 //   - egress_ended:             enqueues process_recording job (or marks failed if egress error)
 type LiveKitWebhookHandler struct {
@@ -219,6 +219,12 @@ func (h *LiveKitWebhookHandler) handleRoomFinished(ctx context.Context, event *l
 	if err := h.roomRepo.RemoveAllParticipants(room.ID); err != nil {
 		log.Error().Err(err).Str("room", roomName).
 			Msg("LiveKit webhook: failed to remove all participants")
+		return
+	}
+
+	// Persistent rooms outlive their calls, matching the scheduler's idle check.
+	if room.Settings.IsPersistent {
+		log.Info().Str("room", roomName).Msg("LiveKit webhook: persistent room kept active on finished")
 		return
 	}
 

@@ -163,6 +163,54 @@ func TestLiveKitWebhook_RoomFinished(t *testing.T) {
 	}
 }
 
+func TestLiveKitWebhook_RoomFinished_PersistentRoom(t *testing.T) {
+	t.Run("should keep a persistent room active and release its participants", func(t *testing.T) {
+		db := testutil.SetupTestDB(t)
+		roomRepo := repository.NewRoomRepository(db)
+
+		db.Create(&models.User{ID: "whp-u1", Email: "whp1@ex.com", Name: "WHP1", Provider: "local", IsActive: true})
+
+		room, _ := roomRepo.CreateRoom("whp-u1", "wh-persistent-room", true, "standard", 0, &models.RoomSettings{IsPersistent: true})
+		_ = roomRepo.AddParticipant(room.ID, "whp-u1")
+
+		event := &livekit.WebhookEvent{
+			Event: "room_finished",
+			Room:  &livekit.Room{Name: "wh-persistent-room"},
+		}
+
+		req := newWebhookRequest(t, whTestAPIKey, whTestAPISecret, event)
+		h := NewLiveKitWebhookHandler(&config.LiveKitConfig{
+			APIKey:    whTestAPIKey,
+			APISecret: whTestAPISecret,
+		}, roomRepo, nil, nil, db)
+
+		app := fiber.New()
+		app.Post("/webhook", h.Handle)
+
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+
+		// The LiveKit room is empty, so stale rows must not keep counting toward capacity.
+		var active []models.RoomParticipant
+		db.Where("room_id = ? AND is_active = ?", room.ID, true).Find(&active)
+		if len(active) != 0 {
+			t.Fatalf("expected 0 active participants, got %d", len(active))
+		}
+
+		var r models.Room
+		db.First(&r, "id = ?", room.ID)
+		if !r.IsActive {
+			t.Fatal("expected persistent room to stay active after room_finished")
+		}
+	})
+}
+
 func TestLiveKitWebhook_UnknownRoom(t *testing.T) {
 	event := &livekit.WebhookEvent{
 		Event: "participant_left",

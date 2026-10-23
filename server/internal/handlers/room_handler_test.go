@@ -752,11 +752,17 @@ func TestAdminMuteParticipant_NotFound(t *testing.T) {
 // and the authenticated user set to the given claims.
 func setupJoinTestApp(t *testing.T, claims *auth.Claims) (*fiber.App, *repository.RoomRepository) {
 	t.Helper()
+	return setupJoinTestAppWithLiveKit(t, claims, testutil.NewMockRoomService())
+}
+
+// setupJoinTestAppWithLiveKit is setupJoinTestApp with a caller-supplied LiveKit
+// room service, so tests can observe or fail the calls the join handlers make.
+func setupJoinTestAppWithLiveKit(t *testing.T, claims *auth.Claims, lkMock *testutil.MockRoomService) (*fiber.App, *repository.RoomRepository) {
+	t.Helper()
 	db := testutil.SetupTestDB(t)
 	roomRepo := repository.NewRoomRepository(db)
 	userRepo := repository.NewUserRepository(db)
 
-	lkMock := testutil.NewMockRoomService()
 	lkCfg := config.LiveKitConfig{
 		Host:      "http://localhost:9999",
 		APIKey:    "test-key",
