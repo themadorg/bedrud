@@ -44,6 +44,8 @@ type UserDetails struct {
 	Accesses        []string `json:"accesses" example:"user,admin"`
 	EmailVerifiedAt *string  `json:"emailVerifiedAt,omitempty" example:"2025-01-01 12:00:00"`
 	CreatedAt       string   `json:"createdAt" example:"2025-01-01 12:00:00"`
+	// WelcomeSoundURL is only filled on the detail view, where an admin can clear it.
+	WelcomeSoundURL string `json:"welcomeSoundUrl,omitempty" example:"/uploads/welcome-sounds/123e4567-e89b-12d3-a456-426614174000.mp3?v=1"`
 }
 
 type UserStatusUpdateRequest struct {
@@ -976,6 +978,7 @@ func (h *UsersHandler) GetUserDetail(c *fiber.Ctx) error {
 			Accesses:        user.Accesses,
 			EmailVerifiedAt: eva,
 			CreatedAt:       user.CreatedAt.Format("2006-01-02 15:04:05"),
+			WelcomeSoundURL: user.WelcomeSoundURL,
 		},
 		"rooms": rooms,
 	})

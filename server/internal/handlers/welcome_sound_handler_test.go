@@ -291,6 +291,27 @@ func TestRoomHandler_GetParticipantProfile_WelcomeSound(t *testing.T) {
 	})
 }
 
+func TestUsersHandler_GetUserDetail_WelcomeSound(t *testing.T) {
+	t.Run("should include the user's welcome sound for moderation", func(t *testing.T) {
+		app, userRepo := setupUsersTestApp(t)
+		const soundURL = "/uploads/welcome-sounds/target-user.mp3?v=1"
+		if err := userRepo.CreateUser(&models.User{ID: "target-user", Email: "target@ex.com", Name: "Target", Provider: "local", IsActive: true, WelcomeSoundURL: soundURL}); err != nil {
+			t.Fatal(err)
+		}
+
+		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/admin/users/target-user", http.NoBody), -1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+
+		user, _ := decodeJSONBody(t, resp)["user"].(map[string]any)
+		if user["welcomeSoundUrl"] != soundURL {
+			t.Fatalf("expected %q, got %v", soundURL, user["welcomeSoundUrl"])
+		}
+	})
+}
+
 func TestUsersHandler_ClearUserWelcomeSound(t *testing.T) {
 	t.Run("should clear another user's welcome sound", func(t *testing.T) {
 		t.Cleanup(storage.SetWelcomeSoundDirForTest(t.TempDir()))

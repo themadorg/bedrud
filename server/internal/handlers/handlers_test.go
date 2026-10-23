@@ -60,6 +60,7 @@ func setupUsersTestApp(t *testing.T) (*fiber.App, *repository.UserRepository) {
 	})
 
 	app.Get("/admin/users", usersHandler.ListUsers)
+	app.Get("/admin/users/:id", usersHandler.GetUserDetail)
 	app.Put("/admin/users/:id/status", usersHandler.UpdateUserStatus)
 	app.Put("/admin/users/:id/accesses", usersHandler.UpdateUserAccesses)
 	app.Delete("/admin/users/:id", usersHandler.DeleteUser)
