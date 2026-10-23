@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { Check, Loader2, Monitor, Video, VideoOff } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import {
   deviceIdToSelectValue,
   readMeetingDeviceId,
@@ -130,6 +130,7 @@ function useCameraPreview(deviceId: string) {
 
 export function VideoSettingsPanel({ tone = 'default', onCameraDeviceChange }: VideoSettingsPanelProps) {
   const meeting = isMeetingTone(tone)
+  const mirrorSwitchId = useId()
   const mirrorWebcam = useVideoPreferencesStore((s) => s.mirrorWebcam)
   const setMirrorWebcam = useVideoPreferencesStore((s) => s.setMirrorWebcam)
   const cameras = useVideoInputDevices()
@@ -265,13 +266,15 @@ export function VideoSettingsPanel({ tone = 'default', onCameraDeviceChange }: V
               )}
             />
             <div className="min-w-0">
-              <p className="text-sm font-medium">Mirror my video</p>
+              <label htmlFor={mirrorSwitchId} className="block text-sm font-medium">
+                Mirror my video
+              </label>
               <p className={cn('text-xs', meeting ? 'text-[var(--meet-fg-muted)]' : 'text-muted-foreground')}>
                 Flip the preview horizontally so it behaves like a mirror
               </p>
             </div>
           </div>
-          <Switch checked={mirrorWebcam} onCheckedChange={setMirrorWebcam} />
+          <Switch id={mirrorSwitchId} checked={mirrorWebcam} onCheckedChange={setMirrorWebcam} />
         </div>
 
         {syncStatus !== 'idle' && (

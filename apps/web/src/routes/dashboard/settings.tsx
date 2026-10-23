@@ -2,6 +2,7 @@ import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from '@tan
 import { Camera, Lock, Mic, User } from 'lucide-react'
 import { useEffect } from 'react'
 import { isMobileViewport } from '#/lib/use-is-mobile'
+import { OpenSourceLicensesLink } from '@/components/settings/OpenSourceLicensesLink'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/dashboard/settings')({
@@ -68,6 +69,10 @@ function SettingsLayout() {
       </nav>
 
       <Outlet />
+
+      <footer>
+        <OpenSourceLicensesLink />
+      </footer>
     </div>
   )
 }

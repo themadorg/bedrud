@@ -5,6 +5,7 @@ import { MobileOnlyGate } from '@/components/dashboard/MobileOnlyGate'
 import { AppearanceSettingsPanel } from '@/components/settings/AppearanceSettingsPanel'
 import { AudioSettingsPanel } from '@/components/settings/AudioSettingsPanel'
 import { ExperimentalSettingsPanel } from '@/components/settings/ExperimentalSettingsPanel'
+import { OpenSourceLicensesLink } from '@/components/settings/OpenSourceLicensesLink'
 import { SecuritySettingsPanel } from '@/components/settings/SecuritySettingsPanel'
 import {
   SETTINGS_SECTIONS,
@@ -80,6 +81,10 @@ function SettingsLayout() {
             <SettingsSectionPanel id={id} />
           </section>
         ))}
+
+        <footer>
+          <OpenSourceLicensesLink />
+        </footer>
       </div>
 
       {/* Renders the matched sub-route so its document title applies; the sub-routes draw nothing. */}

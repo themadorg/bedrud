@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { Check, Loader2, Monitor, Moon, Sun } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useAuthStore } from '#/lib/auth.store'
 import { useInterfacePreferencesStore } from '#/lib/interface-preferences.store'
 import { applyTheme, resolveTheme, type Theme, useThemeStore } from '#/lib/theme.store'
@@ -40,6 +40,7 @@ export function AppearanceSettingsPanel({ tone = 'default' }: { tone?: SettingsP
   const showWelcomeScreen = useInterfacePreferencesStore((s) => s.showWelcomeScreen)
   const setShowWelcomeScreen = useInterfacePreferencesStore((s) => s.setShowWelcomeScreen)
   const [mounted, setMounted] = useState(false)
+  const welcomeScreenSwitchId = useId()
 
   const interfacePrefsRef = useRef({ showWelcomeScreen })
   interfacePrefsRef.current = { showWelcomeScreen }
@@ -118,12 +119,14 @@ export function AppearanceSettingsPanel({ tone = 'default' }: { tone?: SettingsP
 
       <div className={cn('flex items-center justify-between gap-4 border-t px-5 py-4', sectionBorderClass(meeting))}>
         <div className="min-w-0">
-          <p className="text-sm font-medium">Welcome screen</p>
+          <label htmlFor={welcomeScreenSwitchId} className="block text-sm font-medium">
+            Welcome screen
+          </label>
           <p className={cn('mt-0.5 text-xs', meeting ? 'text-[var(--meet-fg-muted)]' : 'text-muted-foreground')}>
             Show camera and microphone setup before joining a meeting
           </p>
         </div>
-        <Switch checked={showWelcomeScreen} onCheckedChange={setShowWelcomeScreen} />
+        <Switch id={welcomeScreenSwitchId} checked={showWelcomeScreen} onCheckedChange={setShowWelcomeScreen} />
       </div>
 
       {syncStatus !== 'idle' && (

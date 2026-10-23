@@ -6,6 +6,7 @@ import { useAuthStore } from '#/lib/auth.store'
 import { formatJoinRoomError } from '#/lib/errors'
 import { isGuestToken } from '#/lib/jwt-user'
 import { type RecentRoom, useRecentRoomsStore } from '#/lib/recent-rooms.store'
+import { timeAgo } from '#/lib/time-ago'
 import type { User } from '#/lib/user.store'
 import { isGuestUser, useUserStore } from '#/lib/user.store'
 import { cn } from '#/lib/utils'
@@ -47,17 +48,6 @@ export const Route = createFileRoute('/')({
   staleTime: Infinity,
   component: HomePage,
 })
-
-function timeAgo(ts: number): string {
-  const diff = Date.now() - ts
-  const mins = Math.floor(diff / 60_000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
 
 function JoinForm() {
   const navigate = useNavigate()

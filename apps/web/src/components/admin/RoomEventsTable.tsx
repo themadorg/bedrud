@@ -1,19 +1,9 @@
 import { DoorOpen, PlusCircle } from 'lucide-react'
+import { timeAgo } from '#/lib/time-ago'
 import type { AdminRoomEvent } from '#/lib/use-admin-overview'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
@@ -114,7 +104,9 @@ export function RoomEventsTable({ events, isLoading }: RoomEventsTableProps) {
                 </TableCell>
                 <TableCell className="px-3 py-2.5">
                   <div className="flex flex-col">
-                    <span className="text-xs tabular-nums text-muted-foreground">{timeAgo(ev.timestamp)}</span>
+                    <span className="text-xs tabular-nums text-muted-foreground">
+                      {timeAgo(Date.parse(ev.timestamp))}
+                    </span>
                     <span className="text-[10px] text-muted-foreground/60">{formatDate(ev.timestamp)}</span>
                   </div>
                 </TableCell>

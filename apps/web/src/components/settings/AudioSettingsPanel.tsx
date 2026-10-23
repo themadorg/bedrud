@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { Brain, Check, Globe, Loader2, Mic, MicOff, Shield, Zap } from 'lucide-react'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { PushToTalkKeyCapture } from '#/components/settings/PushToTalkKeyCapture'
 import {
   type AudioPreferences,
@@ -229,17 +229,26 @@ function ToggleRow({
   title,
   description,
   meeting,
+  controlId,
   children,
 }: {
   title: string
   description: string
   meeting: boolean
+  /** The id of a form control in `children`; its title then labels it, so a click on the title reaches it. */
+  controlId?: string
   children: React.ReactNode
 }) {
   return (
     <div className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
       <div className="min-w-0">
-        <p className="text-xs font-medium">{title}</p>
+        {controlId ? (
+          <label htmlFor={controlId} className="block text-xs font-medium">
+            {title}
+          </label>
+        ) : (
+          <p className="text-xs font-medium">{title}</p>
+        )}
         <p className={cn('mt-0.5 text-[10px]', meeting ? 'text-white/50' : 'text-muted-foreground')}>{description}</p>
       </div>
       {children}
@@ -249,6 +258,7 @@ function ToggleRow({
 
 export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelTone }) {
   const meeting = isMeetingTone(tone)
+  const switchIdPrefix = useId()
   const mode = useAudioPreferencesStore((s) => s.noiseSuppressionMode)
   const echoCancellation = useAudioPreferencesStore((s) => s.echoCancellation)
   const autoGainControl = useAudioPreferencesStore((s) => s.autoGainControl)
@@ -403,12 +413,30 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
           </div>
 
           <div className={cn('divide-y', meeting ? 'divide-white/[0.08]' : undefined)}>
-            <ToggleRow title="Echo cancellation" description="Reduce feedback from speakers" meeting={meeting}>
-              <Switch checked={echoCancellation} onCheckedChange={setEchoCancellation} />
+            <ToggleRow
+              title="Echo cancellation"
+              description="Reduce feedback from speakers"
+              meeting={meeting}
+              controlId={`${switchIdPrefix}-echo-cancellation`}
+            >
+              <Switch
+                id={`${switchIdPrefix}-echo-cancellation`}
+                checked={echoCancellation}
+                onCheckedChange={setEchoCancellation}
+              />
             </ToggleRow>
             {mode === 'browser' && (
-              <ToggleRow title="Auto gain" description="Normalize input volume automatically" meeting={meeting}>
-                <Switch checked={autoGainControl} onCheckedChange={setAutoGainControl} />
+              <ToggleRow
+                title="Auto gain"
+                description="Normalize input volume automatically"
+                meeting={meeting}
+                controlId={`${switchIdPrefix}-auto-gain`}
+              >
+                <Switch
+                  id={`${switchIdPrefix}-auto-gain`}
+                  checked={autoGainControl}
+                  onCheckedChange={setAutoGainControl}
+                />
               </ToggleRow>
             )}
           </div>
@@ -547,10 +575,14 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-5">
-          <div className="flex items-center justify-between gap-4">
+          <label htmlFor={`${switchIdPrefix}-push-to-talk`} className="flex items-center justify-between gap-4">
             <span className="text-xs font-medium">Enable push to talk</span>
-            <Switch checked={pushToTalkEnabled} onCheckedChange={setPushToTalkEnabled} />
-          </div>
+            <Switch
+              id={`${switchIdPrefix}-push-to-talk`}
+              checked={pushToTalkEnabled}
+              onCheckedChange={setPushToTalkEnabled}
+            />
+          </label>
 
           {pushToTalkEnabled ? (
             <div
@@ -599,10 +631,14 @@ export function AudioSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelT
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-5">
-          <div className="flex items-center justify-between gap-4">
+          <label htmlFor={`${switchIdPrefix}-muted-beep`} className="flex items-center justify-between gap-4">
             <span className="text-xs font-medium">Enable reminder</span>
-            <Switch checked={mutedBeepEnabled} onCheckedChange={setMutedBeepEnabled} />
-          </div>
+            <Switch
+              id={`${switchIdPrefix}-muted-beep`}
+              checked={mutedBeepEnabled}
+              onCheckedChange={setMutedBeepEnabled}
+            />
+          </label>
 
           {mutedBeepEnabled && (
             <div className="space-y-2">

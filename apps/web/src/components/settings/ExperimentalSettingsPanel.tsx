@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Check, Film, FlaskConical, Loader2, Package, PenLine } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { useExperimentalPreferencesStore } from '#/lib/experimental-preferences.store'
 import { patchUserPreferences } from '#/lib/user-preferences'
 import { fetchWebxdcConfig } from '@/components/meeting/webxdc/webxdcApi'
@@ -10,6 +10,7 @@ import { isMeetingTone, panelSurfaceClass, type SettingsPanelTone } from './sett
 
 export function ExperimentalSettingsPanel({ tone = 'default' }: { tone?: SettingsPanelTone }) {
   const meeting = isMeetingTone(tone)
+  const switchIdPrefix = useId()
   const whiteboardEnabled = useExperimentalPreferencesStore((s) => s.whiteboardEnabled)
   const youtubeEnabled = useExperimentalPreferencesStore((s) => s.youtubeEnabled)
   const webxdcEnabled = useExperimentalPreferencesStore((s) => s.webxdcEnabled)
@@ -79,13 +80,19 @@ export function ExperimentalSettingsPanel({ tone = 'default' }: { tone?: Setting
         <div className="flex min-w-0 items-start gap-3">
           <PenLine className={cn('mt-0.5 h-4 w-4 shrink-0', meeting ? 'text-white/50' : 'text-muted-foreground')} />
           <div className="min-w-0">
-            <p className="text-sm font-medium">Shared whiteboard</p>
+            <label htmlFor={`${switchIdPrefix}-whiteboard`} className="block text-sm font-medium">
+              Shared whiteboard
+            </label>
             <p className={cn('text-xs', meeting ? 'text-white/50' : 'text-muted-foreground')}>
               Show the whiteboard in meeting controls. You will still be asked to accept before each session.
             </p>
           </div>
         </div>
-        <Switch checked={whiteboardEnabled} onCheckedChange={setWhiteboardEnabled} />
+        <Switch
+          id={`${switchIdPrefix}-whiteboard`}
+          checked={whiteboardEnabled}
+          onCheckedChange={setWhiteboardEnabled}
+        />
       </div>
 
       <div
@@ -94,20 +101,24 @@ export function ExperimentalSettingsPanel({ tone = 'default' }: { tone?: Setting
         <div className="flex min-w-0 items-start gap-3">
           <Film className={cn('mt-0.5 h-4 w-4 shrink-0', meeting ? 'text-white/50' : 'text-muted-foreground')} />
           <div className="min-w-0">
-            <p className="text-sm font-medium">YouTube watch party</p>
+            <label htmlFor={`${switchIdPrefix}-youtube`} className="block text-sm font-medium">
+              YouTube watch party
+            </label>
             <p className={cn('text-xs', meeting ? 'text-white/50' : 'text-muted-foreground')}>
               Share a YouTube video with everyone in the room in sync.
             </p>
           </div>
         </div>
-        <Switch checked={youtubeEnabled} onCheckedChange={setYoutubeEnabled} />
+        <Switch id={`${switchIdPrefix}-youtube`} checked={youtubeEnabled} onCheckedChange={setYoutubeEnabled} />
       </div>
 
       <div className="flex items-center justify-between gap-4 px-5 py-4">
         <div className="flex min-w-0 items-start gap-3">
           <Package className={cn('mt-0.5 h-4 w-4 shrink-0', meeting ? 'text-white/50' : 'text-muted-foreground')} />
           <div className="min-w-0">
-            <p className="text-sm font-medium">WebXDC mini-apps</p>
+            <label htmlFor={`${switchIdPrefix}-webxdc`} className="block text-sm font-medium">
+              WebXDC mini-apps
+            </label>
             <p className={cn('text-xs', meeting ? 'text-white/50' : 'text-muted-foreground')}>
               {serverWebxdc.isLoading
                 ? 'Checking server support…'
@@ -118,6 +129,7 @@ export function ExperimentalSettingsPanel({ tone = 'default' }: { tone?: Setting
           </div>
         </div>
         <Switch
+          id={`${switchIdPrefix}-webxdc`}
           checked={webxdcEnabled && serverWebxdcOn}
           disabled={!serverWebxdcOn}
           onCheckedChange={setWebxdcEnabled}

@@ -1,18 +1,8 @@
 import { DoorOpen, PlusCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import { ScrollArea } from '#/components/ui/scroll-area'
+import { timeAgo } from '#/lib/time-ago'
 import type { RoomEvent } from '#/lib/use-admin-overview'
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
 
 function eventMeta(event: RoomEvent): { icon: React.ElementType; label: string } {
   if (event.type === 'room_created') return { icon: PlusCircle, label: 'Room created' }
@@ -54,7 +44,9 @@ export function AdminRecentEvents({ events }: RecentEventsProps) {
                         </p>
                       )}
                     </div>
-                    <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo(ev.timestamp)}</span>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                      {timeAgo(Date.parse(ev.timestamp))}
+                    </span>
                   </div>
                 )
               })

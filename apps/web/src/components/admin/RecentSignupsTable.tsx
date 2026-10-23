@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback } from '#/components/ui/avatar'
 import { Badge } from '#/components/ui/badge'
+import { timeAgo } from '#/lib/time-ago'
 import type { RecentUser } from '#/lib/use-admin-overview'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -11,17 +12,6 @@ function initials(name: string): string {
     .join('')
     .toUpperCase()
     .slice(0, 2)
-}
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
 }
 
 function formatDate(iso: string): string {
@@ -116,7 +106,7 @@ export function RecentSignupsTable({ users, isLoading }: RecentSignupsTableProps
               </TableCell>
               <TableCell className="px-3 py-2.5">
                 <div className="flex flex-col">
-                  <span className="text-xs tabular-nums text-muted-foreground">{timeAgo(u.createdAt)}</span>
+                  <span className="text-xs tabular-nums text-muted-foreground">{timeAgo(Date.parse(u.createdAt))}</span>
                   <span className="text-[10px] text-muted-foreground/60">{formatDate(u.createdAt)}</span>
                 </div>
               </TableCell>

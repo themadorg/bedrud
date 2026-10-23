@@ -119,6 +119,8 @@ For a compound input (URL prefix + input + button), wrap in a border container a
 
 **No focused gradient borders. No `boxShadow` glow on inputs.**
 
+A switch row's text labels its switch, so a click on the text toggles it and a screen reader names the switch, as on Android. Give the `Switch` an `id` (from `useId()`) and make the row's title a `<label htmlFor>`; a row holding only inline text and the switch can be the `<label>` itself. Biome's `noLabelWithoutControl` does not see a component inside a label, so the `htmlFor` is needed either way. `ToggleRow` in `AudioSettingsPanel.tsx` takes a `controlId` for the same purpose.
+
 ---
 
 ## Navigation (Sidebar)
@@ -222,6 +224,8 @@ Avoid animations in the dashboard. On landing pages, a single subtle keyframe is
 - `@keyframes meet-speak-bar` for meeting waveform animation
 - `@keyframes meet-connecting-spin` for meeting spinner
 - `@keyframes wave` for auth layout waveform
+
+The Android client shows a morphing shape while a screen loads its content (Material 3's expressive loading indicator). The web deliberately keeps spinners and skeleton pulses instead, under the rule above.
 
 ---
 
@@ -342,11 +346,15 @@ menu — add it to `isPhoneOnlyRow` in `meetingOptionRows.ts`, beside the four r
 
 Phone settings live on one scrolling page at `/settings`, one section per panel, each anchored by its route segment so `/settings/audio` and `/settings#audio` reach the same section. The sub-routes carry only their document title. Desktop settings stay at `/dashboard/settings`, and each route redirects the other's visitors. Section headers are `text-xs font-semibold uppercase tracking-wide text-primary`, the web reading of Android's `labelLarge` in the primary colour.
 
+Both settings pages end with `OpenSourceLicensesLink`, the web's reading of Android's "Open-source licenses" row. It opens `/third-party-licenses.txt`, which only the production build writes (`thirdPartyLicenses` in `vite.config.ts`, formatted by `src/lib/third-party-licenses.ts`), so under the dev server the link answers 404. The bundler lists every package in the browser build by itself; what it cannot see is added by hand from `apps/web/licenses/`, exactly as each project publishes its licence. That is the Shabnam font in `public/fonts` and the vendored Excalidraw tree. A new font or vendored tree adds its licence file there.
+
 ## Phone dashboard
 
-`/dashboard` is one list at every width. The quick-join bar is always visible and resolves its field through `parseJoinInput` in `src/lib/join-input.ts`, which accepts a full meeting URL, a bare `/m/` or `/c/` path, or a plain room name, and returns null for anything else. The "New room" button beside it is desktop-only; phones create from the floating button in `MobileBottomNav`.
+`/dashboard` is one list at every width. The quick-join bar is always visible and resolves its field through `parseJoinInput` in `src/lib/join-input.ts`, which accepts a full meeting URL, a bare `/m/` or `/c/` path, or a plain room name, and returns null for anything else. It leads with a link icon, not a magnifier, because it joins the room it names and filters nothing. The "New room" button beside it is desktop-only; phones create from the floating button in `MobileBottomNav`.
 
 Two filter chips, All and My Rooms, replace the tabs the page used to carry. `FilterChip` wears `badgeVariants` so the chip corner stays single-sourced. Under All the list holds server rooms and rooms known only from this device's history, merged and ordered by `mergeDashboardRooms` in `src/lib/dashboard-room-list.ts`; under My Rooms it holds server rooms only. `RoomCard` renders both kinds: a locally known room has no capacity, visibility or capability row, and carries Remove where an owned room carries Settings and Delete.
+
+A server room is dated by its own `lastActivityAt`, which the server stamps on every participant's join, and falls back to this device's visit only when the server reports none or something that does not parse. Local history only knows this device's visits, so a room somebody else used minutes ago would otherwise sit below one opened here weeks ago. Both chips order by that date, rooms nothing can date last in server order, so the order agrees with the time each card prints. The "time ago" labels on room cards, the home page's recent rooms, the admin tables and chat messages go through `timeAgo` in `src/lib/time-ago.ts`; the admin queue's oldest-job age counts seconds and keeps its own label.
 
 The admin tree has no phone layout, so `MobileBottomNav` deliberately has no Admin tab even though the Android client shows one.
 
