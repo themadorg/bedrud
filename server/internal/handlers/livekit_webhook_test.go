@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/livekit/protocol/auth"
 	"github.com/livekit/protocol/livekit"
+	"github.com/livekit/protocol/utils/protojson"
 )
 
 const (
@@ -533,7 +533,7 @@ func TestLiveKitWebhook_EgressEnded_Duplicate(t *testing.T) {
 func newWebhookRequest(t *testing.T, apiKey, apiSecret string, event *livekit.WebhookEvent) *http.Request {
 	t.Helper()
 
-	body, err := json.Marshal(event)
+	body, err := protojson.Marshal(event)
 	if err != nil {
 		t.Fatalf("failed to marshal event: %v", err)
 	}
